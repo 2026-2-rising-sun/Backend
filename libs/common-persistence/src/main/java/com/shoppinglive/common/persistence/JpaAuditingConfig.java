@@ -4,9 +4,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 /**
- * Import this from a service configuration once the service has a real DataSource.
- * It is deliberately not auto-configured: enabling JPA auditing in a service without a
- * DataSource would break application startup.
+ * Not auto-configured on purpose: {@code @EnableJpaAuditing} forces early JPA bootstrapping when
+ * it runs from an auto-configuration. Services pull it in with {@code @Import} instead.
  */
 @Configuration
 @EnableJpaAuditing
