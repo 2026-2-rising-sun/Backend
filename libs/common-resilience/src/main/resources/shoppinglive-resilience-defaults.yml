@@ -1,0 +1,32 @@
+# Shared Resilience4j baseline for synchronous service-to-service REST calls.
+# A service imports this with:
+#   spring.config.import: classpath:shoppinglive-resilience-defaults.yml
+# and then declares its instances with `base-config: shoppinglive-default`.
+resilience4j:
+  circuitbreaker:
+    configs:
+      shoppinglive-default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+  retry:
+    configs:
+      shoppinglive-default:
+        max-attempts: 3
+        wait-duration: 200ms
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException
+  timelimiter:
+    configs:
+      shoppinglive-default:
+        timeout-duration: 3s
+        cancel-running-future: true
