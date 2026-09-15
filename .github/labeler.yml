@@ -1,0 +1,46 @@
+service:member:
+  - changed-files:
+      - any-glob-to-any-file: "services/member-service/**"
+
+service:shopping:
+  - changed-files:
+      - any-glob-to-any-file: "services/shopping-service/**"
+
+service:commerce:
+  - changed-files:
+      - any-glob-to-any-file: "services/commerce-service/**"
+
+service:live:
+  - changed-files:
+      - any-glob-to-any-file: "services/live-service/**"
+
+service:notification:
+  - changed-files:
+      - any-glob-to-any-file: "services/notification-service/**"
+
+libs:
+  - changed-files:
+      - any-glob-to-any-file: "libs/**"
+
+contracts:
+  - changed-files:
+      - any-glob-to-any-file: "contracts/**"
+
+build:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "build-logic/**"
+          - "gradle/**"
+          - "**/*.gradle.kts"
+          - "gradlew"
+          - "gradlew.bat"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/README.md"
