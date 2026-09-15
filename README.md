@@ -35,6 +35,14 @@
 | `contracts/api` | OpenAPI 문서 (Gradle 모듈 아님) | |
 | `build-logic` | Gradle 컨벤션 플러그인 (composite build) | |
 
+## API 경로 규칙
+
+컨트롤러 경로는 `/v1/...`부터 시작합니다. **`/api/<service>` prefix를 붙이지 마세요.**
+
+Infra의 k8s Ingress(nginx `rewrite-target`)가 prefix를 벗겨낸 뒤 넘기기 때문입니다.
+외부 요청 `/api/member/v1/users/1` → member-service가 실제로 받는 경로는 `/v1/users/1`입니다.
+같은 이유로 `server.servlet.context-path`도 설정하지 않습니다.
+
 ## 모듈 경계 규칙
 
 서비스는 다른 서비스 모듈을 `project()`로 의존할 수 없습니다. `:contracts:events`와 `:libs:common-*`만
