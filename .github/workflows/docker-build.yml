@@ -7,10 +7,6 @@ on:
       - 'services/**'
       - 'libs/**'
       - 'contracts/**'
-      - 'build-logic/**'
-      - 'gradle/**'
-      - 'gradlew'
-      - '*.gradle.kts'
       - '.dockerignore'
       - '.github/workflows/docker-build.yml'
   workflow_dispatch:
