@@ -22,18 +22,27 @@ logging:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
 
 ---
+# 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
+# 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.
 spring:
   config:
     activate:
       on-profile: local
-# TODO: Infra 레포의 local/docker-compose.yml 확정 후 채운다.
-#  datasource:
-#    url: jdbc:postgresql://localhost:5432/notification
-#    username:
-#    password:
-#  kafka:
-#    bootstrap-servers: localhost:9092
-#  data:
-#    redis:
-#      host: localhost
-#      port: 6379
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/notification
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+  jpa:
+    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
+    hibernate:
+      ddl-auto: none
+  kafka:
+    # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
+    consumer:
+      group-id: notification-service
+      properties:
+        spring.json.trusted.packages: com.shoppinglive.contracts.events
+
+# Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
+# 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
