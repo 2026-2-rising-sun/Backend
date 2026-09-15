@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: member-service
+  config:
+    import: classpath:shoppinglive-resilience-defaults.yml
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+# TODO: Infra 레포의 local/docker-compose.yml 확정 후 채운다.
+#  datasource:
+#    url: jdbc:postgresql://localhost:5432/member
+#    username:
+#    password:
+#  kafka:
+#    bootstrap-servers: localhost:9092
+#  data:
+#    redis:
+#      host: localhost
+#      port: 6379
