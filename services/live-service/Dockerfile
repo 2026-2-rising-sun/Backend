@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # build context는 레포 루트다: docker build -f services/live-service/Dockerfile .
 FROM eclipse-temurin:21-jdk AS build
 
@@ -5,7 +6,8 @@ WORKDIR /workspace
 
 COPY gradlew ./
 COPY gradle gradle
-RUN chmod +x gradlew && ./gradlew --no-daemon --version
+RUN --mount=type=cache,target=/root/.gradle \
+    chmod +x gradlew && ./gradlew --no-daemon --version
 
 COPY settings.gradle.kts build.gradle.kts ./
 COPY build-logic build-logic
@@ -22,12 +24,21 @@ COPY services/shopping-service/build.gradle.kts services/shopping-service/
 COPY services/commerce-service/build.gradle.kts services/commerce-service/
 COPY services/live-service/build.gradle.kts services/live-service/
 COPY services/notification-service/build.gradle.kts services/notification-service/
-RUN ./gradlew --no-daemon :services:live-service:dependencies --configuration runtimeClasspath
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew --no-daemon :services:live-service:dependencies --configuration runtimeClasspath
 
-COPY contracts contracts
-COPY libs libs
+# live-service가 실제로 의존하는 모듈 소스만 복사한다(common-security 등 의존하지 않는
+# 모듈은 build.gradle.kts만 있으면 되고 전체 소스가 필요 없다). 이렇게 하면 이 서비스가 안 쓰는
+# 모듈이 바뀌었을 때 이 레이어의 캐시가 불필요하게 깨지지 않는다.
+COPY contracts/events contracts/events
+COPY libs/common-core libs/common-core
+COPY libs/common-web libs/common-web
+COPY libs/common-persistence libs/common-persistence
+COPY libs/common-resilience libs/common-resilience
+COPY libs/common-kafka libs/common-kafka
 COPY services/live-service services/live-service
-RUN ./gradlew --no-daemon :services:live-service:bootJar
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew --no-daemon :services:live-service:bootJar
 
 FROM eclipse-temurin:21-jre AS runtime
 
