@@ -20,6 +20,9 @@ commerce:
     # 결제 없이 방치된 주문의 자동 만료 유효시간. 팀 합의 시점에 최종 값 결정.
     expiration:
       duration: PT15M
+  shopping-client:
+    # 개발·통합 테스트 모드. 화요일 페어링에서 HttpShoppingClient 로 교체 시 http 로.
+    mode: stub
 
 management:
   endpoints:
