@@ -25,6 +25,7 @@ postgresql = { module = "org.postgresql:postgresql" }
 h2 = { module = "com.h2database:h2" }
 flyway-core = { module = "org.flywaydb:flyway-core" }
 flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 
 resilience4j-spring-boot3 = { module = "io.github.resilience4j:resilience4j-spring-boot3", version.ref = "resilience4j" }
 
