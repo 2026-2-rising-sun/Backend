@@ -57,4 +57,17 @@ public class SalesController {
         SalesStock updated = salesService.adjustAvailable(id, request.delta());
         return SalesStockResponse.from(updated);
     }
+
+    /**
+     * 판매 상태를 변경한다 (판매 4).
+     *
+     * <p>관리자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은
+     * 400, 조회 실패는 404, 동시 변경 감지는 409.
+     */
+    @PatchMapping("/{id}/status")
+    public SalesResponse changeStatus(
+        @PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request) {
+        Sales updated = salesService.changeStatus(id, request.status());
+        return SalesResponse.from(updated);
+    }
 }

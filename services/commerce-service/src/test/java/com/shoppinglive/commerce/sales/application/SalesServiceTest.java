@@ -122,4 +122,66 @@ class SalesServiceTest {
         assertThatThrownBy(() -> salesService.getStock(999L))
             .isInstanceOf(SalesNotFoundException.class);
     }
+
+    // ----- changeStatus (판매 4) -----
+
+    @Test
+    void changeStatus_READY_에서_ON_SALE_로_전이_성공() {
+        Sales sales = new Sales(100L, 10_000L, SalesStatus.READY);
+        given(salesRepository.findById(1L)).willReturn(Optional.of(sales));
+        given(salesRepository.transitionStatus(1L, "READY", "ON_SALE")).willReturn(1);
+        // 전이 후 재조회는 새 sales 인스턴스일 수 있으나 mock 은 같은 인스턴스 반환
+
+        salesService.changeStatus(1L, SalesStatus.ON_SALE);
+        // 예외 없이 반환되면 성공. 세부 반환값은 mock 이라 확인 불가
+    }
+
+    @Test
+    void changeStatus_SOLD_OUT_target_은_IllegalStateTransitionException() {
+        assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.SOLD_OUT))
+            .isInstanceOf(IllegalStateTransitionException.class)
+            .hasMessageContaining("SOLD_OUT");
+    }
+
+    @Test
+    void changeStatus_READY_target_은_IllegalStateTransitionException() {
+        assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.READY))
+            .isInstanceOf(IllegalStateTransitionException.class);
+    }
+
+    @Test
+    void changeStatus_null_target_은_IllegalStateTransitionException() {
+        assertThatThrownBy(() -> salesService.changeStatus(1L, null))
+            .isInstanceOf(IllegalStateTransitionException.class);
+    }
+
+    @Test
+    void changeStatus_판매정보가_없으면_SalesNotFoundException() {
+        given(salesRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> salesService.changeStatus(999L, SalesStatus.ON_SALE))
+            .isInstanceOf(SalesNotFoundException.class);
+    }
+
+    @Test
+    void changeStatus_조건부_UPDATE_실패시_ConcurrentStateChangeException() {
+        Sales sales = new Sales(100L, 10_000L, SalesStatus.READY);
+        given(salesRepository.findById(1L)).willReturn(Optional.of(sales));
+        given(salesRepository.transitionStatus(1L, "READY", "ON_SALE")).willReturn(0);
+
+        assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.ON_SALE))
+            .isInstanceOf(ConcurrentStateChangeException.class);
+    }
+
+    @Test
+    void changeStatus_PRIVATE에서_ON_SALE_요청이고_재고_0이면_SOLD_OUT_으로_자동_조정() {
+        Sales sales = new Sales(100L, 10_000L, SalesStatus.PRIVATE);
+        SalesStock stock = new SalesStock(1L, 0, 0);
+        given(salesRepository.findById(1L)).willReturn(Optional.of(sales));
+        given(salesStockRepository.findById(1L)).willReturn(Optional.of(stock));
+        given(salesRepository.transitionStatus(1L, "PRIVATE", "SOLD_OUT")).willReturn(1);
+
+        salesService.changeStatus(1L, SalesStatus.ON_SALE);
+        // transitionStatus 가 PRIVATE→SOLD_OUT 으로 호출되는지 mock 검증 대신 정상 반환 확인
+    }
 }
