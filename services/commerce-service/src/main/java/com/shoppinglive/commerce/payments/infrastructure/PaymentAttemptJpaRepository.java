@@ -1,6 +1,10 @@
 package com.shoppinglive.commerce.payments.infrastructure;
 
 import com.shoppinglive.commerce.payments.domain.PaymentAttempt;
+import com.shoppinglive.commerce.payments.domain.PaymentStatus;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -8,18 +12,21 @@ import org.springframework.data.repository.query.Param;
 
 /**
  * 결제 시도 JPA 리포지토리.
- *
- * <p>기본 CRUD + 조건부 UPDATE. Reconciler 스캔 쿼리는 결제 3 이슈에서 추가.
  */
 public interface PaymentAttemptJpaRepository extends JpaRepository<PaymentAttempt, Long> {
 
     /**
-     * PROCESSING · resolved_at IS NULL 인 결제 시도의 status 를 {@code outcome} 으로 확정한다.
+     * Reconciler 스캔용 (결제 3). status = PROCESSING · scheduled_resolve_at 이 기준 시각 이전.
+     */
+    List<PaymentAttempt> findByStatusAndScheduledResolveAtBefore(
+        PaymentStatus status, Instant boundary, Limit limit);
+
+    /**
+     * PROCESSING · resolved_at IS NULL 인 결제 시도의 status 를 확정한다.
      *
-     * <p>Mock 엔진(결제 2)과 Reconciler(결제 3) 두 경로에서 동시 호출되어도 이 조건부 UPDATE
-     * 로 하나만 성공. affected rows > 0 일 때만 후속 처리 (Order 전이 · 재고 처리) 트리거.
+     * <p>Mock 엔진 · Reconciler 두 경로에서 동시 호출되어도 조건부 UPDATE 로 하나만 성공.
      *
-     * @return 0 이면 이미 다른 흐름에서 확정됨 (idempotent no-op), 1 이면 성공
+     * @return 0 이면 이미 확정됨, 1 이면 성공
      */
     @Modifying(clearAutomatically = true)
     @Query(

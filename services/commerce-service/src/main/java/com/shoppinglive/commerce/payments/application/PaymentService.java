@@ -16,9 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 결제 도메인 유스케이스 서비스.
- *
- * <p>결제 1 (시작) · 결제 2 (결과 확정 + Order 전이 + 재고 처리) 구현. 지연 재확인 (결제 3) 은
- * 후속 이슈.
  */
 @Service
 public class PaymentService {
@@ -64,24 +61,13 @@ public class PaymentService {
         PaymentAttempt saved = paymentAttemptRepository
             .save(new PaymentAttempt(order.getId(), effectiveScenario, Instant.now()));
 
-        // 트랜잭션 커밋 후에 Mock 엔진이 확정 호출을 하도록 커밋 전에 예약. 커밋 실패 시에도
-        // 엔진은 attemptId 로만 조회하므로 조회 실패 → no-op.
         mockPaymentEngine.schedule(saved.getId(), effectiveScenario);
 
         return saved;
     }
 
     /**
-     * 결제 결과를 확정한다 (결제 2). Mock 엔진 또는 Reconciler 가 호출.
-     *
-     * <p>흐름:
-     * <ol>
-     *   <li>PaymentAttempt 조회. 이미 terminal 상태면 no-op (idempotent)</li>
-     *   <li>시나리오의 outcome (SUCCESS/FAILED) 을 조건부 UPDATE 로 확정. 실패 시 이미 다른
-     *       경로가 확정한 것이므로 no-op</li>
-     *   <li>SUCCESS: Order PAYMENT_CONFIRMING → PAID, 재고 consumeReserved
-     *       FAILED: Order PAYMENT_CONFIRMING → FAILED, 재고 restoreReserved</li>
-     * </ol>
+     * 결제 결과를 확정한다 (결제 2). Mock 엔진 또는 Reconciler 가 호출. Idempotent.
      */
     @Transactional
     public void resolvePayment(Long paymentAttemptId) {
@@ -94,7 +80,6 @@ public class PaymentService {
         int updated = paymentAttemptRepository
             .resolveIfProcessing(paymentAttemptId, outcome.name());
         if (updated == 0) {
-            // 이미 다른 흐름 (Reconciler race 등) 이 확정. 후속 처리 스킵
             return;
         }
 
@@ -111,5 +96,22 @@ public class PaymentService {
             orderRepository.transitionStatus(order.getId(), "PAYMENT_CONFIRMING", "FAILED");
             salesStockRepository.restoreReserved(order.getSalesInfoId(), order.getQuantity());
         }
+    }
+
+    /**
+     * 결제 시도를 조회한다 (결제 3).
+     *
+     * <p>주문 비밀번호 검증 + 결제 시도가 해당 주문 소속인지 검증. 두 조건 실패 모두 404 로
+     * 통합 (leak 방지).
+     */
+    @Transactional(readOnly = true)
+    public PaymentAttempt getPayment(String orderNumber, String rawPassword, Long paymentId) {
+        Order order = orderService.findByOrderNumberAndPassword(orderNumber, rawPassword);
+        PaymentAttempt attempt = paymentAttemptRepository.findById(paymentId).orElse(null);
+        if (attempt == null || !attempt.getOrderId().equals(order.getId())) {
+            throw new PaymentNotFoundException(
+                "payment not found: orderNumber=" + orderNumber + ", paymentId=" + paymentId);
+        }
+        return attempt;
     }
 }
