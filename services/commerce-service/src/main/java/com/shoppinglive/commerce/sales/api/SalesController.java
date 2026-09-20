@@ -2,7 +2,9 @@ package com.shoppinglive.commerce.sales.api;
 
 import com.shoppinglive.commerce.sales.application.SalesService;
 import com.shoppinglive.commerce.sales.domain.Sales;
+import com.shoppinglive.commerce.sales.domain.SalesStock;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,18 +28,33 @@ public class SalesController {
     }
 
     /**
-     * 판매정보의 가격을 변경한다.
-     *
-     * @param id 판매정보 식별자
-     * @param request 변경할 가격 (양의 정수 원 단위)
-     * @return 변경 반영된 판매정보 스냅샷
+     * 판매정보의 가격을 변경한다 (판매 2).
      */
     @PatchMapping("/{id}/price")
     public SalesResponse changePrice(
-        @PathVariable Long id,
-        @Valid @RequestBody ChangePriceRequest request
-    ) {
+        @PathVariable Long id, @Valid @RequestBody ChangePriceRequest request) {
         Sales updated = salesService.changePrice(id, request.price());
         return SalesResponse.from(updated);
+    }
+
+    /**
+     * 판매 재고를 조회한다 (판매 3).
+     */
+    @GetMapping("/{id}/stock")
+    public SalesStockResponse getStock(@PathVariable Long id) {
+        SalesStock stock = salesService.getStock(id);
+        return SalesStockResponse.from(stock);
+    }
+
+    /**
+     * 판매 재고 available 을 delta 만큼 조정한다 (판매 3, 관리자 대상).
+     *
+     * <p>delta 양수: 추가. 음수: 감소. 감소 후 available 이 음수가 되면 409 Conflict.
+     */
+    @PatchMapping("/{id}/stock")
+    public SalesStockResponse adjustStock(
+        @PathVariable Long id, @Valid @RequestBody AdjustStockRequest request) {
+        SalesStock updated = salesService.adjustAvailable(id, request.delta());
+        return SalesStockResponse.from(updated);
     }
 }
