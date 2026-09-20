@@ -11,6 +11,7 @@ import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,28 +28,37 @@ public class PaymentService {
     private final PaymentAttemptJpaRepository paymentAttemptRepository;
     private final SalesStockJpaRepository salesStockRepository;
     private final MockPaymentEngine mockPaymentEngine;
+    private final ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
 
     public PaymentService(
         OrderService orderService,
         OrderJpaRepository orderRepository,
         PaymentAttemptJpaRepository paymentAttemptRepository,
         SalesStockJpaRepository salesStockRepository,
-        MockPaymentEngine mockPaymentEngine) {
+        MockPaymentEngine mockPaymentEngine,
+        ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider) {
         this.orderService = orderService;
         this.orderRepository = orderRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.salesStockRepository = salesStockRepository;
         this.mockPaymentEngine = mockPaymentEngine;
+        this.devRegistryProvider = devRegistryProvider;
     }
 
     /**
-     * 결제를 시작한다 (결제 1). Mock 엔진에 결과 확정 예약 걸림.
+     * 결제를 시작한다.
+     *
+     * <p>시나리오 결정 우선순위:
+     * <ol>
+     *   <li>요청 body 에 명시된 scenario</li>
+     *   <li>Dev 레지스트리에 사전 지정된 scenario (결제 4, dev 프로파일만)</li>
+     *   <li>Default: {@link PaymentScenario#INSTANT_SUCCESS}</li>
+     * </ol>
      */
     @Transactional
     public PaymentAttempt startPayment(
         String orderNumber, String rawPassword, PaymentScenario scenario) {
-        PaymentScenario effectiveScenario =
-            scenario != null ? scenario : PaymentScenario.INSTANT_SUCCESS;
+        PaymentScenario effectiveScenario = resolveScenario(orderNumber, scenario);
 
         Order order = orderService.findByOrderNumberAndPassword(orderNumber, rawPassword);
 
@@ -66,8 +76,19 @@ public class PaymentService {
         return saved;
     }
 
+    private PaymentScenario resolveScenario(String orderNumber, PaymentScenario explicit) {
+        if (explicit != null) {
+            return explicit;
+        }
+        DevPaymentScenarioRegistry registry = devRegistryProvider.getIfAvailable();
+        if (registry != null) {
+            return registry.get(orderNumber).orElse(PaymentScenario.INSTANT_SUCCESS);
+        }
+        return PaymentScenario.INSTANT_SUCCESS;
+    }
+
     /**
-     * 결제 결과를 확정한다 (결제 2). Mock 엔진 또는 Reconciler 가 호출. Idempotent.
+     * 결제 결과를 확정한다. Mock 엔진 또는 Reconciler 가 호출. Idempotent.
      */
     @Transactional
     public void resolvePayment(Long paymentAttemptId) {
@@ -100,9 +121,6 @@ public class PaymentService {
 
     /**
      * 결제 시도를 조회한다 (결제 3).
-     *
-     * <p>주문 비밀번호 검증 + 결제 시도가 해당 주문 소속인지 검증. 두 조건 실패 모두 404 로
-     * 통합 (leak 방지).
      */
     @Transactional(readOnly = true)
     public PaymentAttempt getPayment(String orderNumber, String rawPassword, Long paymentId) {
