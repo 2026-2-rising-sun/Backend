@@ -1,6 +1,7 @@
 # context-load 테스트는 Docker 없이 CI에서도 돌아야 하므로 in-memory H2를 쓴다.
-# 스키마는 운영과 같은 Flyway 마이그레이션으로 만들어 SQL 오류를 CI 에서 잡는다
-# (ddl-auto 는 main 설정의 validate 를 그대로 따른다).
+# 이 파일은 테스트 classpath 에서 main 의 application.yml 을 통째로 가린다(병합되지 않음).
+# 그래서 main 과 같아야 하는 설정(Flyway 소유 스키마, ddl-auto validate)도 여기에 다시 적는다.
+# 스키마는 운영과 같은 Flyway 마이그레이션으로 만들어 SQL·매핑 오류를 CI 에서 잡는다.
 # 실제 Postgres 연동 확인은 local 프로필로 기동해서 한다.
 spring:
   datasource:
@@ -8,3 +9,10 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
