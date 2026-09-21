@@ -31,6 +31,9 @@ shopping:
       # 로컬 테스트용 저장소. 기본 위치를 레포 밖에 둬 업로드 이미지가 git 에 추적되지 않게 한다.
       dir: ${SHOPPING_IMAGE_DIR:${user.home}/.shoppinglive/shopping-images}
     public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:http://localhost:8082}
+  # 비어 있으면 CORS 매핑을 만들지 않는다 (local 프로필에서만 개발 프론트 origin 을 기본 허용).
+  cors:
+    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
 
 management:
   endpoints:
@@ -57,6 +60,11 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
+
+# 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
+shopping:
+  cors:
+    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
