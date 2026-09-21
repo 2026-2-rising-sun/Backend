@@ -54,12 +54,15 @@ public class ProductImageService {
         if (!StringUtils.hasText(originalFilename)) {
             return null;
         }
-        String filename = StringUtils.getFilename(StringUtils.cleanPath(originalFilename)).strip();
+        // 제어 문자(NUL 등)는 PostgreSQL 저장을 실패시키므로 지우고, 서로게이트 쌍이 잘리지 않게 코드포인트로 자른다.
+        String filename = StringUtils.getFilename(StringUtils.cleanPath(originalFilename))
+                .replaceAll("\\p{Cntrl}", "").strip();
         if (filename.isEmpty()) {
             return null;
         }
-        return filename.length() > ORIGINAL_FILENAME_MAX_LENGTH
-                ? filename.substring(filename.length() - ORIGINAL_FILENAME_MAX_LENGTH)
+        int codePoints = filename.codePointCount(0, filename.length());
+        return codePoints > ORIGINAL_FILENAME_MAX_LENGTH
+                ? filename.substring(filename.offsetByCodePoints(0, codePoints - ORIGINAL_FILENAME_MAX_LENGTH))
                 : filename;
     }
 }

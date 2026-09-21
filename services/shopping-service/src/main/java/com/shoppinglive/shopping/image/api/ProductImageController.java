@@ -9,13 +9,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 상품 이미지 API. 업로드는 상품 등록·수정 화면에서만 쓰므로 관리용 경로(/v1/admin/**)에 두어
+ * 관리자 인증이 붙을 때 함께 보호되게 한다.
+ */
 @RestController
-@RequestMapping("/v1/product-images")
 public class ProductImageController {
 
     private final ProductImageService productImageService;
@@ -24,7 +26,7 @@ public class ProductImageController {
         this.productImageService = productImageService;
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(path = "/v1/admin/product-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ProductImageUploadResponse>> upload(@RequestPart("file") MultipartFile file) {
         UploadedImage uploaded = productImageService.upload(readBytes(file), file.getContentType(),
                 file.getOriginalFilename());
