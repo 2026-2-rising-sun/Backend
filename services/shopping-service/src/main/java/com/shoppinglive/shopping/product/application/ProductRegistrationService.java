@@ -21,6 +21,7 @@ public class ProductRegistrationService {
     private static final Logger log = LoggerFactory.getLogger(ProductRegistrationService.class);
     private static final int NAME_MAX_LENGTH = 100;
     private static final int DESCRIPTION_MAX_LENGTH = 2000;
+    static final String MAIN_IMAGE_NOT_FOUND = "대표 이미지를 찾을 수 없습니다. 이미지를 다시 업로드해 주세요.";
 
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
@@ -39,8 +40,8 @@ public class ProductRegistrationService {
      * 있으면 예외 후 그 트랜잭션이 rollback-only 가 되어 재조회 결과를 돌려줄 수 없다.
      */
     public Product register(RegisterProductCommand command, String idempotencyKey) {
-        String name = requireText(command.name(), "상품명", NAME_MAX_LENGTH);
-        String description = requireText(command.description(), "상품 설명", DESCRIPTION_MAX_LENGTH);
+        String name = requireName(command.name());
+        String description = requireDescription(command.description());
 
         Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         Optional<Product> existing = productRepository.findByIdempotencyKey(idempotencyKey);
@@ -48,7 +49,7 @@ public class ProductRegistrationService {
             return existing.get();
         }
         if (command.mainImageId() == null || !productImageRepository.existsById(command.mainImageId())) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "대표 이미지를 찾을 수 없습니다. 이미지를 다시 업로드해 주세요.");
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, MAIN_IMAGE_NOT_FOUND);
         }
         try {
             return productRepository.saveAndFlush(new Product(name, description, command.mainImageId(), idempotencyKey));
@@ -61,6 +62,15 @@ public class ProductRegistrationService {
                     })
                     .orElseThrow(() -> e);
         }
+    }
+
+    /** 수정에서도 같은 규칙을 쓴다. */
+    static String requireName(String value) {
+        return requireText(value, "상품명", NAME_MAX_LENGTH);
+    }
+
+    static String requireDescription(String value) {
+        return requireText(value, "상품 설명", DESCRIPTION_MAX_LENGTH);
     }
 
     /** 앞뒤 공백을 제거한 뒤 1~max 자인지 확인한다. */
