@@ -36,12 +36,12 @@ shopping:
     allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
   # Commerce 판매정보 연동. stub | http.
   # Commerce 벌크 API(docs/commerce-sales-bulk-contract.md) 배포 전까지 stub 이 기본값.
-  # base-url 기본값은 로컬에서 따로 띄운 commerce-service(server.port 8083).
+  # base-url 은 프로필별로만 둔다. 기본값을 두면 http 모드에서 base-url 누락 시 기동을 막는 검사가 무력해진다.
+  # timeout·재시도는 공개 목록 한 번의 최악 대기(시도 2회 × (연결 1s + 읽기 1s) + 대기 200ms ≈ 4s)를 기준으로 잡았다.
   sales-client:
     mode: stub
-    base-url: http://localhost:8083
     connect-timeout: 1s
-    read-timeout: 2s
+    read-timeout: 1s
 
 management:
   endpoints:
@@ -69,6 +69,7 @@ resilience4j:
     instances:
       commerceSales:
         base-config: shoppinglive-default
+        max-attempts: 2
         retry-exceptions:
           - java.io.IOException
           - org.springframework.web.client.HttpServerErrorException
@@ -87,9 +88,12 @@ spring:
     password: ${POSTGRES_PASSWORD:changeme}
 
 # 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
+# sales-client.base-url 은 로컬에서 따로 띄운 commerce-service(server.port 8083). mode: http 로 바꿀 때 쓰인다.
 shopping:
   cors:
     allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  sales-client:
+    base-url: http://localhost:8083
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.

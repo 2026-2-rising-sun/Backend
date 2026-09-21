@@ -61,8 +61,10 @@ public class HttpSalesInfoClient implements SalesInfoClient {
             for (CommerceSalesResponse response : fetch(chunk)) {
                 SalesInfo info = toSalesInfo(response);
                 // 요청하지 않은 상품이 섞여 와도 결과는 요청 범위로 제한한다.
-                if (ids.contains(info.productId())) {
-                    found.put(info.productId(), info);
+                if (ids.contains(info.productId()) && found.put(info.productId(), info) != null) {
+                    // 계약상 상품당 판매정보는 1개다. 중복이 오면 어느 값이 맞는지 알 수 없으므로 실패로 본다.
+                    throw new SalesInfoUnavailableException(
+                        "commerce sales response has duplicate productId: " + info.productId());
                 }
             }
         }
