@@ -16,3 +16,13 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 7MB
+
+shopping:
+  image:
+    storage:
+      # 개발자 PC 의 로컬 이미지 폴더를 테스트가 더럽히지 않도록 임시 폴더를 쓴다.
+      dir: ${java.io.tmpdir}/shopping-images-test
