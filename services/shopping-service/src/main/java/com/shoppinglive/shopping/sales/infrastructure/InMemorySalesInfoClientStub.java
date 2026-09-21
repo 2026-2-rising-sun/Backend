@@ -6,6 +6,7 @@ import com.shoppinglive.shopping.sales.domain.SalesInfo;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -23,18 +24,15 @@ public class InMemorySalesInfoClientStub implements SalesInfoClient {
 
     @Override
     public Map<Long, SalesInfo> findByProductIds(Collection<Long> productIds) {
-        if (productIds == null) {
-            throw new IllegalArgumentException("productIds must not be null");
+        Set<Long> ids = ProductIds.distinct(productIds);
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        if (unavailable) {
+            throw new SalesInfoUnavailableException("sales info stub is set to unavailable");
         }
         Map<Long, SalesInfo> found = new HashMap<>();
-        // List.of(..).contains(null) 은 NPE 라 원소를 직접 검사한다.
-        for (Long productId : productIds) {
-            if (productId == null) {
-                throw new IllegalArgumentException("productIds must not contain null");
-            }
-            if (unavailable) {
-                throw new SalesInfoUnavailableException("sales info stub is set to unavailable");
-            }
+        for (Long productId : ids) {
             SalesInfo info = sales.get(productId);
             if (info != null) {
                 found.put(productId, info);
