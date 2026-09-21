@@ -46,6 +46,17 @@ public class PublicProductDetailService {
         return new PublicProductDetail(product, imageUrlResolver.urlOf(product.getMainImageId()), salesInfo, status);
     }
 
+    /**
+     * 주문 화면으로 넘어가기 전 수량 사전 확인. 부작용이 없고 재고를 예약·차감하지 않는다. 최종 가격·재고 검증은
+     * 주문 생성 시 Commerce 가 하므로, 여기서 통과해도 주문이 실패할 수 있다. 공개 여부 규칙은
+     * {@link #getDetail(Long)} 과 같다 (404/503).
+     *
+     * @param quantity 1 이상 (형식 검증은 호출 측 책임)
+     */
+    public PurchaseCheck checkPurchase(Long productId, int quantity) {
+        return PurchaseCheck.of(getDetail(productId), quantity);
+    }
+
     private static BusinessException notFound(Long productId) {
         return new BusinessException(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다: " + productId);
     }
