@@ -3,9 +3,26 @@ spring:
     name: commerce-service
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
+  jpa:
+    # 스키마는 Flyway 가 소유한다. Hibernate 는 엔티티 매핑이 실제 스키마와 맞는지 검증만.
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 server:
   port: 8083
+
+# 애플리케이션 도메인 설정.
+commerce:
+  order:
+    # 결제 없이 방치된 주문의 자동 만료 유효시간. 팀 합의 시점에 최종 값 결정.
+    expiration:
+      duration: PT15M
+  shopping-client:
+    # 개발·통합 테스트 모드. 화요일 페어링에서 HttpShoppingClient 로 교체 시 http 로.
+    mode: stub
 
 management:
   endpoints:
@@ -32,10 +49,6 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/commerce
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
-    hibernate:
-      ddl-auto: none
   kafka:
     # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
     bootstrap-servers: localhost:${KAFKA_PORT:29092}
@@ -60,10 +73,6 @@ spring:
     url: jdbc:postgresql://postgres:5432/commerce
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
-    hibernate:
-      ddl-auto: none
   kafka:
     # 클러스터 안에서는 브로커의 PLAINTEXT 리스너로 바로 붙는다 (local 의 EXTERNAL 29092 아님).
     bootstrap-servers: kafka:9092

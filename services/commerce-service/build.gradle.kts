@@ -11,5 +11,11 @@ dependencies {
     implementation(project(":libs:common-kafka"))
     implementation(project(":contracts:events"))
 
+    implementation(libs.flyway.core)
+    runtimeOnly(libs.flyway.database.postgresql)
+    runtimeOnly(libs.postgresql)
+
+    implementation(libs.spring.security.crypto)
+
     testRuntimeOnly(libs.h2)
 }
