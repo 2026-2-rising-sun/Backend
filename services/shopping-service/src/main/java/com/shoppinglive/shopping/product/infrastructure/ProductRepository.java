@@ -20,10 +20,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     /**
      * {@code (createdAt, id)} 가 주어진 위치보다 앞선(오래된) 구간. offset 대신 키셋으로 넘겨 페이지가 깊어져도
      * 비용이 같고, 조회 사이에 상품이 새로 등록돼도 중복·누락이 없다. createdAt 이 같은 상품은 id 로 순서를 정한다.
+     * 앞의 {@code createdAt <= :createdAt} 은 결과를 바꾸지 않지만, OR 조건만으로는 PostgreSQL 이 인덱스 탐색
+     * 시작점을 잡지 못해 가장 최신 행부터 훑으므로 인덱스 범위를 좁히려고 둔다.
      */
     @Query("""
             select p from Product p
-            where p.createdAt < :createdAt or (p.createdAt = :createdAt and p.id < :id)
+            where p.createdAt <= :createdAt and (p.createdAt < :createdAt or p.id < :id)
             order by p.createdAt desc, p.id desc""")
     List<Product> findLatestBefore(@Param("createdAt") Instant createdAt, @Param("id") Long id, Limit limit);
 }

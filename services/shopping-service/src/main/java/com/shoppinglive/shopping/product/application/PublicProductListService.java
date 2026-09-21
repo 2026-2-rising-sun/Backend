@@ -6,6 +6,7 @@ import com.shoppinglive.shopping.sales.application.SalesInfoClient;
 import com.shoppinglive.shopping.sales.application.SalesInfoUnavailableException;
 import com.shoppinglive.shopping.sales.domain.SalesDisplayStatus;
 import com.shoppinglive.shopping.sales.domain.SalesInfo;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,8 @@ import org.springframework.stereotype.Service;
 public class PublicProductListService {
 
     static final int MAX_BATCHES = 5;
+    /** 판매정보 호출이 느릴 때 한 요청이 오래 붙잡히지 않도록, 첫 구간 이후에는 이 시간을 넘기면 멈추고 커서를 준다. */
+    static final Duration TIME_BUDGET = Duration.ofSeconds(3);
     private static final int MAX_BATCH_SIZE = 100;
 
     private final ProductRepository productRepository;
@@ -57,7 +60,10 @@ public class PublicProductListService {
         boolean sourceExhausted = false;
         boolean batchFullyExamined = true;
 
-        for (int batchCount = 0; batchCount < MAX_BATCHES && entries.size() < size && !sourceExhausted; batchCount++) {
+        long deadline = System.nanoTime() + TIME_BUDGET.toNanos();
+
+        for (int batchCount = 0; batchCount < MAX_BATCHES && entries.size() < size && !sourceExhausted
+                && (batchCount == 0 || System.nanoTime() < deadline); batchCount++) {
             List<Product> batch = fetch(position, batchSize);
             sourceExhausted = batch.size() < batchSize;
             Map<Long, SalesInfo> salesInfos = salesInfoClient.findByProductIds(batch.stream().map(Product::getId).toList());
