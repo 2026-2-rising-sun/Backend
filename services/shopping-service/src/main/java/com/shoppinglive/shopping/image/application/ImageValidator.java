@@ -12,6 +12,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -81,7 +82,8 @@ public class ImageValidator {
      */
     private ValidatedImage decode(ImageFormat format, byte[] content) {
         ImageReader reader = ImageIO.getImageReadersByFormatName(format.extension()).next();
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
+        // 이미 메모리에 있는 바이트라 ImageIO 기본 디스크 캐시(요청마다 임시 파일 생성)를 쓰지 않는다.
+        try (ImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(content))) {
             reader.setInput(input, true, true);
             int width = reader.getWidth(0);
             int height = reader.getHeight(0);

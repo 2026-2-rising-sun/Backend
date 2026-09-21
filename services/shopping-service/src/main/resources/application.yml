@@ -20,6 +20,9 @@ spring:
 
 server:
   port: 8082
+  tomcat:
+    # 업로드 한도를 넘은 요청도 본문을 끝까지 읽어 연결 리셋 대신 400 응답을 돌려준다 (기본 2MB).
+    max-swallow-size: 10MB
 
 # 나머지 한도(max-size, allowed-types, max-width/height)는 ImageStorageProperties 기본값을 쓴다.
 shopping:
