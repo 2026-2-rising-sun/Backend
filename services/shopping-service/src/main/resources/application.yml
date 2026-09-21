@@ -30,6 +30,7 @@ shopping:
     storage:
       # 로컬 테스트용 저장소. 기본 위치를 레포 밖에 둬 업로드 이미지가 git 에 추적되지 않게 한다.
       dir: ${SHOPPING_IMAGE_DIR:${user.home}/.shoppinglive/shopping-images}
+    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:http://localhost:8082}
 
 management:
   endpoints:
@@ -73,3 +74,9 @@ spring:
     url: jdbc:postgresql://postgres:5432/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
+
+# Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
+# 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.
+shopping:
+  image:
+    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:/api/shopping}

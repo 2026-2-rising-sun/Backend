@@ -3,6 +3,7 @@ package com.shoppinglive.shopping.image.api;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.shopping.image.application.ImageFile;
 import com.shoppinglive.shopping.image.application.ImageStorageException;
+import com.shoppinglive.shopping.image.application.ImageUrlResolver;
 import com.shoppinglive.shopping.image.application.ProductImageService;
 import com.shoppinglive.shopping.image.application.UploadedImage;
 import java.io.IOException;
@@ -27,9 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProductImageController {
 
     private final ProductImageService productImageService;
+    private final ImageUrlResolver imageUrlResolver;
 
-    public ProductImageController(ProductImageService productImageService) {
+    public ProductImageController(ProductImageService productImageService, ImageUrlResolver imageUrlResolver) {
         this.productImageService = productImageService;
+        this.imageUrlResolver = imageUrlResolver;
     }
 
     @PostMapping(path = "/v1/admin/product-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -37,7 +40,8 @@ public class ProductImageController {
         UploadedImage uploaded = productImageService.upload(readBytes(file), file.getContentType(),
                 file.getOriginalFilename());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(ProductImageUploadResponse.from(uploaded)));
+                .body(ApiResponse.ok(
+                        ProductImageUploadResponse.of(uploaded, imageUrlResolver.urlOf(uploaded.imageId()))));
     }
 
     /**

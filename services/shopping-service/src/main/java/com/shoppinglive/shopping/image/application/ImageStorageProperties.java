@@ -10,7 +10,8 @@ import org.springframework.util.unit.DataSize;
  * 상품 이미지 저장·검증 설정 ({@code shopping.image.*}).
  *
  * @param allowedTypes 허용 Content-Type. 검증기가 판별하는 JPEG·PNG 안에서만 좁힐 수 있다
- * @param maxWidth     허용 최대 가로 픽셀. 작은 파일이 거대한 비트맵으로 풀리는 압축 폭탄을 막는다
+ * @param maxWidth      허용 최대 가로 픽셀. 작은 파일이 거대한 비트맵으로 풀리는 압축 폭탄을 막는다
+ * @param publicBaseUrl 클라이언트가 이미지를 받을 때 쓰는 이 서비스의 공개 주소 (끝 슬래시 없이)
  */
 @ConfigurationProperties("shopping.image")
 public record ImageStorageProperties(
@@ -18,7 +19,8 @@ public record ImageStorageProperties(
         @DefaultValue("5MB") DataSize maxSize,
         @DefaultValue({"image/jpeg", "image/png"}) List<String> allowedTypes,
         @DefaultValue("8000") int maxWidth,
-        @DefaultValue("8000") int maxHeight) {
+        @DefaultValue("8000") int maxHeight,
+        @DefaultValue("http://localhost:8082") String publicBaseUrl) {
 
     /** 사용자 안내 문구용 용량 표기 (예: 5MB). */
     public String maxSizeLabel() {
