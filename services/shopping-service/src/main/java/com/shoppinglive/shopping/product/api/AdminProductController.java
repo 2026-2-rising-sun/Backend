@@ -3,7 +3,9 @@ package com.shoppinglive.shopping.product.api;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.shopping.image.application.ImageUrlResolver;
 import com.shoppinglive.shopping.product.application.ProductRegistrationService;
+import com.shoppinglive.shopping.product.domain.Product;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,9 +28,11 @@ public class AdminProductController {
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     private final ProductRegistrationService registrationService;
+    private final ImageUrlResolver imageUrlResolver;
 
-    public AdminProductController(ProductRegistrationService registrationService) {
+    public AdminProductController(ProductRegistrationService registrationService, ImageUrlResolver imageUrlResolver) {
         this.registrationService = registrationService;
+        this.imageUrlResolver = imageUrlResolver;
     }
 
     /**
@@ -44,7 +48,8 @@ public class AdminProductController {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
                     IDEMPOTENCY_KEY_HEADER + " 헤더가 필요합니다 (1~" + IDEMPOTENCY_KEY_MAX_LENGTH + "자).");
         }
-        ProductResponse body = ProductResponse.from(registrationService.register(request.toCommand(), idempotencyKey));
+        Product product = registrationService.register(request.toCommand(), idempotencyKey);
+        ProductResponse body = ProductResponse.of(product, imageUrlResolver.urlOf(product.getMainImageId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(body));
     }
 }
