@@ -34,6 +34,10 @@ shopping:
   # 비어 있으면 CORS 매핑을 만들지 않는다 (local 프로필에서만 개발 프론트 origin 을 기본 허용).
   cors:
     allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
+  # Commerce 판매정보 연동. stub | http.
+  # Commerce 벌크 API(docs/commerce-sales-bulk-contract.md) 배포 전까지 stub 이 기본값.
+  sales-client:
+    mode: stub
 
 management:
   endpoints:
