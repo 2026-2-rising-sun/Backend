@@ -15,6 +15,16 @@ import org.springframework.data.repository.query.Param;
 public interface SalesJpaRepository extends JpaRepository<Sales, Long> {
 
     /**
+     * 상품에 이미 판매정보가 등록되어 있는지 확인한다 (판매 1).
+     *
+     * <p>"한 상품의 판매정보는 하나만 관리한다" 는 완료 기준의 선제 검사다. 최종 방어선은
+     * {@code uk_sales_info_product_id} UNIQUE 제약이므로, 이 조회를 통과했더라도 동시 요청이
+     * 겹치면 INSERT 단계에서 제약 위반이 날 수 있다. 서비스 계층은 두 경우를 같은 409 로
+     * 매핑한다.
+     */
+    boolean existsByProductId(Long productId);
+
+    /**
      * 판매 상태를 {@code expectedStatus} 에서 {@code nextStatus} 로 전이한다.
      *
      * <p>{@code WHERE status = :expectedStatus} 조건으로 compare-and-swap 을 표현한다.
