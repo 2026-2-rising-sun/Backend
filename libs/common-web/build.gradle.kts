@@ -8,4 +8,5 @@ dependencies {
     implementation(libs.spring.boot.autoconfigure)
 
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.starter.validation)
 }

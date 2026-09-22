@@ -63,4 +63,12 @@ public interface SalesJpaRepository extends JpaRepository<Sales, Long> {
         @Param("salesId") Long salesId,
         @Param("expectedStatus") String expectedStatus,
         @Param("nextStatus") String nextStatus);
+    /** 복원/보충된 재고가 있는 품절 판매만 재개한다. 관리자 비공개 상태는 보존한다. */
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE sales_info SET status = 'ON_SALE', version = version + 1, "
+        + "updated_at = CURRENT_TIMESTAMP WHERE id = :salesId AND status = 'SOLD_OUT' "
+        + "AND EXISTS (SELECT 1 FROM sales_stock WHERE sales_info_id = :salesId AND available > 0)",
+        nativeQuery = true)
+    int reopenIfStockAvailable(@Param("salesId") Long salesId);
+
 }

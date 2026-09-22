@@ -61,9 +61,20 @@ public class SalesService {
             throw new InsufficientStockException(
                 "cannot adjust stock: id=" + salesId + ", delta=" + delta);
         }
+        salesRepository.reopenIfStockAvailable(salesId);
         return salesStockRepository.findById(salesId).orElseThrow(
             () -> new SalesNotFoundException(
                 "sales stock disappeared after update: id=" + salesId));
+    }
+
+    /** 취소·만료·결제 실패의 재고 복구와 품절 해제를 같은 트랜잭션으로 처리한다. */
+    @Transactional
+    public void restoreReserved(Long salesId, int quantity) {
+        if (salesStockRepository.restoreReserved(salesId, quantity) != 1) {
+            throw new IllegalStateException("stock reserved insufficient for restore: salesId=" + salesId);
+        }
+        // 관리자가 숨긴 PRIVATE와 준비 중 READY는 자동 공개하지 않는다.
+        salesRepository.reopenIfStockAvailable(salesId);
     }
 
     /**
@@ -85,7 +96,7 @@ public class SalesService {
      * <ol>
      *   <li>대상 상태가 관리자 지정 가능한 값인지 검증 (ON_SALE · PRIVATE 만 허용)</li>
      *   <li>현재 상태 로드</li>
-     *   <li>PRIVATE → ON_SALE 요청이고 재고 available == 0 이면 실제 전이 대상을 SOLD_OUT 으로 조정</li>
+     *   <li>ON_SALE 요청은 재고 확인. 재고 0이면 PRIVATE는 SOLD_OUT, SOLD_OUT은 유지하고 나머지는 거절</li>
      *   <li>도메인 전이 규칙 검증 ({@link SalesStatus#canTransitionTo})</li>
      *   <li>조건부 UPDATE 실행. 실패(row 0)면 다른 트랜잭션이 먼저 바꿨다는 뜻</li>
      * </ol>
@@ -109,11 +120,17 @@ public class SalesService {
         SalesStatus current = sales.getStatus();
 
         SalesStatus effectiveTarget = requestedTarget;
-        // PRIVATE 에서 재개 요청인데 재고가 없으면 SOLD_OUT 으로 자동 조정
-        if (current == SalesStatus.PRIVATE && requestedTarget == SalesStatus.ON_SALE) {
+        // PRIVATE 재공개는 기존 계약대로 재고가 없으면 SOLD_OUT으로 표시한다.
+        if (requestedTarget == SalesStatus.ON_SALE) {
             Optional<SalesStock> stock = salesStockRepository.findById(salesId);
             if (stock.isEmpty() || stock.get().getAvailable() == 0) {
-                effectiveTarget = SalesStatus.SOLD_OUT;
+                if (current == SalesStatus.PRIVATE) {
+                    effectiveTarget = SalesStatus.SOLD_OUT;
+                } else if (current == SalesStatus.SOLD_OUT) {
+                    return sales;
+                } else {
+                    throw new InsufficientStockException("판매를 시작할 재고가 없습니다: id=" + salesId);
+                }
             }
         }
 
