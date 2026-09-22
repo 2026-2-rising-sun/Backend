@@ -16,6 +16,7 @@ import com.shoppinglive.live.broadcast.infrastructure.BroadcastProductRepository
 import java.time.Instant;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** stub 은 1=ON_SALE, 2=SOLD_OUT, 3=READY, 4=PRIVATE, 그 밖은 미존재다. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@DisplayName("방송-상품 연결·해제 (판매 상태 제약, 낙관적 잠금, 정렬 압축, 재시도 멱등성)")
 class BroadcastProductLinkTest {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService products;
@@ -49,6 +51,7 @@ class BroadcastProductLinkTest {
         return broadcasts.get(id).getVersion();
     }
 
+    @DisplayName("판매중·품절 상품은 연결할 수 있고 salesId는 productId와 별개로 저장된다")
     @Test
     void onSaleAndSoldOutProductsCanBeLinkedAndSalesIdIsSeparate() {
         final Broadcast broadcast = register("link-ok");
@@ -60,6 +63,7 @@ class BroadcastProductLinkTest {
         assertThat(soldOut.getPosition()).isEqualTo(1);
     }
 
+    @DisplayName("준비중·비공개·존재하지 않는 상품은 연결을 거절한다")
     @Test
     void readyAndPrivateAndMissingProductsAreRejected() {
         final Broadcast broadcast = register("link-reject");
@@ -72,6 +76,7 @@ class BroadcastProductLinkTest {
         assertThat(links.findByBroadcastIdOrderByPositionAsc(broadcast.getId())).isEmpty();
     }
 
+    @DisplayName("이미 연결된 상품을 다시 연결하면 충돌로 거절한다")
     @Test
     void duplicateProductIsConflict() {
         final Broadcast broadcast = register("link-dup");
@@ -80,6 +85,7 @@ class BroadcastProductLinkTest {
             .hasMessageContaining("이미 연결된 상품");
     }
 
+    @DisplayName("낡은 expectedVersion으로 연결하면 충돌로 거절한다")
     @Test
     void staleExpectedVersionIsConflict() {
         final Broadcast broadcast = register("link-version");
@@ -89,6 +95,7 @@ class BroadcastProductLinkTest {
             .hasMessageContaining("다시 조회");
     }
 
+    @DisplayName("상품을 연결하면 방송 version이 올라가 다른 수정과 충돌한다")
     @Test
     void linkingBumpsBroadcastVersionSoOtherEditsCollide() {
         final Broadcast broadcast = register("link-bump");
@@ -97,6 +104,7 @@ class BroadcastProductLinkTest {
         assertThat(versionOf(broadcast.getId())).isGreaterThan(before);
     }
 
+    @DisplayName("종료된 방송에는 상품을 연결할 수 없다")
     @Test
     void endedBroadcastIsReadOnly() {
         final Broadcast broadcast = register("link-ended");
@@ -107,6 +115,7 @@ class BroadcastProductLinkTest {
             .hasMessageContaining("종료된 방송");
     }
 
+    @DisplayName("LIVE 방송은 마지막 남은 연결 상품을 해제할 수 없다")
     @Test
     void liveBroadcastKeepsItsLastProduct() {
         final Broadcast broadcast = register("link-last");
@@ -123,6 +132,7 @@ class BroadcastProductLinkTest {
             .hasMessageContaining("마지막 연결 상품");
     }
 
+    @DisplayName("이미 해제된 연결의 재삭제는 204, 남의 방송 연결 삭제는 404다")
     @Test
     void unlinkingAnAlreadyRemovedLinkSucceedsButAForeignLinkIs404() throws Exception {
         final Broadcast owner = register("unlink-owner");
@@ -143,6 +153,7 @@ class BroadcastProductLinkTest {
             .andExpect(status().isNotFound());
     }
 
+    @DisplayName("연결을 해제하면 남은 상품의 정렬 위치가 앞으로 당겨진다")
     @Test
     void unlinkingCompactsPositions() {
         final Broadcast broadcast = register("unlink-positions");
@@ -157,6 +168,7 @@ class BroadcastProductLinkTest {
             });
     }
 
+    @DisplayName("HTTP 연결은 201을 반환하고 없는 방송은 404를 반환한다")
     @Test
     void httpLinkReturns201AndMissingBroadcastIs404() throws Exception {
         final Broadcast broadcast = register("link-http");
@@ -173,6 +185,7 @@ class BroadcastProductLinkTest {
             .andExpect(status().isNotFound());
     }
 
+    @DisplayName("필수 필드가 빠진 연결 요청은 400을 반환한다")
     @Test
     void httpLinkWithoutRequiredFieldsIs400() throws Exception {
         final Broadcast broadcast = register("link-bad");
@@ -181,6 +194,7 @@ class BroadcastProductLinkTest {
             .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("처음 발급받은 version으로 삭제를 재시도해도 204이고 version은 변하지 않는다")
     @Test
     void retryingDeleteWithTheOriginallyIssuedVersionStillReturns204() throws Exception {
         final Broadcast broadcast = register("unlink-retry");
@@ -205,6 +219,7 @@ class BroadcastProductLinkTest {
         assertThat(versionOf(broadcast.getId())).isEqualTo(afterDelete);
     }
 
+    @DisplayName("종료된 방송은 없는 linkId의 해제도 no-op이 아니라 거절한다")
     @Test
     void endedBroadcastRejectsUnlinkEvenForAMissingLinkId() {
         final Broadcast broadcast = register("unlink-ended-missing");
