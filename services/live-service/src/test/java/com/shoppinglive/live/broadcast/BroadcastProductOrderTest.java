@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@DisplayName("#63 방송 상품 노출 순서 변경")
 class BroadcastProductOrderTest {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService products;
@@ -60,6 +62,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("전체 순열을 뒤바꾸면 노출 순서가 바뀐다")
     void swappingTheWholePermutationReorders() {
         final Broadcast broadcast = register("order-swap");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -69,6 +72,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("LIVE 방송도 노출 순서를 변경할 수 있다")
     void liveBroadcastCanStillBeReordered() {
         final Broadcast broadcast = register("order-live");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -81,6 +85,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("ENDED 방송은 노출 순서를 변경할 수 없다")
     void endedBroadcastCannotBeReordered() {
         final Broadcast broadcast = register("order-ended");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -92,6 +97,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("linkId 누락·중복·타 방송 소속이면 거절되고 기존 순서가 유지된다")
     void missingDuplicateOrForeignLinkIdsAreRejectedAndOrderIsUnchanged() {
         final Broadcast broadcast = register("order-invalid");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -111,6 +117,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("오래된 expectedVersion으로 정렬하면 연결 변경과 충돌해 거절된다")
     void staleExpectedVersionCollidesWithLinkChanges() {
         final Broadcast broadcast = register("order-version");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -120,6 +127,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("정렬은 version을 증가시켜 이후 예전 version으로 한 해제 요청을 실패시킨다")
     void reorderBumpsVersionSoAFollowingUnlinkWithTheOldVersionFails() {
         final Broadcast broadcast = register("order-bump");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -131,6 +139,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("HTTP PUT 정렬은 새 순서를 반환하고 version 누락은 400이다")
     void httpReorderReturnsNewOrderAndRejectsMissingVersion() throws Exception {
         final Broadcast broadcast = register("order-http");
         final List<Long> ids = linkTwo(broadcast.getId());
@@ -146,6 +155,7 @@ class BroadcastProductOrderTest {
     }
 
     @Test
+    @DisplayName("동시 정렬 요청은 하나만 200이고 나머지는 409로 끝난다")
     void concurrentReordersResolveTo200And409() throws Exception {
         final Broadcast broadcast = register("order-concurrent");
         final List<Long> ids = linkTwo(broadcast.getId());
