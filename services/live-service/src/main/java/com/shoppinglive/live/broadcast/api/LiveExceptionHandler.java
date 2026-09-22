@@ -10,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class LiveExceptionHandler {
@@ -46,6 +47,13 @@ public class LiveExceptionHandler {
         MissingServletRequestParameterException e) {
         final String message = e.getParameterName() + " 파라미터는 필수입니다.";
         return toResponse(ErrorCode.INVALID_REQUEST, message);
+    }
+
+    /** 잘못된 상태 필터 등 타입이 맞지 않는 쿼리 파라미터는 400 이다. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
+        MethodArgumentTypeMismatchException e) {
+        return toResponse(ErrorCode.INVALID_REQUEST, e.getName() + " 값이 올바르지 않습니다.");
     }
 
     private ResponseEntity<ApiResponse<Void>> toResponse(final ErrorCode code,
