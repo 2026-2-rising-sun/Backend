@@ -16,6 +16,7 @@ import com.shoppinglive.live.integration.ivs.IvsConfiguration;
 import java.time.Instant;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=true"})
 @AutoConfigureMockMvc
+@DisplayName("방송 시작 (상품 연결 전제, IVS 송출 확인, 멱등성, 외부 장애 구분)")
 class BroadcastStartTest {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
@@ -51,6 +53,7 @@ class BroadcastStartTest {
         return broadcast;
     }
 
+    @DisplayName("품절 상품만 연결돼 있어도 재고를 보지 않으므로 방송을 시작할 수 있다")
     @Test
     void soldOutOnlyBroadcastCanStartBecauseAvailableIsNotChecked() {
         final Broadcast broadcast = readyToStart("start-soldout", 2L);
@@ -59,6 +62,7 @@ class BroadcastStartTest {
         assertThat(started.getStartedAt()).isNotNull();
     }
 
+    @DisplayName("시작을 반복 호출해도 최초 시작 시각이 보존된다")
     @Test
     void repeatedStartPreservesFirstStartedAtWithoutRecheckingExternals() {
         final Broadcast broadcast = readyToStart("start-repeat", 1L);
@@ -68,6 +72,7 @@ class BroadcastStartTest {
             .isEqualTo(first);
     }
 
+    @DisplayName("연결된 상품이 없으면 방송을 시작할 수 없다")
     @Test
     void broadcastWithoutProductsCannotStart() {
         final Broadcast broadcast = register("start-noproducts");
@@ -75,6 +80,7 @@ class BroadcastStartTest {
             .hasMessageContaining("연결된 상품이 없습니다");
     }
 
+    @DisplayName("낡은 version은 충돌, 없는 방송은 404로 거절한다")
     @Test
     void staleVersionIsConflictAndMissingBroadcastIs404() {
         final Broadcast broadcast = readyToStart("start-version", 1L);
@@ -84,6 +90,7 @@ class BroadcastStartTest {
         assertThatThrownBy(() -> start.start(999_999L, 0)).hasMessageContaining("찾을 수 없습니다");
     }
 
+    @DisplayName("종료된 방송은 다시 시작할 수 없다")
     @Test
     void endedBroadcastCannotRestart() {
         final Broadcast broadcast = readyToStart("start-ended", 1L);
@@ -93,6 +100,7 @@ class BroadcastStartTest {
             .hasMessageContaining("다시 시작할 수 없습니다");
     }
 
+    @DisplayName("등록된 재생 URL이 IVS 실제 URL과 다르면 시작을 막는다")
     @Test
     void mismatchedPlaybackUrlBlocksStart() {
         final Broadcast broadcast = broadcasts.register(UUID.randomUUID().toString(),
@@ -104,6 +112,7 @@ class BroadcastStartTest {
             .hasMessageContaining("실제 URL과 다릅니다");
     }
 
+    @DisplayName("HTTP 시작은 LIVE를 반환하고 expectedVersion을 필수로 요구한다")
     @Test
     void httpStartReturnsLiveAndRequiresVersion() throws Exception {
         final Broadcast broadcast = readyToStart("start-http", 1L);
@@ -115,6 +124,7 @@ class BroadcastStartTest {
             .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("처음 발급받은 version으로 시작을 재시도해도 멱등하게 성공한다")
     @Test
     void httpStartRetryWithTheOriginallyIssuedVersionIsIdempotent() throws Exception {
         final Broadcast broadcast = readyToStart("start-retry", 1L);
@@ -136,6 +146,7 @@ class BroadcastStartTest {
         assertThat(broadcasts.get(broadcast.getId()).getStartedAt()).isEqualTo(first);
     }
 
+    @DisplayName("시작은 연결된 상품의 재고를 조회하거나 차감하지 않는다")
     @Test
     void startingDoesNotTouchStockOfTheConnectedSoldOutProduct() {
         // 재고 조회·차감·예약을 하지 않으므로 available 0 인 상품만 연결해도 시작한다.
@@ -147,11 +158,13 @@ class BroadcastStartTest {
     /** 송출 중이 아니면 업무 전이를 허용하지 않는다. */
     @Nested
     @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=false"})
+    @DisplayName("IVS 채널이 송출 중이 아닌 경우")
     class WhenChannelIsNotBroadcasting {
         @Autowired BroadcastService broadcasts;
         @Autowired BroadcastProductService links;
         @Autowired BroadcastStartService start;
 
+        @DisplayName("IVS 채널이 송출 중이 아니면 시작을 거절한다")
         @Test
         void notReadyChannelBlocksStart() {
             final String arn = "arn:aws:ivs:ap-northeast-2:1:channel/notready";
@@ -170,11 +183,13 @@ class BroadcastStartTest {
     @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=true",
         "live.products.mode=disabled"})
     @AutoConfigureMockMvc
+    @DisplayName("Commerce 서비스가 중단된 경우")
     class WhenCommerceIsDown {
         @Autowired BroadcastService broadcasts;
         @Autowired MockMvc mvc;
         @Autowired DataSource dataSource;
 
+        @DisplayName("Commerce 장애로 판매 정보를 못 읽으면 409가 아니라 503을 반환한다")
         @Test
         void salesLookupFailureIs503() throws Exception {
             final String arn = "arn:aws:ivs:ap-northeast-2:1:channel/down";
