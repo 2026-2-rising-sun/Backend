@@ -13,6 +13,7 @@ import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.integration.ivs.IvsConfiguration;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** #61 공개 상세에 #64 의 영상 준비 상태를 연결한다. 업무 상태와 영상 상태는 분리된다. */
 @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=true"})
 @AutoConfigureMockMvc
+@DisplayName("공개 시청 연결 (업무 상태와 영상 준비 상태의 분리)")
 class PublicViewingTest {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
@@ -42,6 +44,7 @@ class PublicViewingTest {
         return start.start(broadcast.getId(), broadcasts.get(broadcast.getId()).getVersion());
     }
 
+    @DisplayName("진행 중 방송 상세는 재생 URL과 READY 영상 상태를 노출한다")
     @Test
     void liveDetailExposesPlaybackUrlAndReadyVideoStatus() throws Exception {
         final Broadcast broadcast = live("viewing-ready");
@@ -54,6 +57,7 @@ class PublicViewingTest {
             .andExpect(jsonPath("$.data.channelArn").doesNotExist());
     }
 
+    @DisplayName("예정 방송 상세는 재생 정보도 영상 상태도 제공하지 않는다")
     @Test
     void preparingDetailHasNoPlaybackAndNoVideoStatus() throws Exception {
         final Broadcast broadcast = register(broadcasts, "viewing-preparing");
@@ -64,6 +68,7 @@ class PublicViewingTest {
             .andExpect(jsonPath("$.data.playbackUrl").doesNotExist());
     }
 
+    @DisplayName("종료된 방송은 채널이 재사용되더라도 재생을 허용하지 않는다")
     @Test
     void endedBroadcastOffersNoPlaybackEvenThoughTheChannelIsReused() throws Exception {
         final Broadcast broadcast = live("viewing-ended");
@@ -81,11 +86,13 @@ class PublicViewingTest {
     @Nested
     @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=false"})
     @AutoConfigureMockMvc
+    @DisplayName("송출자가 일시적으로 끊긴 경우")
     class WhenBroadcasterDisconnects {
         @Autowired BroadcastService broadcasts;
         @Autowired MockMvc mvc;
         @Autowired javax.sql.DataSource dataSource;
 
+        @DisplayName("송출이 끊겨도 업무 상태는 진행이고 영상 상태만 NOT_READY가 된다")
         @Test
         void businessStatusStaysLiveWhileVideoIsNotReady() throws Exception {
             final Broadcast broadcast = register(broadcasts, "viewing-disconnect");
