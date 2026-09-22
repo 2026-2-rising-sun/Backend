@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@DisplayName("방송 등록·수정 (멱등성, 낙관적 잠금, HTTP 계약)")
 class BroadcastRegistrationTest {
     @Autowired BroadcastService service;
     @Autowired BroadcastRepository repository;
@@ -38,6 +40,7 @@ class BroadcastRegistrationTest {
     private final String channelArn = "arn:aws:ivs:ap-northeast-2:123456789012:channel/abc";
     private final String playbackUrl = "https://abc.live-video.net/api/channel.m3u8";
 
+    @DisplayName("유효한 입력으로 등록하면 PREPARING 상태의 방송이 생성된다")
     @Test
     void registrationWithValidInputCreatesBroadcast() {
         final BroadcastInput input = new BroadcastInput("title", past, channelArn, playbackUrl);
@@ -47,6 +50,7 @@ class BroadcastRegistrationTest {
         assertThat(broadcast.getStatus().name()).isEqualTo("PREPARING");
     }
 
+    @DisplayName("과거 시각으로 예약해도 등록이 허용된다")
     @Test
     void pastScheduledAtIsAllowed() {
         final BroadcastInput input = new BroadcastInput("past-scheduled", past, channelArn,
@@ -55,6 +59,7 @@ class BroadcastRegistrationTest {
         assertThat(broadcast.getScheduledAt()).isEqualTo(past);
     }
 
+    @DisplayName("같은 Idempotency-Key로 재요청하면 동일한 방송을 돌려준다")
     @Test
     void idempotencyKeyReturnsIdenticalBroadcastOnRepeatedRequest() {
         final BroadcastInput input = new BroadcastInput("title", past, channelArn, playbackUrl);
@@ -63,6 +68,7 @@ class BroadcastRegistrationTest {
         assertThat(first.getId()).isEqualTo(second.getId());
     }
 
+    @DisplayName("같은 Idempotency-Key에 다른 본문을 보내면 409로 거절한다")
     @Test
     void differentPayloadWithSameKeyThrows409() {
         final BroadcastInput input1 = new BroadcastInput("title1", past, channelArn, playbackUrl);
@@ -72,6 +78,7 @@ class BroadcastRegistrationTest {
             .hasMessageContaining("다른 요청");
     }
 
+    @DisplayName("같은 키로 동시에 등록해도 하나의 방송만 만들어진다")
     @Test
     void concurrentRegistrationWithSameKeyIsIdempotent() throws Exception {
         final BroadcastInput input = new BroadcastInput("title", past, channelArn, playbackUrl);
@@ -89,6 +96,7 @@ class BroadcastRegistrationTest {
         }
     }
 
+    @DisplayName("수정하면 필드가 갱신되고 version이 올라간다")
     @Test
     void editingUpdatesFieldsAndIncreasesVersion() {
         final BroadcastInput input = new BroadcastInput("original", past, channelArn, playbackUrl);
@@ -103,6 +111,7 @@ class BroadcastRegistrationTest {
         assertThat(edited.getVersion()).isGreaterThan(originalVersion);
     }
 
+    @DisplayName("잘못된 version으로 수정하면 409로 거절한다")
     @Test
     void editingWithWrongVersionThrows409() {
         final BroadcastInput input = new BroadcastInput("title", past, channelArn, playbackUrl);
@@ -113,6 +122,7 @@ class BroadcastRegistrationTest {
             patch)).hasMessageContaining("변경되었습니다");
     }
 
+    @DisplayName("Idempotency-Key로 POST하면 방송이 등록된다")
     @Test
     void httpPostWithIdempotencyKeyCreatesRegistration() throws Exception {
         final String body = String.format(
@@ -129,6 +139,7 @@ class BroadcastRegistrationTest {
             .andExpect(jsonPath("$.data.title").value("http-title"));
     }
 
+    @DisplayName("Idempotency-Key 없이 POST하면 400을 반환한다")
     @Test
     void httpPostWithoutIdempotencyKeyReturnsBadRequest() throws Exception {
         final String body = String.format(
@@ -141,6 +152,7 @@ class BroadcastRegistrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("특수문자가 섞인 Idempotency-Key도 허용된다")
     @Test
     void httpPostWithSpecialCharIdempotencyKeyIsAccepted() throws Exception {
         final String body = String.format(
@@ -154,6 +166,7 @@ class BroadcastRegistrationTest {
             .andExpect(status().isCreated());
     }
 
+    @DisplayName("128자를 넘는 Idempotency-Key는 400을 반환한다")
     @Test
     void httpPostWithTooLongIdempotencyKeyReturnsBadRequest() throws Exception {
         final String body = String.format(
@@ -167,6 +180,7 @@ class BroadcastRegistrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("필수 필드가 빠진 POST는 400을 반환한다")
     @Test
     void httpPostWithoutRequiredFieldReturnsBadRequest() throws Exception {
         final String bodyNoTitle = String.format(
@@ -180,6 +194,7 @@ class BroadcastRegistrationTest {
             .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("관리 응답은 IVS 필드를 노출하되 비밀 필드는 숨긴다")
     @Test
     void adminResponseExposesIvsFieldsForOperatorVerification() throws Exception {
         // 관리 응답은 운영자가 채널/재생 URL 일치를 확인해야 하므로 IVS 필드를 포함한다.
@@ -198,6 +213,7 @@ class BroadcastRegistrationTest {
             .andExpect(jsonPath("$.data.fingerprint").doesNotExist());
     }
 
+    @DisplayName("PATCH에서 생략한 필드는 기존 값을 유지한다")
     @Test
     void omittedPatchFieldsKeepCurrentValues() {
         final Broadcast registered = service.register("patch-keep",
@@ -210,6 +226,7 @@ class BroadcastRegistrationTest {
         assertThat(edited.getPlaybackUrl()).isEqualTo(playbackUrl);
     }
 
+    @DisplayName("PATCH로 필드를 명시적 null로 지정하면 거절한다")
     @Test
     void explicitNullPatchFieldIsRejected() {
         final Broadcast registered = service.register("patch-null",
@@ -219,6 +236,7 @@ class BroadcastRegistrationTest {
             .hasMessageContaining("null을 지정할 수 없습니다");
     }
 
+    @DisplayName("IVS 필드는 channelArn과 playbackUrl을 함께 변경해야 한다")
     @Test
     void ivsFieldsMustBePatchedAsAPair() {
         final Broadcast registered = service.register("patch-pair",
@@ -228,6 +246,7 @@ class BroadcastRegistrationTest {
             .hasMessageContaining("함께 변경");
     }
 
+    @DisplayName("version과 함께 PATCH하면 필드가 수정된다")
     @Test
     void httpPatchWithValidInputUpdatesFields() throws Exception {
         final BroadcastInput input = new BroadcastInput("patch-test", past, channelArn,
@@ -249,6 +268,7 @@ class BroadcastRegistrationTest {
             .andExpect(jsonPath("$.data.title").value("patched"));
     }
 
+    @DisplayName("version 파라미터 없이 PATCH하면 400을 반환한다")
     @Test
     void httpPatchWithoutVersionParamReturnsBadRequest() throws Exception {
         final BroadcastInput input = new BroadcastInput("no-version", past, channelArn,

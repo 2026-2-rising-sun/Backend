@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("postgres")
 @EnabledIfEnvironmentVariable(named = "LIVE_PG_TEST", matches = "1")
+@DisplayName("실제 PostgreSQL에서 Flyway 마이그레이션과 DB 불변조건 검증")
 class PostgresMigrationTest {
 
     @Autowired
@@ -32,6 +34,7 @@ class PostgresMigrationTest {
         jdbc.execute("TRUNCATE TABLE broadcast CASCADE");
     }
 
+    @DisplayName("Flyway 마이그레이션이 적용되어 broadcast 테이블이 생성된다")
     @Test
     void migrationIsApplied() {
         final Integer applied = jdbc.queryForObject(
@@ -42,6 +45,7 @@ class PostgresMigrationTest {
             Integer.class)).isEqualTo(1);
     }
 
+    @DisplayName("같은 request_key를 중복 INSERT하면 유니크 제약에 걸린다")
     @Test
     void duplicateIdempotencyKeyViolatesUniqueConstraint() {
         insertBroadcast("dup-key", "arn:aws:ivs:channel/a", "PREPARING");
