@@ -1,0 +1,21 @@
+name: Naming conventions
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  naming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify naming checker
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Check issue or PR naming
+        run: python3 .github/scripts/check_conventions.py
