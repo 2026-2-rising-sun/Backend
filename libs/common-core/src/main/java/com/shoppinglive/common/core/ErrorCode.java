@@ -6,6 +6,7 @@ public enum ErrorCode {
     FORBIDDEN(403, "권한이 없습니다."),
     NOT_FOUND(404, "대상을 찾을 수 없습니다."),
     CONFLICT(409, "요청이 현재 상태와 충돌합니다."),
+    SERVICE_UNAVAILABLE(503, "외부 서비스를 사용할 수 없습니다."),
     INTERNAL_ERROR(500, "서버 내부 오류가 발생했습니다.");
 
     private final int status;
