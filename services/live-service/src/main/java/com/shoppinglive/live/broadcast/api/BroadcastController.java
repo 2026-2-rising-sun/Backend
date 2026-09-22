@@ -2,10 +2,13 @@ package com.shoppinglive.live.broadcast.api;
 
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
+import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
+import org.springframework.data.domain.Page;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,5 +45,18 @@ public class BroadcastController {
         final long version,
         @Valid @RequestBody final BroadcastPatchInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.edit(id, version, input)));
+    }
+
+    @GetMapping
+    public ApiResponse<Page<BroadcastResponse>> list(
+        @RequestParam(required = false) final BroadcastStatus status,
+        @RequestParam(defaultValue = "0") final int page,
+        @RequestParam(defaultValue = "20") final int size) {
+        return ApiResponse.ok(service.list(status, page, size));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<BroadcastResponse> detail(@PathVariable final long id) {
+        return ApiResponse.ok(BroadcastResponse.from(service.get(id)));
     }
 }
