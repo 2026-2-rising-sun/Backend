@@ -4,7 +4,7 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,8 +29,7 @@ public class BroadcastController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<BroadcastResponse> register(
         @RequestHeader("Idempotency-Key")
-        @Pattern(regexp = "[A-Za-z0-9_-]{1,128}",
-            message = "Idempotency-Key는 1~128자의 알파벳, 숫자, -, _ 문자만 허용됩니다.")
+        @Size(min = 1, max = 128, message = "Idempotency-Key는 1~128자여야 합니다.")
         final String key,
         @Valid @RequestBody final BroadcastInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.register(key, input)));

@@ -142,13 +142,26 @@ class BroadcastRegistrationTest {
     }
 
     @Test
-    void httpPostWithInvalidIdempotencyKeyReturnsBadRequest() throws Exception {
+    void httpPostWithSpecialCharIdempotencyKeyIsAccepted() throws Exception {
         final String body = String.format(
             """
-            {"title":"invalid-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
+            {"title":"special-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
         mvc.perform(post("/v1/admin/broadcasts")
             .header("Idempotency-Key", "invalid key!")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void httpPostWithTooLongIdempotencyKeyReturnsBadRequest() throws Exception {
+        final String body = String.format(
+            """
+            {"title":"too-long-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
+            """, past, channelArn, playbackUrl);
+        mvc.perform(post("/v1/admin/broadcasts")
+            .header("Idempotency-Key", "k".repeat(129))
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
             .andExpect(status().isBadRequest());
