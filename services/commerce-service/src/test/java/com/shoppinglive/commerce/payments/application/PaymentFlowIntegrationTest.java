@@ -28,6 +28,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * 결제 시작 → Mock 엔진 → 결과 확정 → DB · 재고 반영까지 e2e.
  *
  * <p>Awaitility 로 async 완료를 폴링. INSTANT · DELAYED · dev 레지스트리 지정 케이스.
+ *
+ * <p><b>대기 시간이 10 초인 이유:</b> 원래 2 초였는데 CI 에서 첫 비동기 결제가 2.2 초 걸려
+ * 빌드가 깨졌다. 스레드풀 생성·JIT 워밍업·첫 DB 쓰기가 한꺼번에 몰리는 클래스의 첫 테스트라
+ * 느린 러너에서는 2 초를 넘길 수 있다. Awaitility 는 조건이 충족되면 즉시 빠져나오므로 상한을
+ * 늘려도 정상 경로는 그대로 빠르다 — 느릴 때 더 기다려줄 뿐이다.
  */
 @SpringBootTest
 class PaymentFlowIntegrationTest {
@@ -87,7 +92,7 @@ class PaymentFlowIntegrationTest {
     void INSTANT_SUCCESS_결제_시작_후_짧게_기다리면_PAID_로_확정_재고_소진() {
         paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_SUCCESS);
 
-        await().atMost(Duration.ofSeconds(2)).pollDelay(Duration.ofMillis(50))
+        await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
                 Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
@@ -102,7 +107,7 @@ class PaymentFlowIntegrationTest {
     void INSTANT_FAIL_이면_FAILED_확정_재고_복구() {
         paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_FAIL);
 
-        await().atMost(Duration.ofSeconds(2)).pollDelay(Duration.ofMillis(50))
+        await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
                 Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
@@ -121,7 +126,7 @@ class PaymentFlowIntegrationTest {
         // 시작 직후: 아직 PAYMENT_CONFIRMING, attempt.status = PROCESSING
         assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
 
-        await().atMost(Duration.ofSeconds(2)).pollDelay(Duration.ofMillis(100))
+        await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(100))
             .untilAsserted(() -> {
                 Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
@@ -134,7 +139,7 @@ class PaymentFlowIntegrationTest {
 
         paymentService.startPayment(orderNumber, "secret", null);
 
-        await().atMost(Duration.ofSeconds(2)).pollDelay(Duration.ofMillis(50))
+        await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
                 Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
@@ -147,7 +152,7 @@ class PaymentFlowIntegrationTest {
 
         paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_SUCCESS);
 
-        await().atMost(Duration.ofSeconds(2)).pollDelay(Duration.ofMillis(50))
+        await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
                 Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
