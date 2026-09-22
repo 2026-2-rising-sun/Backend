@@ -21,6 +21,18 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderNumber(String orderNumber);
 
     /**
+     * 멱등키로 기존 주문을 조회한다 (주문 2).
+     *
+     * <p>클라이언트가 {@code X-Idempotency-Key} 헤더로 같은 값을 재전송했을 때, 새 주문을 만드는
+     * 대신 이미 만들어진 주문을 돌려주기 위해 사용한다. 완료 기준 "동일 주문 반복 요청은 주문
+     * 한 건·재고 차감 한 번만 발생한다" 의 조회 경로다.
+     *
+     * <p>키가 {@code null} 인 요청도 허용하므로 (컬럼 nullable) 호출 전에 null 여부를 먼저
+     * 가려야 한다. Postgres UNIQUE 는 NULL 중복을 허용해 제약으로는 걸러지지 않는다.
+     */
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+
+    /**
      * 만료 대상 조회 (주문 5). status = PENDING_PAYMENT 이고 expires_at 이 기준 시각보다
      * 이전. 스케줄러가 한 번에 처리할 배치 크기는 {@code limit} 로 제한.
      *
