@@ -4,7 +4,10 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -13,6 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -25,12 +29,84 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build
-        run: ./gradlew build --no-daemon
+      - name: Build and run all tests
+        run: ./gradlew build --no-daemon --continue
 
       - name: Upload test reports
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: '**/build/reports/tests/test'
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          retention-days: 7
+
+  postgres:
+    name: PostgreSQL migration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: live_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d live_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Detect Live migration tests
+        id: live-tests
+        shell: bash
+        run: |
+          if [ -d services/live-service/src/main/resources/db/migration ]; then
+            test -f services/live-service/src/test/java/com/shoppinglive/live/broadcast/PostgresMigrationTest.java
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'Live migrations are not present in this PR snapshot.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-java@v5
+        if: steps.live-tests.outputs.present == 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+        if: steps.live-tests.outputs.present == 'true'
+      - name: Verify Live migrations and database constraints
+        if: steps.live-tests.outputs.present == 'true'
+        env:
+          LIVE_PG_TEST: '1'
+          LIVE_PG_PORT: '55432'
+        run: ./gradlew :services:live-service:test --tests '*PostgresMigrationTest' --no-daemon
+      - name: Require executed PostgreSQL tests
+        if: steps.live-tests.outputs.present == 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path('services/live-service/build/test-results/test').glob('TEST-*PostgresMigrationTest.xml'))
+          assert reports, 'PostgreSQL test report is missing'
+          suites = [ET.parse(path).getroot() for path in reports]
+          assert sum(int(suite.get('tests', '0')) for suite in suites) > 0, 'No PostgreSQL tests ran'
+          for suite in suites:
+              assert int(suite.get('skipped', '0')) == 0, 'PostgreSQL tests were skipped'
+              assert int(suite.get('failures', '0')) == 0 and int(suite.get('errors', '0')) == 0
+          PY
+      - name: Upload PostgreSQL test reports
+        if: always() && steps.live-tests.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-test-reports
+          path: |
+            services/live-service/build/reports/tests/
+            services/live-service/build/test-results/
+          retention-days: 7
