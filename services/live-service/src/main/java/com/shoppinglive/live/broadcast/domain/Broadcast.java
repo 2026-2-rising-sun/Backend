@@ -69,6 +69,21 @@ public class Broadcast extends BaseEntity {
         this.playbackUrl = playbackUrl;
     }
 
+    /**
+     * LIVE → ENDED. 반복 종료는 최초 endedAt 을 보존하며 성공하고, 준비 상태 종료는 409 다.
+     * 종료는 주문·결제·재고·송출에 관여하지 않는다.
+     */
+    public void end(final Instant now) {
+        if (status == BroadcastStatus.PREPARING) {
+            throw new BusinessException(ErrorCode.CONFLICT, "준비 상태의 방송은 종료할 수 없습니다.");
+        }
+        if (status == BroadcastStatus.ENDED) {
+            return;
+        }
+        this.status = BroadcastStatus.ENDED;
+        this.endedAt = now;
+    }
+
     public String getFingerprint() {
         return fingerprint;
     }

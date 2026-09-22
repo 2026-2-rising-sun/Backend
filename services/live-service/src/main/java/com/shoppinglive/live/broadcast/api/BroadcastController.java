@@ -47,6 +47,11 @@ public class BroadcastController {
         return ApiResponse.ok(BroadcastResponse.from(service.edit(id, version, input)));
     }
 
+    @PostMapping("/{id}/end")
+    public ApiResponse<BroadcastResponse> end(@PathVariable final long id) {
+        return ApiResponse.ok(BroadcastResponse.from(service.end(id)));
+    }
+
     @GetMapping
     public ApiResponse<Page<BroadcastResponse>> list(
         @RequestParam(required = false) final BroadcastStatus status,

@@ -11,6 +11,7 @@ import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -97,6 +98,16 @@ public class BroadcastService {
             case ENDED -> repository.findAllEnded(pageable);
         };
         return found.map(BroadcastResponse::from);
+    }
+
+    /** 종료는 짧은 트랜잭션의 원자적 상태 전이다. 외부 호출을 하지 않는다. */
+    @Transactional
+    public Broadcast end(final long id) {
+        final Broadcast broadcast = get(id);
+        // DB timestamp 컬럼은 마이크로초 정밀도라, 저장 전에 맞춰 잘라낸다(#65 start()와 동일 이유).
+        broadcast.end(java.time.Instant.now().truncatedTo(ChronoUnit.MICROS));
+        repository.flush();
+        return broadcast;
     }
 
     @Transactional(readOnly = true)
