@@ -12,6 +12,7 @@ import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.application.BroadcastStartService;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
+import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
 import com.shoppinglive.live.integration.ivs.IvsConfiguration;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,6 +20,8 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +37,7 @@ class BroadcastStartTest {
     @Autowired BroadcastStartService start;
     @Autowired MockMvc mvc;
     @Autowired DataSource dataSource;
+    @Autowired BroadcastRepository repository;
 
     /** stub IVS 는 channelArn 에서 시청 URL 을 유도한다. 일치시켜 등록해야 시작할 수 있다. */
     private Broadcast register(final String name) {
@@ -70,6 +74,26 @@ class BroadcastStartTest {
             start.start(broadcast.getId(), versionOf(broadcast.getId())).getStartedAt();
         assertThat(start.start(broadcast.getId(), versionOf(broadcast.getId())).getStartedAt())
             .isEqualTo(first);
+    }
+
+    @DisplayName("나노초 시각도 최초 응답과 DB 재조회·재시도의 시작/종료 시각이 정확히 같다")
+    @ParameterizedTest
+    @ValueSource(strings = {"2026-09-22T09:24:20.123456179Z", "2026-09-22T09:24:20.123456789Z"})
+    void transitionTimestampsKeepDatabasePrecision(final String rawTimestamp) {
+        final Instant timestamp = Instant.parse(rawTimestamp);
+        final Instant persistedPrecision = Instant.parse("2026-09-22T09:24:20.123456Z");
+        final Broadcast broadcast = register("precision-" + UUID.randomUUID());
+        final long initialVersion = broadcast.getVersion();
+        broadcast.start(initialVersion, timestamp);
+        final Broadcast firstStart = repository.saveAndFlush(broadcast);
+        assertThat(firstStart.getStartedAt()).isEqualTo(persistedPrecision);
+        assertThat(start.start(broadcast.getId(), initialVersion).getStartedAt())
+            .isEqualTo(firstStart.getStartedAt());
+
+        firstStart.end(timestamp.plusSeconds(10));
+        final Broadcast firstEnd = repository.saveAndFlush(firstStart);
+        assertThat(firstEnd.getEndedAt()).isEqualTo(persistedPrecision.plusSeconds(10));
+        assertThat(broadcasts.end(broadcast.getId()).getEndedAt()).isEqualTo(firstEnd.getEndedAt());
     }
 
     @DisplayName("연결된 상품이 없으면 방송을 시작할 수 없다")
