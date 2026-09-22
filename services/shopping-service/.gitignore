@@ -1,0 +1,2 @@
+# 로컬 이미지 저장소 기본 위치는 레포 밖(~/.shoppinglive)이다. SHOPPING_IMAGE_DIR 를 ./data/... 로 지정한 경우를 대비해 무시한다.
+data/

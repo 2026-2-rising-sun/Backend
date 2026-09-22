@@ -11,9 +11,25 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # 검증기 한도(shopping.image.max-size, 기본 5MB)보다 조금 크게 둬서 5~6MB 파일은 검증기가
+      # "용량 초과" 안내를 주고, 그보다 큰 요청은 파싱 단계에서 끊는다.
+      max-file-size: 6MB
+      max-request-size: 7MB
 
 server:
   port: 8082
+  tomcat:
+    # 업로드 한도를 넘은 요청도 본문을 끝까지 읽어 연결 리셋 대신 400 응답을 돌려준다 (기본 2MB).
+    max-swallow-size: 10MB
+
+# 나머지 한도(max-size, allowed-types, max-width/height)는 ImageStorageProperties 기본값을 쓴다.
+shopping:
+  image:
+    storage:
+      # 로컬 테스트용 저장소. 기본 위치를 레포 밖에 둬 업로드 이미지가 git 에 추적되지 않게 한다.
+      dir: ${SHOPPING_IMAGE_DIR:${user.home}/.shoppinglive/shopping-images}
 
 management:
   endpoints:

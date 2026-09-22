@@ -46,6 +46,13 @@ RUN groupadd --system spring && useradd --system --gid spring --home-dir /app sp
 WORKDIR /app
 COPY --from=build --chown=spring:spring /workspace/services/shopping-service/build/libs/*.jar app.jar
 
+# 상품 이미지 저장 폴더 (S3 도입 전 로컬 저장소). 컨테이너를 재시작해도 이미지가 지워지면 안 되므로
+# 볼륨으로 선언한다. k8s 에서 이 경로에 PVC 를 마운트하는 것은 Infra 레포 작업이다.
+# 비루트 사용자로 쓰기 위해 USER 전환 전에 소유권을 넘긴다.
+RUN mkdir -p /app/data/images && chown -R spring:spring /app/data
+ENV SHOPPING_IMAGE_DIR=/app/data/images
+VOLUME ["/app/data/images"]
+
 USER spring
 
 # 컨테이너 포트는 5개 서비스 모두 8080으로 통일한다 (application.yml의 서비스별 포트는 로컬 동시 기동용).
