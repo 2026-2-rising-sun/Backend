@@ -14,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 결제 도메인 유스케이스 서비스.
@@ -71,9 +73,44 @@ public class PaymentService {
         PaymentAttempt saved = paymentAttemptRepository
             .save(new PaymentAttempt(order.getId(), effectiveScenario, Instant.now()));
 
-        mockPaymentEngine.schedule(saved.getId(), effectiveScenario);
+        scheduleAfterCommit(saved.getId(), effectiveScenario);
 
         return saved;
+    }
+
+    /**
+     * 결제 처리 예약을 트랜잭션 커밋 이후로 미룬다.
+     *
+     * <p><b>왜 바로 예약하면 안 되는가:</b> 이 메서드를 부르는 {@link #startPayment} 는
+     * {@code @Transactional} 이라 아직 커밋 전이다. {@code INSTANT_*} 시나리오는 지연 없이 다른
+     * 스레드에서 즉시 실행되는데, 그 스레드가 커밋보다 먼저 도착하면 자기 트랜잭션에서
+     * {@code payment_attempt} 를 조회해도 아직 보이지 않는다. {@link #resolvePayment} 는 그때
+     * 조용히 빠져나가므로 로그조차 남지 않고, 결제는 영원히 {@code PROCESSING}, 주문은 영원히
+     * {@code PAYMENT_CONFIRMING} 으로 멈춘다.
+     *
+     * <p>복구 경로도 없다. {@link PaymentDelayReconciler} 는 {@code scheduled_resolve_at} 이
+     * 지난 건만 훑는데 {@code INSTANT_*} 는 그 값이 {@code null} 이고, 주문 만료 스케줄러는
+     * {@code PENDING_PAYMENT} 만 대상으로 하는데 이 주문은 이미 {@code PAYMENT_CONFIRMING} 이다.
+     * 주문과 재고가 영구히 묶이는 셈이라 반드시 커밋 이후에 예약해야 한다.
+     *
+     * <p>덤으로 롤백 시에는 {@code afterCommit} 이 호출되지 않으므로, 존재하지 않는 결제를
+     * 처리하려 드는 일도 사라진다.
+     *
+     * <p>트랜잭션 밖에서 호출된 경우 (단위 테스트 등) 는 미룰 커밋이 없으므로 즉시 예약한다.
+     */
+    private void scheduleAfterCommit(Long paymentAttemptId, PaymentScenario scenario) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            mockPaymentEngine.schedule(paymentAttemptId, scenario);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    mockPaymentEngine.schedule(paymentAttemptId, scenario);
+                }
+            });
     }
 
     private PaymentScenario resolveScenario(String orderNumber, PaymentScenario explicit) {
