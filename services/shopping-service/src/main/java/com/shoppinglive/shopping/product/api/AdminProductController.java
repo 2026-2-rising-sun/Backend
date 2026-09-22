@@ -5,11 +5,14 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.image.application.ImageUrlResolver;
 import com.shoppinglive.shopping.product.application.ProductRegistrationService;
+import com.shoppinglive.shopping.product.application.ProductUpdateService;
 import com.shoppinglive.shopping.product.domain.Product;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -28,10 +31,13 @@ public class AdminProductController {
     private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     private final ProductRegistrationService registrationService;
+    private final ProductUpdateService updateService;
     private final ImageUrlResolver imageUrlResolver;
 
-    public AdminProductController(ProductRegistrationService registrationService, ImageUrlResolver imageUrlResolver) {
+    public AdminProductController(ProductRegistrationService registrationService, ProductUpdateService updateService,
+            ImageUrlResolver imageUrlResolver) {
         this.registrationService = registrationService;
+        this.updateService = updateService;
         this.imageUrlResolver = imageUrlResolver;
     }
 
@@ -49,7 +55,17 @@ public class AdminProductController {
                     IDEMPOTENCY_KEY_HEADER + " 헤더가 필요합니다 (1~" + IDEMPOTENCY_KEY_MAX_LENGTH + "자).");
         }
         Product product = registrationService.register(request.toCommand(), idempotencyKey);
-        ProductResponse body = ProductResponse.of(product, imageUrlResolver.urlOf(product.getMainImageId()));
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(body));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
+    }
+
+    /** 기본정보 부분 수정·대표 이미지 교체. 응답의 version 을 다음 수정 요청에 그대로 보내야 한다. */
+    @PatchMapping("/{productId}")
+    public ApiResponse<ProductResponse> update(@PathVariable Long productId,
+            @Valid @RequestBody UpdateProductRequest request) {
+        return ApiResponse.ok(toResponse(updateService.update(productId, request.toCommand())));
+    }
+
+    private ProductResponse toResponse(Product product) {
+        return ProductResponse.of(product, imageUrlResolver.urlOf(product.getMainImageId()));
     }
 }
