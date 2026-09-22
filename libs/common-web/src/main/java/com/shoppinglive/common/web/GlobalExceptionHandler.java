@@ -6,14 +6,22 @@ import com.shoppinglive.common.core.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(Exception e) {
+        return toResponse(ErrorCode.INVALID_REQUEST, ErrorCode.INVALID_REQUEST.defaultMessage());
+    }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
@@ -32,6 +40,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception e) {
+        if (e instanceof ErrorResponse error && error.getStatusCode().isError()) {
+            ErrorCode code = error.getStatusCode().value() == 404 ? ErrorCode.NOT_FOUND
+                    : error.getStatusCode().is4xxClientError() ? ErrorCode.INVALID_REQUEST
+                    : ErrorCode.INTERNAL_ERROR;
+            if (error.getStatusCode().is5xxServerError()) {
+                log.error("HTTP server exception", e);
+            }
+            return ResponseEntity.status(error.getStatusCode()).headers(error.getHeaders())
+                    .body(ApiResponse.fail(code, code.defaultMessage(), CorrelationId.current()));
+        }
         log.error("unhandled exception", e);
         return toResponse(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage());
     }
