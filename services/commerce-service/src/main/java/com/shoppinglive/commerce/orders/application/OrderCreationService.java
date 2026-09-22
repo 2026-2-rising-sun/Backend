@@ -17,6 +17,7 @@ import com.shoppinglive.common.core.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -117,7 +118,7 @@ public class OrderCreationService {
         // 눌러도 주문이 둘로 늘지 않는다.
         Optional<Order> replay = findByIdempotencyKey(idempotencyKey);
         if (replay.isPresent()) {
-            return OrderCreationResult.replayed(replay.get());
+            return replayMatching(command, replay.get());
         }
 
         // 트랜잭션 밖. 주문에 남길 상품명을 확정하지 못하면 재고를 건드리기 전에 멈춘다.
@@ -135,7 +136,7 @@ public class OrderCreationService {
                 // 두 재전송 중 진 쪽이 여기로 온다.
                 Optional<Order> concurrent = findByIdempotencyKey(idempotencyKey);
                 if (concurrent.isPresent()) {
-                    return OrderCreationResult.replayed(concurrent.get());
+                    return replayMatching(command, concurrent.get());
                 }
                 // 아니면 주문번호 난수가 겹친 것이므로 새 번호로 다시 시도한다.
                 log.warn("order number collision, retrying (attempt {}/{})",
@@ -221,6 +222,21 @@ public class OrderCreationService {
         if (updated > 0) {
             log.info("sales marked SOLD_OUT after order: salesId={}", sales.getId());
         }
+    }
+
+    /** 멱등키만으로 다른 구매자의 주문 결과를 공개하지 않는다. 충돌 경로에도 같은 검증을 쓴다. */
+    private OrderCreationResult replayMatching(CreateOrderCommand command, Order order) {
+        boolean sameProduct = salesRepository.findById(order.getSalesInfoId())
+            .map(sales -> Objects.equals(sales.getProductId(), command.productId())).orElse(false);
+        if (!sameProduct || !Objects.equals(order.getQuantity(), command.quantity())
+            || !Objects.equals(order.getBuyerName(), command.buyerName())
+            || !Objects.equals(order.getBuyerPhone(), command.buyerPhone())
+            || (command.expectedTotalAmount() != null
+                && !Objects.equals(order.getTotalAmount(), command.expectedTotalAmount()))
+            || !passwordEncoder.matches(command.lookupPassword(), order.getLookupPasswordHash())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
+        }
+        return OrderCreationResult.replayed(order);
     }
 
     private Optional<Order> findByIdempotencyKey(String idempotencyKey) {

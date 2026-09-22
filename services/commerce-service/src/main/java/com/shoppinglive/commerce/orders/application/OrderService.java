@@ -2,7 +2,7 @@ package com.shoppinglive.commerce.orders.application;
 
 import com.shoppinglive.commerce.orders.domain.Order;
 import com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository;
-import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
+import com.shoppinglive.commerce.sales.application.SalesService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,21 +10,21 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 주문 도메인 유스케이스 서비스.
  *
- * <p>조회(주문 3) · 취소(주문 4). 생성(주문 2) · 만료(주문 5) 는 후속 이슈에서 유스케이스 추가.
+ * <p>조회(주문 3) · 취소(주문 4). 생성·만료는 각 전용 서비스와 스케줄러에서 처리한다.
  */
 @Service
 public class OrderService {
 
     private final OrderJpaRepository orderRepository;
-    private final SalesStockJpaRepository salesStockRepository;
+    private final SalesService salesService;
     private final PasswordEncoder passwordEncoder;
 
     public OrderService(
         OrderJpaRepository orderRepository,
-        SalesStockJpaRepository salesStockRepository,
+        SalesService salesService,
         PasswordEncoder passwordEncoder) {
         this.orderRepository = orderRepository;
-        this.salesStockRepository = salesStockRepository;
+        this.salesService = salesService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -73,13 +73,6 @@ public class OrderService {
             throw new OrderCannotBeCancelledException(orderNumber);
         }
 
-        int restored = salesStockRepository
-            .restoreReserved(order.getSalesInfoId(), order.getQuantity());
-        if (restored == 0) {
-            // 여기 도달하면 재고 정합성 이상. 트랜잭션 롤백해서 취소도 취소되게.
-            throw new IllegalStateException(
-                "stock reserved insufficient for restore during cancel: orderNumber="
-                    + orderNumber);
-        }
+        salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
     }
 }

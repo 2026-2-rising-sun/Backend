@@ -198,11 +198,10 @@ class OrderCreationConcurrencyTest {
         ConcurrentLinkedQueue<Throwable> unexpected = new ConcurrentLinkedQueue<>();
 
         for (int i = 0; i < THREADS; i++) {
-            int index = i;
             executor.submit(() -> {
                 try {
                     startGate.await();
-                    orderCreationService.create(command(index), "same-key");
+                    orderCreationService.create(command(0), "same-key");
                 } catch (Throwable t) {
                     unexpected.add(t);
                 } finally {

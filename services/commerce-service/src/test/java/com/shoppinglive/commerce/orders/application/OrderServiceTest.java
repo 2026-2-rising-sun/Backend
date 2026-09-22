@@ -7,7 +7,8 @@ import static org.mockito.Mockito.verify;
 
 import com.shoppinglive.commerce.orders.domain.Order;
 import com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository;
-import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
+import com.shoppinglive.commerce.sales.application.SalesService;
+import static org.mockito.Mockito.doThrow;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class OrderServiceTest {
     private OrderJpaRepository orderRepository;
 
     @Mock
-    private SalesStockJpaRepository salesStockRepository;
+    private SalesService salesService;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -103,13 +104,11 @@ class OrderServiceTest {
             .willReturn(Optional.of(order));
         given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
         given(orderRepository.cancelOrder(order.getId())).willReturn(1);
-        given(salesStockRepository.restoreReserved(order.getSalesInfoId(), order.getQuantity()))
-            .willReturn(1);
 
         orderService.cancelBeforePayment("OD-20260920-000001", "secret");
 
         verify(orderRepository).cancelOrder(order.getId());
-        verify(salesStockRepository).restoreReserved(order.getSalesInfoId(), order.getQuantity());
+        verify(salesService).restoreReserved(order.getSalesInfoId(), order.getQuantity());
     }
 
     @Test
@@ -144,8 +143,8 @@ class OrderServiceTest {
             .willReturn(Optional.of(order));
         given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
         given(orderRepository.cancelOrder(order.getId())).willReturn(1);
-        given(salesStockRepository.restoreReserved(order.getSalesInfoId(), order.getQuantity()))
-            .willReturn(0);
+        doThrow(new IllegalStateException("stock restoration failed"))
+            .when(salesService).restoreReserved(order.getSalesInfoId(), order.getQuantity());
 
         assertThatThrownBy(() -> orderService
             .cancelBeforePayment("OD-20260920-000001", "secret"))

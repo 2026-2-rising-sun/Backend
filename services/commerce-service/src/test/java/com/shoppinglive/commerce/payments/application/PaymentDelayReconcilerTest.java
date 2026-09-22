@@ -1,6 +1,10 @@
 package com.shoppinglive.commerce.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import java.util.List;
 
 import com.shoppinglive.commerce.orders.domain.Order;
 import com.shoppinglive.commerce.orders.domain.OrderStatus;
@@ -36,6 +40,9 @@ class PaymentDelayReconcilerTest {
 
     @Autowired
     private PaymentDelayReconciler reconciler;
+
+    @Autowired
+    private PaymentService paymentService;
 
     @Autowired
     private PaymentAttemptJpaRepository paymentAttemptRepository;
@@ -146,4 +153,16 @@ class PaymentDelayReconcilerTest {
         assertThat(stock.getReserved()).isZero();
         assertThat(stock.getAvailable()).isEqualTo(4);
     }
+    @Test
+    void 스캔_이후_다른_콜백이_확정한_결제는_처리수에_포함하지_않는다() {
+        PaymentAttempt attempt = insertProcessingAttempt(
+            PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
+        assertThat(paymentService.resolvePayment(attempt.getId())).isTrue();
+        PaymentAttemptJpaRepository staleScan = mock(PaymentAttemptJpaRepository.class);
+        when(staleScan.findByStatusAndScheduledResolveAtBefore(any(), any(), any()))
+            .thenReturn(List.of(attempt));
+        assertThat(new PaymentDelayReconciler(staleScan, paymentService).reconcileOverdue()).isZero();
+        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+    }
+
 }

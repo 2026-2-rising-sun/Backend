@@ -2,6 +2,11 @@ package com.shoppinglive.commerce.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.shoppinglive.commerce.orders.domain.Order;
 import com.shoppinglive.commerce.orders.domain.OrderStatus;
@@ -22,35 +27,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-/**
- * 결제 처리 예약이 <b>커밋 이후</b>에 일어나는지 검증한다.
- *
- * <p><b>막으려는 사고:</b> {@code startPayment} 는 {@code @Transactional} 이고, 예전에는 아직
- * 커밋되지 않은 상태에서 {@code MockPaymentEngine.schedule} 을 호출했다. {@code INSTANT_*}
- * 시나리오는 지연 없이 다른 스레드에서 바로 실행되므로, 그 스레드가 커밋보다 먼저 도착하면
- * {@code paymentAttemptRepository.findById} 가 빈 결과를 받는다. {@code resolvePayment} 는
- * 그때 조용히 {@code return} 하므로 로그조차 남지 않고, 결제는 영원히 {@code PROCESSING},
- * 주문은 영원히 {@code PAYMENT_CONFIRMING} 으로 멈춘다.
- *
- * <p>복구 경로도 없다. {@code PaymentDelayReconciler} 는 {@code scheduled_resolve_at} 이 지난
- * 건만 훑는데 {@code INSTANT_*} 는 그 값이 {@code null} 이고, {@code OrderExpirationScheduler}
- * 는 {@code PENDING_PAYMENT} 만 대상으로 하는데 이 주문은 이미 {@code PAYMENT_CONFIRMING} 이다.
- * 결과적으로 주문과 재고가 영구히 묶인다.
- *
- * <p><b>왜 바깥 트랜잭션을 만드나:</b> 실제 호출 경로에서도 저장과 커밋 사이에 같은 틈이
- * 있지만 폭이 마이크로초 단위라 빠른 장비에서는 거의 재현되지 않는다 (CI 의 2 코어 러너에서만
- * 간헐적으로 터졌다). 여기서는 바깥 트랜잭션으로 그 틈을 수백 밀리초로 넓혀 스케줄링 시점을
- * 결정적으로 검증한다. 수정 전 코드에서는 반드시 실패하고, 수정 후에는 반드시 통과한다.
- */
+/** 커밋 전/롤백 시 예약하지 않고, 커밋 후에만 실제 비동기 결제를 시작하는지 검증한다. */
 @SpringBootTest
 class PaymentSchedulingAfterCommitTest {
 
     private static final long PRODUCT_ID = 510L;
     private static final String ORDER_NUMBER = "OD-COMMIT-1";
 
-    /** 비동기 스레드가 커밋보다 먼저 도달할 시간을 충분히 준다. */
-    private static final long WINDOW_MILLIS = 300L;
+    @MockitoSpyBean
+    private MockPaymentEngine mockPaymentEngine;
 
     @Autowired
     private PaymentService paymentService;
@@ -78,6 +65,7 @@ class PaymentSchedulingAfterCommitTest {
     @BeforeEach
     void setUp() {
         clean();
+        clearInvocations(mockPaymentEngine);
 
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 10_000L, SalesStatus.ON_SALE));
         salesInfoId = sales.getId();
@@ -112,7 +100,7 @@ class PaymentSchedulingAfterCommitTest {
             .untilAsserted(() -> {
                 Order order = orderRepository.findByOrderNumber(ORDER_NUMBER).orElseThrow();
                 assertThat(order.getStatus())
-                    .as("커밋 전에 예약이 걸리면 결제가 영원히 멈춘다")
+                    .as("커밋 직후 결제 콜백으로 확정된다")
                     .isEqualTo(OrderStatus.PAID);
 
                 SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
@@ -152,7 +140,7 @@ class PaymentSchedulingAfterCommitTest {
             // 롤백 유도용
         }
 
-        sleep(500);
+        verify(mockPaymentEngine, never()).schedule(anyLong(), any());
 
         Order order = orderRepository.findByOrderNumber(ORDER_NUMBER).orElseThrow();
         assertThat(order.getStatus())
@@ -162,22 +150,13 @@ class PaymentSchedulingAfterCommitTest {
     }
 
     /**
-     * 바깥 트랜잭션 안에서 결제를 시작하고, 커밋 전에 일부러 머무른다. 예약이 커밋 전에 걸리는
-     * 구현이라면 이 시간 동안 비동기 스레드가 빈 DB 를 보고 조용히 포기한다.
+     * 바깥 트랜잭션 안에서는 예약 호출이 없고, 반환 후 커밋된 시점에는 한 번 호출됐음을 확인한다.
      */
     private void startPaymentInsideLongTransaction(PaymentScenario scenario) {
         transactionTemplate.executeWithoutResult(status -> {
             paymentService.startPayment(ORDER_NUMBER, "secret", scenario);
-            sleep(WINDOW_MILLIS);
+            verify(mockPaymentEngine, never()).schedule(anyLong(), any());
         });
-    }
-
-    private static void sleep(long millis) {
-        try {
-            Thread.sleep(millis);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
-        }
+        verify(mockPaymentEngine).schedule(anyLong(), any());
     }
 }

@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -49,6 +50,13 @@ public class CommerceExceptionHandler {
         ApiResponse<Void> body = new ApiResponse<>(false, null, new ApiResponse.ApiError(
             SHOPPING_UNAVAILABLE, SHOPPING_UNAVAILABLE_MESSAGE, CorrelationId.current()));
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(OptimisticLockingFailureException e) {
+        return ResponseEntity.status(ErrorCode.CONFLICT.status()).body(
+            ApiResponse.fail(ErrorCode.CONFLICT, "다른 수정이 먼저 반영되었습니다. 다시 조회해 주세요.",
+                CorrelationId.current()));
     }
 
     /**

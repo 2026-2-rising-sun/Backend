@@ -8,9 +8,8 @@ import com.shoppinglive.commerce.payments.domain.PaymentScenario;
 import com.shoppinglive.commerce.payments.domain.PaymentStatus;
 import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository;
 import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
+import com.shoppinglive.commerce.sales.application.SalesService;
 import java.time.Instant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,12 +22,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class PaymentService {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
-
     private final OrderService orderService;
     private final OrderJpaRepository orderRepository;
     private final PaymentAttemptJpaRepository paymentAttemptRepository;
     private final SalesStockJpaRepository salesStockRepository;
+    private final SalesService salesService;
     private final MockPaymentEngine mockPaymentEngine;
     private final ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
 
@@ -37,12 +35,14 @@ public class PaymentService {
         OrderJpaRepository orderRepository,
         PaymentAttemptJpaRepository paymentAttemptRepository,
         SalesStockJpaRepository salesStockRepository,
+        SalesService salesService,
         MockPaymentEngine mockPaymentEngine,
         ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider) {
         this.orderService = orderService;
         this.orderRepository = orderRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.salesStockRepository = salesStockRepository;
+        this.salesService = salesService;
         this.mockPaymentEngine = mockPaymentEngine;
         this.devRegistryProvider = devRegistryProvider;
     }
@@ -85,13 +85,9 @@ public class PaymentService {
      * {@code @Transactional} 이라 아직 커밋 전이다. {@code INSTANT_*} 시나리오는 지연 없이 다른
      * 스레드에서 즉시 실행되는데, 그 스레드가 커밋보다 먼저 도착하면 자기 트랜잭션에서
      * {@code payment_attempt} 를 조회해도 아직 보이지 않는다. {@link #resolvePayment} 는 그때
-     * 조용히 빠져나가므로 로그조차 남지 않고, 결제는 영원히 {@code PROCESSING}, 주문은 영원히
-     * {@code PAYMENT_CONFIRMING} 으로 멈춘다.
-     *
-     * <p>복구 경로도 없다. {@link PaymentDelayReconciler} 는 {@code scheduled_resolve_at} 이
-     * 지난 건만 훑는데 {@code INSTANT_*} 는 그 값이 {@code null} 이고, 주문 만료 스케줄러는
-     * {@code PENDING_PAYMENT} 만 대상으로 하는데 이 주문은 이미 {@code PAYMENT_CONFIRMING} 이다.
-     * 주문과 재고가 영구히 묶이는 셈이라 반드시 커밋 이후에 예약해야 한다.
+     * 조용히 빠져나가므로 즉시 결제가 다음 Reconciler 실행까지 지연된다.
+     * INSTANT 시나리오도 scheduled_resolve_at을 가지므로 재확인 대상이지만,
+     * 정상 경로의 즉시 처리를 보장하려면 커밋 이후에 예약해야 한다.
      *
      * <p>덤으로 롤백 시에는 {@code afterCommit} 이 호출되지 않으므로, 존재하지 않는 결제를
      * 처리하려 드는 일도 사라진다.
@@ -126,34 +122,40 @@ public class PaymentService {
 
     /**
      * 결제 결과를 확정한다. Mock 엔진 또는 Reconciler 가 호출. Idempotent.
+     *
+     * @return 이번 호출에서 결제·주문·재고를 함께 확정했으면 true, 이미 처리된 경우 false
      */
     @Transactional
-    public void resolvePayment(Long paymentAttemptId) {
+    public boolean resolvePayment(Long paymentAttemptId) {
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
         if (attempt == null || attempt.getStatus().isTerminal()) {
-            return;
+            return false;
         }
 
         PaymentStatus outcome = attempt.getScenario().getOutcome();
         int updated = paymentAttemptRepository
             .resolveIfProcessing(paymentAttemptId, outcome.name());
         if (updated == 0) {
-            return;
+            return false;
         }
 
         Order order = orderRepository.findById(attempt.getOrderId()).orElse(null);
         if (order == null) {
-            log.warn("order missing for resolved payment: attemptId={}", paymentAttemptId);
-            return;
+            throw new IllegalStateException("order missing for payment: attemptId=" + paymentAttemptId);
         }
 
         if (outcome == PaymentStatus.SUCCESS) {
-            orderRepository.transitionStatus(order.getId(), "PAYMENT_CONFIRMING", "PAID");
-            salesStockRepository.consumeReserved(order.getSalesInfoId(), order.getQuantity());
+            if (orderRepository.transitionStatus(order.getId(), "PAYMENT_CONFIRMING", "PAID") != 1
+                || salesStockRepository.consumeReserved(order.getSalesInfoId(), order.getQuantity()) != 1) {
+                throw new IllegalStateException("payment stock/order transition failed: attemptId=" + paymentAttemptId);
+            }
         } else {
-            orderRepository.transitionStatus(order.getId(), "PAYMENT_CONFIRMING", "FAILED");
-            salesStockRepository.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+            if (orderRepository.transitionStatus(order.getId(), "PAYMENT_CONFIRMING", "FAILED") != 1) {
+                throw new IllegalStateException("payment order transition failed: attemptId=" + paymentAttemptId);
+            }
+            salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
         }
+        return true;
     }
 
     /**
