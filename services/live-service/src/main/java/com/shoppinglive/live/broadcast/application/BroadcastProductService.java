@@ -90,13 +90,14 @@ public class BroadcastProductService {
     @Transactional
     public void unlink(final long broadcastId, final long linkId, final long expectedVersion) {
         final Broadcast broadcast = readBroadcast(broadcastId);
-        requireChangeable(broadcast, expectedVersion);
 
         final BroadcastProduct link = links.findById(linkId).orElse(null);
         if (link == null) {
-            bumpVersion(broadcast);
+            // 이미 해제된 linkId 는 순수 no-op 이다. version 을 검사하지도 올리지도 않는다.
+            // 그래야 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 204 다.
             return;
         }
+        requireChangeable(broadcast, expectedVersion);
         if (!link.getBroadcast().getId().equals(broadcastId)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "다른 방송의 연결입니다.");
         }
