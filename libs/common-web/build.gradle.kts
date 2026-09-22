@@ -9,4 +9,5 @@ dependencies {
     implementation(libs.spring.orm)
 
     testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.boot.starter.validation)
 }
