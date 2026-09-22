@@ -14,6 +14,12 @@ import software.amazon.awssdk.services.ivs.IvsClient;
 @EnableConfigurationProperties(IvsProperties.class)
 public class IvsConfiguration {
 
+    /** stub 모드에서 channelArn 에 대응하는 결정적 시청 URL. */
+    public static String stubPlaybackUrl(final String channelArn) {
+        final int slash = channelArn.lastIndexOf('/');
+        return "https://stub.live-video.net/" + channelArn.substring(slash + 1) + ".m3u8";
+    }
+
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(name = "live.ivs.mode", havingValue = "aws", matchIfMissing = true)
     IvsClient ivsClient(final IvsProperties properties) {
@@ -38,8 +44,9 @@ public class IvsConfiguration {
 
                 @Override
                 public IvsPlaybackInfo getPlaybackInfo(final String channelArn) {
-                    // ponytail: stub playback URL is static, real URL from GetChannel when aws mode
-                    return new IvsPlaybackInfo("https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/stub");
+                    // 채널마다 다른 URL 을 돌려주어야 #65 의 채널-URL 동일성 검사를 stub 에서도
+                    // 실제로 검증할 수 있다. 실제 모드의 URL 은 GetChannel 이 준다.
+                    return new IvsPlaybackInfo(stubPlaybackUrl(channelArn));
                 }
             };
         }

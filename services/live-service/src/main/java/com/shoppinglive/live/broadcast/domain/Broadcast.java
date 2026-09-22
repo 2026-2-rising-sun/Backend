@@ -70,6 +70,24 @@ public class Broadcast extends BaseEntity {
     }
 
     /**
+     * PREPARING → LIVE. 이미 LIVE 면 최초 startedAt 을 보존하며 성공하고,
+     * ENDED 재시작은 409 다. 외부 준비 확인은 호출자가 이 트랜잭션 밖에서 마친다.
+     */
+    public void start(final long expectedVersion, final Instant now) {
+        if (version != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
+        }
+        if (status == BroadcastStatus.LIVE) {
+            return;
+        }
+        if (status == BroadcastStatus.ENDED) {
+            throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
+        }
+        this.status = BroadcastStatus.LIVE;
+        this.startedAt = now;
+    }
+
+    /**
      * LIVE → ENDED. 반복 종료는 최초 endedAt 을 보존하며 성공하고, 준비 상태 종료는 409 다.
      * 종료는 주문·결제·재고·송출에 관여하지 않는다.
      */
