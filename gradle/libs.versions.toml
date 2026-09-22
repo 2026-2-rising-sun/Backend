@@ -18,6 +18,7 @@ spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
+spring-orm = { module = "org.springframework:spring-orm" }
 spring-kafka = { module = "org.springframework.kafka:spring-kafka" }
 kafka-clients = { module = "org.apache.kafka:kafka-clients" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }

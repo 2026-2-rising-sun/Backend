@@ -10,7 +10,13 @@ import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -75,5 +81,27 @@ class BroadcastEndTest {
         final Broadcast ended = service.end(broadcast.getId());
         assertThat(ended.getStatus()).isEqualTo(BroadcastStatus.ENDED);
         assertThat(ended.getEndedAt()).isNotNull();
+    }
+
+    @Test
+    void concurrentEndRequestsNeverReturnServerError() throws Exception {
+        final Broadcast broadcast = register("end-concurrent");
+        forceLive(broadcast);
+
+        final CyclicBarrier gate = new CyclicBarrier(2);
+        final Callable<Integer> call = () -> {
+            gate.await();
+            return mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+                .andReturn().getResponse().getStatus();
+        };
+        final List<Integer> statuses;
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            final List<Future<Integer>> futures = List.of(pool.submit(call), pool.submit(call));
+            statuses = List.of(futures.get(0).get(), futures.get(1).get());
+        }
+
+        assertThat(statuses).allSatisfy(status -> assertThat(status).isIn(200, 409));
+        assertThat(statuses).contains(200);
+        assertThat(service.get(broadcast.getId()).getStatus()).isEqualTo(BroadcastStatus.ENDED);
     }
 }
