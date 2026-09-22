@@ -48,15 +48,16 @@ public class BroadcastStartService {
 
     public Broadcast start(final long broadcastId, final long expectedVersion) {
         final Broadcast broadcast = read(broadcastId);
-        if (broadcast.getVersion() != expectedVersion) {
-            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
-        }
-        // 이미 LIVE 면 외부를 다시 확인하지 않고 최초 결과를 그대로 돌려준다.
+        // 이미 LIVE 면 version 일치 여부와 무관하게 최초 결과를 그대로 돌려준다 (멱등).
+        // 시작 성공이 version 을 올리므로, 이 검사가 version 검사 뒤에 있으면 재시도가 409 가 된다.
         if (broadcast.getStatus() == BroadcastStatus.LIVE) {
             return broadcast;
         }
         if (broadcast.getStatus() == BroadcastStatus.ENDED) {
             throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
+        }
+        if (broadcast.getVersion() != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
         }
 
         requireIvsReady(broadcast);

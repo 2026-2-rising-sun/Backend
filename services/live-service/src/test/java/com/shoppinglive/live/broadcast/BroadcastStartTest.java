@@ -116,6 +116,27 @@ class BroadcastStartTest {
     }
 
     @Test
+    void httpStartRetryWithTheOriginallyIssuedVersionIsIdempotent() throws Exception {
+        final Broadcast broadcast = readyToStart("start-retry", 1L);
+        // 클라이언트가 한 번 발급받은 버전. 응답이 유실된 재시도는 이 값을 그대로 다시 보낸다.
+        final long issued = versionOf(broadcast.getId());
+
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+                .param("expectedVersion", String.valueOf(issued)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("LIVE"));
+        final Instant first = broadcasts.get(broadcast.getId()).getStartedAt();
+
+        // 시작 성공으로 version 이 올랐지만 재시도는 같은 issued 로 온다 → 멱등 성공이어야 한다.
+        assertThat(versionOf(broadcast.getId())).isNotEqualTo(issued);
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+                .param("expectedVersion", String.valueOf(issued)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("LIVE"));
+        assertThat(broadcasts.get(broadcast.getId()).getStartedAt()).isEqualTo(first);
+    }
+
+    @Test
     void startingDoesNotTouchStockOfTheConnectedSoldOutProduct() {
         // 재고 조회·차감·예약을 하지 않으므로 available 0 인 상품만 연결해도 시작한다.
         final Broadcast broadcast = readyToStart("start-nostock", 2L);
