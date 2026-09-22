@@ -130,6 +130,37 @@ public class BroadcastProductService {
         entityManager.lock(broadcast, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
     }
 
+    /**
+     * 전체 linkId 순열로 노출 순서를 한 번에 바꾼다. 중복·누락·타 방송 ID 는 400 이고,
+     * 실패하면 일부 순서만 남지 않도록 같은 트랜잭션에서 되돌린다.
+     */
+    @Transactional
+    public List<BroadcastProduct> reorder(final long broadcastId, final List<Long> linkIds,
+                                          final long expectedVersion) {
+        final Broadcast broadcast = readBroadcast(broadcastId);
+        requireChangeable(broadcast, expectedVersion);
+
+        final List<BroadcastProduct> current =
+            links.findByBroadcastIdOrderByPositionAsc(broadcastId);
+        final java.util.Map<Long, BroadcastProduct> byId = new java.util.LinkedHashMap<>();
+        current.forEach(link -> byId.put(link.getId(), link));
+
+        if (linkIds.size() != new java.util.HashSet<>(linkIds).size()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "linkId가 중복되었습니다.");
+        }
+        if (!new java.util.HashSet<>(linkIds).equals(byId.keySet())) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                "이 방송의 전체 연결 상품 순열이어야 합니다.");
+        }
+
+        bumpVersion(broadcast);
+        for (int position = 0; position < linkIds.size(); position++) {
+            byId.get(linkIds.get(position)).moveTo(position);
+        }
+        links.flush();
+        return links.findByBroadcastIdOrderByPositionAsc(broadcastId);
+    }
+
     Broadcast readBroadcast(final long broadcastId) {
         return broadcasts.findById(broadcastId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));

@@ -3,12 +3,14 @@ package com.shoppinglive.live.broadcast.api;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.live.broadcast.application.BroadcastProductService;
 import com.shoppinglive.live.broadcast.domain.BroadcastProduct;
+import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,6 +33,14 @@ public class BroadcastProductController {
         @Valid @RequestBody final LinkProductInput input) {
         final BroadcastProduct link = service.link(id, input.productId(), input.expectedVersion());
         return ApiResponse.ok(BroadcastProductLinkResponse.from(link));
+    }
+
+    @PutMapping("/order")
+    public ApiResponse<List<BroadcastProductLinkResponse>> reorder(
+        @PathVariable final long id,
+        @Valid @RequestBody final ReorderProductsInput input) {
+        return ApiResponse.ok(service.reorder(id, input.linkIds(), input.expectedVersion())
+            .stream().map(BroadcastProductLinkResponse::from).toList());
     }
 
     /** 성공은 204 무본문이다. */
