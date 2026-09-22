@@ -180,4 +180,28 @@ class BroadcastProductLinkTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"productId\":1}"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void retryingDeleteWithTheOriginallyIssuedVersionStillReturns204() throws Exception {
+        final Broadcast broadcast = register("unlink-retry");
+        products.link(broadcast.getId(), 1L, versionOf(broadcast.getId()));
+        final BroadcastProduct target =
+            products.link(broadcast.getId(), 2L, versionOf(broadcast.getId()));
+
+        // 클라이언트가 한 번 발급받은 버전. 응답이 유실된 재시도는 이 값을 그대로 다시 보낸다.
+        final long issued = versionOf(broadcast.getId());
+
+        mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", broadcast.getId(),
+                target.getId()).param("expectedVersion", String.valueOf(issued)))
+            .andExpect(status().isNoContent());
+
+        final long afterDelete = versionOf(broadcast.getId());
+        for (int retry = 0; retry < 2; retry++) {
+            mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", broadcast.getId(),
+                    target.getId()).param("expectedVersion", String.valueOf(issued)))
+                .andExpect(status().isNoContent());
+        }
+        // no-op 삭제는 version 을 건드리지 않는다.
+        assertThat(versionOf(broadcast.getId())).isEqualTo(afterDelete);
+    }
 }
