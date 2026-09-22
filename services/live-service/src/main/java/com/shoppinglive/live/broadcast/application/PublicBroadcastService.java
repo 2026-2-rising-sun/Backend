@@ -6,6 +6,8 @@ import com.shoppinglive.live.broadcast.api.PublicBroadcastResponse;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
+import com.shoppinglive.live.integration.ivs.IvsReadiness;
+import com.shoppinglive.live.integration.ivs.IvsReadinessClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -30,9 +32,12 @@ public class PublicBroadcastService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final BroadcastRepository repository;
+    private final IvsReadinessClient ivs;
 
-    public PublicBroadcastService(final BroadcastRepository repository) {
+    public PublicBroadcastService(final BroadcastRepository repository,
+                                  final IvsReadinessClient ivs) {
         this.repository = repository;
+        this.ivs = ivs;
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +80,23 @@ public class PublicBroadcastService {
     public PublicBroadcastResponse get(final long id) {
         final Broadcast broadcast = repository.findById(id)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));
-        return PublicBroadcastResponse.from(broadcast);
+        return PublicBroadcastResponse.from(broadcast, videoStatus(broadcast));
+    }
+
+    /**
+     * 시청 연결. LIVE 에서만 IVS 를 조회하고, 조회가 실패해도 기본정보 응답을 실패시키지 않는다.
+     * 공개 시청은 IVS → FE 직접 재생이며 Live API 는 영상 프록시가 아니다.
+     */
+    private IvsReadiness videoStatus(final Broadcast broadcast) {
+        if (broadcast.getStatus() != BroadcastStatus.LIVE) {
+            return null;
+        }
+        try {
+            return ivs.isReady(broadcast.getChannelArn())
+                ? IvsReadiness.READY : IvsReadiness.NOT_READY;
+        } catch (RuntimeException e) {
+            return IvsReadiness.UNAVAILABLE;
+        }
     }
 
     /** PageRequest 는 offset 이 page*size 로 고정되므로 임의 offset 용 Pageable 을 쓴다. */
