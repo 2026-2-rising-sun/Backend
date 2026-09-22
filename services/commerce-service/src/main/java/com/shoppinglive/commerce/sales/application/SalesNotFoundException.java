@@ -1,18 +1,24 @@
 package com.shoppinglive.commerce.sales.application;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 
 /**
- * 판매정보를 찾을 수 없을 때 던지는 예외. Spring 이 자동으로 404 응답으로 매핑한다.
+ * 판매정보를 찾을 수 없을 때 던지는 예외 (404).
  *
- * <p>Sprint 2 후반에 {@code common-web} {@code GlobalExceptionHandler} 로 표준화된 오류 응답
- * 포맷을 붙일 때 이 애노테이션 대신 전용 매핑을 사용할 수 있다.
+ * <p>원래 이 클래스는 {@code @ResponseStatus(NOT_FOUND)} 만 붙인 {@code RuntimeException} 이었다.
+ * 그런데 {@code common-web} 의 {@code GlobalExceptionHandler} 에
+ * {@code @ExceptionHandler(Exception.class)} 가 있고, Spring 은
+ * {@code ExceptionHandlerExceptionResolver} 를 {@code ResponseStatusExceptionResolver} 보다 먼저
+ * 적용한다. 그래서 {@code @ResponseStatus} 는 무시되고 실제 응답은 500 이었다.
+ * {@link BusinessException} 을 상속하면 핸들러가 {@link ErrorCode} 를 보고 404 로 내려준다.
+ *
+ * <p>같은 문제가 남아 있는 예외가 이 서비스에 더 있다 ({@code InsufficientStockException},
+ * {@code OrderNotFoundException} 등). 일괄 정리는 별도 이슈에서 다룬다.
  */
-@ResponseStatus(HttpStatus.NOT_FOUND)
-public class SalesNotFoundException extends RuntimeException {
+public class SalesNotFoundException extends BusinessException {
 
     public SalesNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.NOT_FOUND, message);
     }
 }

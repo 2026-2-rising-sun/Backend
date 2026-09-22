@@ -1,6 +1,7 @@
 package com.shoppinglive.commerce.sales.infrastructure;
 
 import com.shoppinglive.commerce.sales.domain.Sales;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -23,6 +24,15 @@ public interface SalesJpaRepository extends JpaRepository<Sales, Long> {
      * 매핑한다.
      */
     boolean existsByProductId(Long productId);
+
+    /**
+     * 상품 식별자로 판매정보를 조회한다.
+     *
+     * <p>구매자는 상품 페이지·방송 화면에서 주문 흐름으로 들어오므로 {@code productId} 만 알고
+     * {@code salesId} 는 모른다. 주문서 조회(주문 1)·주문 생성(주문 2)이 이 메서드로 판매정보를
+     * 찾는다.
+     */
+    Optional<Sales> findByProductId(Long productId);
 
     /**
      * 판매 상태를 {@code expectedStatus} 에서 {@code nextStatus} 로 전이한다.
