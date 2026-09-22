@@ -2,6 +2,7 @@ package com.shoppinglive.live.broadcast.api;
 
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
+import com.shoppinglive.live.broadcast.application.BroadcastStartService;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import org.springframework.data.domain.Page;
 import jakarta.validation.Valid;
@@ -23,9 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/admin/broadcasts")
 public class BroadcastController {
     private final BroadcastService service;
+    private final BroadcastStartService startService;
 
-    public BroadcastController(final BroadcastService service) {
+    public BroadcastController(final BroadcastService service,
+                               final BroadcastStartService startService) {
         this.service = service;
+        this.startService = startService;
     }
 
     @PostMapping
@@ -45,6 +49,12 @@ public class BroadcastController {
         final long version,
         @Valid @RequestBody final BroadcastPatchInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.edit(id, version, input)));
+    }
+
+    @PostMapping("/{id}/start")
+    public ApiResponse<BroadcastResponse> start(@PathVariable final long id,
+                                                @RequestParam final long expectedVersion) {
+        return ApiResponse.ok(BroadcastResponse.from(startService.start(id, expectedVersion)));
     }
 
     @PostMapping("/{id}/end")

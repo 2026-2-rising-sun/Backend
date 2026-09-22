@@ -63,6 +63,21 @@ class PostgresMigrationTest {
             .hasMessageContaining("uk_broadcast_product");
     }
 
+    @Test
+    void twoBroadcastsCannotBeLiveOnTheSameChannel() {
+        final String channel = "arn:aws:ivs:ap-northeast-2:1:channel/shared";
+        insertBroadcast("live-a", channel, "LIVE");
+        // 같은 채널의 PREPARING/ENDED 는 얼마든지 공존한다.
+        insertBroadcast("prep-b", channel, "PREPARING");
+        insertBroadcast("ended-c", channel, "ENDED");
+
+        assertThatThrownBy(() -> insertBroadcast("live-b", channel, "LIVE"))
+            .hasMessageContaining("uk_broadcast_live_channel");
+        assertThatThrownBy(() -> jdbc.update(
+            "UPDATE broadcast SET status = 'LIVE' WHERE request_key = 'prep-b'"))
+            .hasMessageContaining("uk_broadcast_live_channel");
+    }
+
     void insertLink(final Long broadcastId, final long productId, final int position) {
         jdbc.update("""
             INSERT INTO broadcast_product (created_at, updated_at, broadcast_id, product_id,

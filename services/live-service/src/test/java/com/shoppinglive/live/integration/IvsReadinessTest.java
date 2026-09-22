@@ -157,8 +157,11 @@ class IvsReadinessTest {
                 .run(application -> {
                     final IvsReadinessClient stubClient = application.getBean(IvsReadinessClient.class);
                     assertThat(application).doesNotHaveBean(IvsClient.class);
+                    // stub 은 채널마다 다른 URL 을 돌려주어야 #65 의 채널-URL 동일성 검사를
+                    // stub 에서도 실제로 검증할 수 있다.
                     assertThat(stubClient.getPlaybackInfo(ARN).playbackUrl())
-                            .isEqualTo("https://fcc3ddae59ed.us-west-2.playback.live-video.net/api/video/v1/stub");
+                            .isEqualTo(IvsConfiguration.stubPlaybackUrl(ARN))
+                            .isNotEqualTo(IvsConfiguration.stubPlaybackUrl("arn:other/x"));
                 });
     }
 }
