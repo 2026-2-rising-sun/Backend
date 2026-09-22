@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@DisplayName("방송 상품 공개·관리 조회 (정렬, 구매 가능 여부, 누락 처리, 외부 장애)")
 class BroadcastProductViewTest {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
@@ -43,6 +45,7 @@ class BroadcastProductViewTest {
         return broadcasts.get(id).getVersion();
     }
 
+    @DisplayName("상품은 연결 순서대로 productId와 salesId를 함께 반환한다")
     @Test
     void productsAreReturnedInConnectionOrderWithBothIdentifiers() {
         final Broadcast broadcast = register("view-order");
@@ -56,6 +59,7 @@ class BroadcastProductViewTest {
         assertThat(products.getFirst().name()).isEqualTo("Local demo product 2");
     }
 
+    @DisplayName("품절 상품은 보이되 구매 불가이고 판매중 상품만 구매 가능하다")
     @Test
     void soldOutIsVisibleButNotPurchasableAndOnSaleIs() {
         final Broadcast broadcast = register("view-purchasable");
@@ -69,6 +73,7 @@ class BroadcastProductViewTest {
                 org.assertj.core.groups.Tuple.tuple("SOLD_OUT", false));
     }
 
+    @DisplayName("삭제된 상품은 공개 조회에서 숨기고 관리 조회에서는 missing으로 표시한다")
     @Test
     void publicViewHidesDeletedProductsWhileAdminViewMarksThemMissing() {
         final Broadcast broadcast = register("view-missing");
@@ -86,6 +91,7 @@ class BroadcastProductViewTest {
             });
     }
 
+    @DisplayName("방송 중 추가한 상품이 다음 조회에 즉시 반영된다")
     @Test
     void liveChangesShowUpOnTheNextQuery() {
         final Broadcast broadcast = register("view-live-change");
@@ -95,6 +101,7 @@ class BroadcastProductViewTest {
         assertThat(view.forPublic(broadcast.getId())).hasSize(2);
     }
 
+    @DisplayName("상품이 없으면 빈 목록, 없는 방송이면 404를 반환한다")
     @Test
     void broadcastWithoutProductsIsEmptyAndMissingBroadcastIs404() throws Exception {
         final Broadcast broadcast = register("view-empty");
@@ -105,6 +112,7 @@ class BroadcastProductViewTest {
             .andExpect(status().isNotFound());
     }
 
+    @DisplayName("공개·관리 상품 조회 API가 공통 응답 envelope로 반환한다")
     @Test
     void httpViewsReturnEnvelope() throws Exception {
         final Broadcast broadcast = register("view-http");
@@ -122,11 +130,13 @@ class BroadcastProductViewTest {
     @Nested
     @SpringBootTest(properties = "live.products.mode=disabled")
     @AutoConfigureMockMvc
+    @DisplayName("외부 상품 서비스가 중단된 경우")
     class WhenUpstreamIsDown {
         @Autowired BroadcastService broadcasts;
         @Autowired MockMvc mvc;
         @Autowired DataSource dataSource;
 
+        @DisplayName("외부 장애 시 상품 endpoint는 503이지만 방송 기본 정보 조회는 정상이다")
         @Test
         void productEndpointIs503ButBasicInfoStillWorks() throws Exception {
             final Broadcast broadcast = broadcasts.register(UUID.randomUUID().toString(),
