@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,6 +37,14 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .orElse(ErrorCode.INVALID_REQUEST.defaultMessage());
         return toResponse(ErrorCode.INVALID_REQUEST, message);
+    }
+
+    /** 낙관적 잠금 충돌은 서버 오류가 아니라 동시 변경 충돌이므로 409 로 내린다. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(
+            ObjectOptimisticLockingFailureException e) {
+        log.warn("optimistic locking failure: {}", e.getMessage());
+        return toResponse(ErrorCode.CONFLICT, "다른 요청이 먼저 변경했습니다. 다시 조회하세요.");
     }
 
     @ExceptionHandler(Exception.class)
