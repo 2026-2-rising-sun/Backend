@@ -1,0 +1,142 @@
+package com.shoppinglive.live.broadcast.domain;
+
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.common.persistence.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import java.time.Instant;
+
+@Entity
+@Table(name = "broadcast")
+public class Broadcast extends BaseEntity {
+    @Column(nullable = false, unique = true, updatable = false, length = 128)
+    private String requestKey;
+
+    @Column(nullable = false, updatable = false, length = 64)
+    private String fingerprint;
+
+    @Column(nullable = false, length = 100)
+    private String title;
+
+    @Column(nullable = false)
+    private Instant scheduledAt;
+
+    @Column(nullable = false, length = 255)
+    private String channelArn;
+
+    @Column(nullable = false, length = 2048)
+    private String playbackUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private BroadcastStatus status = BroadcastStatus.PREPARING;
+
+    private Instant startedAt;
+    private Instant endedAt;
+
+    @Version
+    private long version;
+
+    protected Broadcast() {
+    }
+
+    public Broadcast(final String requestKey, final String fingerprint, final String title,
+                     final Instant scheduledAt, final String channelArn, final String playbackUrl) {
+        this.requestKey = requestKey;
+        this.fingerprint = fingerprint;
+        this.title = title;
+        this.scheduledAt = scheduledAt;
+        this.channelArn = channelArn;
+        this.playbackUrl = playbackUrl;
+    }
+
+    public void edit(final long expectedVersion, final String title, final Instant scheduledAt,
+                     final String channelArn, final String playbackUrl) {
+        if (status != BroadcastStatus.PREPARING) {
+            throw new BusinessException(ErrorCode.CONFLICT, "준비 상태에서만 기본정보를 수정할 수 있습니다.");
+        }
+        if (version != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
+        }
+        this.title = title;
+        this.scheduledAt = scheduledAt;
+        this.channelArn = channelArn;
+        this.playbackUrl = playbackUrl;
+    }
+
+    /**
+     * PREPARING → LIVE. 이미 LIVE 면 최초 startedAt 을 보존하며 성공하고,
+     * ENDED 재시작은 409 다. 외부 준비 확인은 호출자가 이 트랜잭션 밖에서 마친다.
+     */
+    public void start(final long expectedVersion, final Instant now) {
+        // 멱등 판정이 version 검사보다 먼저다. 시작 성공이 version 을 올리므로,
+        // 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 성공해야 한다.
+        if (status == BroadcastStatus.LIVE) {
+            return;
+        }
+        if (status == BroadcastStatus.ENDED) {
+            throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
+        }
+        if (version != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
+        }
+        this.status = BroadcastStatus.LIVE;
+        this.startedAt = now;
+    }
+
+    /**
+     * LIVE → ENDED. 반복 종료는 최초 endedAt 을 보존하며 성공하고, 준비 상태 종료는 409 다.
+     * 종료는 주문·결제·재고·송출에 관여하지 않는다.
+     */
+    public void end(final Instant now) {
+        if (status == BroadcastStatus.PREPARING) {
+            throw new BusinessException(ErrorCode.CONFLICT, "준비 상태의 방송은 종료할 수 없습니다.");
+        }
+        if (status == BroadcastStatus.ENDED) {
+            return;
+        }
+        this.status = BroadcastStatus.ENDED;
+        this.endedAt = now;
+    }
+
+    public String getFingerprint() {
+        return fingerprint;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public Instant getScheduledAt() {
+        return scheduledAt;
+    }
+
+    public String getChannelArn() {
+        return channelArn;
+    }
+
+    public String getPlaybackUrl() {
+        return playbackUrl;
+    }
+
+    public BroadcastStatus getStatus() {
+        return status;
+    }
+
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+
+    public Instant getEndedAt() {
+        return endedAt;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+}
