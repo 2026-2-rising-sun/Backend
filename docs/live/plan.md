@@ -69,6 +69,43 @@ dev
 
 R7/R11을 포함한 검증은 각 branch 및 별도 로컬 통합 worktree에서 수행한다. 통합 검증 worktree를 제품 PR로 제출하지 않는다. 실제 줄 수가 약500을 크게 넘으면 같은 Issue의 동작 단위 PR을 추가한다. 문서 이동/생성 줄도 포함해 보고하고 문서만을 위한 Issue는 만들지 않는다. 문서 정책 변경은 첫 관련 기능 PR에 나누어 넣으며 현재 문서를 전부 첫 PR에 실어 500줄을 숨기지 않는다.
 
+## 실제 제출 결과 (위 제안 대체)
+
+위 표와 트리는 구현 착수 전 제안이다. 실제 제출된 Stack은 branch 명명 규칙이 이 저장소의 기존 convention(`feat/#<Issue번호>`)을 따르고, R1/R2(#59)를 하나의 PR로 통합했으며, 총 11개 PR로 구성된다. 최종 기준은 이 표다.
+
+| Issue | 제출 branch | 실제 PR base | PR |
+|---|---|---|---|
+| #59 (R1+R2 통합) | `feat/#59` | `dev` | [#73](https://github.com/2026-2-rising-sun/Backend/pull/73) |
+| #60 | `feat/#60` | `feat/#59` | [#74](https://github.com/2026-2-rising-sun/Backend/pull/74) |
+| #61 | `feat/#61` | `feat/#60` | [#75](https://github.com/2026-2-rising-sun/Backend/pull/75) |
+| #66 | `feat/#66` | `feat/#61` | [#76](https://github.com/2026-2-rising-sun/Backend/pull/76) |
+| #62 R5(client) | `feat/#62-clients` | `feat/#66` | [#77](https://github.com/2026-2-rising-sun/Backend/pull/77) |
+| #62 R6(연결·해제) | `feat/#62-links` | `feat/#62-clients` | [#78](https://github.com/2026-2-rising-sun/Backend/pull/78) |
+| #63 | `feat/#63` | `feat/#62-links` | [#79](https://github.com/2026-2-rising-sun/Backend/pull/79) |
+| #67 | `feat/#67` | `feat/#62-links` | [#80](https://github.com/2026-2-rising-sun/Backend/pull/80) |
+| #64 R9(IVS 준비 adapter) | `feat/#64-ivs` | `feat/#67` | [#81](https://github.com/2026-2-rising-sun/Backend/pull/81) |
+| #65 | `feat/#65` | `feat/#64-ivs` | [#82](https://github.com/2026-2-rising-sun/Backend/pull/82) |
+| #64 R12(시청 연결·실검증) | `feat/#64-viewing` | `feat/#65` | [#83](https://github.com/2026-2-rising-sun/Backend/pull/83) |
+
+실제 제출 트리:
+
+```text
+dev
+└─ #73 feat/#59 (등록+수정 통합)
+   └─ #74 feat/#60 관리 조회
+      └─ #75 feat/#61 공개 조회
+         └─ #76 feat/#66 종료
+            └─ #77 feat/#62-clients 상품 client
+               └─ #78 feat/#62-links 연결·해제
+                  ├─ #79 feat/#63 정렬
+                  ├─ #80 feat/#67 상품 조회·구매
+                  └─ #81 feat/#64-ivs (base: feat/#67) IVS 준비
+                     └─ #82 feat/#65 시작
+                        └─ #83 feat/#64-viewing 시청 연결·실검증
+```
+
+`#81`의 base가 `feat/#62-links`가 아니라 `feat/#67`인 것은 제안 트리와의 유일한 구조적 차이다(branch ancestry가 실제로 `#67` 위에서 분기됐기 때문). 나머지는 제안과 동일한 위상이다. 전부 Draft이며 `dev`/부모 PR을 merge하지 않았다. gh-stack은 이 환경에 설치되어 있지 않아(존재하지 않는 tap) git/gh로 수동 구성했다.
+
 ## 내부 스캐폴딩
 
 ```text
