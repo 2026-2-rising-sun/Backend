@@ -3,6 +3,14 @@ spring:
     name: shopping-service
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
+  jpa:
+    # 스키마는 Flyway 가 소유한다. Hibernate 는 엔티티 매핑이 실제 스키마와 맞는지 검증만.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 server:
   port: 8082
@@ -32,10 +40,6 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
-    hibernate:
-      ddl-auto: none
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
@@ -53,7 +57,3 @@ spring:
     url: jdbc:postgresql://postgres:5432/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
-    hibernate:
-      ddl-auto: none
