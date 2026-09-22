@@ -99,6 +99,15 @@ public class BroadcastService {
         return found.map(BroadcastResponse::from);
     }
 
+    /** 종료는 짧은 트랜잭션의 원자적 상태 전이다. 외부 호출을 하지 않는다. */
+    @Transactional
+    public Broadcast end(final long id) {
+        final Broadcast broadcast = get(id);
+        broadcast.end(java.time.Instant.now());
+        repository.flush();
+        return broadcast;
+    }
+
     @Transactional(readOnly = true)
     public Broadcast get(final long id) {
         return repository.findById(id)
