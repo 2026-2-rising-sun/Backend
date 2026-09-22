@@ -74,14 +74,16 @@ public class Broadcast extends BaseEntity {
      * ENDED 재시작은 409 다. 외부 준비 확인은 호출자가 이 트랜잭션 밖에서 마친다.
      */
     public void start(final long expectedVersion, final Instant now) {
-        if (version != expectedVersion) {
-            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
-        }
+        // 멱등 판정이 version 검사보다 먼저다. 시작 성공이 version 을 올리므로,
+        // 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 성공해야 한다.
         if (status == BroadcastStatus.LIVE) {
             return;
         }
         if (status == BroadcastStatus.ENDED) {
             throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
+        }
+        if (version != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
         }
         this.status = BroadcastStatus.LIVE;
         this.startedAt = now;
