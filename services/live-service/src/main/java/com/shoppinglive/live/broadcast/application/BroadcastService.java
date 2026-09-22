@@ -4,13 +4,18 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.live.broadcast.api.BroadcastInput;
 import com.shoppinglive.live.broadcast.api.BroadcastPatchInput;
+import com.shoppinglive.live.broadcast.api.BroadcastResponse;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
+import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +23,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class BroadcastService {
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final BroadcastRepository repository;
     private final TransactionTemplate transaction;
 
@@ -71,6 +78,28 @@ public class BroadcastService {
             field + "에 null을 지정할 수 없습니다."));
     }
 
+    /**
+     * 관리 목록. 외부(Shopping/Commerce/IVS) 호출 없이 방송 기본정보만 읽는다.
+     * 정렬은 repository 쿼리가 상태별로 고정하므로 호출자가 바꿀 수 없다.
+     */
+    @Transactional(readOnly = true)
+    public Page<BroadcastResponse> list(final BroadcastStatus status, final int page,
+                                        final int size) {
+        if (page < 0 || size < 1) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                "page는 0 이상, size는 1 이상이어야 합니다.");
+        }
+        final Pageable pageable = PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE));
+        final Page<Broadcast> found = switch (status) {
+            case null -> repository.findAllOrderByCreatedAtDesc(pageable);
+            case PREPARING -> repository.findAllPreparing(pageable);
+            case LIVE -> repository.findAllLive(pageable);
+            case ENDED -> repository.findAllEnded(pageable);
+        };
+        return found.map(BroadcastResponse::from);
+    }
+
+    @Transactional(readOnly = true)
     public Broadcast get(final long id) {
         return repository.findById(id)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
