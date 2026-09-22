@@ -44,6 +44,13 @@ public class Product extends BaseEntity {
         this.idempotencyKey = idempotencyKey;
     }
 
+    /** 검증된 값으로 기본정보를 바꾼다. 실제로 바뀐 값이 있으면 flush 때 version 이 오른다. */
+    public void changeBasicInfo(String name, String description, Long mainImageId) {
+        this.name = name;
+        this.description = description;
+        this.mainImageId = mainImageId;
+    }
+
     public String getName() {
         return name;
     }
