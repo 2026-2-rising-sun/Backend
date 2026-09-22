@@ -1,14 +1,18 @@
 package com.shoppinglive.commerce.sales.api;
 
+import com.shoppinglive.commerce.sales.application.SalesRegistrationService;
 import com.shoppinglive.commerce.sales.application.SalesService;
 import com.shoppinglive.commerce.sales.domain.Sales;
 import com.shoppinglive.commerce.sales.domain.SalesStock;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -22,9 +26,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class SalesController {
 
     private final SalesService salesService;
+    private final SalesRegistrationService salesRegistrationService;
 
-    public SalesController(SalesService salesService) {
+    public SalesController(
+        SalesService salesService, SalesRegistrationService salesRegistrationService) {
         this.salesService = salesService;
+        this.salesRegistrationService = salesRegistrationService;
+    }
+
+    /**
+     * 상품에 판매정보를 최초로 등록한다 (판매 1).
+     *
+     * <p>등록 직후 상태는 판매 준비({@code READY})라 아직 공개·주문 대상이 아니다. 판매를
+     * 시작하려면 이어서 판매 4 의 상태 변경을 호출한다.
+     *
+     * <p>상품 없음은 404, 이미 판매정보가 있는 상품은 409, 가격·재고 입력 제약 위반은 400.
+     */
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public SalesResponse register(@Valid @RequestBody RegisterSalesRequest request) {
+        Sales registered = salesRegistrationService.register(
+            request.productId(), request.price(), request.initialStock());
+        return SalesResponse.from(registered);
     }
 
     /**
