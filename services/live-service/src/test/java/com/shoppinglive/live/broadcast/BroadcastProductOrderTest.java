@@ -14,6 +14,11 @@ import com.shoppinglive.live.broadcast.infrastructure.BroadcastProductRepository
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,5 +143,30 @@ class BroadcastProductOrderTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"linkIds\":[" + ids.get(0) + "," + ids.get(1) + "]}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void concurrentReordersResolveTo200And409() throws Exception {
+        final Broadcast broadcast = register("order-concurrent");
+        final List<Long> ids = linkTwo(broadcast.getId());
+        final long version = versionOf(broadcast.getId());
+        final String body = "{\"linkIds\":[" + ids.get(1) + "," + ids.get(0) + "],"
+            + "\"expectedVersion\":" + version + "}";
+
+        final CyclicBarrier gate = new CyclicBarrier(2);
+        final Callable<Integer> call = () -> {
+            gate.await();
+            return mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
+                    .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andReturn().getResponse().getStatus();
+        };
+        final List<Integer> statuses;
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            final List<Future<Integer>> futures = List.of(pool.submit(call), pool.submit(call));
+            statuses = List.of(futures.get(0).get(), futures.get(1).get());
+        }
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(versionOf(broadcast.getId())).isEqualTo(version + 1);
     }
 }
