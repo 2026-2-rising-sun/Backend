@@ -36,8 +36,12 @@ shopping:
     allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
   # Commerce 판매정보 연동. stub | http.
   # Commerce 벌크 API(docs/commerce-sales-bulk-contract.md) 배포 전까지 stub 이 기본값.
+  # base-url 은 프로필별로만 둔다. 기본값을 두면 http 모드에서 base-url 누락 시 기동을 막는 검사가 무력해진다.
+  # timeout·재시도는 공개 목록 한 번의 최악 대기(시도 2회 × (연결 1s + 읽기 1s) + 대기 200ms ≈ 4s)를 기준으로 잡았다.
   sales-client:
     mode: stub
+    connect-timeout: 1s
+    read-timeout: 1s
 
 management:
   endpoints:
@@ -53,6 +57,24 @@ logging:
   pattern:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
 
+# http 모드 HttpSalesInfoClient 의 resilience 인스턴스. 값은 libs/common-resilience 공용 기본값을 따른다.
+# retry-exceptions 는 base-config 목록에 합쳐지지 않고 통째로 덮어쓰므로 기본 목록을 다시 적는다.
+# RestClient 는 I/O 오류(연결 거부·read timeout)를 ResourceAccessException 으로 감싸므로 추가해야 재시도된다.
+resilience4j:
+  circuitbreaker:
+    instances:
+      commerceSales:
+        base-config: shoppinglive-default
+  retry:
+    instances:
+      commerceSales:
+        base-config: shoppinglive-default
+        max-attempts: 2
+        retry-exceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+
 ---
 # 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
 # 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.
@@ -66,9 +88,12 @@ spring:
     password: ${POSTGRES_PASSWORD:changeme}
 
 # 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
+# sales-client.base-url 은 로컬에서 따로 띄운 commerce-service(server.port 8083). mode: http 로 바꿀 때 쓰인다.
 shopping:
   cors:
     allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  sales-client:
+    base-url: http://localhost:8083
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
@@ -89,6 +114,9 @@ spring:
 
 # Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
 # 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.
+# Commerce 판매정보 연동: commerce-service Service 이름·포트는 Infra 와 확인이 필요하다.
 shopping:
   image:
     public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:/api/shopping}
+  sales-client:
+    base-url: http://commerce-service:8080

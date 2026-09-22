@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * commerce-service 판매정보 조회 어댑터 계약. {@code shopping.sales-client.mode} 로 구현체를 고른다
- * ({@code stub}: 인메모리, 기본값 / {@code http}: Commerce {@code GET /v1/sales}, 후속 PR).
+ * ({@code stub}: 인메모리, 기본값 / {@code http}: Commerce {@code GET /v1/sales}).
  *
  * <p>모든 구현체가 지키는 계약:
  * <ul>
