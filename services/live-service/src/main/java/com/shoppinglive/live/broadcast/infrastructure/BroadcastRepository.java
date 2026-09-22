@@ -1,6 +1,7 @@
 package com.shoppinglive.live.broadcast.infrastructure;
 
 import com.shoppinglive.live.broadcast.domain.Broadcast;
+import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface BroadcastRepository extends JpaRepository<Broadcast, Long> {
     Optional<Broadcast> findByRequestKey(String requestKey);
+
+    long countByStatus(BroadcastStatus status);
 
     @Query("SELECT b FROM Broadcast b ORDER BY b.createdAt DESC, b.id DESC")
     Page<Broadcast> findAllOrderByCreatedAtDesc(Pageable pageable);

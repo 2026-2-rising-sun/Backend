@@ -10,6 +10,11 @@ import com.shoppinglive.live.broadcast.api.PublicBroadcastResponse;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.application.PublicBroadcastService;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
+import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
+import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.data.domain.Page;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -24,6 +29,7 @@ class PublicBroadcastQueryTest {
     @Autowired BroadcastService broadcasts;
     @Autowired PublicBroadcastService publicBroadcasts;
     @Autowired MockMvc mvc;
+    @Autowired BroadcastRepository repository;
 
     private Broadcast register(final String title) {
         return broadcasts.register(UUID.randomUUID().toString(),
@@ -71,5 +77,31 @@ class PublicBroadcastQueryTest {
         mvc.perform(get("/v1/broadcasts").param("size", "100"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void listStaysAccurateBeyondOneThousandRows() {
+        final List<Broadcast> bulk = new ArrayList<>();
+        for (int i = 0; i < 1200; i++) {
+            bulk.add(new Broadcast("bulk-" + UUID.randomUUID(), "bulk-fingerprint",
+                String.format("bulk-%04d", i),
+                Instant.parse("2030-01-01T00:00:00Z").plusSeconds(i),
+                "arn:aws:ivs:channel/bulk", "https://example.live-video.net/bulk"));
+        }
+        repository.saveAll(bulk);
+
+        final long total = repository.count();
+        assertThat(total).isGreaterThan(1200);
+        assertThat(repository.countByStatus(BroadcastStatus.PREPARING)).isGreaterThan(1200);
+
+        final Page<PublicBroadcastResponse> first = publicBroadcasts.list(0, 100);
+        assertThat(first.getTotalElements()).isEqualTo(total);
+        assertThat(first.getContent()).hasSize(100);
+
+        final int lastPage = (int) ((total - 1) / 100);
+        assertThat(lastPage).isGreaterThanOrEqualTo(12);
+        assertThat(publicBroadcasts.list(lastPage, 100).getContent())
+            .hasSize((int) (total - lastPage * 100L));
+        assertThat(publicBroadcasts.list(lastPage + 1, 100).getContent()).isEmpty();
     }
 }
