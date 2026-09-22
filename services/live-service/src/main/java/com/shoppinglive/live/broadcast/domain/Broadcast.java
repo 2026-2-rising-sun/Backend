@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "broadcast")
@@ -86,7 +87,8 @@ public class Broadcast extends BaseEntity {
             throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
         }
         this.status = BroadcastStatus.LIVE;
-        this.startedAt = now;
+        // DB timestamp의 마이크로초 정밀도와 맞춰 최초 응답과 재조회 응답을 동일하게 유지한다.
+        this.startedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     /**
@@ -101,7 +103,7 @@ public class Broadcast extends BaseEntity {
             return;
         }
         this.status = BroadcastStatus.ENDED;
-        this.endedAt = now;
+        this.endedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     public String getFingerprint() {
