@@ -1,0 +1,171 @@
+# IVS 준비 조회 및 시청 검증
+
+## 개요
+
+Issue #64 구현: AWS IVS 영상 시청 준비 상태를 조회하고 플레이백 URL을 확인하는 서비스.
+
+## 서비스 계약
+
+`IvsReadinessClient` 인터페이스는 두 가지 작업을 제공한다.
+
+### `boolean isReady(String channelArn)`
+
+주어진 채널 ARN의 현재 스트림 상태를 조회한다.
+
+- **READY**: 스트림이 LIVE + HEALTHY인 경우
+- **NOT_READY**: 채널이 미송출 상태(ChannelNotBroadcastingException) 또는 STARVING 상태인 경우
+- **UNAVAILABLE**: SDK 호출 실패, 권한 오류, 네트워크 오류 등 → `IvsUnavailableException` (원문 진단 미노출)
+
+### `IvsPlaybackInfo getPlaybackInfo(String channelArn)`
+
+채널 ARN의 플레이백 URL을 조회한다.
+
+- 성공: `IvsPlaybackInfo(playbackUrl)` 반환
+- 실패: URL이 없거나 SDK 호출 실패 → `IvsUnavailableException`
+
+## 구현 전략
+
+### AWS 모드 (기본값)
+
+환경 변수 또는 설정: `live.ivs.mode=aws` (기본값)
+
+- `GetStream`: 현재 스트림 상태 확인 (isReady)
+- `GetChannel`: 채널 플레이백 URL 확인 (getPlaybackInfo)
+- AWS 기본 자격증명 체인 사용 (boto profile, env vars, IAM role 등)
+- SDK 타임아웃: 전체 3초, 개별 시도 2초
+
+#### 자격증명 보안
+
+- 자격증명은 SDK 클라이언트 빌더(Region, credentials)에만 사용하며, 로그·응답에 기록하지 않음
+- AWS SDK 전체 응답을 직렬화하지 않음 (원문 진단이 민감 정보 포함 가능)
+- 각 SDK 예외를 `IvsUnavailableException`으로 감싸 원문 메시지 미노출
+
+### Stub 모드 (local/test 프로필)
+
+환경 변수 또는 설정:
+- `spring.profiles.active=local` 또는 `test`
+- `live.ivs.mode=stub`
+
+#### 특성
+
+- AWS 클라이언트 생성 안 함 → 자격증명 필요 없음
+- `isReady()`: `live.ivs.stub-ready` 설정값 반환 (기본값 false)
+- `getPlaybackInfo()`: 고정 테스트 URL 반환
+- 실제 영상 송출/수신 없음
+
+#### 활성화 조건
+
+- `local` 또는 `test` 프로필에서만 사용 가능
+- 다른 프로필에서 설정 시 애플리케이션 시작 실패 (fail-closed)
+
+## 테스트
+
+### 단위 테스트 (IvsReadinessTest)
+
+모든 테스트는 AWS SDK를 mock으로 교체하며, 실제 AWS 호출 없음.
+
+#### isReady 테스트
+
+1. **liveStreamIsReadyAndOfflineStreamIsNot**: LIVE + HEALTHY = true, ChannelNotBroadcasting = false
+2. **starvingOrUnknownHealthIsNotReady**: STARVING/null health = false
+3. **missingStreamIsNotReady**: stream이 null = false
+4. **networkAndPermissionFailuresAreUnavailableAndSanitized**: SDK 오류 → IvsUnavailableException (원문 미노출)
+
+#### getPlaybackInfo 테스트
+
+5. **getPlaybackUrlReturnsChannelPlaybackUrl**: GetChannel → playbackUrl 반환
+6. **getPlaybackUrlThrowsWhenChannelHasNoPlaybackUrl**: 채널에 playbackUrl 없음 → IvsUnavailableException
+7. **getPlaybackUrlThrowsWhenChannelResponseIsNull**: 채널 정보 없음 → IvsUnavailableException
+8. **getPlaybackUrlHandlesGetChannelErrors**: SDK 오류 → IvsUnavailableException (원문 미노출)
+
+#### Spring 설정 테스트
+
+9. **explicitLocalStubRequiresNoSdkAndCanSimulateReady**: stub 모드에서 AWS 클라이언트 미생성, 자격증명 불필요
+10. **testStubDefaultsToNotReady**: test 프로필의 stub은 false 반환
+11. **stubIsRejectedOutsideLocalAndTest**: dev 등 다른 프로필에서 stub 사용 시 실패
+12. **unknownModeFailsClosed**: 알 수 없는 mode 값은 실패
+13. **defaultModeUsesAwsWithoutCallingAwsDuringStartup**: AWS 모드가 기본값, 시작 시 AWS 호출 없음
+14. **stubProvidesPlaybackUrlWithoutSdk**: stub 모드에서 playbackUrl 제공, SDK 미생성
+
+## 설정
+
+### application.properties (기본값)
+
+```properties
+live.ivs.mode=aws
+live.ivs.region=ap-northeast-2
+live.ivs.stub-ready=false
+```
+
+### local/test 오버라이드
+
+```properties
+# application-local.properties
+spring.profiles.active=local
+live.ivs.mode=stub
+live.ivs.stub-ready=false
+
+# application-test.properties
+spring.profiles.active=test
+live.ivs.mode=stub
+live.ivs.stub-ready=false
+```
+
+## E2E 검증 (미완성 - 물리적 환경 필요)
+
+현재 단계에서는 자동 테스트(mock SDK)만 수행했다. 실제 AWS 송출·시청 검증은 다음 환경이 필요하다.
+
+### 준비 조건
+
+1. **AWS 계정**: 실제 IVS 채널 및 자격증명
+2. **OBS**: 실제 송출 (GetStream의 LIVE + HEALTHY 상태 재현)
+3. **브라우저/플레이어**: IVS Player 또는 hls.js 플레이어로 playbackUrl 재생 테스트
+4. **네트워크**: 로컬 개발 환경에서 AWS 접근 가능
+
+### 검증 절차 (수동)
+
+1. 기존 채널의 ARN과 playback URL을 방송에 등록한다.
+2. 송출 비밀은 OBS에만 설정한다.
+3. 미송출 시 `isReady(arn)` = false 확인.
+4. OBS에서 송출 시작 후 `isReady(arn)` = true 확인.
+5. `getPlaybackInfo(arn).playbackUrl()`이 실제 playback URL과 일치하는지 확인.
+6. 해당 URL을 IVS Player/플레이어로 열어 실제 영상·음성 재생 확인.
+7. OBS 일시 단절 후 업무 방송 상태 유지 여부, 재연결 후 재생 복구 여부 확인.
+
+### 블로커
+
+- 현재 환경에서는 실제 AWS 자격증명, 채널, OBS 송출 및 시청 클라이언트가 없어 E2E 검증 불가
+- 이 서비스는 **준비 상태 조회만 제공**하며, 영상 프록시나 재생 서버는 없음
+- 공개 시청은 FE가 playbackUrl을 IVS Player/hls.js로 직접 재생함
+
+## 의존성
+
+- `software.amazon.awssdk:ivs:2.49.6` (AWS SDK for Java v2)
+- Spring Boot 자동 설정 (Configuration)
+- Lombok (RequiredArgsConstructor)
+
+## 비밀 관리
+
+다음 항목은 로그, 응답, 테스트 fixture에 절대 기록하지 않는다.
+
+- AWS access key / secret key
+- Stream key (ingest secret)
+- 채널 stream key
+- AWS SDK 원문 예외 메시지 (connection details, diagnostic info 포함)
+
+## 향후 통합
+
+이 서비스는 현재 독립적인 조회 서비스로 구현되었다. 나중에 Broadcast 엔티티(Issue #59)와 통합할 때:
+
+1. Broadcast.channelArn을 저장한다.
+2. Broadcast 생성/조회 시 IvsReadinessClient를 호출해 현재 준비 상태를 조회한다.
+3. 준비 상태와 업무 상태(Broadcast.status)는 별개다. (송출이 정지되어도 방송 레코드는 유지 가능)
+4. 시청 URL은 IvsPlaybackInfo.playbackUrl()을 FE로 전달한다.
+
+## SDK 버전
+
+[AWS SDK for Java v2 2.49.6](https://github.com/aws/aws-sdk-java-v2/releases/tag/2.49.6)
+
+[IvsClient.getStream() 계약](https://docs.aws.amazon.com/java/api/latest/software/amazon/awssdk/services/ivs/IvsClient.html)
+
+[IvsClient.getChannel() 계약](https://docs.aws.amazon.com/java/api/latest/software/amazon/awssdk/services/ivs/IvsClient.html#getChannel-software.amazon.awssdk.services.ivs.model.GetChannelRequest-)
