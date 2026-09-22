@@ -13,11 +13,13 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.web.client.RestClient;
 
 /** 실제 HTTP 로 Shopping 봉투/Commerce raw 계약과 오류 구분을 검증한다. */
+@DisplayName("Shopping·Commerce 외부 client 계약과 오류 구분 (실제 HTTP 서버 기반)")
 class ProductClientsTest {
     private HttpServer server;
     private RestClient client;
@@ -36,6 +38,7 @@ class ProductClientsTest {
         server.stop(0);
     }
 
+    @DisplayName("Shopping 봉투 응답과 Commerce raw 배열을 한 번의 배치 호출로 읽는다")
     @Test
     void readsShoppingWrapperAndCommerceRawBatchInOneCall() {
         respond("/v1/internal/products", 200,
@@ -51,6 +54,7 @@ class ProductClientsTest {
             .extracting("status").containsExactly(SalesStatus.ON_SALE, SalesStatus.SOLD_OUT);
     }
 
+    @DisplayName("없는 상품은 NOT_FOUND, 상위 서비스 장애는 UNAVAILABLE로 구분한다")
     @Test
     void missingProductIsNotFoundWhileUpstreamFailureIsUnavailable() {
         respond("/v1/internal/products", 200, "{\"success\":true,\"data\":[],\"error\":null}");
@@ -66,6 +70,7 @@ class ProductClientsTest {
             ProductLookupException.Reason.UNAVAILABLE);
     }
 
+    @DisplayName("미배포 경로는 빈 결과가 아니라 UNAVAILABLE로 처리한다")
     @Test
     void undeployedPathIsUnavailableNotEmpty() {
         assertReason(() -> new HttpSalesClient(client).get(1L),
@@ -74,6 +79,7 @@ class ProductClientsTest {
             ProductLookupException.Reason.UNAVAILABLE);
     }
 
+    @DisplayName("알 수 없는 상태·필드 누락·중복·무관한 판매 응답을 모두 거절한다")
     @Test
     void rejectsUnknownStatusMissingFieldDuplicateAndForeignSales() {
         for (final String body : new String[] {
@@ -90,6 +96,7 @@ class ProductClientsTest {
         }
     }
 
+    @DisplayName("형식이 깨졌거나 무관한 Shopping 봉투 응답을 거절한다")
     @Test
     void rejectsMalformedOrForeignShoppingWrapper() {
         for (final String body : new String[] {"{}",
@@ -103,6 +110,7 @@ class ProductClientsTest {
         }
     }
 
+    @DisplayName("읽기 타임아웃이 나도 stub으로 폴백하지 않고 UNAVAILABLE로 실패한다")
     @Test
     void readTimeoutDoesNotFallBackToStub() {
         server.createContext("/v1/internal/products", exchange -> {
@@ -117,6 +125,7 @@ class ProductClientsTest {
             ProductLookupException.Reason.UNAVAILABLE);
     }
 
+    @DisplayName("배치 조회는 100건으로 제한되어 N+1 팬아웃을 막는다")
     @Test
     void batchIsCappedAtHundredSoNoNPlusOneFanOut() {
         final List<Long> tooMany = java.util.stream.LongStream.rangeClosed(1, 101).boxed().toList();
@@ -125,6 +134,7 @@ class ProductClientsTest {
             .hasMessageContaining("limited to 100");
     }
 
+    @DisplayName("stub 모드는 local·test 프로파일에서만 허용된다")
     @Test
     void stubRequiresLocalOrTestProfile() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
@@ -136,6 +146,7 @@ class ProductClientsTest {
             .hasMessageContaining("stub requires local or test profile");
     }
 
+    @DisplayName("http 모드는 상위 서비스 URL 설정을 요구한다")
     @Test
     void httpModeRequiresUpstreamUrl() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
