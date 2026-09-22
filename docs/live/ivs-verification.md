@@ -171,3 +171,47 @@ live.ivs.stub-ready=false
 [IvsClient.getStream() 계약](https://docs.aws.amazon.com/java/api/latest/software/amazon/awssdk/services/ivs/IvsClient.html)
 
 [IvsClient.getChannel() 계약](https://docs.aws.amazon.com/java/api/latest/software/amazon/awssdk/services/ivs/IvsClient.html#getChannel-software.amazon.awssdk.services.ivs.model.GetChannelRequest-)
+
+---
+
+## R12 공개 시청 연결 (#64)
+
+`GET /v1/broadcasts/{id}` 가 LIVE 방송에 한해 IVS 준비 상태를 조회해 `videoStatus` 로 돌려준다.
+
+| 응답 필드 | 의미 | 출처 |
+|---|---|---|
+| `status` | 업무 상태(예정/진행/종료) | Live DB |
+| `playbackAllowed` | 업무적으로 재생 진입을 제공하는가 | 업무 상태 LIVE 여부 |
+| `playbackUrl` | HLS 재생 URL. LIVE 에서만 반환 | 등록 시 저장된 값 |
+| `videoStatus` | 지금 이 순간의 영상 신호 | IVS GetStream |
+
+규칙:
+
+- 목록(`GET /v1/broadcasts`)은 IVS 를 호출하지 않는다. 방송 수만큼 SDK 호출이 늘어나는 것을 막는다.
+- IVS 조회가 실패해도 상세 응답은 200 이고 `videoStatus: UNAVAILABLE` 로만 표시된다.
+  외부 장애가 방송 기본정보 응답을 실패시키지 않는다.
+- OBS 가 잠시 끊기면 `videoStatus` 만 `NOT_READY` 가 되고 업무 상태는 LIVE 를 유지한다.
+  FE 는 재시도 안내를 띄우고 관리자는 종료를 누르지 않아도 된다.
+- 종료하면 `playbackAllowed: false` 이고 `playbackUrl` 과 `videoStatus` 는 모두 null 이다.
+  채널을 재사용해 새 송출이 시작돼도 종료된 방송 페이지는 그 URL 을 제공하지 않는다.
+  이미 공개 HLS URL 을 가진 사람의 접근 자체를 철회하는 기능은 P1 범위가 아니다.
+
+## 실제 검증 절차 (미수행 — 환경 없음)
+
+아래는 실행 절차이고, 이 PR 시점에 **실제로 수행하지 않았다**. blocker B3 가 열려 있다.
+
+필요한 것: 기존 IVS 채널, GetStream/GetChannel 읽기 권한만 가진 IAM 자격증명, OBS 송출자, FE 플레이어.
+
+1. `live.ivs.mode=aws`, `live.ivs.region` 을 지정하고 자격증명을 환경에 둔 채 기동한다.
+   자격증명·streamKey 는 설정 파일·로그·PR 본문에 남기지 않는다.
+2. OBS 송출 전: `POST /v1/admin/broadcasts/{id}/start` 가 409 "송출 중이 아닙니다" 인지 확인한다.
+3. OBS 송출 시작 → 같은 요청이 200 LIVE 이고 `startedAt` 이 기록되는지 확인한다.
+4. `GET /v1/broadcasts/{id}` 의 `playbackUrl` 로 FE 플레이어가 실제로 재생되는지 확인한다.
+5. OBS 를 30초 끊었다가 재연결한다. 업무 상태는 LIVE 를 유지하고 `videoStatus` 만
+   `NOT_READY` → `READY` 로 돌아오는지 확인한다.
+6. `POST /v1/admin/broadcasts/{id}/end` 후 공개 상세에 재생 진입이 없는지 확인한다.
+   OBS 는 운영자가 수동으로 중단한다.
+7. 같은 채널로 다른 방송을 등록해 동시 LIVE 시도가 409 인지 확인한다.
+
+기록할 것: 실행 환경·시각·각 단계 결과·로그 위치. 자격증명과 송출키는 기록하지 않는다.
+이 절차를 통과하기 전에는 P1 전체 완료로 표시하지 않는다.
