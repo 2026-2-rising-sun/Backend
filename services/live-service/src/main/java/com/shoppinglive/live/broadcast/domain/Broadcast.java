@@ -10,6 +10,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "broadcast")
@@ -70,6 +71,27 @@ public class Broadcast extends BaseEntity {
     }
 
     /**
+     * PREPARING → LIVE. 이미 LIVE 면 최초 startedAt 을 보존하며 성공하고,
+     * ENDED 재시작은 409 다. 외부 준비 확인은 호출자가 이 트랜잭션 밖에서 마친다.
+     */
+    public void start(final long expectedVersion, final Instant now) {
+        // 멱등 판정이 version 검사보다 먼저다. 시작 성공이 version 을 올리므로,
+        // 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 성공해야 한다.
+        if (status == BroadcastStatus.LIVE) {
+            return;
+        }
+        if (status == BroadcastStatus.ENDED) {
+            throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
+        }
+        if (version != expectedVersion) {
+            throw new BusinessException(ErrorCode.CONFLICT, "방송이 변경되었습니다. 다시 조회하세요.");
+        }
+        this.status = BroadcastStatus.LIVE;
+        // DB timestamp의 마이크로초 정밀도와 맞춰 최초 응답과 재조회 응답을 동일하게 유지한다.
+        this.startedAt = now.truncatedTo(ChronoUnit.MICROS);
+    }
+
+    /**
      * LIVE → ENDED. 반복 종료는 최초 endedAt 을 보존하며 성공하고, 준비 상태 종료는 409 다.
      * 종료는 주문·결제·재고·송출에 관여하지 않는다.
      */
@@ -81,7 +103,7 @@ public class Broadcast extends BaseEntity {
             return;
         }
         this.status = BroadcastStatus.ENDED;
-        this.endedAt = now;
+        this.endedAt = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     public String getFingerprint() {
