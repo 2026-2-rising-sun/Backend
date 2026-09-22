@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.shoppinglive.live.broadcast.api.BroadcastInput;
 import com.shoppinglive.live.broadcast.api.BroadcastPatchInput;
+import java.util.Optional;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
@@ -94,8 +95,8 @@ class BroadcastRegistrationTest {
         final Broadcast registered = service.register("edit-1", input);
         final long originalVersion = registered.getVersion();
 
-        final BroadcastPatchInput patch = new BroadcastPatchInput("updated", past, channelArn,
-            playbackUrl);
+        final BroadcastPatchInput patch = new BroadcastPatchInput(Optional.of("updated"),
+            Optional.of(past), Optional.of(channelArn), Optional.of(playbackUrl));
         final Broadcast edited = service.edit(registered.getId(), originalVersion, patch);
 
         assertThat(edited.getTitle()).isEqualTo("updated");
@@ -106,8 +107,8 @@ class BroadcastRegistrationTest {
     void editingWithWrongVersionThrows409() {
         final BroadcastInput input = new BroadcastInput("title", past, channelArn, playbackUrl);
         final Broadcast registered = service.register("edit-2", input);
-        final BroadcastPatchInput patch = new BroadcastPatchInput("title2", past, channelArn,
-            playbackUrl);
+        final BroadcastPatchInput patch = new BroadcastPatchInput(Optional.of("title2"),
+            Optional.of(past), Optional.of(channelArn), Optional.of(playbackUrl));
         assertThatThrownBy(() -> service.edit(registered.getId(), registered.getVersion() + 1,
             patch)).hasMessageContaining("변경되었습니다");
     }
@@ -167,18 +168,51 @@ class BroadcastRegistrationTest {
     }
 
     @Test
-    void httpPostResponseDoesNotExposeChannelArn() throws Exception {
+    void adminResponseExposesIvsFieldsForOperatorVerification() throws Exception {
+        // 관리 응답은 운영자가 채널/재생 URL 일치를 확인해야 하므로 IVS 필드를 포함한다.
+        // 비밀 필드(requestKey/fingerprint)는 어떤 응답에도 넣지 않는다.
         final String body = String.format(
             """
-            {"title":"secret-arn","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
+            {"title":"admin-arn","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
         mvc.perform(post("/v1/admin/broadcasts")
-            .header("Idempotency-Key", "secret-key")
+            .header("Idempotency-Key", "admin-key")
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.data.channelArn").doesNotExist())
-            .andExpect(jsonPath("$.data.playbackUrl").doesNotExist());
+            .andExpect(jsonPath("$.data.channelArn").value(channelArn))
+            .andExpect(jsonPath("$.data.requestKey").doesNotExist())
+            .andExpect(jsonPath("$.data.fingerprint").doesNotExist());
+    }
+
+    @Test
+    void omittedPatchFieldsKeepCurrentValues() {
+        final Broadcast registered = service.register("patch-keep",
+            new BroadcastInput("keep", past, channelArn, playbackUrl));
+        final Broadcast edited = service.edit(registered.getId(), registered.getVersion(),
+            new BroadcastPatchInput(Optional.of("renamed"), null, null, null));
+        assertThat(edited.getTitle()).isEqualTo("renamed");
+        assertThat(edited.getScheduledAt()).isEqualTo(past);
+        assertThat(edited.getChannelArn()).isEqualTo(channelArn);
+        assertThat(edited.getPlaybackUrl()).isEqualTo(playbackUrl);
+    }
+
+    @Test
+    void explicitNullPatchFieldIsRejected() {
+        final Broadcast registered = service.register("patch-null",
+            new BroadcastInput("null-test", past, channelArn, playbackUrl));
+        assertThatThrownBy(() -> service.edit(registered.getId(), registered.getVersion(),
+            new BroadcastPatchInput(Optional.empty(), null, null, null)))
+            .hasMessageContaining("null을 지정할 수 없습니다");
+    }
+
+    @Test
+    void ivsFieldsMustBePatchedAsAPair() {
+        final Broadcast registered = service.register("patch-pair",
+            new BroadcastInput("pair", past, channelArn, playbackUrl));
+        assertThatThrownBy(() -> service.edit(registered.getId(), registered.getVersion(),
+            new BroadcastPatchInput(null, null, Optional.of("arn:other"), null)))
+            .hasMessageContaining("함께 변경");
     }
 
     @Test

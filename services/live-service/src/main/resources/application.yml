@@ -3,6 +3,9 @@ spring:
     name: live-service
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 server:
   port: 8084

@@ -9,3 +9,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  # 마이그레이션은 PostgreSQL 전용 구문(partial unique index)을 쓰므로 H2 에서는 돌리지 않는다.
+  # 실제 migration 검증은 postgres 프로파일 테스트(LIVE_PG_TEST=1)로 한다.
+  flyway:
+    enabled: false

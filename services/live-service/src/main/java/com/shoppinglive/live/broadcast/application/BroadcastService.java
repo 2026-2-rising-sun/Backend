@@ -48,10 +48,27 @@ public class BroadcastService {
     @Transactional
     public Broadcast edit(final long id, final long version, final BroadcastPatchInput input) {
         final Broadcast broadcast = get(id);
-        broadcast.edit(version, input.title(), input.scheduledAt(), input.channelArn(),
-            input.playbackUrl());
+        if (input.channelArn() == null ^ input.playbackUrl() == null) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST,
+                "channelArn과 playbackUrl은 함께 변경해야 합니다.");
+        }
+        broadcast.edit(version,
+            patched("title", input.title(), broadcast.getTitle()),
+            patched("scheduledAt", input.scheduledAt(), broadcast.getScheduledAt()),
+            patched("channelArn", input.channelArn(), broadcast.getChannelArn()),
+            patched("playbackUrl", input.playbackUrl(), broadcast.getPlaybackUrl()));
         repository.flush();
         return broadcast;
+    }
+
+    /** 생략(null)은 기존 값 유지, 명시적 null(Optional.empty)은 거절. */
+    private static <T> T patched(final String field, final java.util.Optional<T> given,
+                                 final T current) {
+        if (given == null) {
+            return current;
+        }
+        return given.orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST,
+            field + "에 null을 지정할 수 없습니다."));
     }
 
     public Broadcast get(final long id) {
