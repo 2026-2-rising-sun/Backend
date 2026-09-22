@@ -204,4 +204,18 @@ class BroadcastProductLinkTest {
         // no-op 삭제는 version 을 건드리지 않는다.
         assertThat(versionOf(broadcast.getId())).isEqualTo(afterDelete);
     }
+
+    @Test
+    void endedBroadcastRejectsUnlinkEvenForAMissingLinkId() {
+        final Broadcast broadcast = register("unlink-ended-missing");
+        forceLive(broadcast.getId());
+        final BroadcastProduct target =
+            products.link(broadcast.getId(), 1L, versionOf(broadcast.getId()));
+        broadcasts.end(broadcast.getId());
+
+        // 존재하지 않는(이미 해제된) linkId 라도 ENDED 는 읽기 전용이므로 no-op 취급하지 않는다.
+        assertThatThrownBy(() ->
+            products.unlink(broadcast.getId(), target.getId() + 999, versionOf(broadcast.getId())))
+            .hasMessageContaining("종료된 방송");
+    }
 }
