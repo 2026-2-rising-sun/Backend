@@ -44,7 +44,7 @@ public class ImageValidator {
             throw invalid("빈 파일입니다");
         }
         if (content.length > properties.maxSize().toBytes()) {
-            throw invalid("이미지 용량이 " + properties.maxSizeLabel() + " 를 초과합니다");
+            throw invalid(oversizeMessage(properties));
         }
         ImageFormat format = ImageFormat.detect(content)
                 .filter(detected -> properties.allowedTypes().contains(detected.contentType()))
@@ -58,6 +58,11 @@ public class ImageValidator {
             throw invalid("파일 확장자가 실제 이미지 형식과 일치하지 않습니다");
         }
         return decode(format, content);
+    }
+
+    /** multipart 한도에 걸린 요청도 같은 안내를 받도록 공개한다. */
+    public static String oversizeMessage(ImageStorageProperties properties) {
+        return "이미지 용량이 " + properties.maxSizeLabel() + " 를 초과합니다";
     }
 
     /** 값이 없거나 형식을 모르는 클라이언트(curl 등)가 보내는 application/octet-stream 은 "미지정"으로 본다. */
