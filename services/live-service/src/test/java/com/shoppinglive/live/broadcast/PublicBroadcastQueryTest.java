@@ -14,6 +14,7 @@ import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.springframework.data.domain.Page;
 import java.time.Instant;
 import java.util.UUID;
@@ -25,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@DisplayName("공개 방송 목록·상세 조회 (상태 표기, 비밀 필드 은닉, 대량 페이지네이션)")
 class PublicBroadcastQueryTest {
     @Autowired BroadcastService broadcasts;
     @Autowired PublicBroadcastService publicBroadcasts;
@@ -37,6 +39,7 @@ class PublicBroadcastQueryTest {
                 "arn:aws:ivs:channel/" + title, "https://example.live-video.net/" + title));
     }
 
+    @DisplayName("PREPARING 방송은 '예정'으로 표기되고 재생 정보가 제공되지 않는다")
     @Test
     void preparingBroadcastIsShownAsScheduledWithoutPlayback() {
         final Broadcast broadcast = register("public-preparing");
@@ -46,6 +49,7 @@ class PublicBroadcastQueryTest {
         assertThat(response.playbackAllowed()).isFalse();
     }
 
+    @DisplayName("공개 목록은 페이지 크기 100 제한과 범위 밖 조회를 안전하게 처리한다")
     @Test
     void listIsPagedAndNeverFails() {
         register("public-list");
@@ -54,11 +58,13 @@ class PublicBroadcastQueryTest {
         assertThat(publicBroadcasts.list(999, 20).getContent()).isEmpty();
     }
 
+    @DisplayName("존재하지 않는 방송을 공개 조회하면 404를 반환한다")
     @Test
     void missingBroadcastIs404() throws Exception {
         mvc.perform(get("/v1/broadcasts/{id}", 999_999L)).andExpect(status().isNotFound());
     }
 
+    @DisplayName("공개 응답은 channelArn·requestKey 등 비밀 필드를 노출하지 않는다")
     @Test
     void publicResponseHidesSecretFields() throws Exception {
         final Broadcast broadcast = register("public-secret");
@@ -71,6 +77,7 @@ class PublicBroadcastQueryTest {
             .andExpect(jsonPath("$.data.playbackUrl").doesNotExist());
     }
 
+    @DisplayName("공개 목록 API는 공통 응답 envelope로 반환한다")
     @Test
     void publicListEndpointReturnsEnvelope() throws Exception {
         register("public-http-list");
@@ -79,6 +86,7 @@ class PublicBroadcastQueryTest {
             .andExpect(jsonPath("$.success").value(true));
     }
 
+    @DisplayName("1200건을 넘겨도 공개 목록의 총건수와 마지막 페이지가 정확하다")
     @Test
     void listStaysAccurateBeyondOneThousandRows() {
         final List<Broadcast> bulk = new ArrayList<>();
