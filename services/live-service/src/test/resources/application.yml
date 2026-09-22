@@ -1,6 +1,8 @@
 # context-load 테스트는 Docker 없이 CI에서도 돌아야 하므로 in-memory H2를 쓴다.
 # 실제 Postgres 연동 확인은 local 프로필로 기동해서 한다.
 spring:
+  profiles:
+    active: test
   datasource:
     url: jdbc:h2:mem:live;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
     driver-class-name: org.h2.Driver
@@ -13,3 +15,7 @@ spring:
   # 실제 migration 검증은 postgres 프로파일 테스트(LIVE_PG_TEST=1)로 한다.
   flyway:
     enabled: false
+
+live:
+  products:
+    mode: stub
