@@ -1,0 +1,20 @@
+# 실제 PostgreSQL 에 Flyway migration 을 적용해 DB 불변조건(partial/unique index)을 검증한다.
+# H2 는 partial unique index 를 지원하지 않으므로 이 검증을 대체할 수 없다.
+# 기동:
+#   docker run -d --name live-pg-test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=live_test \
+#     -p 55432:5432 postgres:16
+# 실행:
+#   LIVE_PG_TEST=1 ./gradlew :services:live-service:test --tests '*Postgres*' --no-daemon
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${LIVE_PG_PORT:55432}/live_test
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: test
+  flyway:
+    enabled: true
+    clean-disabled: false
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      ddl-auto: validate
