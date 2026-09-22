@@ -176,9 +176,12 @@ class SalesStatusConcurrencyTest {
 
     private static void awaitQuietly(CountDownLatch latch) {
         try {
-            latch.await(5, TimeUnit.SECONDS);
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Both transactions did not reach the read barrier");
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw new IllegalStateException("Read barrier interrupted", e);
         }
     }
 }

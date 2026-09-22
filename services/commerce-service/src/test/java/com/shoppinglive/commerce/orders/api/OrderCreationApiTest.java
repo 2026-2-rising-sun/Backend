@@ -19,6 +19,9 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -160,6 +163,26 @@ class OrderCreationApiTest {
         assertThat(orderRepository.findAll()).hasSize(1);
         SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
         assertThat(stock.getReserved()).as("재고도 한 번만 잡힌다").isEqualTo(2);
+    }
+
+    static Stream<Map<String, Object>> conflictingRequests() {
+        return Stream.of(Map.of("productId", 999L), Map.of("quantity", 1),
+            Map.of("buyerName", "다른 구매자"), Map.of("buyerPhone", "010-9999-0000"),
+            Map.of("lookupPassword", "different-secret"), Map.of("expectedTotalAmount", 999L));
+    }
+
+    @ParameterizedTest
+    @MethodSource("conflictingRequests")
+    void 같은_키에_다른_요청은_409이고_원주문을_노출하지_않는다(Map<String, Object> changes) throws Exception {
+        order(body(Map.of()), "key-1").andExpect(status().isCreated());
+        order(body(changes), "key-1")
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.error.code").value("CONFLICT"))
+            .andExpect(jsonPath("$.orderNumber").doesNotExist())
+            .andExpect(jsonPath("$.buyerName").doesNotExist())
+            .andExpect(jsonPath("$.data").isEmpty());
+        assertThat(orderRepository.count()).isEqualTo(1);
+        assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
     }
 
     @Test

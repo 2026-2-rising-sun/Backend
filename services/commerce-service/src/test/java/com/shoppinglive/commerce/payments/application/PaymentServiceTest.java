@@ -16,6 +16,7 @@ import com.shoppinglive.commerce.payments.domain.PaymentScenario;
 import com.shoppinglive.commerce.payments.domain.PaymentStatus;
 import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository;
 import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
+import com.shoppinglive.commerce.sales.application.SalesService;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class PaymentServiceTest {
 
     @Mock
     private SalesStockJpaRepository salesStockRepository;
+
+    @Mock
+    private SalesService salesService;
 
     @Mock
     private MockPaymentEngine mockPaymentEngine;
@@ -101,13 +105,15 @@ class PaymentServiceTest {
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
         given(paymentAttemptRepository.resolveIfProcessing(100L, "SUCCESS")).willReturn(1);
+        given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).willReturn(1);
+        given(salesStockRepository.consumeReserved(order.getSalesInfoId(), 1)).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
         paymentService.resolvePayment(100L);
 
         verify(orderRepository).transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID");
         verify(salesStockRepository).consumeReserved(order.getSalesInfoId(), 1);
-        verify(salesStockRepository, never()).restoreReserved(any(), any(Integer.class));
+        verify(salesService, never()).restoreReserved(any(), any(Integer.class));
     }
 
     @Test
@@ -116,12 +122,13 @@ class PaymentServiceTest {
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
         given(paymentAttemptRepository.resolveIfProcessing(100L, "FAILED")).willReturn(1);
+        given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
         paymentService.resolvePayment(100L);
 
         verify(orderRepository).transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED");
-        verify(salesStockRepository).restoreReserved(order.getSalesInfoId(), 1);
+        verify(salesService).restoreReserved(order.getSalesInfoId(), 1);
         verify(salesStockRepository, never()).consumeReserved(any(), any(Integer.class));
     }
 

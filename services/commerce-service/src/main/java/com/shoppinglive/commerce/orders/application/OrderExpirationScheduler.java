@@ -3,7 +3,7 @@ package com.shoppinglive.commerce.orders.application;
 import com.shoppinglive.commerce.orders.domain.Order;
 import com.shoppinglive.commerce.orders.domain.OrderStatus;
 import com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository;
-import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
+import com.shoppinglive.commerce.sales.application.SalesService;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -29,14 +29,15 @@ public class OrderExpirationScheduler {
     private static final int BATCH_SIZE = 100;
 
     private final OrderJpaRepository orderRepository;
-    private final SalesStockJpaRepository salesStockRepository;
+    private final SalesService salesService;
 
     public OrderExpirationScheduler(
-        OrderJpaRepository orderRepository, SalesStockJpaRepository salesStockRepository) {
+        OrderJpaRepository orderRepository, SalesService salesService) {
         this.orderRepository = orderRepository;
-        this.salesStockRepository = salesStockRepository;
+        this.salesService = salesService;
     }
 
+    @Transactional
     @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")
     public void runScheduled() {
         int processed = processExpiredOrders();
@@ -60,13 +61,7 @@ public class OrderExpirationScheduler {
         for (Order order : candidates) {
             int updated = orderRepository.expireOrder(order.getId());
             if (updated == 1) {
-                int restored = salesStockRepository
-                    .restoreReserved(order.getSalesInfoId(), order.getQuantity());
-                if (restored == 0) {
-                    log.warn(
-                        "stock reserved insufficient during expiration: orderNumber={}",
-                        order.getOrderNumber());
-                }
+                salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
                 expired++;
             }
             // updated == 0 이면 이미 다른 흐름에서 상태 전이 (결제 시작·수동 취소 등). 무해.

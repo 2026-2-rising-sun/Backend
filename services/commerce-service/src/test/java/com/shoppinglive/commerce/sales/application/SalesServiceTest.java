@@ -129,6 +129,7 @@ class SalesServiceTest {
     void changeStatus_READY_에서_ON_SALE_로_전이_성공() {
         Sales sales = new Sales(100L, 10_000L, SalesStatus.READY);
         given(salesRepository.findById(1L)).willReturn(Optional.of(sales));
+        given(salesStockRepository.findById(1L)).willReturn(Optional.of(new SalesStock(1L, 1, 0)));
         given(salesRepository.transitionStatus(1L, "READY", "ON_SALE")).willReturn(1);
         // 전이 후 재조회는 새 sales 인스턴스일 수 있으나 mock 은 같은 인스턴스 반환
 
@@ -167,6 +168,7 @@ class SalesServiceTest {
     void changeStatus_조건부_UPDATE_실패시_ConcurrentStateChangeException() {
         Sales sales = new Sales(100L, 10_000L, SalesStatus.READY);
         given(salesRepository.findById(1L)).willReturn(Optional.of(sales));
+        given(salesStockRepository.findById(1L)).willReturn(Optional.of(new SalesStock(1L, 1, 0)));
         given(salesRepository.transitionStatus(1L, "READY", "ON_SALE")).willReturn(0);
 
         assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.ON_SALE))

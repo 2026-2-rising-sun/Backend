@@ -320,6 +320,9 @@ class OrderCreationServiceTest {
     @Test
     void create_같은_멱등키_재전송은_기존_주문을_돌려주고_새로_만들지_않는다() {
         Order existing = existingOrder();
+        given(salesRepository.findById(SALES_ID))
+            .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(passwordEncoder.matches("secret", "hashed")).willReturn(true);
         given(orderRepository.findByIdempotencyKey("key-1")).willReturn(Optional.of(existing));
 
         OrderCreationResult result = orderCreationService.create(command(2, null), "key-1");
@@ -339,6 +342,9 @@ class OrderCreationServiceTest {
         productExists();
         given(passwordEncoder.encode("secret")).willReturn("hashed");
         Order existing = existingOrder();
+        given(salesRepository.findById(SALES_ID))
+            .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(passwordEncoder.matches("secret", "hashed")).willReturn(true);
         given(orderRepository.findByIdempotencyKey("key-1"))
             .willReturn(Optional.empty())
             .willReturn(Optional.of(existing));

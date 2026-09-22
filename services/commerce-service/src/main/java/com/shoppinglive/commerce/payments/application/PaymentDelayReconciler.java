@@ -59,8 +59,9 @@ public class PaymentDelayReconciler {
         int count = 0;
         for (PaymentAttempt attempt : overdue) {
             // resolvePayment 는 idempotent. 조건부 UPDATE 로 이미 확정된 것은 자연스럽게 스킵.
-            paymentService.resolvePayment(attempt.getId());
-            count++;
+            if (paymentService.resolvePayment(attempt.getId())) {
+                count++;
+            }
         }
         return count;
     }
