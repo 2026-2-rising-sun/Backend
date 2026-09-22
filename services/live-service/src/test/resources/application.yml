@@ -19,3 +19,5 @@ spring:
 live:
   products:
     mode: stub
+  ivs:
+    mode: stub
