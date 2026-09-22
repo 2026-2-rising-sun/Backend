@@ -49,5 +49,5 @@ Infra의 k8s Ingress(nginx `rewrite-target`)가 prefix를 벗겨낸 뒤 넘기�
 참조 가능하며, 위반 시 `shoppinglive.module-boundary-conventions` 플러그인이 빌드를 실패시킵니다.
 
 서비스 간 통신은 Kafka 이벤트(비동기) 또는 REST(동기, `libs/common-resilience` 적용)로만 합니다.
-자세한 배경은 [ADR-0001](docs/decisions/0001-record-architecture-decisions.md),
-이벤트 스키마 변경 규칙은 [ADR-0002](docs/decisions/0002-event-schema-compatibility-policy.md)를 보세요.
+기능·API·ERD·팀 컨벤션·설계 결정은 [팀 문서 시작 페이지](https://app.notion.com/p/3e3226545d158160b249d823be7085e2)에서 관리합니다.
+공유용 Markdown은 저장소에 추가하지 않으며, 실행 가능한 OpenAPI YAML과 이벤트 계약은 Git으로 관리합니다.

@@ -21,3 +21,8 @@ build/
 .env
 
 .omc/
+
+# Shared documentation is maintained in Notion.
+docs/**/*.md
+services/*/docs/**/*.md
+contracts/api/README.md
