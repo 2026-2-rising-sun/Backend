@@ -93,8 +93,12 @@ public class BroadcastProductService {
 
         final BroadcastProduct link = links.findById(linkId).orElse(null);
         if (link == null) {
-            // 이미 해제된 linkId 는 순수 no-op 이다. version 을 검사하지도 올리지도 않는다.
-            // 그래야 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 204 다.
+            // 이미 해제된 linkId 는 순수 no-op 이다. version 은 검사하지도 올리지도 않아
+            // 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 204 다.
+            // 다만 ENDED 는 읽기 전용이므로 no-op 이라도 거절해야 한다.
+            if (broadcast.getStatus() == BroadcastStatus.ENDED) {
+                throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 읽기 전용입니다.");
+            }
             return;
         }
         requireChangeable(broadcast, expectedVersion);
