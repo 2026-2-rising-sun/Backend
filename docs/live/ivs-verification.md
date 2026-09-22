@@ -153,14 +153,16 @@ live.ivs.stub-ready=false
 - 채널 stream key
 - AWS SDK 원문 예외 메시지 (connection details, diagnostic info 포함)
 
-## 향후 통합
+## Broadcast 연동 (완료)
 
-이 서비스는 현재 독립적인 조회 서비스로 구현되었다. 나중에 Broadcast 엔티티(Issue #59)와 통합할 때:
+이 문서 초안 시점(R9)에는 이 서비스가 Broadcast와 분리된 독립 조회 서비스였다. 이후 R10(#65)·R12(#64 시청 연결)에서 다음과 같이 통합이 끝났고, 현재 dev 제출 Stack(`feat/#64-viewing`, PR #83 기준)에 반영돼 있다:
 
-1. Broadcast.channelArn을 저장한다.
-2. Broadcast 생성/조회 시 IvsReadinessClient를 호출해 현재 준비 상태를 조회한다.
-3. 준비 상태와 업무 상태(Broadcast.status)는 별개다. (송출이 정지되어도 방송 레코드는 유지 가능)
-4. 시청 URL은 IvsPlaybackInfo.playbackUrl()을 FE로 전달한다.
+1. `Broadcast.channelArn`을 저장하고 있다(#59, `broadcast` 테이블).
+2. `BroadcastStartService.start()`가 시작 직전 `IvsReadinessClient`를 호출해 READY(LIVE+HEALTHY) 및 channelArn/playbackUrl 동일성을 확인한다 — 미준비/불일치 시 시작을 거절한다.
+3. `PublicBroadcastService`가 공개 상세 조회(`GET /v1/broadcasts/{id}`) 시 `IvsReadinessClient`를 호출해 `videoStatus`(READY/NOT_READY/UNAVAILABLE)를 채운다. 준비 상태(videoStatus)와 업무 상태(`Broadcast.status`)는 여전히 별개다 — 송출이 끊겨도 업무 상태는 LIVE로 유지된다. 목록 조회는 N+1을 피하기 위해 `videoStatus`를 채우지 않는다(null).
+4. 시청 URL은 `PublicBroadcastResponse.playbackUrl`로 FE에 전달되며, `playbackAllowed`(=`status==LIVE`)가 true일 때만 `videoStatus`도 함께 채워진다. ENDED/PREPARING은 둘 다 null이다.
+
+실제 검증 절차는 위 "E2E 검증" 절을 따르되, 위 통합 지점(BroadcastStartService, PublicBroadcastService)이 실제 코드 경로임을 전제로 한다.
 
 ## SDK 버전
 
