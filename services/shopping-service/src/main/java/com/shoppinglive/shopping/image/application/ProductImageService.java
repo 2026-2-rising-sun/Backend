@@ -1,5 +1,7 @@
 package com.shoppinglive.shopping.image.application;
 
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.image.domain.ProductImage;
 import com.shoppinglive.shopping.image.infrastructure.ProductImageRepository;
 import java.io.ByteArrayInputStream;
@@ -47,6 +49,13 @@ public class ProductImageService {
             }
             throw e;
         }
+    }
+
+    /** 행이 없거나 파일이 없으면 NOT_FOUND. */
+    public ImageFile getFile(Long imageId) {
+        ProductImage image = repository.findById(imageId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "이미지를 찾을 수 없습니다"));
+        return new ImageFile(image.getContentType(), image.getSizeBytes(), storage.load(image.getStorageKey()));
     }
 
     /** 브라우저에 따라 전체 경로가 오기도 하므로 파일명만 남기고 컬럼 길이에 맞춘다. */
