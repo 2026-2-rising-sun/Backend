@@ -18,7 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
  * H2 통과는 이 검증의 증거가 되지 못한다. 실행 방법은 application-postgres.yml 주석 참고.
  */
 @SpringBootTest
-@ActiveProfiles("postgres")
+@ActiveProfiles({"test", "postgres"})
 @EnabledIfEnvironmentVariable(named = "LIVE_PG_TEST", matches = "1")
 @DisplayName("실제 PostgreSQL에서 Flyway 마이그레이션과 DB 불변조건 검증")
 class PostgresMigrationTest {
@@ -51,6 +51,24 @@ class PostgresMigrationTest {
         insertBroadcast("dup-key", "arn:aws:ivs:channel/a", "PREPARING");
         assertThatThrownBy(() -> insertBroadcast("dup-key", "arn:aws:ivs:channel/b", "PREPARING"))
             .hasMessageContaining("broadcast_request_key_key");
+    }
+
+    @Test
+    void duplicateProductOnSameBroadcastViolatesUniqueConstraint() {
+        insertBroadcast("bp-key", "arn:aws:ivs:channel/bp", "PREPARING");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'bp-key'", Long.class);
+        insertLink(broadcastId, 7L, 0);
+        assertThatThrownBy(() -> insertLink(broadcastId, 7L, 1))
+            .hasMessageContaining("uk_broadcast_product");
+    }
+
+    void insertLink(final Long broadcastId, final long productId, final int position) {
+        jdbc.update("""
+            INSERT INTO broadcast_product (created_at, updated_at, broadcast_id, product_id,
+                sales_id, position)
+            VALUES (now(), now(), ?, ?, ?, ?)
+            """, broadcastId, productId, productId + 100, position);
     }
 
     void insertBroadcast(final String requestKey, final String channelArn, final String status) {
