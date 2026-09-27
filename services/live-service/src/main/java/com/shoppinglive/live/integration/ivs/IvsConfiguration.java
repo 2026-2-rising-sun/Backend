@@ -40,11 +40,17 @@ public class IvsConfiguration {
             return new IvsReadinessClient() {
                 @Override
                 public boolean isReady(final String channelArn) {
+                    if (properties.stubUnavailable()) {
+                        throw new IvsUnavailableException();
+                    }
                     return properties.stubReady();
                 }
 
                 @Override
                 public IvsPlaybackInfo getPlaybackInfo(final String channelArn) {
+                    if (properties.stubUnavailable()) {
+                        throw new IvsUnavailableException();
+                    }
                     // 채널마다 다른 URL 을 돌려주어야 #65 의 채널-URL 동일성 검사를 stub 에서도
                     // 실제로 검증할 수 있다. 실제 모드의 URL 은 GetChannel 이 준다.
                     return new IvsPlaybackInfo(stubPlaybackUrl(channelArn));
