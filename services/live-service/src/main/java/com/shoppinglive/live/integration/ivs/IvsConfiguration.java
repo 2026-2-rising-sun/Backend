@@ -1,6 +1,7 @@
 package com.shoppinglive.live.integration.ivs;
 
 import java.time.Duration;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -31,7 +32,7 @@ public class IvsConfiguration {
 
     @Bean
     IvsReadinessClient ivsReadinessClient(final IvsProperties properties,
-            final org.springframework.beans.factory.ObjectProvider<IvsClient> client, final Environment environment) {
+            final ObjectProvider<IvsClient> client, final Environment environment) {
         if ("stub".equals(properties.mode())) {
             if (!environment.acceptsProfiles(Profiles.of("local", "test"))) {
                 throw new IllegalStateException("IVS stub requires local or test profile");
