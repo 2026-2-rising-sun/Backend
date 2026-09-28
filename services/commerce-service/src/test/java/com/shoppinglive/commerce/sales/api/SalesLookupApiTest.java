@@ -154,9 +154,26 @@ class SalesLookupApiTest {
             .andExpect(jsonPath("$.length()").value(0));
     }
 
+    /**
+     * 무엇을 조회할지 정하지 않은 요청이다. 전체를 내보낼지 아무것도 안 내보낼지 서버가 정할
+     * 수 없으므로 거절한다.
+     */
     @Test
     void 파라미터가_없으면_400이다() throws Exception {
         lookup("").andExpect(status().isBadRequest());
+    }
+
+    /**
+     * 파라미터는 왔는데 값이 비었으면 400 이 아니라 빈 배열이다. 물어본 게 없으니 답도 없는
+     * 것이지 잘못된 요청은 아니고, 미등록 상품을 물었을 때와 같은 모양으로 나가야 부르는 쪽이
+     * 한 가지 경우만 다루면 된다.
+     */
+    @Test
+    void 파라미터_값이_비어_있으면_200과_빈_배열이다() throws Exception {
+        lookup("?productIds=")
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$").isArray())
+            .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test

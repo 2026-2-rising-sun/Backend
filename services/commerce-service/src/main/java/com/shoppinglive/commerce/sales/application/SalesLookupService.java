@@ -48,21 +48,32 @@ public class SalesLookupService {
      * 상품", 응답 자체를 못 받았으면 "판매 상태를 알 수 없음" 이다. 둘을 같은 모양으로 돌려주면
      * 부르는 쪽이 장애를 품절로 표시하게 된다.
      *
-     * @param productIds 조회할 상품 식별자. 중복은 여기서 제거한다
+     * <p>조회할 상품이 하나도 없으면 DB 를 거치지 않고 빈 목록을 돌려준다. 물어본 게 없으니
+     * 답도 없는 것이지 잘못된 요청은 아니다. 이미 {@code productIds=999} 같은 미등록 상품도
+     * 빈 배열로 나가므로, "찾은 게 없다" 는 같은 모양으로 맞춘다.
+     *
+     * @param productIds 조회할 상품 식별자. 중복은 여기서 제거한다. 비어 있으면 빈 목록
      * @return 판매정보가 있는 상품만 담긴 목록. 순서는 보장하지 않는다
-     * @throws BusinessException 비었거나 {@value #MAX_PRODUCT_IDS} 개를 넘음 (400)
+     * @throws BusinessException {@value #MAX_PRODUCT_IDS} 개를 넘음 (400)
      */
     @Transactional(readOnly = true)
     public List<SalesLookup> findByProductIds(Collection<Long> productIds) {
-        return salesRepository.findLookupsByProductIds(distinct(productIds));
+        Set<Long> unique = distinct(productIds);
+        if (unique.isEmpty()) {
+            return List.of();
+        }
+        return salesRepository.findLookupsByProductIds(unique);
     }
 
     /**
-     * 중복을 제거하고 개수 제약을 확인한다.
+     * 중복을 제거하고 개수 상한을 확인한다.
      *
      * <p>같은 상품이 두 번 들어와도 거절하지 않는다. 방송 화면이 같은 상품을 여러 슬롯에 걸어둘
      * 수 있어서 부르는 쪽이 중복을 걸러내야만 하는 계약은 불편하다. 대신 조회 전에 합쳐서 결과에
      * 같은 상품이 두 번 나오지 않게 한다.
+     *
+     * <p>{@code null} 컬렉션과 {@code null} 원소는 그대로 400 이다. 요청이 비어 있는 것과 달리
+     * 이쪽은 부르는 코드의 버그이므로, 빈 결과로 덮어 버리면 원인을 찾기 어려워진다.
      */
     private static Set<Long> distinct(Collection<Long> productIds) {
         if (productIds == null) {
@@ -77,9 +88,6 @@ public class SalesLookupService {
             unique.add(productId);
         }
 
-        if (unique.isEmpty()) {
-            throw invalidProductIds("productIds 는 1개 이상이어야 합니다.");
-        }
         if (unique.size() > MAX_PRODUCT_IDS) {
             throw invalidProductIds(
                 "productIds 는 최대 " + MAX_PRODUCT_IDS + "개입니다: " + unique.size());

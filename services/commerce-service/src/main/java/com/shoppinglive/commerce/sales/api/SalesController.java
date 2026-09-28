@@ -60,7 +60,12 @@ public class SalesController {
      * <p>파라미터는 두 가지 형태를 모두 받는다. Shopping 은 {@code ?productIds=1,2,3} 으로,
      * Live 는 {@code ?productIds=1&productIds=2} 로 보낸다. 둘 중 하나만 받으면 한쪽이 못 쓴다.
      *
-     * @param productIds 상품 식별자 1~{@value SalesLookupService#MAX_PRODUCT_IDS} 개. 중복 허용
+     * <p>{@code productIds} 자체가 없으면 400 이다. 무엇을 조회할지 정하지 않은 요청이라
+     * 판매정보 전체를 내보낼지 아무것도 안 내보낼지 서버가 정할 수 없다. 반면 파라미터는 왔는데
+     * 값이 비어 있으면({@code ?productIds=}) 200 + 빈 배열이다 — 물어본 게 없으니 답도 없는
+     * 것이지 잘못된 요청은 아니고, 미등록 상품을 물었을 때와 같은 모양으로 나간다.
+     *
+     * @param productIds 상품 식별자. 최대 {@value SalesLookupService#MAX_PRODUCT_IDS} 개, 중복 허용
      * @return 판매정보가 있는 상품만 담긴 배열. 순서는 보장하지 않는다
      * @throws BusinessException 파라미터 누락·숫자 아님·개수 초과 (400)
      */

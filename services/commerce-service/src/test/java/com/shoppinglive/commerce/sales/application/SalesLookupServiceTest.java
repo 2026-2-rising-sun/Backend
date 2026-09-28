@@ -161,11 +161,16 @@ class SalesLookupServiceTest {
         assertThatInvalidRequest(() -> salesLookupService.findByProductIds(tooMany));
     }
 
+    /**
+     * 조회할 상품이 없는 건 잘못된 요청이 아니라 "물어본 게 없는" 요청이다. 미등록 상품을
+     * 물었을 때도 빈 배열이 나가므로 같은 모양으로 맞춘다.
+     */
     @Test
-    void 비어_있으면_400이다() {
-        assertThatInvalidRequest(() -> salesLookupService.findByProductIds(List.of()));
+    void 비어_있으면_빈_목록이다() {
+        assertThat(salesLookupService.findByProductIds(List.of())).isEmpty();
     }
 
+    /** 컬렉션 자체가 {@code null} 인 건 부르는 코드의 버그라 빈 결과로 덮지 않는다. */
     @Test
     void null_이면_400이다() {
         assertThatInvalidRequest(() -> salesLookupService.findByProductIds(null));
