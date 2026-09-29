@@ -75,7 +75,8 @@ class ProductHttpContractTest {
         long id = register().path("productId").asLong();
 
         mvc.perform(get("/v1/internal/products")
-                .param("ids", id + "," + id + "," + Long.MAX_VALUE))
+                .param("ids", id + "," + id)
+                .param("ids", String.valueOf(Long.MAX_VALUE)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data", hasSize(1)))
