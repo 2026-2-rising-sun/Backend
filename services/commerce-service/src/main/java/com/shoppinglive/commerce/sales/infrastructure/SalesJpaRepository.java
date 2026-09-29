@@ -1,6 +1,9 @@
 package com.shoppinglive.commerce.sales.infrastructure;
 
 import com.shoppinglive.commerce.sales.domain.Sales;
+import com.shoppinglive.commerce.sales.domain.SalesLookup;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -33,6 +36,32 @@ public interface SalesJpaRepository extends JpaRepository<Sales, Long> {
      * 찾는다.
      */
     Optional<Sales> findByProductId(Long productId);
+
+    /**
+     * 여러 상품의 판매정보와 재고를 한 번에 조회한다 (서비스 간 배치 조회).
+     *
+     * <p>Shopping 상품 목록과 Live 방송 상품 카드는 한 화면에 상품 수십 개를 띄우고 각각 가격·
+     * 판매상태·재고를 표시한다. 상품마다 단건 조회를 부르면 N+1 호출이 되므로 한 번에 묻는다.
+     *
+     * <p>{@code sales_info} 와 {@code sales_stock} 은 shared PK 로 1:1 이지만 JPA 연관관계를
+     * 두지 않았으므로 {@code st.salesInfoId = s.id} 로 직접 이어 붙인다. 판매정보만 있고 재고
+     * 행이 없는 상품은 결과에서 빠지는데, 판매 1 이 둘을 같은 트랜잭션에서 만들기 때문에 정상
+     * 데이터에서는 생기지 않는 경우다.
+     *
+     * <p>판매정보가 등록되지 않은 상품은 결과에 담기지 않는다. 호출한 쪽은 "응답에 없음" 을
+     * 미등록으로 해석한다 (계약: 판매정보 배치 조회).
+     *
+     * @param productIds 조회할 상품 식별자. 중복은 호출 전에 제거되어 있어야 한다
+     * @return 판매정보가 있는 상품만 담긴 목록. 순서는 보장하지 않는다
+     */
+    @Query("""
+        SELECT new com.shoppinglive.commerce.sales.domain.SalesLookup(
+                   s.productId, s.id, s.price, s.status, st.available)
+          FROM Sales s, SalesStock st
+         WHERE st.salesInfoId = s.id
+           AND s.productId IN :productIds
+        """)
+    List<SalesLookup> findLookupsByProductIds(@Param("productIds") Collection<Long> productIds);
 
     /**
      * 판매 상태를 {@code expectedStatus} 에서 {@code nextStatus} 로 전이한다.

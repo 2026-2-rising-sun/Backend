@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.shoppinglive.commerce.sales.api.SalesController;
 import com.shoppinglive.commerce.sales.application.ConcurrentStateChangeException;
+import com.shoppinglive.commerce.sales.application.SalesLookupService;
 import com.shoppinglive.commerce.sales.application.SalesRegistrationService;
 import com.shoppinglive.commerce.sales.application.SalesService;
 import com.shoppinglive.commerce.sales.domain.SalesStatus;
@@ -14,6 +15,7 @@ import com.shoppinglive.common.web.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class CommerceExceptionHandlerTest {
@@ -24,7 +26,9 @@ class CommerceExceptionHandlerTest {
             .thenThrow(new ObjectOptimisticLockingFailureException("Sales", 1L));
         when(service.changeStatus(1L, SalesStatus.ON_SALE))
             .thenThrow(new ConcurrentStateChangeException(1L));
-        var mvc = MockMvcBuilders.standaloneSetup(new SalesController(service, mock(SalesRegistrationService.class)))
+        SalesController controller = new SalesController(
+            service, mock(SalesRegistrationService.class), mock(SalesLookupService.class));
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)
             .setControllerAdvice(new CommerceExceptionHandler(), new GlobalExceptionHandler()).build();
         mvc.perform(patch("/v1/sales/1/price").contentType(MediaType.APPLICATION_JSON)
             .content("{\"price\":100}")).andExpect(status().isConflict());
