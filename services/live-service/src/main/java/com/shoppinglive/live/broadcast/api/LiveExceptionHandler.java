@@ -17,7 +17,7 @@ public class LiveExceptionHandler {
 
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodValidation(
-        HandlerMethodValidationException e) {
+        final HandlerMethodValidationException e) {
         final String message = e.getAllErrors().stream()
             .findFirst()
             .map(error -> error.getDefaultMessage())
@@ -27,7 +27,7 @@ public class LiveExceptionHandler {
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolation(
-        ConstraintViolationException e) {
+        final ConstraintViolationException e) {
         final String message = e.getConstraintViolations().stream()
             .findFirst()
             .map(violation -> violation.getMessage())
@@ -37,14 +37,14 @@ public class LiveExceptionHandler {
 
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingHeader(
-        MissingRequestHeaderException e) {
+        final MissingRequestHeaderException e) {
         final String message = e.getHeaderName() + " 헤더는 필수입니다.";
         return toResponse(ErrorCode.INVALID_REQUEST, message);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingParameter(
-        MissingServletRequestParameterException e) {
+        final MissingServletRequestParameterException e) {
         final String message = e.getParameterName() + " 파라미터는 필수입니다.";
         return toResponse(ErrorCode.INVALID_REQUEST, message);
     }
@@ -52,7 +52,7 @@ public class LiveExceptionHandler {
     /** 잘못된 상태 필터 등 타입이 맞지 않는 쿼리 파라미터는 400 이다. */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
-        MethodArgumentTypeMismatchException e) {
+        final MethodArgumentTypeMismatchException e) {
         return toResponse(ErrorCode.INVALID_REQUEST, e.getName() + " 값이 올바르지 않습니다.");
     }
 

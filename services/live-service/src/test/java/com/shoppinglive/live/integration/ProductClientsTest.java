@@ -157,6 +157,23 @@ class ProductClientsTest {
             .hasMessageContaining("URL is required");
     }
 
+    @DisplayName("dev 프로파일의 http 모드는 두 client 를 모두 실제 HTTP 구현으로 만든다")
+    @Test
+    void httpModeBuildsHttpClientsOnDevProfile() {
+        // given
+        final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
+        final ProductClientsConfiguration.Properties http = new ProductClientsConfiguration.Properties(
+            "http", "http://shopping", "http://commerce");
+        final MockEnvironment dev = new MockEnvironment();
+        dev.setActiveProfiles("dev");
+
+        // when & then
+        assertThat(configuration.productClient(http, RestClient.builder(), dev))
+            .isInstanceOf(HttpProductClient.class);
+        assertThat(configuration.salesClient(http, RestClient.builder(), dev))
+            .isInstanceOf(HttpSalesClient.class);
+    }
+
     private void respond(final String path, final int status, final String body) {
         server.createContext(path, exchange -> {
             final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
