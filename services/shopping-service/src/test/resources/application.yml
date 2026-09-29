@@ -22,6 +22,9 @@ spring:
       max-request-size: 7MB
 
 shopping:
+  sales-client:
+    # 테스트가 원격 Commerce를 호출하지 않는다. HTTP 빈 생성에만 쓰는 더미 주소다.
+    base-url: http://127.0.0.1:1
   image:
     storage:
       # 개발자 PC 의 로컬 이미지 폴더를 테스트가 더럽히지 않도록 임시 폴더를 쓴다.
