@@ -22,7 +22,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * commerce-service {@code GET /v1/sales?productIds=} 호출 구현체.
- * 계약 전문은 Notion의 {@code 서비스 간 API 계약} 페이지를 기준으로 관리한다.
+ * 계약 전문은 <a href="https://app.notion.com/p/3ea226545d15810f8585c03901b257f3">Notion 서비스 간 API 계약</a>을 기준으로 관리한다.
  *
  * <p>한 요청 최대 {@value #MAX_IDS_PER_REQUEST} 개라 나눠 호출하고 합친다. 조각 하나라도 실패하면 전체 실패다
  * (일부만 UNKNOWN 이 섞인 화면보다 명확한 재시도 안내가 낫다). 요청마다 Retry(CircuitBreaker(호출)) 로 감싸
