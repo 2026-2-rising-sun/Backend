@@ -47,10 +47,15 @@ spring:
       properties:
         spring.json.trusted.packages: com.shoppinglive.contracts.events
 
-# 키 없는 로컬 개발을 위해 외부 경계는 stub 을 명시한다. 운영 프로파일에서 stub 은 기동 실패다.
+# 내부 서비스(shopping·commerce)는 로컬에서도 실제로 호출하고, 과금되는 IVS 만 stub 을 쓴다.
+# 상품 조회에는 shopping(8082)·commerce(8083)를 함께 띄워야 한다. mock 서버로 바꿀 때는 URL 만
+# 바꾸거나 LIVE_PRODUCTS_SHOPPING_URL / LIVE_PRODUCTS_COMMERCE_URL 로 덮는다.
+# stub 은 local/test 에서만 허용되며 운영 프로파일에서 stub 은 기동 실패다.
 live:
   products:
-    mode: stub
+    mode: http
+    shopping-url: http://localhost:8082
+    commerce-url: http://localhost:8083
   ivs:
     mode: stub
     stub-ready: true
