@@ -7,5 +7,6 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record IvsProperties(
         @DefaultValue("aws") String mode,
         @DefaultValue("ap-northeast-2") String region,
-        @DefaultValue("false") boolean stubReady) {
+        @DefaultValue("false") boolean stubReady,
+        @DefaultValue("false") boolean stubUnavailable) {
 }
