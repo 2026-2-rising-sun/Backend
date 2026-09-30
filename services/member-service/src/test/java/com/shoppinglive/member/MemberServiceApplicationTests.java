@@ -1,6 +1,7 @@
 package com.shoppinglive.member;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -16,9 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthContributor;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -27,6 +32,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
     @Autowired protected ObjectMapper mapper;
     @Autowired protected MemberRepository members;
     @Autowired PasswordEncoder passwords;
+    @MockitoSpyBean(name = "dbHealthContributor") HealthContributor databaseHealth;
 
     @BeforeEach
     void resetMembers() { members.deleteAll(); }
@@ -99,5 +105,16 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
 
     protected String signup(String email) throws Exception {
         return mapper.writeValueAsString(Map.of("email", email, "password", "password123", "displayName", "member"));
+    }
+
+    @Test
+    void databaseHealthFailureMakesReadinessUnavailableWithoutLeakingDetailsOrFailingLiveness() throws Exception {
+        doReturn(Health.down().withDetail("database", "sensitive-database-details").build())
+            .when((HealthIndicator) databaseHealth).health();
+        mvc.perform(get("/actuator/health/readiness")).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.status").value("DOWN"))
+            .andExpect(jsonPath("$.components").doesNotExist()).andExpect(jsonPath("$.details").doesNotExist());
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"));
     }
 }

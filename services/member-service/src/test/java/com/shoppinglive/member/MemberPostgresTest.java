@@ -6,7 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.member.members.application.MemberService;
+import com.shoppinglive.member.operations.AdminBootstrapCommand;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -67,5 +69,30 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
     private void insertRaw(String email, String role) {
         jdbc.update("INSERT INTO members(id,email,password_hash,display_name,role,created_at,updated_at) VALUES (?,?,?,?,?,now(),now())",
             UUID.randomUUID(), email, "not-a-real-password-hash", "member", role);
+    }
+
+    @Test
+    void bootstrapOnlyCreatesNewAdminAndNeverPromotesExistingUser() {
+        service.register("user@example.com", "password123", "user");
+        var command = new AdminBootstrapCommand();
+        assertThatThrownBy(() -> command.execute(bootstrapEnvironment("user@example.com")))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(members.findByEmail("user@example.com").orElseThrow().roles()).containsExactly("USER");
+        UUID adminId = command.execute(bootstrapEnvironment("admin@example.com"));
+        var admin = members.findById(adminId).orElseThrow();
+        assertThat(admin.roles()).containsExactly("ADMIN");
+        assertThat(passwords.matches("only-test-password", admin.getPasswordHash())).isTrue();
+        assertThatThrownBy(() -> command.execute(bootstrapEnvironment("admin@example.com")))
+            .isInstanceOf(IllegalStateException.class);
+        assertThat(members.count()).isEqualTo(2);
+    }
+
+    private Map<String, String> bootstrapEnvironment(String email) {
+        return Map.of("MEMBER_BOOTSTRAP_DB_URL", System.getenv("MEMBER_TEST_DB_URL"),
+            "MEMBER_BOOTSTRAP_DB_SCHEMA", POSTGRES_SCHEMA,
+            "MEMBER_BOOTSTRAP_DB_USER", System.getenv("MEMBER_TEST_DB_USER"),
+            "MEMBER_BOOTSTRAP_DB_PASSWORD", System.getenv("MEMBER_TEST_DB_PASSWORD"),
+            "MEMBER_BOOTSTRAP_ADMIN_EMAIL", email,
+            "MEMBER_BOOTSTRAP_ADMIN_PASSWORD", "only-test-password", "MEMBER_BOOTSTRAP_ADMIN_DISPLAY_NAME", "admin");
     }
 }
