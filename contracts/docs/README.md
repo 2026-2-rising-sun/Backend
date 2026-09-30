@@ -25,12 +25,13 @@ npm run check --prefix scripts/contracts
 ## 정적 문서와 Mock 실행
 
 ```sh
-node scripts/local/contracts.cjs docs 8090
+node scripts/local/contracts.cjs docs 18090
 node scripts/local/contracts.cjs mock shopping 4010
 npm run smoke --prefix scripts/contracts
 ```
 
 각 명령을 별도 터미널에서 실행한다. host 포트는 loopback만 열고 YAML은 읽기 전용으로 mount한다.
+Swagger 기본 포트 18090은 기존 로컬 Kafka UI의 8090과 구분한다.
 Ctrl-C는 해당 명령이 생성한 컨테이너만 종료한다. 기존 DB·Compose는 변경하지 않는다.
 Swagger는 작업 파일의 스냅샷과 SHA/hash를 `/contracts/provenance.json`에 남긴다.
 `urls`로 서비스를 선택하고 Try it out은 비활성화한다. 작업 스냅샷을 승인본으로 표시하지 않는다.

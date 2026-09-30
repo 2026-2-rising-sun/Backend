@@ -29,7 +29,7 @@ function docs(port) {
 async function main() {
   const [mode, service, portArg] = process.argv.slice(2);
   if (!['docs', 'mock'].includes(mode)) throw new Error('Usage: contracts.cjs docs [port] | mock <service> [port]');
-  const port = Number((mode === 'docs' ? service : portArg) || (mode === 'docs' ? 8090 : 4010));
+  const port = Number((mode === 'docs' ? service : portArg) || (mode === 'docs' ? 18090 : 4010));
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Port must be 1024..65535');
   fs.mkdirSync(path.join(root, 'build/contracts'), { recursive: true });
   const server = mode === 'docs' ? docs(port) : mock(service, port);

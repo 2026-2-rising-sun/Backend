@@ -13,8 +13,15 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
 });
 function start(args, containerPort, hostPort = '') {
   const name = 'sl-contract-' + process.pid + '-' + crypto.randomBytes(4).toString('hex');
-  const id = docker(['run', '-d', '--name', name,
-    '-p', `127.0.0.1:${hostPort}:${containerPort}`, ...args]);
+  let id;
+  try {
+    id = docker(['run', '-d', '--name', name,
+      '-p', `127.0.0.1:${hostPort}:${containerPort}`, ...args]);
+  } catch (error) {
+    // Docker can create the container before failing to bind an occupied port.
+    try { docker(['rm', '-f', name]); } catch { /* Preserve the startup error. */ }
+    throw error;
+  }
   running.add(id);
   try {
     const port = docker(['port', id, `${containerPort}/tcp`]).split(':').at(-1);
