@@ -6,7 +6,6 @@ import com.shoppinglive.shopping.image.domain.ImageFormat;
 import com.shoppinglive.shopping.image.domain.ProductImage;
 import com.shoppinglive.shopping.image.infrastructure.ProductImageRepository;
 import com.shoppinglive.shopping.product.infrastructure.ProductRepository;
-import com.shoppinglive.shopping.sales.infrastructure.InMemorySalesInfoClientStub;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +34,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
     "spring.datasource.url=jdbc:h2:mem:shopping_http_contracts;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
-    "shopping.sales-client.mode=stub"
 })
 @AutoConfigureMockMvc
 @DisplayName("Shopping 실제 HTTP 핵심 계약")
@@ -44,20 +42,17 @@ class ProductHttpContractTest {
     @Autowired ObjectMapper mapper;
     @Autowired ProductRepository products;
     @Autowired ProductImageRepository images;
-    @Autowired InMemorySalesInfoClientStub sales;
 
     private long imageId;
 
     @BeforeEach
     void prepareImageMetadata() {
-        sales.clear();
         imageId = images.saveAndFlush(new ProductImage(UUID.randomUUID() + ".png",
             ImageFormat.PNG, 100, 10, 10, "fixture.png")).getId();
     }
 
     @AfterEach
     void cleanFixtures() {
-        sales.clear();
         products.deleteAll();
         images.deleteAll();
     }
@@ -169,8 +164,6 @@ class ProductHttpContractTest {
     @DisplayName("판매정보 장애는 공개 상세503이며 내부 기본정보 조회는 계속200이다")
     void salesFailureDoesNotExposePurchaseDataOrBreakInternalLookup() throws Exception {
         long id = register().path("productId").asLong();
-        sales.setUnavailable(true);
-
         mvc.perform(get("/v1/products/{id}", id))
             .andExpect(status().isServiceUnavailable())
             .andExpect(jsonPath("$.success").value(false))
