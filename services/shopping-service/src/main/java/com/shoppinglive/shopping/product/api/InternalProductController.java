@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 서비스 간 상품 조회 API (docs/internal-product-api.md). 클러스터 내부 호출용이라 Ingress 로 외부에 노출하지 않는다.
+ * 서비스 간 상품 조회 API. 계약 전문은 <a href="https://app.notion.com/p/3ea226545d15810f8585c03901b257f3">Notion 서비스 간 API 계약</a>을
+ * 기준으로 관리한다. 클러스터 내부 호출용이라 Ingress 로 외부에 노출하지 않는다.
  */
 @RestController
 @RequestMapping("/v1/internal/products")
@@ -30,11 +31,12 @@ public class InternalProductController {
     }
 
     /**
-     * 벌크 조회 {@code ?ids=1,2,3}. 중복을 제거한 뒤 1~{@value #MAX_IDS} 개여야 한다. 없는 상품은 결과에서 빠진다.
+     * 벌크 조회 {@code ?ids=1,2,3} 또는 {@code ?ids=1&ids=2}. 중복을 제거한 뒤 1~{@value #MAX_IDS} 개여야 한다.
+     * 없는 상품은 결과에서 빠진다.
      * 파라미터 누락·형식 오류를 스프링에 맡기면 공통 핸들러가 500 을 주므로 직접 해석한다.
      */
     @GetMapping
-    public ApiResponse<List<ProductSnapshot>> getAll(@RequestParam(name = "ids", required = false) String ids) {
+    public ApiResponse<List<ProductSnapshot>> getAll(@RequestParam(name = "ids", required = false) List<String> ids) {
         return ApiResponse.ok(productQueryService.findSnapshots(parseIds(ids)));
     }
 
@@ -44,12 +46,14 @@ public class InternalProductController {
         return ApiResponse.ok(productQueryService.getSnapshot(productId));
     }
 
-    private static Set<Long> parseIds(String ids) {
+    private static Set<Long> parseIds(List<String> ids) {
         Set<Long> parsed = new LinkedHashSet<>();
         try {
-            for (String token : (ids == null ? "" : ids).split(",")) {
-                if (!token.isBlank()) {
-                    parsed.add(Long.parseLong(token.strip()));
+            for (String idsValue : ids == null ? List.<String>of() : ids) {
+                for (String token : idsValue.split(",")) {
+                    if (!token.isBlank()) {
+                        parsed.add(Long.parseLong(token.strip()));
+                    }
                 }
             }
         } catch (NumberFormatException e) {
@@ -62,6 +66,7 @@ public class InternalProductController {
     }
 
     private static BusinessException invalidIds() {
-        return new BusinessException(ErrorCode.INVALID_REQUEST, "ids 는 쉼표로 구분한 상품 id 1~" + MAX_IDS + "개여야 합니다.");
+        return new BusinessException(ErrorCode.INVALID_REQUEST,
+            "ids 는 쉼표 또는 반복 파라미터로 전달한 상품 id 1~" + MAX_IDS + "개여야 합니다.");
     }
 }
