@@ -41,8 +41,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 class HttpShoppingClientTest {
 
@@ -73,8 +75,9 @@ class HttpShoppingClientTest {
                 }
                 byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
-                exchange.sendResponseHeaders(responseStatus, bytes.length);
-                exchange.getResponseBody().write(bytes);
+                // HttpServer interprets length=0 as chunked, not as an explicitly empty body.
+                exchange.sendResponseHeaders(responseStatus, bytes.length == 0 ? -1 : bytes.length);
+                if (bytes.length > 0) exchange.getResponseBody().write(bytes);
             } catch (InterruptedException exception) {
                 Thread.currentThread().interrupt();
             } finally {
@@ -83,12 +86,16 @@ class HttpShoppingClientTest {
         });
         server.start();
         circuitBreakers = CircuitBreakerRegistry.ofDefaults();
+        client = clientWithReadTimeout(Duration.ofSeconds(3));
+    }
+
+    private HttpShoppingClient clientWithReadTimeout(Duration readTimeout) {
         RetryRegistry retries = RetryRegistry.of(RetryConfig.custom().maxAttempts(2)
             .waitDuration(Duration.ofMillis(10))
             .retryExceptions(HttpServerErrorException.class, ResourceAccessException.class).build());
-        client = new ShoppingClientConfiguration().httpShoppingClient(RestClient.builder(),
+        return new ShoppingClientConfiguration().httpShoppingClient(RestClient.builder(),
             new ShoppingClientProperties("http://127.0.0.1:" + server.getAddress().getPort(),
-                Duration.ofSeconds(1), Duration.ofMillis(150)), circuitBreakers, retries);
+                Duration.ofSeconds(3), readTimeout), circuitBreakers, retries);
     }
 
     @AfterEach
@@ -127,7 +134,8 @@ class HttpShoppingClientTest {
     @ValueSource(ints = {400, 401, 403})
     void 다른4xx를_상품없음으로_숨기거나_재시도하지_않는다(int statusCode) {
         responseStatus = statusCode;
-        assertThatThrownBy(() -> client.findProduct(7L)).isInstanceOf(ShoppingUnavailableException.class);
+        assertThatThrownBy(() -> client.findProduct(7L)).isInstanceOf(ShoppingUnavailableException.class)
+            .hasCauseInstanceOf(HttpClientErrorException.class);
         assertThat(requests).hasValue(1);
     }
 
@@ -144,12 +152,17 @@ class HttpShoppingClientTest {
     })
     void 잘못된응답은_재시도없이_장애이며_빈상품이_아니다(String invalidBody) {
         body = invalidBody;
-        assertThatThrownBy(() -> client.findProduct(7L)).isInstanceOf(ShoppingUnavailableException.class);
+        assertThatThrownBy(() -> client.findProduct(7L)).isInstanceOf(ShoppingUnavailableException.class)
+            .hasCauseInstanceOf("{".equals(invalidBody) ? RestClientException.class : IllegalStateException.class)
+            .satisfies(error -> assertThat(error.getCause())
+                .as("contract failure must not be a network timeout: body=%s", invalidBody)
+                .isNotInstanceOf(ResourceAccessException.class));
         assertThat(requests).hasValue(1);
     }
 
     @Test
     void 실제_read_timeout은_두번후_장애로_종료한다() {
+        client = clientWithReadTimeout(Duration.ofMillis(150));
         delay = true;
         long start = System.nanoTime();
         assertThatThrownBy(() -> client.findProduct(7L)).isInstanceOf(ShoppingUnavailableException.class)
