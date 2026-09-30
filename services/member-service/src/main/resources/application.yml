@@ -3,6 +3,18 @@ spring:
     name: member-service
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  jpa:
+    open-in-view: false
+
+shoppinglive:
+  security:
+    jwt:
+      issuer: ${MEMBER_JWT_ISSUER:shoppinglive-member}
+      audience: ${MEMBER_JWT_AUDIENCE:shoppinglive-api}
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
 
 server:
   port: 8081
@@ -33,9 +45,9 @@ spring:
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
   jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
+    # 스키마는 Flyway가 소유한다.
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
@@ -54,6 +66,6 @@ spring:
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
   jpa:
-    # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
+    # 스키마는 Flyway가 소유한다.
     hibernate:
-      ddl-auto: none
+      ddl-auto: validate
