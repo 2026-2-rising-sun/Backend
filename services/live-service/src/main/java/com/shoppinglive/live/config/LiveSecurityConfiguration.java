@@ -16,7 +16,7 @@ public class LiveSecurityConfiguration {
     @Bean
     SecurityFilterChain broadcasts(HttpSecurity http, MemberJwtAuthenticationConverter converter,
                                     JsonSecurityErrorHandler errors) throws Exception {
-        // Bearer headers only; Member owns refresh cookies and their CSRF boundary.
+        // Bearer headers only; Member owns JSON refresh tokens, and no authentication cookies are used.
         return http.csrf(AbstractHttpConfigurer::disable).logout(AbstractHttpConfigurer::disable)
             .requestCache(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
