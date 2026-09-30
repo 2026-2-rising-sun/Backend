@@ -78,6 +78,21 @@ class MemberLoginTest extends MemberAuthTestSupport {
     }
 
     @Test
+    void expiredLockResetsOnceAndRepeatedFailuresLockTheAccountAgain() throws Exception {
+        register();
+        for (int attempt = 0; attempt < 5; attempt++) login("user@example.com", "wrong-password").andExpect(status().isUnauthorized());
+        jdbc.update("UPDATE members SET login_locked_until = ?", java.sql.Timestamp.from(Instant.now().minusSeconds(1)));
+        login("user@example.com", "wrong-password").andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT failed_login_attempts FROM members", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT login_locked_until FROM members", java.sql.Timestamp.class)).isNull();
+        for (int attempt = 1; attempt < 5; attempt++) login("user@example.com", "wrong-password").andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT failed_login_attempts FROM members", Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT login_locked_until FROM members", java.sql.Timestamp.class).toInstant()).isAfter(Instant.now());
+        login("user@example.com", "password123").andExpect(status().isUnauthorized());
+        assertNoSessions();
+    }
+
+    @Test
     void databaseFailureAfterSessionInsertRollsBackFamilyAndTokenWithoutReturningAccess() throws Exception {
         register();
         doAnswer(invocation -> {

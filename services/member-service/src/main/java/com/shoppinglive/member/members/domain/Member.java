@@ -65,7 +65,10 @@ public class Member {
     public Set<String> roles() { return Set.of(role.name()); }
     public boolean loginLocked(Instant now) { return loginLockedUntil != null && loginLockedUntil.isAfter(now); }
     public void recordLoginFailure(Instant now, int maximum, java.time.Duration lockDuration) {
-        if (loginLockedUntil != null && !loginLockedUntil.isAfter(now)) failedLoginAttempts = 0;
+        if (loginLockedUntil != null && !loginLockedUntil.isAfter(now)) {
+            failedLoginAttempts = 0;
+            loginLockedUntil = null;
+        }
         failedLoginAttempts++;
         if (failedLoginAttempts >= maximum) loginLockedUntil = now.plus(lockDuration);
     }

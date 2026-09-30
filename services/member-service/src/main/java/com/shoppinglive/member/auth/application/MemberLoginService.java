@@ -47,8 +47,8 @@ public class MemberLoginService {
     }
 
     private TokenPair loginLocked(String email, String password) {
-        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Member member = members.findForLogin(Member.normalizeEmail(email)).orElse(null);
+        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         if (member == null || member.loginLocked(now)) {
             passwords.matches(password, dummyHash);
             return null;
@@ -58,8 +58,9 @@ public class MemberLoginService {
             return null;
         }
         member.recordLoginSuccess();
-        String access = issuer.issue(member, now);
-        String refresh = sessions.create(member.getId(), now, now.plus(tokens.refreshTokenTtl()));
+        Instant issuedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        String access = issuer.issue(member, issuedAt);
+        String refresh = sessions.create(member.getId(), issuedAt, issuedAt.plus(tokens.refreshTokenTtl()));
         return new TokenPair(access, "Bearer", tokens.accessTokenTtl().toSeconds(), refresh);
     }
 }
