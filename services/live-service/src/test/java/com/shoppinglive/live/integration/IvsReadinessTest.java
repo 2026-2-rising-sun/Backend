@@ -87,6 +87,35 @@ class IvsReadinessTest {
                 .run(application -> assertThat(application.getBean(IvsReadinessClient.class).isReady(ARN)).isFalse());
     }
 
+    @DisplayName("stub-unavailable 이면 준비 상태·재생 정보 조회 모두 UNAVAILABLE로 실패한다")
+    @Test
+    void stubUnavailableThrowsOnReadinessAndPlayback() {
+        // given
+        context.withPropertyValues("spring.profiles.active=test", "live.ivs.mode=stub",
+                        "live.ivs.stub-ready=true", "live.ivs.stub-unavailable=true")
+                .run(application -> {
+                    final IvsReadinessClient stubClient = application.getBean(IvsReadinessClient.class);
+
+                    // when & then
+                    assertThatThrownBy(() -> stubClient.isReady(ARN)).isInstanceOf(IvsUnavailableException.class);
+                    assertThatThrownBy(() -> stubClient.getPlaybackInfo(ARN))
+                            .isInstanceOf(IvsUnavailableException.class);
+                });
+    }
+
+    @DisplayName("stub-unavailable 이 false 면 stub-ready 값을 그대로 반환한다")
+    @Test
+    void stubAvailableFollowsStubReady() {
+        for (final boolean ready : new boolean[] {true, false}) {
+            // given
+            context.withPropertyValues("spring.profiles.active=test", "live.ivs.mode=stub",
+                            "live.ivs.stub-ready=" + ready, "live.ivs.stub-unavailable=false")
+                    // when & then
+                    .run(application -> assertThat(application.getBean(IvsReadinessClient.class).isReady(ARN))
+                            .isEqualTo(ready));
+        }
+    }
+
     @DisplayName("local·test 이외의 프로파일에서 stub 모드는 기동을 거절한다")
     @Test
     void stubIsRejectedOutsideLocalAndTest() {
