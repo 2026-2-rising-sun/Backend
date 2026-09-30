@@ -26,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 로 한 명만 성공하고 나머지는 {@link ConcurrentStateChangeException} 을 받는다.
  */
 @SpringBootTest
-class SalesStatusConcurrencyTest {
+class SalesStatusConcurrencyTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private SalesJpaRepository salesRepository;

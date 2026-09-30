@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * 결제 시작 → Mock 엔진 → 결과 확정 → DB · 재고 반영까지 e2e.
@@ -35,7 +34,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * 늘려도 정상 경로는 그대로 빠르다 — 느릴 때 더 기다려줄 뿐이다.
  */
 @SpringBootTest
-class PaymentFlowIntegrationTest {
+class PaymentFlowIntegrationTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private PaymentService paymentService;
@@ -55,9 +54,6 @@ class PaymentFlowIntegrationTest {
     @Autowired
     private SalesStockJpaRepository salesStockRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     private String orderNumber;
     private Long salesInfoId;
 
@@ -75,7 +71,7 @@ class PaymentFlowIntegrationTest {
         orderNumber = "OD-FLOW-1";
         Order order = new Order(
             orderNumber, salesInfoId, 1, 10_000L, "홍길동", "010-1234-5678",
-            passwordEncoder.encode("secret"), "테스트", null, Instant.now().plusSeconds(900));
+            "11111111-1111-4111-8111-111111111111", "테스트", null, Instant.now().plusSeconds(900));
         orderRepository.save(order);
     }
 
@@ -90,7 +86,7 @@ class PaymentFlowIntegrationTest {
 
     @Test
     void INSTANT_SUCCESS_결제_시작_후_짧게_기다리면_PAID_로_확정_재고_소진() {
-        paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_SUCCESS);
+        startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_SUCCESS);
 
         await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
@@ -105,7 +101,7 @@ class PaymentFlowIntegrationTest {
 
     @Test
     void INSTANT_FAIL_이면_FAILED_확정_재고_복구() {
-        paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_FAIL);
+        startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_FAIL);
 
         await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
@@ -120,8 +116,8 @@ class PaymentFlowIntegrationTest {
 
     @Test
     void DELAYED_SUCCESS_는_짧게_기다린_후에_PAID_로_확정() {
-        PaymentAttempt attempt = paymentService.startPayment(
-            orderNumber, "secret", PaymentScenario.DELAYED_SUCCESS);
+        PaymentAttempt attempt = startPaymentWithScenario(
+            orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.DELAYED_SUCCESS);
 
         // 시작 직후: 아직 PAYMENT_CONFIRMING, attempt.status = PROCESSING
         assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
@@ -137,7 +133,7 @@ class PaymentFlowIntegrationTest {
     void dev_registry_사전지정_시나리오_body_scenario_없어도_적용() {
         devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
 
-        paymentService.startPayment(orderNumber, "secret", null);
+        startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", null);
 
         await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
@@ -147,10 +143,10 @@ class PaymentFlowIntegrationTest {
     }
 
     @Test
-    void body_scenario가_dev_registry보다_우선() {
+    void 테스트용_registry를_변경한_경우_변경값을_사용() {
         devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
 
-        paymentService.startPayment(orderNumber, "secret", PaymentScenario.INSTANT_SUCCESS);
+        startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_SUCCESS);
 
         await().atMost(Duration.ofSeconds(10)).pollDelay(Duration.ofMillis(50))
             .untilAsserted(() -> {
@@ -158,4 +154,10 @@ class PaymentFlowIntegrationTest {
                 assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
             });
     }
+    private com.shoppinglive.commerce.payments.domain.PaymentAttempt startPaymentWithScenario(
+        String number, String memberId, PaymentScenario scenario) {
+        if (scenario != null) devRegistry.set(number, scenario);
+        return paymentService.startPayment(number, memberId);
+    }
+
 }

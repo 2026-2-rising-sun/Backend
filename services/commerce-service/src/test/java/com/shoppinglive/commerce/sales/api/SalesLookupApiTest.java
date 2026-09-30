@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class SalesLookupApiTest {
+class SalesLookupApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long FIRST_PRODUCT = 9_201L;
     private static final long SECOND_PRODUCT = 9_202L;
@@ -73,7 +73,7 @@ class SalesLookupApiTest {
     }
 
     private ResultActions lookup(String query) throws Exception {
-        return mockMvc.perform(get("/v1/sales" + query));
+        return mockMvc.perform(get("/v1/sales" + query).header("X-Service-Token", SHOPPING_TOKEN));
     }
 
     /**

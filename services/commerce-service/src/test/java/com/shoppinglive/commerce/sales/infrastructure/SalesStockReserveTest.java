@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 커밋한다. {@link BeforeEach} 에서 명시적으로 청소한다.
  */
 @SpringBootTest
-class SalesStockReserveTest {
+class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final int INITIAL_AVAILABLE = 5;
 

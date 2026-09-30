@@ -38,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class OrderCreationApiTest {
+class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 810L;
     private static final long PRICE = 15_000L;
@@ -94,13 +94,12 @@ class OrderCreationApiTest {
         payload.put("quantity", 2);
         payload.put("buyerName", "홍길동");
         payload.put("buyerPhone", "010-1234-5678");
-        payload.put("lookupPassword", "secret");
         payload.putAll(overrides);
         return objectMapper.writeValueAsString(payload);
     }
 
     private ResultActions order(String json, String idempotencyKey) throws Exception {
-        var request = post("/v1/orders")
+        var request = post("/v1/orders").header("Authorization", bearer(MEMBER_A))
             .contentType(MediaType.APPLICATION_JSON)
             .content(json);
         if (idempotencyKey != null) {
@@ -168,7 +167,7 @@ class OrderCreationApiTest {
     static Stream<Map<String, Object>> conflictingRequests() {
         return Stream.of(Map.of("productId", 999L), Map.of("quantity", 1),
             Map.of("buyerName", "다른 구매자"), Map.of("buyerPhone", "010-9999-0000"),
-            Map.of("lookupPassword", "different-secret"), Map.of("expectedTotalAmount", 999L));
+            Map.of("expectedTotalAmount", 999L));
     }
 
     @ParameterizedTest
@@ -247,7 +246,6 @@ class OrderCreationApiTest {
 
         order(body(Map.of("quantity", 0)), null).andExpect(status().isBadRequest());
         order(body(Map.of("buyerPhone", "전화번호")), null).andExpect(status().isBadRequest());
-        order(body(Map.of("lookupPassword", "1")), null).andExpect(status().isBadRequest());
 
         assertThat(orderRepository.findAll()).isEmpty();
     }

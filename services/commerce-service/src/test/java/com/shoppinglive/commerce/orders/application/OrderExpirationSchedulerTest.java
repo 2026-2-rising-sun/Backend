@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * 주문 만료 스케줄러 통합 테스트.
@@ -26,7 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * 정확히 한 번만 복구되는지 확인.
  */
 @SpringBootTest
-class OrderExpirationSchedulerTest {
+class OrderExpirationSchedulerTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private OrderExpirationScheduler scheduler;
@@ -39,9 +38,6 @@ class OrderExpirationSchedulerTest {
 
     @Autowired
     private SalesStockJpaRepository salesStockRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     private Long salesInfoId;
 
@@ -72,7 +68,7 @@ class OrderExpirationSchedulerTest {
             10_000L,
             "홍길동",
             "010-1234-5678",
-            passwordEncoder.encode("secret"),
+            "11111111-1111-4111-8111-111111111111",
             "테스트 상품",
             null,
             expiresAt);

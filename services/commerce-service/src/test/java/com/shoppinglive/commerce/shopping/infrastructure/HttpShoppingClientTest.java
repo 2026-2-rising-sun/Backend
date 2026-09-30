@@ -52,6 +52,7 @@ class HttpShoppingClientTest {
     private CircuitBreakerRegistry circuitBreakers;
     private final AtomicInteger requests = new AtomicInteger();
     private final AtomicReference<String> path = new AtomicReference<>();
+    private final AtomicReference<String> callerToken = new AtomicReference<>();
     private final CountDownLatch release = new CountDownLatch(1);
     private volatile int responseStatus = 200;
     private volatile String body = """
@@ -66,6 +67,7 @@ class HttpShoppingClientTest {
         server.setExecutor(executor);
         server.createContext("/", exchange -> {
             requests.incrementAndGet();
+            callerToken.set(exchange.getRequestHeaders().getFirst("X-Service-Token"));
             path.set(exchange.getRequestMethod() + " " + exchange.getRequestURI());
             try {
                 if (delay) {
@@ -88,7 +90,7 @@ class HttpShoppingClientTest {
             .retryExceptions(HttpServerErrorException.class, ResourceAccessException.class).build());
         client = new ShoppingClientConfiguration().httpShoppingClient(RestClient.builder(),
             new ShoppingClientProperties("http://127.0.0.1:" + server.getAddress().getPort(),
-                Duration.ofSeconds(1), Duration.ofMillis(150)), circuitBreakers, retries);
+                Duration.ofSeconds(1), Duration.ofMillis(150), "test-outbound-commerce-shopping-token-32"), circuitBreakers, retries);
     }
 
     @AfterEach
@@ -102,6 +104,7 @@ class HttpShoppingClientTest {
     void 성공_봉투를_상품스냅샷으로_읽고_이미지는_null을_허용한다() {
         assertThat(client.findProduct(7L)).contains(new ProductSnapshot(7L, "상품", null));
         assertThat(path.get()).isEqualTo("GET /v1/internal/products/7");
+        assertThat(callerToken.get()).isEqualTo("test-outbound-commerce-shopping-token-32");
         assertThat(requests).hasValue(1);
     }
 

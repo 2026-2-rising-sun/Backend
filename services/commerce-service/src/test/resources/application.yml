@@ -1,6 +1,10 @@
 # context-load 테스트는 Docker 없이 CI에서도 돌아야 하므로 in-memory H2를 쓴다.
 # 실제 Postgres 연동 확인은 local 프로필로 기동해서 한다.
 spring:
+  profiles:
+    active: test
+  flyway:
+    enabled: false
   datasource:
     url: jdbc:h2:mem:commerce;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
     driver-class-name: org.h2.Driver
@@ -13,6 +17,20 @@ spring:
 # 기존 도메인 테스트만 명시적으로 인메모리 fixture를 사용한다.
 # HTTP 어댑터 검증은 mode=http와 실제 테스트 서버 URL로 덮어쓴다.
 commerce:
+  dev:
+    payment-scenario:
+      enabled: true
   shopping-client:
     mode: stub
     base-url: http://127.0.0.1:1
+    service-token: commerce-shopping-unit-tests-only-32-characters
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

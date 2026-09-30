@@ -40,7 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * 커밋한다. {@link BeforeEach} 에서 명시적으로 청소한다.
  */
 @SpringBootTest
-class OrderCreationConcurrencyTest {
+class OrderCreationConcurrencyTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 800L;
     private static final int INITIAL_STOCK = 5;
@@ -86,7 +86,7 @@ class OrderCreationConcurrencyTest {
 
     private CreateOrderCommand command(int index) {
         return new CreateOrderCommand(
-            PRODUCT_ID, 1, "구매자" + index, "010-0000-0000", "secret", null);
+            PRODUCT_ID, 1, "구매자" + index, "010-0000-0000", "11111111-1111-4111-8111-111111111111", null);
     }
 
     /**

@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class SalesRegistrationApiTest {
+class SalesRegistrationApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long REGISTERED_PRODUCT_ID = 900L;
     private static final long UNKNOWN_PRODUCT_ID = 999L;
@@ -82,7 +82,7 @@ class SalesRegistrationApiTest {
     }
 
     private ResultActions register(String json) throws Exception {
-        return mockMvc.perform(post("/v1/sales")
+        return mockMvc.perform(post("/v1/sales").header("Authorization", adminBearer())
             .contentType(MediaType.APPLICATION_JSON)
             .content(json));
     }

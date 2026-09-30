@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class OrderCheckoutApiTest {
+class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 700L;
 
@@ -65,7 +65,7 @@ class OrderCheckoutApiTest {
     }
 
     private ResultActions checkout(String query) throws Exception {
-        return mockMvc.perform(get("/v1/orders/checkout" + query));
+        return mockMvc.perform(get("/v1/orders/checkout" + query).header("Authorization", bearer(MEMBER_A)));
     }
 
     @Test
