@@ -7,8 +7,12 @@ import com.shoppinglive.shopping.image.domain.ProductImage;
 import com.shoppinglive.shopping.image.infrastructure.ProductImageRepository;
 import com.shoppinglive.shopping.product.infrastructure.ProductRepository;
 import com.shoppinglive.shopping.sales.infrastructure.InMemorySalesInfoClientStub;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +22,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -70,17 +75,49 @@ class ProductHttpContractTest {
     }
 
     @Test
-    @DisplayName("내부 벌크 조회는 판매정보 없는 상품도 조회하고 중복·미존재 ID를 제외한다")
+    @DisplayName("내부 벌크 조회는 쉼표·반복·혼합 ids를 지원하고 중복 제거 후 100개까지 조회한다")
     void internalLookupDoesNotDependOnSalesPublication() throws Exception {
         long id = register().path("productId").asLong();
 
-        mvc.perform(get("/v1/internal/products")
-                .param("ids", id + "," + id + "," + Long.MAX_VALUE))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data", hasSize(1)))
-            .andExpect(jsonPath("$.data[0].id").value(id))
-            .andExpect(jsonPath("$.data[0].name").value("상품"));
+        List<List<String>> queries = List.of(
+            List.of(id + "," + id + "," + Long.MAX_VALUE),
+            List.of(String.valueOf(id), String.valueOf(id), String.valueOf(Long.MAX_VALUE)),
+            List.of(id + "," + id, String.valueOf(Long.MAX_VALUE)),
+            Collections.nCopies(101, String.valueOf(id)),
+            Stream.concat(Stream.of(String.valueOf(id)),
+                LongStream.range(1, 100).mapToObj(offset -> String.valueOf(Long.MAX_VALUE - offset))).toList());
+
+        for (List<String> ids : queries) {
+            // Live HttpProductClient도 Collection을 queryParam에 전달하여 반복 파라미터를 만든다.
+            var uri = UriComponentsBuilder.fromPath("/v1/internal/products")
+                .queryParam("ids", ids).build().toUri();
+            mvc.perform(get(uri))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value(id))
+                .andExpect(jsonPath("$.data[0].name").value("상품"));
+        }
+    }
+
+    @Test
+    @DisplayName("내부 벌크 조회의 누락·빈 ids·잘못된 숫자·중복 제거 후 100개 초과는 400이다")
+    void invalidInternalLookupIdsReturnBadRequest() throws Exception {
+        List<List<String>> invalidQueries = List.of(
+            List.of(), List.of(""), List.of(" "), List.of(",,", " "),
+            List.of("1", "invalid"), List.of("1.5"), List.of("9223372036854775808"),
+            LongStream.rangeClosed(1, 101).mapToObj(String::valueOf).toList());
+
+        for (List<String> ids : invalidQueries) {
+            var request = get("/v1/internal/products");
+            if (!ids.isEmpty()) {
+                request.param("ids", ids.toArray(String[]::new));
+            }
+            mvc.perform(request)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
     }
 
     @Test
