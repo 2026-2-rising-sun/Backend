@@ -23,7 +23,7 @@ spring:
 
 shopping:
   sales-client:
-    # 테스트가 원격 Commerce를 호출하지 않는다. HTTP 빈 생성에만 쓰는 더미 주소다.
+    # 실제 Commerce 대신 연결 거절을 재현하는 루프백 주소다. HTTP 장애 계약 테스트는 이 주소로 연결을 시도한다.
     base-url: http://127.0.0.1:1
   image:
     storage:

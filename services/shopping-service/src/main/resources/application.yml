@@ -111,9 +111,9 @@ spring:
 
 # Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
 # 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.
-# Commerce 판매정보 연동: commerce-service Service 이름·포트는 Infra 와 확인이 필요하다.
+# dev overlay의 Service 이름은 dev-commerce-service이며 서비스 포트는 8080이다.
 shopping:
   image:
     public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:/api/shopping}
   sales-client:
-    base-url: http://commerce-service:8080
+    base-url: http://dev-commerce-service:8080
