@@ -23,9 +23,23 @@ spring:
 
 shopping:
   sales-client:
+    service-token: test-shopping-commerce-credential-00000001
     # 실제 Commerce 대신 연결 거절을 재현하는 루프백 주소다. HTTP 장애 계약 테스트는 이 주소로 연결을 시도한다.
     base-url: http://127.0.0.1:1
   image:
     storage:
       # 개발자 PC 의 로컬 이미지 폴더를 테스트가 더럽히지 않도록 임시 폴더를 쓴다.
       dir: ${java.io.tmpdir}/shopping-images-test
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db

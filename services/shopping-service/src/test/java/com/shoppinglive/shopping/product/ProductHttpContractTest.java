@@ -6,6 +6,7 @@ import com.shoppinglive.shopping.image.domain.ImageFormat;
 import com.shoppinglive.shopping.image.domain.ProductImage;
 import com.shoppinglive.shopping.image.infrastructure.ProductImageRepository;
 import com.shoppinglive.shopping.product.infrastructure.ProductRepository;
+import com.shoppinglive.shopping.security.ShoppingSecuritySupport;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 @DisplayName("Shopping 실제 HTTP 핵심 계약")
-class ProductHttpContractTest {
+class ProductHttpContractTest extends ShoppingSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired ProductRepository products;
@@ -86,7 +87,7 @@ class ProductHttpContractTest {
             // Live HttpProductClient도 Collection을 queryParam에 전달하여 반복 파라미터를 만든다.
             var uri = UriComponentsBuilder.fromPath("/v1/internal/products")
                 .queryParam("ids", ids).build().toUri();
-            mvc.perform(get(uri))
+            mvc.perform(get(uri).header("X-Service-Token", COMMERCE_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data", hasSize(1)))
@@ -108,7 +109,7 @@ class ProductHttpContractTest {
             if (!ids.isEmpty()) {
                 request.param("ids", ids.toArray(String[]::new));
             }
-            mvc.perform(request)
+            mvc.perform(request.header("X-Service-Token", COMMERCE_KEY))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
@@ -119,6 +120,7 @@ class ProductHttpContractTest {
     @DisplayName("깨진 JSON은 400 INVALID_REQUEST이며 상품을 만들지 않는다")
     void malformedJsonReturnsBadRequestWithoutMutation() throws Exception {
         mvc.perform(post("/v1/admin/products")
+                .header("Authorization", adminBearer())
                 .header("X-Idempotency-Key", "malformed")
                 .contentType(MediaType.APPLICATION_JSON).content("{"))
             .andExpect(status().isBadRequest())
@@ -129,7 +131,7 @@ class ProductHttpContractTest {
     @Test
     @DisplayName("없는 상품의 내부 단건 조회는 404 NOT_FOUND다")
     void missingProductReturnsNotFound() throws Exception {
-        mvc.perform(get("/v1/internal/products/{id}", Long.MAX_VALUE))
+        mvc.perform(get("/v1/internal/products/{id}", Long.MAX_VALUE).header("X-Service-Token", COMMERCE_KEY))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
@@ -142,6 +144,7 @@ class ProductHttpContractTest {
         long originalVersion = registered.path("version").asLong();
 
         String updated = mvc.perform(patch("/v1/admin/products/{id}", id)
+                .header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("name", "먼저 수정", "version", originalVersion))))
             .andExpect(status().isOk())
@@ -151,6 +154,7 @@ class ProductHttpContractTest {
         assertThat(updatedVersion).isGreaterThan(originalVersion);
 
         mvc.perform(patch("/v1/admin/products/{id}", id)
+                .header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("name", "오래된 수정", "version", originalVersion))))
             .andExpect(status().isConflict())
@@ -169,13 +173,14 @@ class ProductHttpContractTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.error.code").value("SALES_INFO_UNAVAILABLE"))
             .andExpect(jsonPath("$.data", nullValue()));
-        mvc.perform(get("/v1/internal/products/{id}", id))
+        mvc.perform(get("/v1/internal/products/{id}", id).header("X-Service-Token", COMMERCE_KEY))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(id));
     }
 
     private JsonNode register() throws Exception {
         String response = mvc.perform(post("/v1/admin/products")
+                .header("Authorization", adminBearer())
                 .header("X-Idempotency-Key", "product-http-contract")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Map.of("name", "상품", "description", "상품 설명",

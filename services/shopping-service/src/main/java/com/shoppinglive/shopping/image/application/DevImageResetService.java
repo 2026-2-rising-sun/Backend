@@ -5,15 +5,17 @@ import com.shoppinglive.shopping.image.infrastructure.ProductImageRepository;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 /**
  * 로컬 개발용 이미지 초기화. 평소 재기동은 파일을 절대 지우지 않으므로, 쌓인 테스트 업로드를 비울 때만
- * 개발자가 명시적으로 호출한다. local 프로필이 아니면 빈이 만들어지지 않는다.
+ * 개발자가 명시적으로 활성화한 local/test 환경에서만 호출한다.
  */
 @Service
-@Profile("local")
+@Profile("(local | test) & !dev & !prod")
+@ConditionalOnProperty(name = "shopping.dev-api.enabled", havingValue = "true")
 public class DevImageResetService {
 
     private static final Logger log = LoggerFactory.getLogger(DevImageResetService.class);

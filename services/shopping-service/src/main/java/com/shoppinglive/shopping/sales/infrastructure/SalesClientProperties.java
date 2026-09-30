@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param readTimeout 기본 1초 — 목록 화면이 판매정보 때문에 오래 멈추지 않도록 짧게 둔다
  */
 @ConfigurationProperties("shopping.sales-client")
-public record SalesClientProperties(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+public record SalesClientProperties(String baseUrl, Duration connectTimeout, Duration readTimeout, String serviceToken) {
 
     public SalesClientProperties {
         connectTimeout = connectTimeout == null ? Duration.ofSeconds(1) : connectTimeout;
