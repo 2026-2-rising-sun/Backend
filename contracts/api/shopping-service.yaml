@@ -1,0 +1,479 @@
+openapi: 3.1.0
+info:
+  title: Shopping Service API
+  version: 1.0.0
+  license: { name: UNLICENSED }
+  description: |
+    Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
+    가격, 재고, 판매 상태는 Commerce 소유이며 공개와 관리자 조회에서 조회 시점에 결합한다.
+    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 내부 경로는 클러스터 내부 서비스 전용이다.
+# P1에는 인증이 구현되지 않았다. 인증을 도입하면 이 값을 security scheme으로 교체한다.
+security: []
+servers:
+  - url: http://localhost:8082
+    description: Shopping 서비스 로컬 실행 주소 (port 8082)
+  - url: http://dev-shopping-service:8080
+    description: Shopping 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
+  - url: https://api.example.com/api/shopping
+    description: Shopping 서비스 게이트웨이 경유 주소 (placeholder)
+tags:
+  - name: Admin Product
+    description: 관리자 상품 등록, 수정, 조회
+  - name: Public Product
+    description: 공개 상품 목록, 상세, 구매 진입 확인
+  - name: Product Image
+    description: 상품 이미지 업로드와 공개 파일 조회
+  - name: Internal Product
+    description: Live와 Commerce가 호출하는 기본정보 스냅샷
+paths:
+  /v1/admin/products:
+    post:
+      tags: [Admin Product]
+      summary: 상품 기본정보 등록
+      operationId: registerProduct
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterProductRequest' }
+            example: { name: 가을 니트, description: 울 혼방 니트, mainImageId: 10 }
+      responses:
+        '201':
+          description: 등록됨. 같은 멱등 키의 재전송은 최초 상품을 같은 상태 코드로 반환한다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductEnvelope' }
+              example: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z' }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+    get:
+      tags: [Admin Product]
+      summary: 관리자 상품 목록
+      operationId: listAdminProducts
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Commerce 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminProductPageEnvelope' }
+              examples:
+                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, createdAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }], page: 0, size: 20, totalElements: 1, totalPages: 1 }, error: null } }
+                empty: { value: { success: true, data: { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }, error: null } }
+                unavailable: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, createdAt: '2026-09-30T03:00:00Z', salesStatus: UNKNOWN, price: null, available: null }], page: 0, size: 20, totalElements: 1, totalPages: 1 }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/admin/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Admin Product]
+      summary: 관리자 상품 상세
+      operationId: getAdminProduct
+      responses:
+        '200':
+          description: Commerce 조회 실패 시 salesStatus는 UNKNOWN이다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminProductDetailEnvelope' }
+              examples:
+                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }, error: null } }
+                notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null }, error: null } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Admin Product]
+      summary: 상품 기본정보 부분 수정
+      operationId: updateProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateProductRequest' }
+            example: { name: 가을 니트 수정, version: 0 }
+      responses:
+        '200':
+          description: 수정됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductEnvelope' }
+              example: { success: true, data: { productId: 1, name: 가을 니트 수정, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 1, createdAt: '2026-09-30T03:00:00Z' }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/products:
+    get:
+      tags: [Public Product]
+      summary: 공개 상품 목록
+      operationId: listPublicProducts
+      parameters:
+        - name: cursor
+          in: query
+          description: 이전 응답의 nextCursor. 형식은 내부 구현이므로 변경 가능하다.
+          schema: { type: string }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: ON_SALE 또는 SOLD_OUT 상품을 최신 등록순으로 반환한다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicProductListEnvelope' }
+              examples:
+                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, purchasable: true }], nextCursor: null, hasNext: false }, error: null } }
+                empty: { value: { success: true, data: { items: [], nextCursor: null, hasNext: false }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/SalesUnavailable' }
+  /v1/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Public Product]
+      summary: 공개 상품 상세
+      operationId: getPublicProduct
+      responses:
+        '200':
+          description: 상품과 Commerce 판매정보를 결합한 조회 시점 스냅샷이다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicProductDetailEnvelope' }
+              examples:
+                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, available: 5, purchasable: true, maxQuantity: 5 }, error: null } }
+                soldOut: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: SOLD_OUT, available: 0, purchasable: false, maxQuantity: 0 }, error: null } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/SalesUnavailable' }
+  /v1/products/{productId}/purchase-check:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Public Product]
+      summary: 주문 전 구매 가능 수량 확인
+      operationId: checkPurchase
+      parameters:
+        - name: quantity
+          in: query
+          required: true
+          description: 부호·선행 0·소수점 없이 1~999999999를 전송한다.
+          schema: { type: integer, minimum: 1, maximum: 999999999 }
+      responses:
+        '200':
+          description: 재고를 예약하거나 차감하지 않는다. 최종 가격과 재고 확인은 Commerce 주문 생성 시 수행한다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchaseCheckEnvelope' }
+              examples:
+                normal: { value: { success: true, data: { productId: 1, quantity: 1, orderable: true, reason: null, maxQuantity: 5, unitPrice: 39000 }, error: null } }
+                soldOut: { value: { success: true, data: { productId: 1, quantity: 1, orderable: false, reason: SOLD_OUT, maxQuantity: 0, unitPrice: 39000 }, error: null } }
+                exceedsStock: { value: { success: true, data: { productId: 1, quantity: 6, orderable: false, reason: EXCEEDS_STOCK, maxQuantity: 5, unitPrice: 39000 }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/SalesUnavailable' }
+  /v1/admin/product-images:
+    post:
+      tags: [Product Image]
+      summary: 상품 이미지 업로드
+      operationId: uploadProductImage
+      description: JPEG 또는 PNG 파일을 받고 최대 5MB, 가로와 세로는 각각 최대 8000px이다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: 업로드됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImageUploadEnvelope' }
+              example: { success: true, data: { imageId: 10, url: /api/shopping/v1/product-images/10, contentType: image/png, sizeBytes: 12345, width: 800, height: 600 }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/product-images/{imageId}:
+    parameters:
+      - name: imageId
+        in: path
+        required: true
+        schema: { type: integer, format: int64, minimum: 1 }
+    get:
+      tags: [Product Image]
+      summary: 공개 이미지 파일 조회
+      operationId: getProductImage
+      responses:
+        '200':
+          description: 저장된 원본 파일. 1년 immutable cache와 nosniff 헤더를 포함한다.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/internal/products:
+    get:
+      tags: [Internal Product]
+      summary: 내부 상품 스냅샷 벌크 조회
+      operationId: getInternalProducts
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: |
+            표준 전송은 ids=1&ids=2 (form, explode=true)다. 기존 ids=1,2도 호환 수용한다.
+            중복 제거 후 1~100개여야 하며 없는 상품은 결과에서 제외한다. #104 통합 기준 계약이다.
+          schema:
+            type: array
+            minItems: 1
+            items: { type: integer, format: int64 }
+          style: form
+          explode: true
+          example: [1, 2]
+      responses:
+        '200':
+          description: 판매 상태와 무관한 기본정보 스냅샷 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductSnapshotListEnvelope' }
+              examples:
+                normal: { value: { success: true, data: [{ id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10 }], error: null } }
+                missing: { value: { success: true, data: [], error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/internal/products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Internal Product]
+      summary: 내부 상품 스냅샷 단건 조회
+      operationId: getInternalProduct
+      responses:
+        '200':
+          description: 판매 상태와 무관한 기본정보 스냅샷
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductSnapshotEnvelope' }
+              example: { success: true, data: { id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10 }, error: null }
+        '404': { $ref: '#/components/responses/NotFound' }
+components:
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 64 }
+  responses:
+    BadRequest:
+      description: 요청 형식 또는 값이 올바르지 않음
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { invalidRequest: { value: { success: false, data: null, error: { code: INVALID_REQUEST, message: 잘못된 요청입니다., requestId: request-001 } } } }
+    NotFound:
+      description: 대상이 없거나 공개 대상이 아님
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { notFound: { value: { success: false, data: null, error: { code: NOT_FOUND, message: 대상을 찾을 수 없습니다., requestId: request-001 } } } }
+    Conflict:
+      description: 요청 version 불일치 또는 저장 시점의 낙관적 락 충돌
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { conflict: { value: { success: false, data: null, error: { code: CONFLICT, message: 다른 수정이 먼저 반영되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요., requestId: request-001 } } } }
+    SalesUnavailable:
+      description: Commerce 판매정보를 조회할 수 없음
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { salesUnavailable: { value: { success: false, data: null, error: { code: SALES_INFO_UNAVAILABLE, message: 판매정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요., requestId: request-001 } } } }
+    InternalError:
+      description: 서버 내부 오류
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { internalError: { value: { success: false, data: null, error: { code: INTERNAL_ERROR, message: 서버 내부 오류가 발생했습니다., requestId: request-001 } } } }
+  schemas:
+    RegisterProductRequest:
+      type: object
+      required: [name, description, mainImageId]
+      properties:
+        name: { type: string, minLength: 1, description: 앞뒤 공백 제거 후 1~100자 }
+        description: { type: string, minLength: 1, description: 앞뒤 공백 제거 후 1~2000자 }
+        mainImageId: { type: integer, format: int64, minimum: 1 }
+    UpdateProductRequest:
+      type: object
+      required: [version]
+      description: 생략하거나 null인 기본정보 필드는 유지한다. 빈 문자열은 허용하지 않는다.
+      properties:
+        name: { type: ['string', 'null'] }
+        description: { type: ['string', 'null'] }
+        mainImageId: { type: ['integer', 'null'], format: int64, minimum: 1 }
+        version: { type: integer, format: int64, minimum: 0 }
+    Product:
+      type: object
+      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt]
+      properties:
+        productId: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        mainImageId: { type: integer, format: int64 }
+        mainImageUrl: { type: string, format: uri-reference }
+        version: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+    ProductSnapshot:
+      type: object
+      required: [id, name, mainImageUrl]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        mainImageUrl: { type: string, format: uri-reference }
+    PublicProductItem:
+      type: object
+      required: [productId, name, mainImageUrl, price, salesStatus, purchasable]
+      properties:
+        productId: { type: integer, format: int64 }
+        name: { type: string }
+        mainImageUrl: { type: string, format: uri-reference }
+        price: { type: integer, format: int64, minimum: 0 }
+        salesStatus: { type: string, enum: [ON_SALE, SOLD_OUT] }
+        purchasable: { type: boolean }
+    PublicProductList:
+      type: object
+      required: [items, nextCursor, hasNext]
+      description: 종료 여부는 hasNext로 판단한다. 비공개 상품을 건너뛰면 items가 비어도 hasNext=true일 수 있다.
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/PublicProductItem' } }
+        nextCursor: { type: ['string', 'null'] }
+        hasNext: { type: boolean }
+    PublicProductDetail:
+      type: object
+      required: [productId, name, description, mainImageUrl, price, salesStatus, available, purchasable, maxQuantity]
+      properties:
+        productId: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        mainImageUrl: { type: string, format: uri-reference }
+        price: { type: integer, format: int64, minimum: 0 }
+        salesStatus: { type: string, enum: [ON_SALE, SOLD_OUT] }
+        available: { type: integer, minimum: 0 }
+        purchasable: { type: boolean }
+        maxQuantity: { type: integer, minimum: 0 }
+    PurchaseCheck:
+      type: object
+      required: [productId, quantity, orderable, reason, maxQuantity, unitPrice]
+      properties:
+        productId: { type: integer, format: int64 }
+        quantity: { type: integer }
+        orderable: { type: boolean }
+        reason: { type: ['string', 'null'], enum: [SOLD_OUT, EXCEEDS_STOCK, null] }
+        maxQuantity: { type: integer }
+        unitPrice: { type: integer, format: int64 }
+    ImageUpload:
+      type: object
+      required: [imageId, url, contentType, sizeBytes, width, height]
+      properties:
+        imageId: { type: integer, format: int64 }
+        url: { type: string, format: uri-reference }
+        contentType: { type: string, enum: [image/jpeg, image/png] }
+        sizeBytes: { type: integer, format: int64 }
+        width: { type: integer }
+        height: { type: integer }
+    AdminProductPage:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminProductSummary' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalElements: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    AdminProductSummary:
+      type: object
+      required: [productId, name, mainImageUrl, createdAt, salesStatus, price, available]
+      properties:
+        productId: { type: integer, format: int64 }
+        name: { type: string }
+        mainImageUrl: { type: string, format: uri-reference }
+        createdAt: { type: string, format: date-time }
+        salesStatus: { $ref: '#/components/schemas/AdminSalesStatus' }
+        price: { type: ['integer', 'null'], format: int64, minimum: 0 }
+        available: { type: ['integer', 'null'], minimum: 0 }
+    AdminSalesStatus:
+      type: string
+      enum: [NOT_REGISTERED, READY, ON_SALE, SOLD_OUT, PRIVATE, UNKNOWN]
+      description: NOT_REGISTERED는 판매정보 미등록, UNKNOWN은 조회 실패다. 둘 다 price와 available이 null이다.
+    AdminProductDetail:
+      type: object
+      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, updatedAt, salesStatus, price, available]
+      properties:
+        productId: { type: integer, format: int64 }
+        name: { type: string }
+        description: { type: string }
+        mainImageId: { type: integer, format: int64 }
+        mainImageUrl: { type: string, format: uri-reference }
+        version: { type: integer, format: int64, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        salesStatus: { $ref: '#/components/schemas/AdminSalesStatus' }
+        price: { type: ['integer', 'null'], format: int64, minimum: 0 }
+        available: { type: ['integer', 'null'], minimum: 0 }
+    ApiError:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        requestId: { type: ['string', 'null'] }
+    ErrorEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: false }
+        data: { type: 'null' }
+        error: { $ref: '#/components/schemas/ApiError' }
+    ProductEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/Product' }, error: { type: 'null' } }
+    ProductSnapshotEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/ProductSnapshot' }, error: { type: 'null' } }
+    ProductSnapshotListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { type: array, items: { $ref: '#/components/schemas/ProductSnapshot' } }, error: { type: 'null' } }
+    PublicProductListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/PublicProductList' }, error: { type: 'null' } }
+    PublicProductDetailEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/PublicProductDetail' }, error: { type: 'null' } }
+    PurchaseCheckEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/PurchaseCheck' }, error: { type: 'null' } }
+    ImageUploadEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/ImageUpload' }, error: { type: 'null' } }
+    AdminProductPageEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/AdminProductPage' }, error: { type: 'null' } }
+    AdminProductDetailEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/AdminProductDetail' }, error: { type: 'null' } }
