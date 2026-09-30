@@ -8,8 +8,9 @@ import com.shoppinglive.live.integration.shopping.HttpProductClient;
 import com.shoppinglive.live.integration.shopping.ProductClient;
 import com.shoppinglive.live.integration.shopping.ProductSnapshot;
 import java.time.Duration;
-
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -31,8 +32,18 @@ public class ProductClientsConfiguration {
     @ConfigurationProperties("live.products")
     public record Properties(String mode, String shoppingUrl, String commerceUrl) { }
 
+    private record StubProduct(long id, long salesId, long price, SalesStatus status, int stock) { }
+
     /** stub 은 1=판매중, 2=품절, 3=READY, 4=PRIVATE 이고 그 밖은 미존재다. */
-    private static final Set<Long> STUB_PRODUCTS = Set.of(1L, 2L, 3L, 4L);
+    private static final List<StubProduct> STUB_CATALOG = List.of(
+        new StubProduct(1L, 101L, 10_000L, SalesStatus.ON_SALE, 5),
+        new StubProduct(2L, 102L, 20_000L, SalesStatus.SOLD_OUT, 0),
+        new StubProduct(3L, 103L, 30_000L, SalesStatus.READY, 10),
+        new StubProduct(4L, 104L, 40_000L, SalesStatus.PRIVATE, 8)
+    );
+
+    private static final Set<Long> STUB_PRODUCTS =
+        STUB_CATALOG.stream().map(StubProduct::id).collect(Collectors.toUnmodifiableSet());
 
     @Bean
     ProductClient productClient(final Properties properties, final RestClient.Builder builder,
@@ -63,12 +74,9 @@ public class ProductClientsConfiguration {
     }
 
     private static SalesSnapshot stubSales(final Long productId) {
-        return switch (productId.intValue()) {
-            case 1 -> new SalesSnapshot(1L, 101L, 10_000L, SalesStatus.ON_SALE, 5);
-            case 2 -> new SalesSnapshot(2L, 102L, 20_000L, SalesStatus.SOLD_OUT, 0);
-            case 3 -> new SalesSnapshot(3L, 103L, 30_000L, SalesStatus.READY, 10);
-            default -> new SalesSnapshot(4L, 104L, 40_000L, SalesStatus.PRIVATE, 8);
-        };
+        final StubProduct stub = STUB_CATALOG.stream()
+            .filter(product -> product.id() == productId).findFirst().orElseThrow();
+        return new SalesSnapshot(stub.id(), stub.salesId(), stub.price(), stub.status(), stub.stock());
     }
 
     private static String mode(final Properties properties, final Environment environment) {
