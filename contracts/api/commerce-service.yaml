@@ -545,7 +545,7 @@ components:
         quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
         buyerName: {"type": "string", "minLength": 1, "maxLength": 64}
         buyerPhone: {"type": "string", "pattern": "^[0-9-]{9,32}$", "writeOnly": true}
-        expectedTotalAmount: {"type": "integer", "format": "int64", "minimum": 1}
+        expectedTotalAmount: {"type": ["integer", "null"], "format": "int64", "minimum": 1}
       description: "소유자는 JWT sub이다. 비회원 조회 비밀번호는 지원하지 않는다. expectedTotalAmount는 직접 주문에서 선택이며 보내면 최신 금액과 일치해야 한다."
     CartOrderRequest:
       type: "object"
