@@ -45,7 +45,9 @@ jobs:
       - name: Package integration application jars
         run: |
           mkdir -p build
+          printf '%s\n' "$GITHUB_SHA" > build/integration-jars.sha
           tar -cf build/integration-jars.tar \
+            build/integration-jars.sha \
             services/member-service/build/libs/*-SNAPSHOT.jar \
             services/shopping-service/build/libs/*-SNAPSHOT.jar \
             services/commerce-service/build/libs/*-SNAPSHOT.jar \
