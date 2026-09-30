@@ -30,7 +30,7 @@ class ProductClientsTest {
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         client = ProductClientsConfiguration.http(RestClient.builder(),
-            "http://127.0.0.1:" + server.getAddress().getPort());
+            "http://127.0.0.1:" + server.getAddress().getPort(), "test-live-shopping-credential-000000000001");
     }
 
     @AfterEach
@@ -139,7 +139,7 @@ class ProductClientsTest {
     void stubRequiresLocalOrTestProfile() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties stub =
-            new ProductClientsConfiguration.Properties("stub", null, null);
+            new ProductClientsConfiguration.Properties("stub", null, null, null, null);
         assertThatThrownBy(() -> configuration.productClient(stub, RestClient.builder(),
             new MockEnvironment()))
             .isInstanceOf(IllegalArgumentException.class)
@@ -151,7 +151,7 @@ class ProductClientsTest {
     void httpModeRequiresUpstreamUrl() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties http =
-            new ProductClientsConfiguration.Properties("http", null, null);
+            new ProductClientsConfiguration.Properties("http", null, null, null, null);
         assertThatThrownBy(() -> configuration.productClient(http, RestClient.builder(),
             new MockEnvironment()))
             .hasMessageContaining("URL is required");
@@ -163,7 +163,8 @@ class ProductClientsTest {
         // given
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties http = new ProductClientsConfiguration.Properties(
-            "http", "http://shopping", "http://commerce");
+            "http", "http://shopping", "http://commerce",
+            "test-live-shopping-credential-000000000001", "test-live-commerce-credential-000000000001");
         final MockEnvironment dev = new MockEnvironment();
         dev.setActiveProfiles("dev");
 
@@ -172,6 +173,36 @@ class ProductClientsTest {
             .isInstanceOf(HttpProductClient.class);
         assertThat(configuration.salesClient(http, RestClient.builder(), dev))
             .isInstanceOf(HttpSalesClient.class);
+    }
+
+    @Test
+    void httpModeRequiresCredentialAndSendsOnlyTheTargetsServiceKey() {
+        final String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+        assertThatThrownBy(() -> ProductClientsConfiguration.http(RestClient.builder(), baseUrl, null))
+            .hasMessageContaining("service token");
+        var headers = new java.util.concurrent.ConcurrentHashMap<String, String>();
+        server.createContext("/v1/internal/products", exchange -> {
+            headers.put("shopping", exchange.getRequestHeaders().getFirst("X-Service-Token"));
+            byte[] body = "{\"success\":true,\"data\":[],\"error\":null}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.createContext("/v1/sales", exchange -> {
+            headers.put("commerce", exchange.getRequestHeaders().getFirst("X-Service-Token"));
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, 2);
+            exchange.getResponseBody().write("[]".getBytes(StandardCharsets.UTF_8));
+            exchange.close();
+        });
+        var config = new ProductClientsConfiguration();
+        var properties = new ProductClientsConfiguration.Properties("http", baseUrl, baseUrl,
+            "test-live-shopping-credential-000000000001", "test-live-commerce-credential-000000000001");
+        var builder = RestClient.builder();
+        config.productClient(properties, builder, new MockEnvironment()).get(List.of(1L));
+        config.salesClient(properties, builder, new MockEnvironment()).get(List.of(1L));
+        assertThat(headers).containsEntry("shopping", properties.shoppingToken()).containsEntry("commerce", properties.commerceToken());
     }
 
     private void respond(final String path, final int status, final String body) {

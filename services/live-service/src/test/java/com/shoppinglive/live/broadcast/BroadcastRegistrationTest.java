@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -31,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("방송 등록·수정 (멱등성, 낙관적 잠금, HTTP 계약)")
-class BroadcastRegistrationTest {
+class BroadcastRegistrationTest extends LiveSecuritySupport {
     @Autowired BroadcastService service;
     @Autowired BroadcastRepository repository;
     @Autowired MockMvc mvc;
@@ -129,7 +130,7 @@ class BroadcastRegistrationTest {
             """
             {"title":"http-title","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .header("Idempotency-Key", "http-key")
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
@@ -146,7 +147,7 @@ class BroadcastRegistrationTest {
             """
             {"title":"no-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
             .andExpect(status().isBadRequest());
@@ -159,7 +160,7 @@ class BroadcastRegistrationTest {
             """
             {"title":"special-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .header("Idempotency-Key", "invalid key!")
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
@@ -173,7 +174,7 @@ class BroadcastRegistrationTest {
             """
             {"title":"too-long-key","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .header("Idempotency-Key", "k".repeat(129))
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
@@ -187,7 +188,7 @@ class BroadcastRegistrationTest {
             """
             {"scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .header("Idempotency-Key", "no-title")
             .contentType(MediaType.APPLICATION_JSON)
             .content(bodyNoTitle))
@@ -203,7 +204,7 @@ class BroadcastRegistrationTest {
             """
             {"title":"admin-arn","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
-        mvc.perform(post("/v1/admin/broadcasts")
+        mvc.perform(post("/v1/admin/broadcasts").header("Authorization", adminBearer())
             .header("Idempotency-Key", "admin-key")
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
@@ -260,7 +261,7 @@ class BroadcastRegistrationTest {
             {"title":"patched","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, newTime, channelArn, playbackUrl);
 
-        mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId())
+        mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId()).header("Authorization", adminBearer())
             .param("version", String.valueOf(version))
             .contentType(MediaType.APPLICATION_JSON)
             .content(patchBody))
@@ -280,7 +281,7 @@ class BroadcastRegistrationTest {
             {"title":"patched","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """, past, channelArn, playbackUrl);
 
-        mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId())
+        mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId()).header("Authorization", adminBearer())
             .contentType(MediaType.APPLICATION_JSON)
             .content(patchBody))
             .andExpect(status().isBadRequest());

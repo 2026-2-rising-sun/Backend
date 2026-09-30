@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=true"})
 @AutoConfigureMockMvc
 @DisplayName("방송 시작 (상품 연결 전제, IVS 송출 확인, 멱등성, 외부 장애 구분)")
-class BroadcastStartTest {
+class BroadcastStartTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
     @Autowired BroadcastStartService start;
@@ -140,11 +141,11 @@ class BroadcastStartTest {
     @Test
     void httpStartReturnsLiveAndRequiresVersion() throws Exception {
         final Broadcast broadcast = readyToStart("start-http", 1L);
-        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()).header("Authorization", adminBearer())
                 .param("expectedVersion", String.valueOf(versionOf(broadcast.getId()))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("LIVE"));
-        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isBadRequest());
     }
 
@@ -155,7 +156,7 @@ class BroadcastStartTest {
         // 클라이언트가 한 번 발급받은 버전. 응답이 유실된 재시도는 이 값을 그대로 다시 보낸다.
         final long issued = versionOf(broadcast.getId());
 
-        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()).header("Authorization", adminBearer())
                 .param("expectedVersion", String.valueOf(issued)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("LIVE"));
@@ -163,7 +164,7 @@ class BroadcastStartTest {
 
         // 시작 성공으로 version 이 올랐지만 재시도는 같은 issued 로 온다 → 멱등 성공이어야 한다.
         assertThat(versionOf(broadcast.getId())).isNotEqualTo(issued);
-        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+        mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()).header("Authorization", adminBearer())
                 .param("expectedVersion", String.valueOf(issued)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("LIVE"));
@@ -224,7 +225,7 @@ class BroadcastStartTest {
                 INSERT INTO broadcast_product (created_at, updated_at, broadcast_id, product_id,
                     sales_id, position) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, 1, 101, 0)
                 """, broadcast.getId());
-            mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
+            mvc.perform(post("/v1/admin/broadcasts/{id}/start", broadcast.getId()).header("Authorization", adminBearer())
                     .param("expectedVersion",
                         String.valueOf(broadcasts.get(broadcast.getId()).getVersion())))
                 .andExpect(status().isServiceUnavailable());

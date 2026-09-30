@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("방송 종료 (상태 전이 제약, 멱등성, 동시 종료 요청)")
-class BroadcastEndTest {
+class BroadcastEndTest extends LiveSecuritySupport {
     @Autowired BroadcastService service;
     @Autowired MockMvc mvc;
     @Autowired DataSource dataSource;
@@ -51,14 +52,14 @@ class BroadcastEndTest {
     @Test
     void endingAPreparingBroadcastIsRejected() throws Exception {
         final Broadcast broadcast = register("end-preparing");
-        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isConflict());
     }
 
     @DisplayName("존재하지 않는 방송을 종료하면 404를 반환한다")
     @Test
     void endingMissingBroadcastIs404() throws Exception {
-        mvc.perform(post("/v1/admin/broadcasts/{id}/end", 999_999L))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/end", 999_999L).header("Authorization", adminBearer()))
             .andExpect(status().isNotFound());
     }
 
@@ -68,12 +69,12 @@ class BroadcastEndTest {
         final Broadcast broadcast = register("end-repeat");
         forceLive(broadcast);
 
-        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.status").value("ENDED"));
         final Instant first = service.get(broadcast.getId()).getEndedAt();
 
-        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isOk());
         assertThat(service.get(broadcast.getId()).getEndedAt()).isEqualTo(first);
         assertThat(service.get(broadcast.getId()).getStatus()).isEqualTo(BroadcastStatus.ENDED);
@@ -98,7 +99,7 @@ class BroadcastEndTest {
         final CyclicBarrier gate = new CyclicBarrier(2);
         final Callable<Integer> call = () -> {
             gate.await();
-            return mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+            return mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()).header("Authorization", adminBearer()))
                 .andReturn().getResponse().getStatus();
         };
         final List<Integer> statuses;

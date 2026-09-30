@@ -6,6 +6,7 @@ plugins {
 dependencies {
     implementation(project(":libs:common-core"))
     implementation(project(":libs:common-web"))
+    implementation(project(":libs:common-security"))
     implementation(project(":libs:common-persistence"))
     implementation(project(":libs:common-resilience"))
     implementation(project(":libs:common-kafka"))
@@ -18,4 +19,5 @@ dependencies {
     implementation("software.amazon.awssdk:ivs:2.49.6")
 
     testRuntimeOnly(libs.h2)
+    testImplementation(testFixtures(project(":libs:common-security")))
 }

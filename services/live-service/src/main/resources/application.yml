@@ -10,15 +10,32 @@ spring:
 server:
   port: 8084
 
+shoppinglive:
+  security:
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+
+live:
+  products:
+    shopping-token: ${LIVE_SHOPPING_SERVICE_TOKEN:}
+    commerce-token: ${LIVE_COMMERCE_SERVICE_TOKEN:}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
   endpoint:
     health:
+      show-details: never
+      show-components: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 logging:
   pattern:

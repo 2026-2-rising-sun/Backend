@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -32,7 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("#63 방송 상품 노출 순서 변경")
-class BroadcastProductOrderTest {
+class BroadcastProductOrderTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService products;
     @Autowired BroadcastProductRepository links;
@@ -143,12 +144,12 @@ class BroadcastProductOrderTest {
     void httpReorderReturnsNewOrderAndRejectsMissingVersion() throws Exception {
         final Broadcast broadcast = register("order-http");
         final List<Long> ids = linkTwo(broadcast.getId());
-        mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
+        mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId()).header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"linkIds\":[" + ids.get(1) + "," + ids.get(0) + "],"
                     + "\"expectedVersion\":" + versionOf(broadcast.getId()) + "}"))
             .andExpect(status().isOk());
-        mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
+        mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId()).header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"linkIds\":[" + ids.get(0) + "," + ids.get(1) + "]}"))
             .andExpect(status().isBadRequest());
@@ -166,7 +167,7 @@ class BroadcastProductOrderTest {
         final CyclicBarrier gate = new CyclicBarrier(2);
         final Callable<Integer> call = () -> {
             gate.await();
-            return mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
+            return mvc.perform(put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId()).header("Authorization", adminBearer())
                     .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andReturn().getResponse().getStatus();
         };

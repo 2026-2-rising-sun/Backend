@@ -30,7 +30,8 @@ import org.springframework.web.client.RestClient;
 public class ProductClientsConfiguration {
 
     @ConfigurationProperties("live.products")
-    public record Properties(String mode, String shoppingUrl, String commerceUrl) { }
+    public record Properties(String mode, String shoppingUrl, String commerceUrl,
+                             String shoppingToken, String commerceToken) { }
 
     private record StubProduct(long id, long salesId, long price, SalesStatus status, int stock) { }
 
@@ -49,7 +50,7 @@ public class ProductClientsConfiguration {
     ProductClient productClient(final Properties properties, final RestClient.Builder builder,
                                 final Environment environment) {
         return switch (mode(properties, environment)) {
-            case "http" -> new HttpProductClient(http(builder, properties.shoppingUrl()));
+            case "http" -> new HttpProductClient(http(builder, properties.shoppingUrl(), properties.shoppingToken()));
             case "stub" -> ids -> ids.stream().filter(STUB_PRODUCTS::contains)
                 .map(id -> new ProductSnapshot(id, "Local demo product " + id, null)).toList();
             default -> ids -> {
@@ -63,7 +64,7 @@ public class ProductClientsConfiguration {
     SalesClient salesClient(final Properties properties, final RestClient.Builder builder,
                             final Environment environment) {
         return switch (mode(properties, environment)) {
-            case "http" -> new HttpSalesClient(http(builder, properties.commerceUrl()));
+            case "http" -> new HttpSalesClient(http(builder, properties.commerceUrl(), properties.commerceToken()));
             case "stub" -> ids -> ids.stream().filter(STUB_PRODUCTS::contains)
                 .map(ProductClientsConfiguration::stubSales).toList();
             default -> ids -> {
@@ -90,14 +91,18 @@ public class ProductClientsConfiguration {
         return mode;
     }
 
-    static RestClient http(final RestClient.Builder builder, final String url) {
+    static RestClient http(final RestClient.Builder builder, final String url, final String serviceToken) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("Product upstream URL is required");
+        }
+        if (serviceToken == null || serviceToken.isBlank() || serviceToken.length() < 32
+            || !serviceToken.equals(serviceToken.strip())) {
+            throw new IllegalArgumentException("Product upstream service token requires at least 32 characters");
         }
         final SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(1));
         factory.setReadTimeout(Duration.ofSeconds(2));
-        return builder.clone().baseUrl(url).requestFactory(factory).build();
+        return builder.clone().baseUrl(url).defaultHeader("X-Service-Token", serviceToken).requestFactory(factory).build();
     }
 
 }

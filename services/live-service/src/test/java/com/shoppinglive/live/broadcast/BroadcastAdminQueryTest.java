@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -23,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("관리용 방송 목록·상세 조회 (정렬, 상태 필터, 페이지네이션)")
-class BroadcastAdminQueryTest {
+class BroadcastAdminQueryTest extends LiveSecuritySupport {
     @Autowired BroadcastService service;
     @Autowired MockMvc mvc;
 
@@ -79,10 +80,10 @@ class BroadcastAdminQueryTest {
     @Test
     void httpListAndDetailReturnBroadcast() throws Exception {
         final Broadcast broadcast = register("http-detail");
-        mvc.perform(get("/v1/admin/broadcasts").param("size", "100"))
+        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", adminBearer()).param("size", "100"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.success").value(true));
-        mvc.perform(get("/v1/admin/broadcasts/{id}", broadcast.getId()))
+        mvc.perform(get("/v1/admin/broadcasts/{id}", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.title").value("http-detail"))
             .andExpect(jsonPath("$.data.status").value("PREPARING"));
@@ -91,14 +92,14 @@ class BroadcastAdminQueryTest {
     @DisplayName("존재하지 않는 방송을 상세 조회하면 404를 반환한다")
     @Test
     void httpDetailOfMissingBroadcastIs404() throws Exception {
-        mvc.perform(get("/v1/admin/broadcasts/{id}", 999_999L))
+        mvc.perform(get("/v1/admin/broadcasts/{id}", 999_999L).header("Authorization", adminBearer()))
             .andExpect(status().isNotFound());
     }
 
     @DisplayName("잘못된 상태 필터로 목록 조회하면 400을 반환한다")
     @Test
     void httpListWithInvalidStatusFilterIs400() throws Exception {
-        mvc.perform(get("/v1/admin/broadcasts").param("status", "NOPE"))
+        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", adminBearer()).param("status", "NOPE"))
             .andExpect(status().isBadRequest());
     }
 }
