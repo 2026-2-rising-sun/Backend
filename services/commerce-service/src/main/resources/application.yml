@@ -21,8 +21,9 @@ commerce:
     expiration:
       duration: PT15M
   shopping-client:
-    # 개발·통합 테스트 모드. 화요일 페어링에서 HttpShoppingClient 로 교체 시 http 로.
-    mode: stub
+    # 항상 HTTP를 사용하며 base-url은 프로필 또는 환경변수로 반드시 지정한다.
+    connect-timeout: 1s
+    read-timeout: 1s
 
 management:
   endpoints:
@@ -37,6 +38,22 @@ management:
 logging:
   pattern:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+# GET 재시도는 최대 두 번. 404·계약 위반·열린 서킷은 재시도하지 않는다.
+resilience4j:
+  circuitbreaker:
+    instances:
+      shoppingProducts:
+        base-config: shoppinglive-default
+  retry:
+    instances:
+      shoppingProducts:
+        base-config: shoppinglive-default
+        max-attempts: 2
+        retry-exceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
 
 ---
 # 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
@@ -60,6 +77,10 @@ spring:
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
 
+commerce:
+  shopping-client:
+    base-url: http://localhost:8082
+
 ---
 # k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.
 # 호스트는 같은 네임스페이스의 Service 이름이고 포트는 클러스터 내부 표준 포트다.
@@ -80,3 +101,7 @@ spring:
       group-id: commerce-service
       properties:
         spring.json.trusted.packages: com.shoppinglive.contracts.events
+
+commerce:
+  shopping-client:
+    base-url: http://dev-shopping-service:8080

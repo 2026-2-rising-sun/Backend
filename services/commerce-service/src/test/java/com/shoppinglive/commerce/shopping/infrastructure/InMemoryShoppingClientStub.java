@@ -6,13 +6,14 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
- * 개발·통합 테스트용 {@link ShoppingClient} 인메모리 구현체.
+ * 테스트 classpath에만 존재하는 {@link ShoppingClient} 인메모리 fixture.
  *
- * <p>{@code commerce.shopping-client.mode=stub} 일 때 (또는 property 미설정 default 시) 활성화.
- * Sprint 2 Phase 4 산출물. 화요일 페어링에서 {@code HttpShoppingClient} 로 교체 예정.
+ * <p>테스트 설정에서 {@code commerce.shopping-client.mode=stub}을 명시해야 활성화된다.
+ * 운영 jar에는 포함되지 않으므로 이 설정으로 실제 HTTP 호출을 우회할 수 없다.
  *
  * <p>동시성 안전: {@link ConcurrentHashMap} 기반. register/clear 는 test setup 에서 사용.
  *
@@ -20,11 +21,11 @@ import org.springframework.stereotype.Component;
  * {@code ShoppingUnavailableException} 을 던지지 않는다. HTTP 구현체에서 그 계약을 검증.
  */
 @Component
+@Primary
 @ConditionalOnProperty(
     prefix = "commerce.shopping-client",
     name = "mode",
-    havingValue = "stub",
-    matchIfMissing = true)
+    havingValue = "stub")
 public class InMemoryShoppingClientStub implements ShoppingClient {
 
     private final ConcurrentMap<Long, ProductSnapshot> products = new ConcurrentHashMap<>();
