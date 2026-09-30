@@ -1,11 +1,20 @@
-# context-load 테스트는 Docker 없이 CI에서도 돌아야 하므로 in-memory H2를 쓴다.
-# 실제 Postgres 연동 확인은 local 프로필로 기동해서 한다.
+# test는 H2, postgresTest는 외부의 격리 PostgreSQL DB를 명시해 같은 API와 migration을 검증한다.
 spring:
   datasource:
-    url: jdbc:h2:mem:member;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${MEMBER_TEST_DB_URL:jdbc:h2:mem:member;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    driver-class-name: ${MEMBER_TEST_DB_DRIVER:org.h2.Driver}
+    username: ${MEMBER_TEST_DB_USER:sa}
+    password: ${MEMBER_TEST_DB_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
+    open-in-view: false
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
