@@ -15,7 +15,8 @@ dependencies {
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
 
-    implementation(libs.spring.security.crypto)
+    implementation(project(":libs:common-security"))
+    testImplementation(testFixtures(project(":libs:common-security")))
 
     testRuntimeOnly(libs.h2)
 }

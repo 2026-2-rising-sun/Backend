@@ -22,10 +22,14 @@ public class ShoppingClientConfiguration {
         if (!StringUtils.hasText(properties.baseUrl())) {
             throw new IllegalStateException("commerce.shopping-client.base-url is required");
         }
+        if (!StringUtils.hasText(properties.serviceToken()) || properties.serviceToken().length() < 32) {
+            throw new IllegalStateException("commerce.shopping-client.service-token must contain at least 32 characters");
+        }
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
-        RestClient client = builder.clone().baseUrl(properties.baseUrl()).requestFactory(factory).build();
+        RestClient client = builder.clone().baseUrl(properties.baseUrl()).requestFactory(factory)
+            .defaultHeader("X-Service-Token", properties.serviceToken()).build();
         return new HttpShoppingClient(client,
             circuitBreakers.circuitBreaker(HttpShoppingClient.RESILIENCE_INSTANCE),
             retries.retry(HttpShoppingClient.RESILIENCE_INSTANCE));

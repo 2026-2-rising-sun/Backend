@@ -11,6 +11,16 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+shoppinglive:
+  security:
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      shopping: ${SHOPPING_COMMERCE_SERVICE_TOKEN}
+      live: ${LIVE_COMMERCE_SERVICE_TOKEN}
+
 server:
   port: 8083
 
@@ -24,12 +34,13 @@ commerce:
     # 항상 HTTP를 사용하며 base-url은 프로필 또는 환경변수로 반드시 지정한다.
     connect-timeout: 1s
     read-timeout: 1s
+    service-token: ${COMMERCE_SHOPPING_SERVICE_TOKEN:}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
   endpoint:
     health:
       probes:

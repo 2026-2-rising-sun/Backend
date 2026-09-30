@@ -52,17 +52,15 @@ public class PaymentService {
      *
      * <p>시나리오 결정 우선순위:
      * <ol>
-     *   <li>요청 body 에 명시된 scenario</li>
-     *   <li>Dev 레지스트리에 사전 지정된 scenario (결제 4, dev 프로파일만)</li>
+     *   <li>명시적으로 켠 local/test 레지스트리의 scenario</li>
      *   <li>Default: {@link PaymentScenario#INSTANT_SUCCESS}</li>
      * </ol>
      */
     @Transactional
     public PaymentAttempt startPayment(
-        String orderNumber, String rawPassword, PaymentScenario scenario) {
-        PaymentScenario effectiveScenario = resolveScenario(orderNumber, scenario);
-
-        Order order = orderService.findByOrderNumberAndPassword(orderNumber, rawPassword);
+        String orderNumber, String memberId) {
+        Order order = orderService.findByOrderNumberAndMemberId(orderNumber, memberId);
+        PaymentScenario effectiveScenario = resolveScenario(orderNumber);
 
         int updated = orderRepository.transitionStatus(
             order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING");
@@ -109,10 +107,7 @@ public class PaymentService {
             });
     }
 
-    private PaymentScenario resolveScenario(String orderNumber, PaymentScenario explicit) {
-        if (explicit != null) {
-            return explicit;
-        }
+    private PaymentScenario resolveScenario(String orderNumber) {
         DevPaymentScenarioRegistry registry = devRegistryProvider.getIfAvailable();
         if (registry != null) {
             return registry.get(orderNumber).orElse(PaymentScenario.INSTANT_SUCCESS);
@@ -162,8 +157,8 @@ public class PaymentService {
      * 결제 시도를 조회한다 (결제 3).
      */
     @Transactional(readOnly = true)
-    public PaymentAttempt getPayment(String orderNumber, String rawPassword, Long paymentId) {
-        Order order = orderService.findByOrderNumberAndPassword(orderNumber, rawPassword);
+    public PaymentAttempt getPayment(String orderNumber, String memberId, Long paymentId) {
+        Order order = orderService.findByOrderNumberAndMemberId(orderNumber, memberId);
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentId).orElse(null);
         if (attempt == null || !attempt.getOrderId().equals(order.getId())) {
             throw new PaymentNotFoundException(

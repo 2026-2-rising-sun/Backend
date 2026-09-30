@@ -1,5 +1,7 @@
 package com.shoppinglive.commerce.orders.api;
 
+import com.shoppinglive.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.shoppinglive.commerce.orders.application.CreateOrderCommand;
 import com.shoppinglive.commerce.orders.application.OrderCreationResult;
 import com.shoppinglive.commerce.orders.application.OrderCreationService;
@@ -42,6 +44,7 @@ public class OrderCreationController {
      */
     @PostMapping
     public ResponseEntity<OrderResponse> create(
+        @AuthenticationPrincipal AuthenticatedUser member,
         @Valid @RequestBody CreateOrderRequest request,
         @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey) {
 
@@ -51,7 +54,7 @@ public class OrderCreationController {
                 request.quantity(),
                 request.buyerName(),
                 request.buyerPhone(),
-                request.lookupPassword(),
+                member.memberId(),
                 request.expectedTotalAmount()),
             idempotencyKey);
 

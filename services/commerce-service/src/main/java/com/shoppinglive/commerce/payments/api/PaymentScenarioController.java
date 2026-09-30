@@ -2,6 +2,9 @@ package com.shoppinglive.commerce.payments.api;
 
 import com.shoppinglive.commerce.payments.application.DevPaymentScenarioRegistry;
 import jakarta.validation.Valid;
+import com.shoppinglive.commerce.orders.application.OrderService;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -12,26 +15,23 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 개발 전용 결제 시나리오 사전 지정 REST 컨트롤러 (결제 4).
- *
- * <p>{@code @Profile("!prod")} + {@code @ConditionalOnProperty} 이중 방어로 프로덕션 프로파일
- * 에는 배포되지 않는다. 경로 prefix {@code /v1/dev/...} 로 관측 시 dev endpoint 임을 명확히.
- */
+/** 명시적으로 켠 local/test 환경에서만 제공하는 Mock 결제 결과 제어. */
 @RestController
 @RequestMapping("/v1/dev/payment-scenarios")
-@Profile("!prod")
+@Profile("(local | test) & !dev & !prod")
 @ConditionalOnProperty(
     prefix = "commerce.dev.payment-scenario",
     name = "enabled",
     havingValue = "true",
-    matchIfMissing = true)
+    matchIfMissing = false)
 public class PaymentScenarioController {
 
     private final DevPaymentScenarioRegistry registry;
+    private final OrderService orders;
 
-    public PaymentScenarioController(DevPaymentScenarioRegistry registry) {
+    public PaymentScenarioController(DevPaymentScenarioRegistry registry, OrderService orders) {
         this.registry = registry;
+        this.orders = orders;
     }
 
     /**
@@ -40,7 +40,9 @@ public class PaymentScenarioController {
      */
     @PutMapping("/{orderNumber}")
     public ResponseEntity<Void> setScenario(
-        @PathVariable String orderNumber, @Valid @RequestBody SetPaymentScenarioRequest request) {
+        @PathVariable String orderNumber, @Valid @RequestBody SetPaymentScenarioRequest request,
+        @AuthenticationPrincipal AuthenticatedUser member) {
+        orders.findByOrderNumberAndMemberId(orderNumber, member.memberId());
         registry.set(orderNumber, request.scenario());
         return ResponseEntity.noContent().build();
     }
@@ -49,7 +51,9 @@ public class PaymentScenarioController {
      * 지정된 시나리오를 제거한다.
      */
     @DeleteMapping("/{orderNumber}")
-    public ResponseEntity<Void> clearScenario(@PathVariable String orderNumber) {
+    public ResponseEntity<Void> clearScenario(@PathVariable String orderNumber,
+        @AuthenticationPrincipal AuthenticatedUser member) {
+        orders.findByOrderNumberAndMemberId(orderNumber, member.memberId());
         registry.clear(orderNumber);
         return ResponseEntity.noContent().build();
     }

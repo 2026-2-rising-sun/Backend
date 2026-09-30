@@ -7,7 +7,7 @@ import java.time.Instant;
 /**
  * 주문 조회 API 응답 DTO.
  *
- * <p>비밀번호 hash · 멱등키 · buyerPhone 등 민감·내부 필드는 노출하지 않는다. buyerName 만
+ * <p>회원 식별자 · 멱등키 · buyerPhone 등 민감·내부 필드는 노출하지 않는다. buyerName 만
  * 본인 확인용으로 표시.
  */
 public record OrderResponse(

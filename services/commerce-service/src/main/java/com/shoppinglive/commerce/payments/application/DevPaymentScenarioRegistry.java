@@ -8,28 +8,14 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/**
- * 개발용 결제 시나리오 in-memory 레지스트리 (결제 4).
- *
- * <p>주문번호별로 결제 시작 시 사용할 시나리오를 사전에 지정할 수 있게 한다. Production
- * 배포에는 활성화되지 않는다.
- *
- * <ul>
- *   <li>{@code @Profile("!prod")} — prod 프로파일에서는 빈 등록 안 됨</li>
- *   <li>{@code @ConditionalOnProperty} — 설정으로 명시적 비활성 가능
- *       ({@code commerce.dev.payment-scenario.enabled: false})</li>
- * </ul>
- *
- * <p>운영 환경에는 결제 시작 요청 body 의 scenario 필드도 무시되어야 하지만, 현재
- * PaymentService 는 body scenario 를 우선 채택하므로 향후 별도 격리 필요.
- */
+/** 명시적으로 켠 local/test 환경에서만 제공하는 Mock 결제 결과 제어. */
 @Component
-@Profile("!prod")
+@Profile("(local | test) & !dev & !prod")
 @ConditionalOnProperty(
     prefix = "commerce.dev.payment-scenario",
     name = "enabled",
     havingValue = "true",
-    matchIfMissing = true)
+    matchIfMissing = false)
 public class DevPaymentScenarioRegistry {
 
     private final ConcurrentMap<String, PaymentScenario> map = new ConcurrentHashMap<>();
