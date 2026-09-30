@@ -16,6 +16,16 @@ shoppinglive:
       audience: ${MEMBER_JWT_AUDIENCE:shoppinglive-api}
       public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
 
+member:
+  auth:
+    private-key-location: ${MEMBER_JWT_PRIVATE_KEY_LOCATION}
+    key-id: ${MEMBER_JWT_KEY_ID}
+    access-token-ttl: ${MEMBER_ACCESS_TOKEN_TTL}
+    refresh-token-ttl: ${MEMBER_REFRESH_TOKEN_TTL}
+  login:
+    max-failed-attempts: ${MEMBER_LOGIN_MAX_FAILED_ATTEMPTS:5}
+    lock-duration: ${MEMBER_LOGIN_LOCK_DURATION:PT15M}
+
 server:
   port: 8081
 

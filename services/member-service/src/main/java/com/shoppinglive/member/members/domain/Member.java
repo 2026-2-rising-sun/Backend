@@ -39,6 +39,9 @@ public class Member {
     private Instant updatedAt;
     @Version
     private Long version;
+    @Column(nullable = false)
+    private int failedLoginAttempts;
+    private Instant loginLockedUntil;
 
     protected Member() { }
 
@@ -60,5 +63,12 @@ public class Member {
     public String getPasswordHash() { return passwordHash; }
     public String getDisplayName() { return displayName; }
     public Set<String> roles() { return Set.of(role.name()); }
+    public boolean loginLocked(Instant now) { return loginLockedUntil != null && loginLockedUntil.isAfter(now); }
+    public void recordLoginFailure(Instant now, int maximum, java.time.Duration lockDuration) {
+        if (loginLockedUntil != null && !loginLockedUntil.isAfter(now)) failedLoginAttempts = 0;
+        failedLoginAttempts++;
+        if (failedLoginAttempts >= maximum) loginLockedUntil = now.plus(lockDuration);
+    }
+    public void recordLoginSuccess() { failedLoginAttempts = 0; loginLockedUntil = null; }
     private enum Role { USER, ADMIN }
 }
