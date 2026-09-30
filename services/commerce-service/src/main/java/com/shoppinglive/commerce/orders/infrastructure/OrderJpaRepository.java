@@ -6,6 +6,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -30,7 +32,11 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
      * <p>키가 {@code null} 인 요청도 허용하므로 (컬럼 nullable) 호출 전에 null 여부를 먼저
      * 가려야 한다. Postgres UNIQUE 는 NULL 중복을 허용해 제약으로는 걸러지지 않는다.
      */
-    Optional<Order> findByIdempotencyKey(String idempotencyKey);
+    Optional<Order> findByMemberIdAndIdempotencyKey(String memberId, String idempotencyKey);
+
+    Optional<Order> findByOrderNumberAndMemberId(String orderNumber, String memberId);
+
+    Page<Order> findByMemberId(String memberId, Pageable pageable);
 
     /**
      * 만료 대상 조회 (주문 5). status = PENDING_PAYMENT 이고 expires_at 이 기준 시각보다

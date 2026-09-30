@@ -2,6 +2,7 @@ package com.shoppinglive.commerce.orders.application;
 
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import java.util.UUID;
 
 /**
  * 주문 생성 입력 (주문 2).
@@ -17,20 +18,32 @@ public record CreateOrderCommand(
     Integer quantity,
     String buyerName,
     String buyerPhone,
-    String lookupPassword,
-    Long expectedTotalAmount
+    String memberId,
+    Long expectedTotalAmount,
+    Long sourceCartItemId,
+    Long sourceCartItemVersion
 ) {
+
+    public CreateOrderCommand(Long productId, Integer quantity, String buyerName, String buyerPhone,
+        String memberId, Long expectedTotalAmount) {
+        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount, null, null);
+    }
 
     /**
      * 컨트롤러의 Bean Validation 과 별개로 서비스 진입점에서도 확인한다. 다른 진입점이 생기거나
      * 서비스를 직접 호출하는 테스트에서도 같은 제약이 걸리게 하기 위함이다.
      */
     public void validate() {
-        require(productId != null, "productId 는 필수입니다.");
+        require(productId != null && productId > 0, "productId 는 필수입니다.");
         require(quantity != null && quantity >= 1, "수량은 1 이상이어야 합니다.");
         require(hasText(buyerName), "주문자 이름은 필수입니다.");
         require(hasText(buyerPhone), "주문자 연락처는 필수입니다.");
-        require(hasText(lookupPassword), "주문 조회 비밀번호는 필수입니다.");
+        require(hasText(memberId), "회원 식별자는 필수입니다.");
+        try {
+            require(UUID.fromString(memberId).toString().equals(memberId), "회원 식별자 형식이 잘못되었습니다.");
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "회원 식별자 형식이 잘못되었습니다.");
+        }
         require(expectedTotalAmount == null || expectedTotalAmount > 0,
             "확인 금액은 양수여야 합니다.");
     }
