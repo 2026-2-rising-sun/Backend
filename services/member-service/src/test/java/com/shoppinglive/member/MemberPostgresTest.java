@@ -18,12 +18,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /** postgresTest 작업은 PostgreSQL URL이 없으면 실패한다. H2 성공으로 이 검증을 대신하지 않는다. */
 @Tag("postgres")
 class MemberPostgresTest extends MemberServiceApplicationTests {
-    @Autowired JdbcTemplate jdbc;
     @Autowired MemberService service;
 
     @Test
