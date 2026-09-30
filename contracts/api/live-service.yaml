@@ -1,26 +1,24 @@
 openapi: 3.1.0
 info:
   title: Live Service API
-  version: 1.0.0
+  version: 2.0.0
   license: { name: UNLICENSED }
   description: |
-    Live P1 방송 API. 컨트롤러 경로는 `/v1` 이고 게이트웨이 외부 prefix 는 `/api/live` 다.
+    Live 방송 API. 컨트롤러 경로는 `/v1` 이며 서비스가 직접 JWT를 검증한다.
 
     - 성공 응답은 공통 `ApiResponse` 봉투를 쓰고 DELETE 성공은 204 무본문이다.
     - 오류는 입력 400 / 미존재 404 / 상태·version·중복 409 / 외부 장애 503 으로 구분한다.
     - 공개 응답에는 채널 ARN·등록 키·fingerprint·송출키·자격증명을 넣지 않는다.
-    - 인증·역할·소유권은 P1 범위가 아니다(B5: 배포 시 관리·내부 경로 접근 범위 확인 필요).
+    - 공개 방송 조회·입장은 비회원 허용. 생성·수정·시작·종료·상품 연결 관리에는 ADMIN 역할이 필요하다.
+    - 현재 관리 모델은 공통 ADMIN 권한이다. 판매자 역할이나 방송별 판매자 소유권을 가정하지 않는다.
 
-# P1에는 인증이 구현되지 않았다. 인증을 도입하면 이 값을 security scheme으로 교체한다.
-security: []
+security: [{ BearerAuth: [] }]
 
 servers:
   - url: http://localhost:8084
     description: Live 서비스 로컬 실행 주소 (port 8084)
   - url: http://dev-live-service:8080
     description: Live 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
-  - url: https://api.example.com/api/live
-    description: Live 서비스 게이트웨이 경유 주소 (placeholder)
 
 tags:
   - name: Admin Broadcast
@@ -35,6 +33,7 @@ tags:
 paths:
   /v1/admin/broadcasts:
     post:
+      x-required-roles: [ADMIN]
       summary: 방송 등록 (#59)
       description: |
         PREPARING 으로 저장한다. 과거 예정 시각도 허용하며 AWS 송출 여부는 조회하지 않는다.
@@ -55,6 +54,8 @@ paths:
               channelArn: arn:aws:ivs:ap-northeast-2:123456789012:channel/abcDEF
               playbackUrl: https://abcdef.live-video.net/api/video/v1/ap-northeast-2.playlist.m3u8
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '201':
           description: 등록됨(같은 키·동일 입력의 재요청도 같은 방송)
           content:
@@ -74,6 +75,7 @@ paths:
                   message: 같은 등록 키에 다른 요청을 사용할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
     get:
+      x-required-roles: [ADMIN]
       summary: 관리 방송 목록 (#60)
       description: |
         상품·IVS 호출 없이 기본정보만 읽는다. 기본 정렬은 createdAt DESC, id DESC 이고
@@ -88,6 +90,8 @@ paths:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 목록
           content:
@@ -99,10 +103,13 @@ paths:
     parameters:
       - $ref: '#/components/parameters/BroadcastId'
     get:
+      x-required-roles: [ADMIN]
       summary: 관리 방송 상세 (#60)
       operationId: getBroadcast
       tags: [Admin Broadcast]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 상세
           content:
@@ -110,6 +117,7 @@ paths:
               schema: { $ref: '#/components/schemas/BroadcastEnvelope' }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
+      x-required-roles: [ADMIN]
       summary: 방송 기본정보 수정 (#59)
       description: |
         PREPARING 에서만 허용한다. 생략한 필드는 기존 값을 유지하고 본문에 명시적으로 null 을
@@ -126,6 +134,8 @@ paths:
             example:
               title: 가을 신상 라이브(수정)
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 수정됨
           content:
@@ -141,6 +151,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/start:
     post:
+      x-required-roles: [ADMIN]
       summary: 방송 시작 (#65)
       description: |
         IVS LIVE+HEALTHY 와 채널-시청 URL 동일성, 현재 ON_SALE/SOLD_OUT 연결 상품 최소 1개를
@@ -153,6 +164,8 @@ paths:
         - $ref: '#/components/parameters/BroadcastId'
         - $ref: '#/components/parameters/ExpectedVersion'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: LIVE
           content:
@@ -176,6 +189,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/end:
     post:
+      x-required-roles: [ADMIN]
       summary: 방송 종료 (#66)
       description: |
         LIVE 를 ENDED 로 바꾸고 최초 endedAt 을 보존한다. 반복 종료는 성공하고 준비 종료는 409 다.
@@ -185,6 +199,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/BroadcastId'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: ENDED
           content:
@@ -201,6 +217,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/BroadcastId'
     post:
+      x-required-roles: [ADMIN]
       summary: 방송 상품 연결 (#62)
       description: |
         Shopping 의 상품 존재와 Commerce 판매 상태를 확인한 뒤 ON_SALE/SOLD_OUT 만 연결한다.
@@ -214,6 +231,8 @@ paths:
             schema: { $ref: '#/components/schemas/LinkProductInput' }
             example: { productId: 1024, expectedVersion: 3 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '201':
           description: 연결됨
           content:
@@ -232,6 +251,7 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
     get:
+      x-required-roles: [ADMIN]
       summary: 관리 방송 상품 조회 (#67)
       description: |
         연결 순서로 Shopping 기본정보와 Commerce 최신 판매정보를 결합한다.
@@ -239,6 +259,8 @@ paths:
       operationId: listAdminBroadcastProducts
       tags: [Admin Broadcast Product]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 연결 상품
           content:
@@ -249,6 +271,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/products/order:
     put:
+      x-required-roles: [ADMIN]
       summary: 방송 상품 노출 순서 변경 (#63)
       description: |
         이 방송의 전체 linkId 순열을 받아 한 번에 순서를 바꾼다. 중복·누락·타 방송 ID 는 400 이고
@@ -264,6 +287,8 @@ paths:
             schema: { $ref: '#/components/schemas/ReorderProductsInput' }
             example: { linkIds: [77, 75, 76], expectedVersion: 8 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 변경된 전체 순서
           content:
@@ -279,6 +304,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/products/{linkId}:
     delete:
+      x-required-roles: [ADMIN]
       summary: 방송 상품 연결 해제 (#62)
       description: |
         방송 존재·상태를 먼저 검사한다. 같은 방송에서 이미 사라진 linkId 는 204 이고,
@@ -293,6 +319,8 @@ paths:
           schema: { type: integer, format: int64 }
         - $ref: '#/components/parameters/ExpectedVersion'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '204':
           description: 해제됨. 본문이 없다.
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -316,6 +344,7 @@ paths:
 
   /v1/broadcasts:
     get:
+      security: []
       summary: 공개 방송 목록 (#61)
       description: |
         로그인 없이 조회한다. LIVE → PREPARING → ENDED 그룹 순서이고 각 상태의 정렬을 쓴다.
@@ -326,6 +355,7 @@ paths:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 목록
           content:
@@ -335,6 +365,7 @@ paths:
 
   /v1/broadcasts/{id}:
     get:
+      security: []
       summary: 공개 방송 상세·시청 연결 (#61 #64)
       description: |
         `playbackUrl` 은 LIVE 에서만 반환한다. `playbackAllowed` 는 업무 상태이고
@@ -347,6 +378,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/BroadcastId'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 상세
           content:
@@ -368,6 +400,7 @@ paths:
 
   /v1/broadcasts/{id}/products:
     get:
+      security: []
       summary: 공개 방송 상품 조회·구매 진입 (#67)
       description: |
         ON_SALE/SOLD_OUT 만 노출하고 READY/PRIVATE·정상 조회에서 삭제된 상품은 제외한다.
@@ -379,6 +412,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/BroadcastId'
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 공개 상품
           content:
@@ -412,6 +446,12 @@ paths:
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api. ADMIN API는 ADMIN 역할 필수.
   parameters:
     BroadcastId:
       name: id
@@ -451,6 +491,18 @@ components:
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
 
   responses:
+    Unauthorized:
+      description: 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { unauthorized: { value: { success: false, data: null, error: { code: UNAUTHORIZED, message: 인증이 필요합니다., requestId: request-001 } } } }
+    Forbidden:
+      description: 검증된 사용자 또는 서비스 호출자에게 필요한 권한이 없음
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { forbidden: { value: { success: false, data: null, error: { code: FORBIDDEN, message: 권한이 없습니다., requestId: request-001 } } } }
     BadRequest:
       description: 입력이 올바르지 않다.
       content:
@@ -503,7 +555,7 @@ components:
       properties:
         code:
           type: string
-          enum: [INVALID_REQUEST, NOT_FOUND, CONFLICT, SERVICE_UNAVAILABLE, INTERNAL_ERROR]
+          enum: [INVALID_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, SERVICE_UNAVAILABLE, INTERNAL_ERROR]
         message: { type: string }
         requestId: { type: ['string', 'null'] }
     ErrorEnvelope:
@@ -617,7 +669,7 @@ components:
         mainImageUrl:
           type: ['string', 'null']
           format: uri-reference
-          description: null 은 기본 이미지 표시. 상대 URL 은 게이트웨이 기준으로 해석한다.
+          description: null 은 기본 이미지 표시. 상대 URL 은 서비스 제공 이미지 경로이며 별도 배포 prefix를 유지한다.
         price: { type: ['integer', 'null'], format: int64, description: KRW 정수 }
         status:
           type: ['string', 'null']
