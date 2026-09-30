@@ -6,6 +6,7 @@
   "scripts": {
     "lint": "node lint.cjs",
     "examples": "node validate.cjs",
+    "smoke": "node smoke.cjs",
     "check": "npm run lint && npm run examples"
   },
   "dependencies": {
