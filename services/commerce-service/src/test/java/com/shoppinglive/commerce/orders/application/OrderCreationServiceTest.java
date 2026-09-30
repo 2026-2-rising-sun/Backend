@@ -427,4 +427,25 @@ class OrderCreationServiceTest {
         assertThat(captor.getValue().getBuyerPhone()).isEqualTo("010-1234-5678");
         assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("key-1");
     }
+    @Test
+    void cartChangedDuringShoppingLookupDoesNotCreateOrReserveOrder() {
+        String member = "11111111-1111-4111-8111-111111111111";
+        var snapshot = new com.shoppinglive.commerce.cart.domain.CartItem(member, PRODUCT_ID, 1);
+        var changed = new com.shoppinglive.commerce.cart.domain.CartItem(member, PRODUCT_ID, 2);
+        ReflectionTestUtils.setField(snapshot, "version", 0L);
+        ReflectionTestUtils.setField(changed, "version", 1L);
+        given(cartItems.findByIdAndMemberId(1L, member)).willReturn(Optional.of(snapshot));
+        given(cartItems.lockOwned(1L, member)).willReturn(Optional.of(changed));
+        productExists();
+        executeTransactionInline();
+
+        assertThatThrownBy(() -> orderCreationService.createFromCart(member, 1L,
+            new com.shoppinglive.commerce.cart.application.CartOrderCommand("회원", "01012345678", PRICE), "cart-key"))
+            .isInstanceOf(BusinessException.class)
+            .extracting(e -> ((BusinessException) e).errorCode()).isEqualTo(ErrorCode.CONFLICT);
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(cartItems, never()).delete(any());
+    }
+
 }

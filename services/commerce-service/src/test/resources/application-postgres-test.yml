@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${COMMERCE_TEST_POSTGRES_URL}
+    driver-class-name: org.postgresql.Driver
+    username: ${COMMERCE_TEST_POSTGRES_USER:postgres}
+    password: ${COMMERCE_TEST_POSTGRES_PASSWORD:postgres}
+    hikari:
+      schema: ${commerce.tests.schema}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ${commerce.tests.schema}
+  flyway:
+    enabled: true
+    schemas: ${commerce.tests.schema}
+    default-schema: ${commerce.tests.schema}
+    create-schemas: true
