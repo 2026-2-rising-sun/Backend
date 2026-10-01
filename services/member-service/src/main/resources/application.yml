@@ -15,13 +15,17 @@ shoppinglive:
       issuer: ${MEMBER_JWT_ISSUER:shoppinglive-member}
       audience: ${MEMBER_JWT_AUDIENCE:shoppinglive-api}
       public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      shopping: ${SHOPPING_MEMBER_SERVICE_TOKEN}
+      commerce: ${COMMERCE_MEMBER_SERVICE_TOKEN}
+      live: ${LIVE_MEMBER_SERVICE_TOKEN}
 
 member:
   auth:
     private-key-location: ${MEMBER_JWT_PRIVATE_KEY_LOCATION}
     key-id: ${MEMBER_JWT_KEY_ID}
-    access-token-ttl: ${MEMBER_ACCESS_TOKEN_TTL}
-    refresh-token-ttl: ${MEMBER_REFRESH_TOKEN_TTL}
+    access-token-ttl: ${MEMBER_ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${MEMBER_REFRESH_TOKEN_TTL:P30D}
   login:
     max-failed-attempts: ${MEMBER_LOGIN_MAX_FAILED_ATTEMPTS:5}
     lock-duration: ${MEMBER_LOGIN_LOCK_DURATION:PT15M}

@@ -46,13 +46,15 @@ public class MemberService {
 
     @Transactional
     public MemberProfile updateProfile(UUID memberId, String displayName) {
-        Member member = requireMember(memberId);
+        Member member = members.findForUpdate(memberId).filter(found -> !found.isWithdrawn())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
         member.changeDisplayName(displayName);
         return MemberProfile.from(member);
     }
 
     private Member requireMember(UUID id) {
-        return members.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
+        return members.findById(id).filter(found -> !found.isWithdrawn())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "회원을 찾을 수 없습니다."));
     }
 
     private BusinessException duplicateEmail() {
