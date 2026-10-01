@@ -26,7 +26,7 @@ DB 장애는 소유 PostgreSQL을 pause/unpause하여 재현한다. 테스트 JD
 세 서비스는 로컬 JWT 서명 검증 후 Member의 상태 API를 캐시 없이 조회하고, Member 자체는 DB를 조회한다.
 Member 중단 시 인증된 요청의 503·쓰기 차단, 무토큰 공개 API와 내부 caller의 독립 동작,
 재시작 후 정상 세션 복구 및 DB에 저장된 보안 폐기 유지도 검증한다.
-소셜 제공자·구현과 Apidog 프로젝트 왕복 검증 대기는 `deferred`에 명시되어 있다.
+소셜 로그인·이메일 소유권 인증은 사용자 요청으로 P2에서 제외했다. Apidog 프로젝트 왕복 검증 대기는 `deferred`에 명시되어 있다.
 현재 구현된 필수 HTTP 흐름의 성공은 `passed`로, 정책 대기와 P2 전체 완료 여부는 `deferred`/`p2Complete`로 구분한다.
 0건·실패·skip·누락을 성공으로 바꾸지 않으며 부분 실행을 P2 또는 CI 완료로 보고하지 않는다.
 PostgreSQL migration·locking의 전체 회귀는 CI의 별도 필수 PostgreSQL job이 수행한다. 그 개수를 HTTP check 개수에 합산하지 않는다.
