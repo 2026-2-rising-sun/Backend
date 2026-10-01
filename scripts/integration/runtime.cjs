@@ -242,6 +242,11 @@ class Runtime {
   }
   async cleanOwnedResources() {
     const errors = [];
+    if (this.buildChild && this.buildChild.exitCode === null && this.buildChild.signalCode === null) {
+      this.buildChild.kill('SIGTERM');
+      await Promise.race([new Promise(resolve => this.buildChild.once('exit', resolve)), delay(5000)]);
+      if (this.buildChild.exitCode === null && this.buildChild.signalCode === null) this.buildChild.kill('SIGKILL');
+    }
     for (const service of services) {
       try {
         let log = '';
