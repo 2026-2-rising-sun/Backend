@@ -41,6 +41,7 @@ paths:
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503": {"$ref": "#/components/responses/AuthUnavailable"}
         "500": {"$ref": "#/components/responses/InternalError"}
   /v1/auth/login:
     post:
@@ -82,6 +83,7 @@ paths:
                 normal: {"value": {"success": true, "data": {"memberId": "11111111-1111-4111-8111-111111111111", "email": "member@example.com", "displayName": "회원", "roles": ["USER"]}, "error": null}}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503": {"$ref": "#/components/responses/AuthUnavailable"}
         "500": {"$ref": "#/components/responses/InternalError"}
     patch:
       tags: ["Member"]
@@ -104,18 +106,19 @@ paths:
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503": {"$ref": "#/components/responses/AuthUnavailable"}
         "500": {"$ref": "#/components/responses/InternalError"}
 components:
   securitySchemes:
     BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api; USER/ADMIN. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
   responses:
     AuthUnavailable:
-      description: 로그인 저장소 연결 또는 일시 오류. 잘못된 자격증명과 구분한다.
+      description: 회원 저장소 연결 또는 일시 오류. 잘못된 자격증명과 구분한다.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
           examples:
-            authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: 외부 서비스를 사용할 수 없습니다., requestId: request-001 } } }
+            authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: 회원 저장소를 사용할 수 없습니다., requestId: request-001 } } }
     BadRequest:
       description: "요청 값·형식 또는 금액 범위 오류"
       content:
