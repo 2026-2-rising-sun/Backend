@@ -16,7 +16,8 @@ class CommonSecurityAutoConfigurationTest {
     @TempDir Path directory;
     private final ApplicationContextRunner context = new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(CommonSecurityAutoConfiguration.class))
-        .withBean(ObjectMapper.class, ObjectMapper::new);
+        .withBean(ObjectMapper.class, ObjectMapper::new)
+        .withBean(AccessSessionVerifier.class, () -> (member, session) -> true);
 
     @Test
     void failsStartupWithoutIssuerAudienceOrLocalKeyFile() throws Exception {
@@ -38,5 +39,38 @@ class CommonSecurityAutoConfigurationTest {
         context.withPropertyValues(required).withPropertyValues(
             "shoppinglive.security.jwt.public-key-set-location=https://example.invalid/keys.jwks")
             .run(result -> assertThat(result).hasFailed());
+    }
+
+    @Test
+    void httpVerifierRequiresConfigurationAndDatabaseVerifierNeedsNoHttpProperties() throws Exception {
+        Path keys = directory.resolve("session-public.jwks");
+        Files.writeString(keys, new JwtTestTokens().publicJwkSet().toString());
+        var candidate = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(CommonSecurityAutoConfiguration.class))
+            .withBean(ObjectMapper.class, ObjectMapper::new)
+            .withPropertyValues("shoppinglive.security.jwt.issuer=shoppinglive-member",
+                "shoppinglive.security.jwt.audience=shoppinglive-api",
+                "shoppinglive.security.jwt.public-key-set-location=" + keys.toUri());
+        candidate.run(result -> assertThat(result).hasFailed());
+        String base = "shoppinglive.security.session.base-url=http://localhost:8081";
+        String key = "shoppinglive.security.session.service-token=test-member-client-credential-at-least-32-characters";
+        candidate.withPropertyValues(base).run(result -> assertThat(result).hasFailed());
+        candidate.withPropertyValues(key).run(result -> assertThat(result).hasFailed());
+        candidate.withPropertyValues(base, key).run(result -> {
+            assertThat(result).hasNotFailed().hasSingleBean(AccessSessionVerifier.class);
+            assertThat(result.getBean(AccessSessionVerifier.class)).isInstanceOf(HttpAccessSessionVerifier.class);
+        });
+        for (String invalid : new String[] {
+            "shoppinglive.security.session.base-url=file:/etc/hosts",
+            "shoppinglive.security.session.base-url=http://user:password@localhost:8081",
+            "shoppinglive.security.session.base-url=http://localhost:8081/path",
+            "shoppinglive.security.session.service-token=short",
+            "shoppinglive.security.session.read-timeout=0s",
+            "shoppinglive.security.session.connect-timeout=10s"}) {
+            candidate.withPropertyValues(base, key, invalid).run(result -> assertThat(result).hasFailed());
+        }
+        candidate.withBean(AccessSessionVerifier.class, () -> (member, session) -> false)
+            .run(result -> assertThat(result).hasNotFailed().hasSingleBean(AccessSessionVerifier.class)
+                .doesNotHaveBean(AccessSessionProperties.class));
     }
 }

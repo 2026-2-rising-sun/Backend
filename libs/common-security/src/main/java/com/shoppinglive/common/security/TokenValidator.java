@@ -1,8 +1,8 @@
 package com.shoppinglive.common.security;
 
 /**
- * Verifies access tokens issued by member-service. Every service validates tokens locally so that
- * a member-service outage cannot block authenticated traffic on the other services.
+ * Verifies the JWT locally and checks current session authorization. A Member status outage fails
+ * closed with AccessSessionUnavailableException; public requests without credentials remain independent.
  */
 public interface TokenValidator {
 
