@@ -39,16 +39,32 @@ shopping:
   sales-client:
     connect-timeout: 1s
     read-timeout: 1s
+    service-token: ${SHOPPING_COMMERCE_SERVICE_TOKEN:}
+
+shoppinglive:
+  security:
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      commerce: ${COMMERCE_SHOPPING_SERVICE_TOKEN:}
+      live: ${LIVE_SHOPPING_SERVICE_TOKEN:}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
   endpoint:
     health:
+      show-details: never
+      show-components: never
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
 
 logging:
   pattern:

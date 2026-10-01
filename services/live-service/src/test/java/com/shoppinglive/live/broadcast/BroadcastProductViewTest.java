@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,7 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("방송 상품 공개·관리 조회 (정렬, 구매 가능 여부, 누락 처리, 외부 장애)")
-class BroadcastProductViewTest {
+class BroadcastProductViewTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
     @Autowired BroadcastProductViewService view;
@@ -108,7 +109,7 @@ class BroadcastProductViewTest {
         mvc.perform(get("/v1/broadcasts/{id}/products", broadcast.getId()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").isEmpty());
-        mvc.perform(get("/v1/admin/broadcasts/{id}/products", 999_999L))
+        mvc.perform(get("/v1/admin/broadcasts/{id}/products", 999_999L).header("Authorization", adminBearer()))
             .andExpect(status().isNotFound());
     }
 
@@ -121,7 +122,7 @@ class BroadcastProductViewTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].productId").value(1))
             .andExpect(jsonPath("$.data[0].salesId").value(101));
-        mvc.perform(get("/v1/admin/broadcasts/{id}/products", broadcast.getId()))
+        mvc.perform(get("/v1/admin/broadcasts/{id}/products", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].position").value(0));
     }

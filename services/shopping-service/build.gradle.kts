@@ -6,6 +6,7 @@ plugins {
 dependencies {
     implementation(project(":libs:common-core"))
     implementation(project(":libs:common-web"))
+    implementation(project(":libs:common-security"))
     implementation(project(":libs:common-persistence"))
     implementation(project(":libs:common-resilience"))
     implementation(project(":contracts:events"))
@@ -17,4 +18,5 @@ dependencies {
     runtimeOnly(libs.postgresql)
 
     testRuntimeOnly(libs.h2)
+    testImplementation(testFixtures(project(":libs:common-security")))
 }

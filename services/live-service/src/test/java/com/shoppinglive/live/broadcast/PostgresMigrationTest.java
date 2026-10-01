@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -21,7 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles({"test", "postgres"})
 @EnabledIfEnvironmentVariable(named = "LIVE_PG_TEST", matches = "1")
 @DisplayName("실제 PostgreSQL에서 Flyway 마이그레이션과 DB 불변조건 검증")
-class PostgresMigrationTest {
+class PostgresMigrationTest extends LiveSecuritySupport {
 
     @Autowired
     DataSource dataSource;

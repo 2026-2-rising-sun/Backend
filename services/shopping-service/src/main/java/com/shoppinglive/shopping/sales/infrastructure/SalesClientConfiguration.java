@@ -29,11 +29,16 @@ public class SalesClientConfiguration {
         if (!StringUtils.hasText(properties.baseUrl())) {
             throw new IllegalStateException("shopping.sales-client.base-url is required");
         }
+        if (!StringUtils.hasText(properties.serviceToken()) || properties.serviceToken().length() < 32
+            || !properties.serviceToken().equals(properties.serviceToken().strip())) {
+            throw new IllegalStateException("shopping.sales-client.service-token requires at least 32 characters");
+        }
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(properties.connectTimeout());
         requestFactory.setReadTimeout(properties.readTimeout());
-        RestClient restClient = restClientBuilder
+        RestClient restClient = restClientBuilder.clone()
             .baseUrl(properties.baseUrl())
+            .defaultHeader("X-Service-Token", properties.serviceToken())
             .requestFactory(requestFactory)
             .build();
         return new HttpSalesInfoClient(

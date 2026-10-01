@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -25,7 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {"live.ivs.mode=stub", "live.ivs.stub-ready=true"})
 @AutoConfigureMockMvc
 @DisplayName("공개 시청 연결 (업무 상태와 영상 준비 상태의 분리)")
-class PublicViewingTest {
+class PublicViewingTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService links;
     @Autowired BroadcastStartService start;
@@ -72,7 +73,7 @@ class PublicViewingTest {
     @Test
     void endedBroadcastOffersNoPlaybackEvenThoughTheChannelIsReused() throws Exception {
         final Broadcast broadcast = live("viewing-ended");
-        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()))
+        mvc.perform(post("/v1/admin/broadcasts/{id}/end", broadcast.getId()).header("Authorization", adminBearer()))
             .andExpect(status().isOk());
         mvc.perform(get("/v1/broadcasts/{id}", broadcast.getId()))
             .andExpect(status().isOk())

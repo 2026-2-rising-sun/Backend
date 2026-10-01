@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -27,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("공개 방송 목록·상세 조회 (상태 표기, 비밀 필드 은닉, 대량 페이지네이션)")
-class PublicBroadcastQueryTest {
+class PublicBroadcastQueryTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired PublicBroadcastService publicBroadcasts;
     @Autowired MockMvc mvc;

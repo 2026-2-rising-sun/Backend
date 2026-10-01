@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -29,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("방송-상품 연결·해제 (판매 상태 제약, 낙관적 잠금, 정렬 압축, 재시도 멱등성)")
-class BroadcastProductLinkTest {
+class BroadcastProductLinkTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastProductService products;
     @Autowired BroadcastProductRepository links;
@@ -140,15 +141,15 @@ class BroadcastProductLinkTest {
         final BroadcastProduct link = products.link(owner.getId(), 1L, versionOf(owner.getId()));
 
         mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", owner.getId(),
-                link.getId()).param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
+                link.getId()).header("Authorization", adminBearer()).param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
             .andExpect(status().isNoContent());
         mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", owner.getId(),
-                link.getId()).param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
+                link.getId()).header("Authorization", adminBearer()).param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
             .andExpect(status().isNoContent());
 
         final BroadcastProduct ownersLink = products.link(owner.getId(), 2L, versionOf(owner.getId()));
         mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", other.getId(),
-                ownersLink.getId())
+                ownersLink.getId()).header("Authorization", adminBearer())
                 .param("expectedVersion", String.valueOf(versionOf(other.getId()))))
             .andExpect(status().isNotFound());
     }
@@ -172,14 +173,14 @@ class BroadcastProductLinkTest {
     @Test
     void httpLinkReturns201AndMissingBroadcastIs404() throws Exception {
         final Broadcast broadcast = register("link-http");
-        mvc.perform(post("/v1/admin/broadcasts/{id}/products", broadcast.getId())
+        mvc.perform(post("/v1/admin/broadcasts/{id}/products", broadcast.getId()).header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"productId\":1,\"expectedVersion\":" + versionOf(broadcast.getId()) + "}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.productId").value(1))
             .andExpect(jsonPath("$.data.salesId").value(101));
 
-        mvc.perform(post("/v1/admin/broadcasts/{id}/products", 999_999L)
+        mvc.perform(post("/v1/admin/broadcasts/{id}/products", 999_999L).header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"productId\":1,\"expectedVersion\":0}"))
             .andExpect(status().isNotFound());
@@ -189,7 +190,7 @@ class BroadcastProductLinkTest {
     @Test
     void httpLinkWithoutRequiredFieldsIs400() throws Exception {
         final Broadcast broadcast = register("link-bad");
-        mvc.perform(post("/v1/admin/broadcasts/{id}/products", broadcast.getId())
+        mvc.perform(post("/v1/admin/broadcasts/{id}/products", broadcast.getId()).header("Authorization", adminBearer())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"productId\":1}"))
             .andExpect(status().isBadRequest());
     }
@@ -206,13 +207,13 @@ class BroadcastProductLinkTest {
         final long issued = versionOf(broadcast.getId());
 
         mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", broadcast.getId(),
-                target.getId()).param("expectedVersion", String.valueOf(issued)))
+                target.getId()).header("Authorization", adminBearer()).param("expectedVersion", String.valueOf(issued)))
             .andExpect(status().isNoContent());
 
         final long afterDelete = versionOf(broadcast.getId());
         for (int retry = 0; retry < 2; retry++) {
             mvc.perform(delete("/v1/admin/broadcasts/{id}/products/{linkId}", broadcast.getId(),
-                    target.getId()).param("expectedVersion", String.valueOf(issued)))
+                    target.getId()).header("Authorization", adminBearer()).param("expectedVersion", String.valueOf(issued)))
                 .andExpect(status().isNoContent());
         }
         // no-op 삭제는 version 을 건드리지 않는다.

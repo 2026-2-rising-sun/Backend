@@ -1,5 +1,6 @@
 package com.shoppinglive.live.broadcast;
 
+import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -28,7 +29,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("방송 부분 수정의 실제 JSON 요청 계약")
-class BroadcastPatchHttpTest {
+class BroadcastPatchHttpTest extends LiveSecuritySupport {
     private static final Instant SCHEDULED_AT = Instant.parse("2026-09-22T10:00:00Z");
     private static final String CHANNEL_ARN = "arn:aws:ivs:ap-northeast-2:123:channel/original";
     private static final String PLAYBACK_URL = "https://example.com/original.m3u8";
@@ -52,7 +53,7 @@ class BroadcastPatchHttpTest {
     }
 
     private ResultActions edit(final String body, final long version) throws Exception {
-        return mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId())
+        return mvc.perform(patch("/v1/admin/broadcasts/{id}", broadcast.getId()).header("Authorization", adminBearer())
             .param("version", Long.toString(version))
             .contentType(MediaType.APPLICATION_JSON)
             .content(body));
