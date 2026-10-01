@@ -121,6 +121,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BroadcastEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
@@ -216,6 +217,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BroadcastEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: 준비 상태 방송의 종료
@@ -278,6 +280,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BroadcastProductViewEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
@@ -414,6 +417,7 @@ paths:
                   playbackAllowed: true
                   videoStatus: READY
                   createdAt: '2026-09-22T05:00:00Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
@@ -462,6 +466,7 @@ paths:
                     status: SOLD_OUT
                     purchasable: false
                     missing: false
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
