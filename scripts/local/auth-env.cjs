@@ -59,6 +59,7 @@ function execute(args) {
   const record = JSON.parse(fs.readFileSync(path.resolve(envPath), 'utf8'));
   if (record.purpose !== 'isolated local development only') throw new Error('Expected generated local credentials');
   const env = { ...process.env };
+  for (const name of new Set([...publicKeys, ...Object.values(serviceKeys).flat()])) delete env[name];
   for (const name of [...publicKeys, ...serviceKeys[service]]) {
     if (typeof record.env?.[name] !== 'string' || !record.env[name]) throw new Error(`Missing ${name}`);
     env[name] = record.env[name];
