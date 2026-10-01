@@ -1,0 +1,17 @@
+{
+  "name": "shoppinglive-contract-tools",
+  "private": true,
+  "version": "1.0.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "lint": "node lint.cjs",
+    "examples": "node validate.cjs",
+    "smoke": "node smoke.cjs",
+    "check": "npm run lint && npm run examples"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "yaml": "2.9.1"
+  }
+}

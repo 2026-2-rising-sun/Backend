@@ -1,0 +1,6 @@
+[
+  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 200, "example": "normal" },
+  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 200, "example": "soldOut" },
+  { "service": "shopping", "path": "/v1/products/999", "contractPath": "/v1/products/{productId}", "code": 404, "example": "notFound" },
+  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 503, "example": "salesUnavailable" }
+]
