@@ -10,10 +10,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.security.test.JwtTestTokens;
 import com.shoppinglive.common.security.test.StubAccessSessionVerifier;
+import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +55,17 @@ class SecurityFilterChainIntegrationTest {
         mvc.perform(get("/public")).andExpect(status().isOk());
         mvc.perform(get("/public").header("Authorization", "Bearer invalid"))
             .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/public//extra", "/admin%2Fextra", "/admin%2fextra", "/admin%252Fextra"})
+    void firewallStillRejectsUnsafePathsBeforeAnyAuthenticationChain(String path) throws Exception {
+        mvc.perform(get(URI.create(path))).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
+            .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mvc.perform(get(URI.create(path)).header("Authorization", adminBearer()))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test

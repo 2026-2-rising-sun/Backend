@@ -13,9 +13,11 @@ import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.firewall.RequestRejectedException;
+import org.springframework.security.web.firewall.RequestRejectedHandler;
 
-/** MVC advice 전에 발생하는 인증·인가 오류도 같은 API 봉투로 보낸다. */
-public final class JsonSecurityErrorHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
+/** MVC advice 전에 발생하는 인증·인가 및 방화벽 오류도 같은 API 봉투로 보낸다. */
+public final class JsonSecurityErrorHandler implements AuthenticationEntryPoint, AccessDeniedHandler, RequestRejectedHandler {
     private final ObjectMapper mapper;
 
     public JsonSecurityErrorHandler(ObjectMapper mapper) {
@@ -52,6 +54,14 @@ public final class JsonSecurityErrorHandler implements AuthenticationEntryPoint,
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        org.springframework.security.access.AccessDeniedException exception) throws IOException {
         write(response, ErrorCode.FORBIDDEN);
+    }
+
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response,
+                       RequestRejectedException exception) throws IOException {
+        // WebSecurity discovers this handler bean. Keep StrictHttpFirewall's rejection and avoid
+        // sendError: its ERROR dispatch can replace the original 400 with an authentication error.
+        write(response, ErrorCode.INVALID_REQUEST);
     }
 
     private void write(HttpServletResponse response, ErrorCode code) throws IOException {
