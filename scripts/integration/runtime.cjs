@@ -125,6 +125,10 @@ class Runtime {
     if (this.mode === 'host') return ['java', [...this.jvm, '-jar', this.jars[service], ...extra], { ...hostBase, ...env }];
     const name = this.id + '-' + service + (oneShot ? '-admin' : '');
     const mounts = ['-v', `${this.jars[service]}:/app.jar:ro`, '-v', `${this.private}/member-public.jwks:/run/integration/member-public.jwks:ro`];
+    if (service === 'shopping') {
+      fs.mkdirSync(path.join(this.private, 'images'), { recursive: true, mode: 0o700 });
+      mounts.push('-v', `${this.private}/images:/tmp/images`);
+    }
     if (service === 'member') mounts.push('-v', `${this.private}/member-private.pem:/run/integration/member-private.pem:ro`);
     const args = ['--network', this.id, '--network-alias', service, '--env-file', this.envFile(service + (oneShot ? '-admin' : ''), env), ...mounts];
     if (oneShot) args.push('--rm');
