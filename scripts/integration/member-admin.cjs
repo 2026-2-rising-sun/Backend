@@ -72,6 +72,10 @@ async function memberAdmin(ctx) {
     const sale = await req(`sale-create-${i}`, 'commerce', 'POST', '/v1/sales', { token: ctx.admin, status: 201,
       body: { productId: product.productId, price: 10000, initialStock: i === 3 ? 0 : 30 } });
     ctx.sales.push(sale.id);
+    if (i === 3) {
+      await req('empty-ready-cannot-start-sale', 'commerce', 'PATCH', `/v1/sales/${sale.id}/status`, { token: ctx.admin, body: { status: 'ON_SALE' }, status: 409 });
+      await req('empty-sale-private', 'commerce', 'PATCH', `/v1/sales/${sale.id}/status`, { token: ctx.admin, body: { status: 'PRIVATE' } });
+    }
     await req(`sale-on-${i}`, 'commerce', 'PATCH', `/v1/sales/${sale.id}/status`, { token: ctx.admin, body: { status: 'ON_SALE' } });
   }
   const detail = (await req('public-product-real-commerce', 'shopping', 'GET', `/v1/products/${ctx.products[0]}`)).data;
