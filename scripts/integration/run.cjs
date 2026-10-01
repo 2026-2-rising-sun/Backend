@@ -22,7 +22,6 @@ async function run() {
       throw new Error('Integration requires a clean checkout including untracked source files');
     context = new Context(runtime);
     context.result.deferred = [
-      'Social login provider and implementation remain undecided',
       'Apidog project import/export has not been verified'
     ];
     context.save();
