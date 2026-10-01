@@ -15,8 +15,9 @@ async function main(args = process.argv.slice(2)) {
   const runtime = new Runtime({ output: path.join(directory, 'logs') });
   const envFile = path.join(directory, 'env.sh');
   const jsonFile = path.join(directory, 'env.json');
-  let cleanupPromise;
+  let cleanupPromise, keepAlive;
   const cleanup = () => cleanupPromise ||= (async () => {
+    clearInterval(keepAlive);
     try {
       // Manual outage checks may leave a process paused; restore only owned resources before cleanup.
       for (const child of runtime.children.values()) if (child.exitCode === null && child.signalCode === null) child.kill('SIGCONT');
@@ -72,7 +73,11 @@ async function main(args = process.argv.slice(2)) {
     console.log(`Shell environment (contains credentials; 0600): ${envFile}`);
     console.log(`Generic key/value JSON (not a tool-specific import format; 0600): ${jsonFile}`);
     console.log('Keep this process open. Ctrl-C removes only this run’s services, databases, keys and environment files.');
-    if (!args.includes('--verify-setup')) await new Promise(() => {});
+    if (!args.includes('--verify-setup')) {
+      // Detached Docker services do not keep the parent Node event loop alive.
+      keepAlive = setInterval(() => {}, 60000);
+      await new Promise(() => {});
+    }
   } finally {
     await cleanup();
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt);
