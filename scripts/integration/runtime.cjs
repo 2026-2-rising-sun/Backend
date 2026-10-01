@@ -35,7 +35,8 @@ class Runtime {
     this.private = fs.mkdtempSync(path.join(os.tmpdir(), this.id + '-'));
     fs.chmodSync(this.private, 0o700);
     this.jvm = ['-Xmx192m', '-XX:MaxMetaspaceSize=192m', '-XX:ActiveProcessorCount=2'];
-    this.credentials = Object.fromEntries(['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_SHOPPING', 'LIVE_COMMERCE']
+    this.credentials = Object.fromEntries(['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_SHOPPING', 'LIVE_COMMERCE',
+      'SHOPPING_MEMBER', 'COMMERCE_MEMBER', 'LIVE_MEMBER']
       .map(pair => [pair + '_SERVICE_TOKEN', crypto.randomBytes(32).toString('base64url')]));
     this.databasePassword = crypto.randomBytes(24).toString('base64url');
     this.remember(this.databasePassword, ...Object.values(this.credentials));
@@ -159,9 +160,12 @@ class Runtime {
       SHOPPING_IMAGE_PUBLIC_BASE_URL: upstream('shopping'), COMMERCE_DEV_PAYMENT_SCENARIO_ENABLED: 'true',
       SERVER_TOMCAT_ACCESSLOG_ENABLED: 'true', SERVER_TOMCAT_ACCESSLOG_DIRECTORY: this.mode === 'docker' ? '/tmp/access' : path.join(this.private, service + '-access'),
       SERVER_TOMCAT_ACCESSLOG_PATTERN: '%m %U%q %s %{X-Request-Id}i', SERVER_TOMCAT_ACCESSLOG_BUFFERED: 'false' };
-    const needed = { member: [], shopping: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_SHOPPING'],
-      commerce: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_COMMERCE'], live: ['LIVE_SHOPPING', 'LIVE_COMMERCE'] };
+    const needed = { member: ['SHOPPING_MEMBER', 'COMMERCE_MEMBER', 'LIVE_MEMBER'],
+      shopping: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_SHOPPING', 'SHOPPING_MEMBER'],
+      commerce: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_COMMERCE', 'COMMERCE_MEMBER'],
+      live: ['LIVE_SHOPPING', 'LIVE_COMMERCE', 'LIVE_MEMBER'] };
     for (const pair of needed[service]) env[pair + '_SERVICE_TOKEN'] = this.credentials[pair + '_SERVICE_TOKEN'];
+    if (service !== 'member') env.MEMBER_SESSION_BASE_URL = upstream('member');
     if (service === 'member') Object.assign(env, { MEMBER_JWT_PRIVATE_KEY_LOCATION: `file:${prefix}/member-private.pem`,
       MEMBER_JWT_KEY_ID: this.kid, MEMBER_ACCESS_TOKEN_TTL: 'PT15M', MEMBER_REFRESH_TOKEN_TTL: 'P30D' });
     Object.assign(env, overrides);

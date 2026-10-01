@@ -8,6 +8,7 @@ const { memberAdmin } = require('./member-admin.cjs');
 const { commerce } = require('./commerce.cjs');
 const { liveFailures } = require('./live-failures.cjs');
 const { mockFailures } = require('./mock-failures.cjs');
+const { sessions } = require('./sessions.cjs');
 
 async function run() {
   const runtime = new Runtime(); let context;
@@ -21,8 +22,8 @@ async function run() {
       throw new Error('Integration requires a clean checkout including untracked source files');
     context = new Context(runtime);
     context.result.deferred = [
-      'Refresh rotation/reuse/logout/withdrawal require the agreed revocation policy and implementation',
-      'Social login implementation and provider fixtures are not yet available'
+      'Social login provider and implementation remain undecided',
+      'Apidog project import/export has not been verified'
     ];
     context.save();
     const usePrebuilt = process.argv.includes('--use-prebuilt') || process.env.CI === 'true';
@@ -35,6 +36,7 @@ async function run() {
     await commerce(context);
     await mockFailures(context);
     await liveFailures(context);
+    await sessions(context);
     context.result.implementedFlowsPassed = true;
   } catch (error) {
     if (context) context.result.error = runtime.sanitize(error.message);

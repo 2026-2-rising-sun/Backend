@@ -20,7 +20,13 @@ DB 장애는 소유 PostgreSQL을 pause/unpause하여 재현한다. 테스트 JD
 정상 응답과 오류 응답 모두 현재 Git YAML을 사용하며, 검토 acknowledgment가 없으면 승인 완료라고 주장하지 않는다.
 네 서비스 관리 포트의 무인증 probe, API 포트의 health 미노출, DB 장애 readiness와 독립 liveness를 검사한다.
 
-현재 refresh/logout/탈퇴/소셜의 정책·구현 대기는 `deferred`에 명시되어 있다.
+세션 검사는 실제 refresh 회전·재사용·동시 소비, 일반 로그아웃과 타 기기 유지, 관리자 강제 차단,
+비밀번호 확인 후 논리 탈퇴를 포함한다. 일반 로그아웃 뒤 기존 access는 남은 15분 만료까지 허용하며,
+보안상 폐기한 family와 탈퇴 계정은 각 서비스에서 이후 인증 확인부터 거절한다.
+세 서비스는 로컬 JWT 서명 검증 후 Member의 상태 API를 캐시 없이 조회하고, Member 자체는 DB를 조회한다.
+Member 중단 시 인증된 요청의 503·쓰기 차단, 무토큰 공개 API와 내부 caller의 독립 동작,
+재시작 후 정상 세션 복구 및 DB에 저장된 보안 폐기 유지도 검증한다.
+소셜 제공자·구현과 Apidog 프로젝트 왕복 검증 대기는 `deferred`에 명시되어 있다.
 현재 구현된 필수 HTTP 흐름의 성공은 `passed`로, 정책 대기와 P2 전체 완료 여부는 `deferred`/`p2Complete`로 구분한다.
 0건·실패·skip·누락을 성공으로 바꾸지 않으며 부분 실행을 P2 또는 CI 완료로 보고하지 않는다.
 PostgreSQL migration·locking의 전체 회귀는 CI의 별도 필수 PostgreSQL job이 수행한다. 그 개수를 HTTP check 개수에 합산하지 않는다.

@@ -12,7 +12,8 @@ class Context {
       contracts: Object.fromEntries(services.map(s => [s, this.contracts[s].sha256])),
       mocks: { payments: 'existing MockPaymentEngine', ivs: 'explicit local IVS stub', internalHttp: 'real services; no Prism fallback' },
       excludedInfrastructure: ['Kafka: no current producer/consumer usage in the four services; listener/admin auto-start disabled', 'Gateway', 'Frontend', 'deployed Kubernetes'],
-      testTokenTtl: { access: 'PT15M', refresh: 'P30D', deploymentPolicy: false },
+      tokenPolicy: { access: 'PT15M', refresh: 'P30D', refreshExpiry: 'absolute from login',
+        ordinaryLogout: 'refresh family only', securityRevocation: 'reject subsequent authentication checks' },
       contractCoverage: { matched: 0, excluded: [], unmatched: [] }, deferred: [] };
   }
   check(name, actual, expected = true) {
