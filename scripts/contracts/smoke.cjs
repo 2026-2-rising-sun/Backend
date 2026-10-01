@@ -20,6 +20,10 @@ function validateCoverage(scenarios) {
     const codes = scenarios.filter(item => item.service === service).map(item => item.code);
     assert.ok(codes.some(code => code >= 200 && code < 300), `Prism coverage: ${service} needs a success scenario`);
     for (const code of required.errors) assert.ok(codes.includes(code), `Prism coverage: ${service} missing error ${code}`);
+    const names = scenarios.filter(item => item.service === service && item.name).map(item => item.name);
+    assert.equal(names.length, new Set(names).size, `Prism coverage: ${service} duplicate named scenario`);
+    for (const name of required.scenarios || [])
+      assert.ok(names.includes(name), `Prism coverage: ${service} missing required scenario ${name}`);
   }
 }
 async function main(scenarios = defaultScenarios) {

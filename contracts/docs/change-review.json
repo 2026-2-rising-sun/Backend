@@ -8,7 +8,17 @@
       "independentReview": {
         "reviewer": "Codex root review lane (separate from A4 contract author)",
         "reviewedAt": "2026-10-01",
-        "evidence": "contracts/docs/p2-review-2026-10-01.md"
+        "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
+      }
+    },
+    {
+      "baseSnapshotSha256": "2ffe5550f3a9eb10892c65a200c477534ec73917e023405a808710d951d061d1",
+      "headSnapshotSha256": "2a86fa7f4679c3a740cf60e0dbfa83ab5aa7dc505fc2e7b4ff79778d9feac104",
+      "reason": "Approved 15-minute access and absolute 30-day rotating refresh policy adds session lifecycle operations and mandatory sid with authoritative session checks; protected requests fail closed with 503 if Member status cannot be verified. Public reads and service caller authorization remain separate.",
+      "independentReview": {
+        "reviewer": "Codex root review lane, independent from A4 contract author",
+        "reviewedAt": "2026-10-01",
+        "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
       }
     }
   ]

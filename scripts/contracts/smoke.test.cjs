@@ -16,3 +16,10 @@ test('success and required failure categories cannot silently disappear', async 
   await assert.rejects(main(scenarios.filter(item => item.service !== 'commerce' || item.code !== 503)), /commerce missing error 503/);
   await assert.rejects(main(scenarios.filter(item => item.service !== 'member' || item.code >= 400)), /member needs a success scenario/);
 });
+
+test('session rotation, logout and inactive status cases cannot hide behind another response with the same code', async () => {
+  for (const name of ['session-refresh-200', 'session-logout-204', 'session-check-inactive', 'session-authority-unavailable-commerce']) {
+    await assert.rejects(main(scenarios.filter(item => item.name !== name)), new RegExp(`missing required scenario ${name}`));
+  }
+  await assert.rejects(main([...scenarios, scenarios.find(item => item.name === 'session-refresh-200')]), /duplicate named scenario/);
+});

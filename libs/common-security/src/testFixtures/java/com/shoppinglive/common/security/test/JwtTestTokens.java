@@ -40,7 +40,8 @@ public final class JwtTestTokens {
         Instant now = Instant.now();
         return new JWTClaimsSet.Builder().subject(memberId).issuer(ISSUER).audience(AUDIENCE)
             .issueTime(Date.from(now)).expirationTime(Date.from(now.plusSeconds(300)))
-            .jwtID(UUID.randomUUID().toString()).claim("roles", List.copyOf(roles));
+            .jwtID(UUID.randomUUID().toString()).claim("roles", List.copyOf(roles))
+            .claim("sid", UUID.randomUUID().toString());
     }
 
     public String token(String memberId, Set<String> roles) { return sign(claims(memberId, roles).build()); }

@@ -15,4 +15,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select member from Member member where member.email = :email")
     Optional<Member> findForLogin(@Param("email") String email);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select member from Member member where member.id = :id")
+    Optional<Member> findForUpdate(@Param("id") UUID id);
 }

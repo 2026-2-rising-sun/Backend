@@ -26,12 +26,14 @@ final class MemberJwtClaimsValidator implements OAuth2TokenValidator<Jwt> {
     public OAuth2TokenValidatorResult validate(Jwt jwt) {
         try {
             String sub = jwt.getSubject();
+            Object sid = jwt.getClaims().get("sid");
             Instant issued = jwt.getIssuedAt();
             Instant expires = jwt.getExpiresAt();
             Object roles = jwt.getClaims().get("roles");
             Object jti = jwt.getClaims().get("jti");
             Object kid = jwt.getHeaders().get("kid");
             if (sub == null || !UUID.fromString(sub).toString().equals(sub)
+                || !(sid instanceof String sessionId) || !UUID.fromString(sessionId).toString().equals(sessionId)
                 || issued == null || expires == null || !expires.isAfter(issued) || issued.isAfter(clock.instant())
                 || !(jti instanceof String id) || id.isBlank()
                 || !(kid instanceof String keyId) || keyId.isBlank()

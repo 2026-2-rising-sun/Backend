@@ -38,6 +38,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
         var data = mapper.readTree(response.getContentAsString()).get("data");
         var access = decoder.decode(data.get("accessToken").asText());
         var member = members.findByEmail("user@example.com").orElseThrow();
+        assertThat(access.getClaimAsString("sid")).isEqualTo(data.get("refreshToken").asText().split("\\.")[0]);
         assertThat(access.getSubject()).isEqualTo(member.getId().toString());
         assertThat(access.getClaimAsStringList("roles")).containsExactly("USER");
         assertThat(access.getHeaders().get("kid")).isEqualTo(TOKENS.keyId());
@@ -71,7 +72,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
     @Test
     void signingFailureDoesNotLeaveSessionOrReturnTokens() throws Exception {
         register();
-        doThrow(new JwtEncodingException("test signing failure")).when(issuer).issue(any(), any());
+        doThrow(new JwtEncodingException("test signing failure")).when(issuer).issue(any(), any(), any());
         login("user@example.com", "password123").andExpect(status().isInternalServerError())
             .andExpect(jsonPath("$.data").isEmpty());
         assertNoSessions();

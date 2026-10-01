@@ -50,6 +50,20 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
     }
 
     @Test
+    void sessionRevocationAndAuthorityOutageDoNotDisableAnonymousBroadcasts() throws Exception {
+        String token = adminBearer();
+        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token)).andExpect(status().isOk());
+        accessSessions.revoke();
+        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token)).andExpect(status().isUnauthorized());
+        accessSessions.fail();
+        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token)).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
+            .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mvc.perform(get("/v1/broadcasts")).andExpect(status().isOk());
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+    }
+
+    @Test
     void anonymousPublicQueriesAndMinimalProbesRemainAvailable() throws Exception {
         var broadcast = broadcasts.register(UUID.randomUUID().toString(), new BroadcastInput("Public auth fixture",
             Instant.now().plusSeconds(600), "arn:aws:ivs:ap-northeast-2:1:channel/auth", "https://example.com/live.m3u8"));

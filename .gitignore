@@ -29,3 +29,6 @@ build/
 docs/**/*.md
 services/*/docs/**/*.md
 contracts/api/README.md
+contracts/docs/*.md
+scripts/integration/*.md
+services/*/ops/*.md

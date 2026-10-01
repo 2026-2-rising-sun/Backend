@@ -8,6 +8,7 @@ import com.shoppinglive.member.auth.infrastructure.RefreshSessionRepository;
 import com.shoppinglive.member.members.domain.Member;
 import com.shoppinglive.member.members.infrastructure.MemberRepository;
 import java.time.Instant;
+import java.time.Clock;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,10 +26,11 @@ public class MemberLoginService {
     private final MemberLoginProperties policy;
     private final TransactionTemplate transaction;
     private final String dummyHash;
+    private final Clock clock;
 
     public MemberLoginService(MemberRepository members, PasswordEncoder passwords, MemberTokenIssuer issuer,
                               RefreshSessionRepository sessions, MemberTokenProperties tokens,
-                              MemberLoginProperties policy, PlatformTransactionManager transactions) {
+                              MemberLoginProperties policy, PlatformTransactionManager transactions, Clock clock) {
         this.members = members;
         this.passwords = passwords;
         this.issuer = issuer;
@@ -36,6 +38,7 @@ public class MemberLoginService {
         this.tokens = tokens;
         this.policy = policy;
         this.transaction = new TransactionTemplate(transactions);
+        this.clock = clock;
         this.dummyHash = passwords.encode(UUID.randomUUID().toString());
     }
 
@@ -48,8 +51,8 @@ public class MemberLoginService {
 
     private TokenPair loginLocked(String email, String password) {
         Member member = members.findForLogin(Member.normalizeEmail(email)).orElse(null);
-        Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-        if (member == null || member.loginLocked(now)) {
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        if (member == null || member.isWithdrawn() || member.loginLocked(now)) {
             passwords.matches(password, dummyHash);
             return null;
         }
@@ -58,9 +61,9 @@ public class MemberLoginService {
             return null;
         }
         member.recordLoginSuccess();
-        Instant issuedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-        String access = issuer.issue(member, issuedAt);
-        String refresh = sessions.create(member.getId(), issuedAt, issuedAt.plus(tokens.refreshTokenTtl()));
-        return new TokenPair(access, "Bearer", tokens.accessTokenTtl().toSeconds(), refresh);
+        Instant issuedAt = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        var session = sessions.create(member.getId(), issuedAt, issuedAt.plus(tokens.refreshTokenTtl()));
+        String access = issuer.issue(member, session.familyId(), issuedAt);
+        return new TokenPair(access, "Bearer", tokens.accessTokenTtl().toSeconds(), session.rawToken());
     }
 }

@@ -1,6 +1,63 @@
 {
-  "member": { "errors": [401, 409, 503] },
-  "shopping": { "errors": [401, 403, 404, 503] },
-  "commerce": { "errors": [401, 403, 404, 409, 503] },
-  "live": { "errors": [401, 403, 503] }
+  "member": {
+    "errors": [
+      400,
+      401,
+      403,
+      409,
+      503
+    ],
+    "scenarios": [
+      "session-refresh-200",
+      "session-refresh-400",
+      "session-refresh-401",
+      "session-refresh-503",
+      "session-logout-204",
+      "session-logout-400",
+      "session-withdraw-204",
+      "session-withdraw-401",
+      "session-force-revoke-204",
+      "session-force-revoke-403",
+      "session-force-revoke-404",
+      "session-check-active",
+      "session-check-inactive",
+      "session-check-invalidRequest",
+      "session-check-unauthorized",
+      "session-check-forbidden",
+      "session-check-authUnavailable"
+    ]
+  },
+  "shopping": {
+    "errors": [
+      401,
+      403,
+      404,
+      503
+    ],
+    "scenarios": [
+      "session-authority-unavailable-shopping"
+    ]
+  },
+  "commerce": {
+    "errors": [
+      401,
+      403,
+      404,
+      409,
+      503
+    ],
+    "scenarios": [
+      "session-authority-unavailable-commerce"
+    ]
+  },
+  "live": {
+    "errors": [
+      401,
+      403,
+      503
+    ],
+    "scenarios": [
+      "session-authority-unavailable-live"
+    ]
+  }
 }

@@ -6,10 +6,11 @@ const { root } = require('../contracts/lib.cjs');
 
 const publicKeys = ['MEMBER_JWT_PUBLIC_KEY_SET_LOCATION'];
 const serviceKeys = {
-  member: ['MEMBER_JWT_PRIVATE_KEY_LOCATION', 'MEMBER_JWT_KEY_ID', 'MEMBER_ACCESS_TOKEN_TTL', 'MEMBER_REFRESH_TOKEN_TTL'],
-  shopping: ['COMMERCE_SHOPPING_SERVICE_TOKEN', 'LIVE_SHOPPING_SERVICE_TOKEN', 'SHOPPING_COMMERCE_SERVICE_TOKEN'],
-  commerce: ['COMMERCE_SHOPPING_SERVICE_TOKEN', 'SHOPPING_COMMERCE_SERVICE_TOKEN', 'LIVE_COMMERCE_SERVICE_TOKEN'],
-  live: ['LIVE_SHOPPING_SERVICE_TOKEN', 'LIVE_COMMERCE_SERVICE_TOKEN']
+  member: ['MEMBER_JWT_PRIVATE_KEY_LOCATION', 'MEMBER_JWT_KEY_ID', 'MEMBER_ACCESS_TOKEN_TTL', 'MEMBER_REFRESH_TOKEN_TTL',
+    'SHOPPING_MEMBER_SERVICE_TOKEN', 'COMMERCE_MEMBER_SERVICE_TOKEN', 'LIVE_MEMBER_SERVICE_TOKEN'],
+  shopping: ['MEMBER_SESSION_BASE_URL', 'SHOPPING_MEMBER_SERVICE_TOKEN', 'COMMERCE_SHOPPING_SERVICE_TOKEN', 'LIVE_SHOPPING_SERVICE_TOKEN', 'SHOPPING_COMMERCE_SERVICE_TOKEN'],
+  commerce: ['MEMBER_SESSION_BASE_URL', 'COMMERCE_MEMBER_SERVICE_TOKEN', 'COMMERCE_SHOPPING_SERVICE_TOKEN', 'SHOPPING_COMMERCE_SERVICE_TOKEN', 'LIVE_COMMERCE_SERVICE_TOKEN'],
+  live: ['MEMBER_SESSION_BASE_URL', 'LIVE_MEMBER_SERVICE_TOKEN', 'LIVE_SHOPPING_SERVICE_TOKEN', 'LIVE_COMMERCE_SERVICE_TOKEN']
 };
 function duration(value, name) {
   const match = /^P(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value || '');
@@ -23,12 +24,18 @@ function duration(value, name) {
 function create(args) {
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
-    if (!['--access-ttl', '--refresh-ttl', '--out'].includes(args[i]) || !args[i + 1]) throw new Error('Invalid create option');
+    if (!['--access-ttl', '--refresh-ttl', '--member-url', '--out'].includes(args[i]) || !args[i + 1]) throw new Error('Invalid create option');
     if (args[i] in options) throw new Error('Duplicate create option');
     options[args[i]] = args[i + 1];
   }
   const accessTtl = duration(options['--access-ttl'], '--access-ttl');
   const refreshTtl = duration(options['--refresh-ttl'], '--refresh-ttl');
+  let memberUrl;
+  try { memberUrl = new URL(options['--member-url'] || 'http://localhost:8081'); }
+  catch { throw new Error('--member-url must be an HTTP(S) service origin'); }
+  if (!['http:', 'https:'].includes(memberUrl.protocol) || !memberUrl.hostname || memberUrl.username
+    || memberUrl.password || memberUrl.search || memberUrl.hash || memberUrl.pathname !== '/')
+    throw new Error('--member-url must be an HTTP(S) service origin without credentials or path');
   const parent = path.join(root, 'build/local');
   fs.mkdirSync(parent, { recursive: true });
   const dest = path.resolve(options['--out'] || path.join(parent, `auth-${crypto.randomUUID()}`));
@@ -42,7 +49,7 @@ function create(args) {
   fs.writeFileSync(publicPath, JSON.stringify({ keys: [{ ...publicKey.export({ format: 'jwk' }), kid, alg: 'RS256', use: 'sig' }] }), { mode: 0o600, flag: 'wx' });
   const env = { MEMBER_JWT_PUBLIC_KEY_SET_LOCATION: `file:${publicPath}`,
     MEMBER_JWT_PRIVATE_KEY_LOCATION: `file:${privatePath}`, MEMBER_JWT_KEY_ID: kid,
-    MEMBER_ACCESS_TOKEN_TTL: accessTtl, MEMBER_REFRESH_TOKEN_TTL: refreshTtl };
+    MEMBER_ACCESS_TOKEN_TTL: accessTtl, MEMBER_REFRESH_TOKEN_TTL: refreshTtl, MEMBER_SESSION_BASE_URL: memberUrl.origin };
   for (const key of new Set(Object.values(serviceKeys).flat().filter(key => key.endsWith('_SERVICE_TOKEN')))) {
     env[key] = crypto.randomBytes(32).toString('base64url');
   }
@@ -75,5 +82,5 @@ try {
   const [mode, ...args] = process.argv.slice(2);
   if (mode === 'create') create(args);
   else if (mode === 'exec') execute(args);
-  else throw new Error('Usage: auth-env.cjs create --access-ttl <duration> --refresh-ttl <duration> [--out <new-directory>] | exec ...');
+  else throw new Error('Usage: auth-env.cjs create --access-ttl <duration> --refresh-ttl <duration> [--member-url <origin>] [--out <new-directory>] | exec ...');
 } catch (error) { console.error(error.message); process.exitCode = 1; }

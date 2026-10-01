@@ -63,7 +63,10 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
             .andExpect(status().isCreated());
         var a = members.findByEmail("a@example.com").orElseThrow();
         var b = members.findByEmail("b@example.com").orElseThrow();
-        String authorization = "Bearer " + TOKENS.token(a.getId().toString(), Set.of("USER"));
+        var login = mvc.perform(post("/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"email\":\"a@example.com\",\"password\":\"password123\"}")).andExpect(status().isOk())
+            .andReturn().getResponse();
+        String authorization = "Bearer " + mapper.readTree(login.getContentAsString()).path("data").path("accessToken").asText();
         mvc.perform(get("/v1/members/me").header("Authorization", authorization).header("X-Member-Id", b.getId()))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.memberId").value(a.getId().toString()));
         mvc.perform(patch("/v1/members/me").header("Authorization", authorization).contentType(MediaType.APPLICATION_JSON)
