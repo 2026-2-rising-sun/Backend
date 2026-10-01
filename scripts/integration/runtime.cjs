@@ -224,6 +224,9 @@ class Runtime {
   }
   async reconfigure(service, overrides) {
     assert(services.includes(service));
+    const upstreamKeys = ['SHOPPING_SALES_CLIENT_BASE_URL', 'COMMERCE_SHOPPING_CLIENT_BASE_URL',
+      'LIVE_PRODUCTS_SHOPPING_URL', 'LIVE_PRODUCTS_COMMERCE_URL'];
+    assert(Object.keys(overrides).every(key => upstreamKeys.includes(key)), 'Only test upstream URLs may be reconfigured');
     await this.stop(service);
     if (this.mode === 'docker') {
       const name = this.id + '-' + service;
