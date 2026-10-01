@@ -42,6 +42,7 @@ public class Member {
     @Column(nullable = false)
     private int failedLoginAttempts;
     private Instant loginLockedUntil;
+    private Instant withdrawnAt;
 
     protected Member() { }
 
@@ -63,6 +64,8 @@ public class Member {
     public String getPasswordHash() { return passwordHash; }
     public String getDisplayName() { return displayName; }
     public Set<String> roles() { return Set.of(role.name()); }
+    public boolean isWithdrawn() { return withdrawnAt != null; }
+    public void withdraw(Instant now) { if (withdrawnAt == null) withdrawnAt = now; }
     public boolean loginLocked(Instant now) { return loginLockedUntil != null && loginLockedUntil.isAfter(now); }
     public void recordLoginFailure(Instant now, int maximum, java.time.Duration lockDuration) {
         if (loginLockedUntil != null && !loginLockedUntil.isAfter(now)) {

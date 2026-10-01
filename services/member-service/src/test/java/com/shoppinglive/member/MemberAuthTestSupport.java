@@ -50,7 +50,11 @@ abstract class MemberAuthTestSupport {
         properties.add("shoppinglive.security.jwt.public-key-set-location", () -> PUBLIC_KEYS.toUri().toString());
         properties.add("member.auth.private-key-location", () -> PRIVATE_KEY.toUri().toString());
         properties.add("member.auth.key-id", TOKENS::keyId);
-        // 테스트 입력일 뿐 운영 수명 정책을 정하지 않는다.
+        properties.add("shoppinglive.security.service-tokens.shopping", () -> "test-shopping-member-credential-0123456789");
+        properties.add("shoppinglive.security.service-tokens.commerce", () -> "test-commerce-member-credential-0123456789");
+        properties.add("shoppinglive.security.service-tokens.live", () -> "test-live-member-credential-0123456789");
+        properties.add("shoppinglive.security.service-tokens.other", () -> "test-other-member-credential-0123456789");
+        // Confirmed policy, kept explicit in test setup.
         properties.add("member.auth.access-token-ttl", () -> "PT15M");
         properties.add("member.auth.refresh-token-ttl", () -> "P30D");
         String databaseUrl = System.getenv("MEMBER_TEST_DB_URL");

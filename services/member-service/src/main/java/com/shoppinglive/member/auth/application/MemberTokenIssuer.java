@@ -45,10 +45,11 @@ public class MemberTokenIssuer {
         }
     }
 
-    public String issue(Member member, Instant issuedAt) {
+    public String issue(Member member, UUID sessionId, Instant issuedAt) {
         var claims = JwtClaimsSet.builder().issuer(verification.issuer()).audience(List.of(verification.audience()))
             .subject(member.getId().toString()).issuedAt(issuedAt).expiresAt(issuedAt.plus(tokens.accessTokenTtl()))
-            .id(UUID.randomUUID().toString()).claim("roles", List.copyOf(member.roles())).build();
+            .id(UUID.randomUUID().toString()).claim("sid", sessionId.toString())
+            .claim("roles", List.copyOf(member.roles())).build();
         var header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(tokens.keyId()).type("JWT").build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
