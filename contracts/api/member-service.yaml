@@ -1,13 +1,13 @@
 openapi: 3.1.0
 info:
   title: Member Service API
-  version: 0.2.0
+  version: "0.3.0"
   license: { name: UNLICENSED }
-  description: |
-    현재 구현된 회원가입·로그인·본인 프로필 계약이다. 성공과 오류 모두 ApiResponse 봉투를 사용한다.
-    refresh·logout·탈퇴·소셜은 정책 및 구현 인계 전이며 이 파일의 완료 범위에 포함하지 않는다.
-    가입 성공은 토큰 발급이 아니다. 로그인은 access JWT와 최초 refresh token을 발급한다.
-    access/refresh TTL은 실행 시 필수 설정이며 이 파일은 운영 기본값을 정하지 않는다. refresh 사용·폐기 API는 아직 없다.
+  description: |-
+    회원가입·로그인·프로필과 승인된 세션 수명·철회 정책 계약이다. 성공과 오류는 ApiResponse 봉투를 사용한다.
+    Access 수명은 15분, refresh family는 최초 로그인부터 절대 30일이며 rotation으로 연장되지 않는다.
+    일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·관리자 강제 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
+    이미 인증 검사를 통과한 요청을 소급 취소하지 않는다. 쿠키를 쓰지 않으며 소셜 로그인은 별도 미구현 범위다.
 security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8081
@@ -108,17 +108,192 @@ paths:
         "404": {"$ref": "#/components/responses/NotFound"}
         "503": {"$ref": "#/components/responses/AuthUnavailable"}
         "500": {"$ref": "#/components/responses/InternalError"}
+    delete:
+      tags:
+        - Member
+      summary: 비밀번호 확인 후 본인 탈퇴
+      operationId: withdrawMyMembership
+      description: 회원 상태를 탈퇴로 바꾸고 모든 family를 보안 폐기한다. 이후 신규 인증 검사는 기존 access도 401로 거부한다. 물리 삭제·타 도메인 주문 삭제가 아니며 같은 이메일 재가입은 409로 거부한다. 비밀번호 불일치 401.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawRequest"
+            example:
+              password: test-password-123
+      responses:
+        "204":
+          description: 탈퇴 완료. 응답 본문 없음.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
+  /v1/auth/refresh:
+    post:
+      tags:
+        - Member
+      summary: Refresh 교체 및 access 재발급
+      operationId: refreshMemberSession
+      security: []
+      description: Access 없이 refresh JSON으로 호출한다. 사용한 refresh는 재사용할 수 없다. 알려진 사용 완료 토큰의 재사용은 해당 family를 보안 폐기한 뒤 401을 반환한다. 만료·미지·폐기된 토큰도 401. 교체해도 최초 로그인 +30일의 절대 만료를 유지한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+            example:
+              refreshToken: contract-example-not-a-refresh-credential
+      responses:
+        "200":
+          description: 새 access와 교체 refresh. 예제는 실제 인증에 사용할 수 없다.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenEnvelope"
+              examples:
+                rotated:
+                  value:
+                    success: true
+                    data:
+                      accessToken: contract-example-not-a-signed-jwt
+                      tokenType: Bearer
+                      expiresIn: 900
+                      refreshToken: contract-example-not-a-refresh-credential
+                    error: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
+  /v1/auth/logout:
+    post:
+      tags:
+        - Member
+      summary: 현재 family refresh 로그아웃
+      operationId: logoutMemberSession
+      security: []
+      description: Access 없이 refresh JSON으로 호출한다. 해당 family의 refresh만 폐기하고 기존 access는 만료까지 허용한다. 미지·이미 만료·폐기된 토큰도 같은 204로 처리한다. 알려진 refresh 재사용 보안 폐기와 구분한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+            example:
+              refreshToken: contract-example-not-a-refresh-credential
+      responses:
+        "204":
+          description: 멱등 처리 완료. 응답 본문 없음.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
+  /v1/admin/members/{id}/sessions/revoke:
+    post:
+      tags:
+        - Member
+      summary: 회원의 모든 기존 세션 강제 폐기
+      operationId: revokeMemberSessions
+      x-required-roles:
+        - ADMIN
+      description: 대상 회원의 모든 기존 family를 보안 폐기한다. 계정 정지가 아니므로 이후 새 로그인은 가능하다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: 폐기 완료. 응답 본문 없음.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
+  /v1/internal/auth/sessions/check:
+    post:
+      tags:
+        - Member
+      summary: 내부 세션 활성 상태 확인
+      operationId: checkMemberSession
+      security:
+        - ServiceToken: []
+      description: Shopping/Commerce/Live caller만 허용한다. memberId와 sessionId가 일치하고 회원·세션이 유효하면 active=true. 미지·불일치·보안 폐기·탈퇴는 false. 일반 로그아웃은 기존 access를 즉시 차단하지 않는다. 이 응답은 캐시하지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionCheckRequest"
+            example:
+              memberId: 11111111-1111-4111-8111-111111111111
+              sessionId: 22222222-2222-4222-8222-222222222222
+      responses:
+        "200":
+          description: 권위 저장소에서 확인한 세션 상태
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionStatusEnvelope"
+              examples:
+                active:
+                  value:
+                    success: true
+                    data:
+                      active: true
+                    error: null
+                inactive:
+                  value:
+                    success: true
+                    data:
+                      active: false
+                    error: null
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api; USER/ADMIN. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    ServiceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: Shopping/Commerce/Live 방향별 opaque caller 자격증명. 사용자·ADMIN JWT와 대체할 수 없다.
   responses:
     AuthUnavailable:
-      description: 회원 저장소 연결 또는 일시 오류. 잘못된 자격증명과 구분한다.
+      description: "JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음."
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
           examples:
-            authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: 회원 저장소를 사용할 수 없습니다., requestId: request-001 } } }
+            authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: "인증 상태를 확인할 수 없습니다.", requestId: request-001 } } }
     BadRequest:
       description: "요청 값·형식 또는 금액 범위 오류"
       content:
@@ -154,6 +329,21 @@ components:
           schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
           examples:
             internalError: {"value": {"success": false, "data": null, "error": {"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "requestId": "request-001"}}}
+    Forbidden:
+      description: 인증된 caller 또는 회원의 역할이 이 작업에 허용되지 않음.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            forbidden:
+              value:
+                success: false
+                data: null
+                error:
+                  code: FORBIDDEN
+                  message: 권한이 없습니다.
+                  requestId: request-001
   schemas:
     LoginRequest:
       type: object
@@ -166,10 +356,10 @@ components:
       type: object
       required: [accessToken, tokenType, expiresIn, refreshToken]
       properties:
-        accessToken: { type: string, minLength: 1, readOnly: true, description: RS256 JWT. 실제 토큰을 계약 예시에 저장하지 않는다. }
+        accessToken: { type: string, minLength: 1, readOnly: true, description: "RS256 JWT. canonical UUID sub/sid와 iss/aud/exp/iat/jti/roles를 포함한다. 실제 토큰을 예시에 저장하지 않는다." }
         tokenType: { type: string, const: Bearer }
-        expiresIn: { type: integer, format: int64, minimum: 1, description: 실행 시 명시한 access TTL의 초수. JWT exp-iat와 같다. 예시 900초는 운영 기본값이 아니다. }
-        refreshToken: { type: string, minLength: 1, readOnly: true, description: family UUID와 opaque random secret. DB에는 해시만 저장. 현재 최초 발급만 구현되었다. }
+        expiresIn: { type: integer, format: int64, minimum: 1, description: "access 잔여 수명 초수. 승인 운영 정책은 900초이며 JWT exp-iat와 같다." }
+        refreshToken: { type: string, minLength: 1, readOnly: true, description: "회전하는 opaque credential. DB에는 해시만 저장하며 family 절대 만료는 최초 로그인 +30일에서 연장되지 않는다." }
     TokenEnvelope:
       type: object
       required: [success, data, error]
@@ -221,3 +411,60 @@ components:
         success: {"type": "boolean", "const": false}
         data: {"type": "null"}
         error: {"$ref": "#/components/schemas/ApiError"}
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+          maxLength: 512
+          writeOnly: true
+          description: 공백만 있는 값 금지. opaque credential이며 실제 값은 문서·로그에 기록하지 않는다.
+    WithdrawRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 72
+          writeOnly: true
+          description: 공백만 있는 값 금지. UTF-8 72바이트 이하도 검사한다.
+    SessionCheckRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - memberId
+        - sessionId
+      properties:
+        memberId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+    SessionStatusEnvelope:
+      type: object
+      required:
+        - success
+        - data
+        - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+            - active
+          properties:
+            active:
+              type: boolean
+        error:
+          type: "null"

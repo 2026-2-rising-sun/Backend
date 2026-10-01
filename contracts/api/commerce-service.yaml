@@ -3,11 +3,13 @@ info:
   title: Commerce Service API
   version: 2.0.0
   license: { name: UNLICENSED }
-  description: |
+  description: |-
     회원 전용 주문·결제·장바구니와 관리자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
     USER와 ADMIN의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
     정상 응답은 봉투 없는 DTO/배열, 오류만 ApiResponse 봉투이다. 204는 본문 없음.
     현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
+    
+    JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8083
@@ -104,6 +106,8 @@ paths:
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/orders/{orderNumber}:
     parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
     get:
@@ -122,6 +126,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/orders/{orderNumber}/cancel:
     parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
     post:
@@ -136,6 +142,8 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/orders/{orderNumber}/payments:
     parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
     post:
@@ -163,6 +171,8 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/orders/{orderNumber}/payments/{paymentId}:
     parameters: [{"$ref": "#/components/parameters/OrderNumber"}, {"$ref": "#/components/parameters/PaymentId"}]
     get:
@@ -183,6 +193,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/cart/items:
     get:
       tags: ["Cart"]
@@ -200,6 +212,8 @@ paths:
                 empty: {"value": []}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     post:
       tags: ["Cart"]
       summary: "장바구니 상품 추가"
@@ -251,6 +265,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     delete:
       tags: ["Cart"]
       summary: "본인 항목 삭제"
@@ -261,6 +277,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/cart/items/{itemId}/orders:
     parameters: [{"$ref": "#/components/parameters/ItemId"}]
     post:
@@ -371,6 +389,8 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/sales/{id}/stock:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     get:
@@ -389,6 +409,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     patch:
       tags: ["Sales Admin"]
       summary: "판매 가능 재고 증감"
@@ -413,6 +435,8 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/sales/{id}/status:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     patch:
@@ -439,6 +463,8 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
   /v1/dev/payment-scenarios/{orderNumber}:
     parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
     put:
@@ -460,6 +486,8 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     delete:
       tags: ["Local Test"]
       summary: "본인 주문 Mock 결과 지정 제거"
@@ -472,9 +500,11 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api; USER/ADMIN. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
     ServiceToken: {"type": "apiKey", "in": "header", "name": "X-Service-Token", "description": "대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다."}
   parameters:
     OrderNumber: {"name": "orderNumber", "in": "path", "required": true, "schema": {"type": "string"}}
@@ -536,6 +566,21 @@ components:
           schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
           examples:
             internalError: {"value": {"success": false, "data": null, "error": {"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "requestId": "request-001"}}}
+    AuthUnavailable:
+      description: JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            authUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 인증 상태를 확인할 수 없습니다.
+                  requestId: request-001
   schemas:
     CreateOrderRequest:
       type: "object"
