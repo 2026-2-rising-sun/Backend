@@ -16,7 +16,7 @@ async function liveFailures(ctx) {
   await req('caller-token-cannot-buy', 'commerce', 'GET', '/v1/cart/items', { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
   await req('wrong-target-credential', 'shopping', 'GET', `/v1/internal/products/${p[0]}`, { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
   const create = { title: 'Integration broadcast', scheduledAt: new Date(Date.now() + 60000).toISOString(),
-    channelArn: 'arn:aws:ivs:ap-northeast-2:000000000000:channel/local-fixture', playbackUrl: 'https://fixture.invalid/local.m3u8' };
+    channelArn: 'arn:aws:ivs:ap-northeast-2:000000000000:channel/local-fixture', playbackUrl: 'https://stub.live-video.net/local-fixture.m3u8' };
   const broadcast = (await req('broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.admin, body: create,
     headers: { 'Idempotency-Key': 'broadcast' }, status: 201 })).data;
   let version = broadcast.version; const links = [];
