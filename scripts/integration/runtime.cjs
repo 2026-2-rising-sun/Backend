@@ -21,10 +21,10 @@ async function freePort() {
   return port;
 }
 class Runtime {
-  constructor() {
+  constructor(options = {}) {
     this.id = 'sl-p2-flow-' + crypto.randomBytes(6).toString('hex');
     this.sha = command('git', ['rev-parse', 'HEAD']);
-    this.output = path.join(root, 'build/integration');
+    this.output = options.output ?? path.join(root, 'build/integration');
     this.containers = new Set(); this.children = new Map(); this.secrets = new Set();
     this.urls = {}; this.health = {}; this.environments = {}; this.jars = {}; this.ports = {};
     const java = spawnSync('java', ['-version'], { encoding: 'utf8' });
