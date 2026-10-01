@@ -40,6 +40,8 @@ Swagger는 작업 파일의 스냅샷과 SHA/hash를 `/contracts/provenance.json
 Mock은 계약 파일의 성공·401·403·타인 객체 404·재고 부족·충돌·의존 실패 예시를 선택한다.
 예: `curl -H 'Prefer: code=200, example=soldOut' http://127.0.0.1:4010/v1/products/1`.
 smoke는 임시 포트로 실행 후 정리하며 `build/contracts/prism.json`과 로그를 남긴다.
+빈 시나리오·서비스 전체 누락·서비스별 성공 또는 필수 오류 코드 누락은 Docker 시작 전에 실패한다.
+필수 실패 범위는 `contracts/scenarios/required-coverage.json`에 있으며 이를 줄이는 변경도 별도 리뷰한다.
 이 검사는 응답 형태만 확인한다. 품절 예시는 실제 재고 차감 검증이 아니며 JWT를 검증하지 않는다.
 시나리오의 Bearer/service token은 Prism의 요청 형태 검사용 가짜 문자열이다. 실제 서비스 인증에는 쓸 수 없다.
 회원별 권한·멱등 replay·장바구니 삭제·재고 원자성·결제 전이는 A5 실제 HTTP/DB 검증으로 확인한다.

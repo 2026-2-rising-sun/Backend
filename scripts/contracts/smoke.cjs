@@ -1,11 +1,30 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { root, load, escape, report } = require('./lib.cjs');
+const { root, files, load, escape, report } = require('./lib.cjs');
 const { mock } = require('../local/contracts.cjs');
 const { docker, stop, ready } = require('./docker.cjs');
-const scenarios = require('../../contracts/scenarios/prism.json');
-async function main() {
+const defaultScenarios = require('../../contracts/scenarios/prism.json');
+const coverage = require('../../contracts/scenarios/required-coverage.json');
+function validateCoverage(scenarios) {
+  assert.ok(Array.isArray(scenarios) && scenarios.length > 0, 'Prism coverage: scenarios must be nonempty');
+  const services = files().map(file => path.basename(file, '-service.yaml'));
+  for (const service of Object.keys(coverage)) assert.ok(services.includes(service), `Prism coverage: missing contract for ${service}`);
+  for (const scenario of scenarios) assert.ok(services.includes(scenario.service), `Prism coverage: unknown service ${scenario.service}`);
+  for (const service of services) {
+    const required = coverage[service];
+    assert.ok(required, `Prism coverage: missing policy for ${service}`);
+    assert.ok(Array.isArray(required.errors) && required.errors.length > 0
+      && required.errors.every(code => Number.isInteger(code) && code >= 400 && code < 600),
+    `Prism coverage: ${service} requires explicit failure codes`);
+    const codes = scenarios.filter(item => item.service === service).map(item => item.code);
+    assert.ok(codes.some(code => code >= 200 && code < 300), `Prism coverage: ${service} needs a success scenario`);
+    for (const code of required.errors) assert.ok(codes.includes(code), `Prism coverage: ${service} missing error ${code}`);
+  }
+}
+async function main(scenarios = defaultScenarios) {
+  // Fail before starting Docker when a deleted/empty scenario file would otherwise look successful.
+  validateCoverage(scenarios);
   const results = [];
   for (const service of new Set(scenarios.map(item => item.service))) {
     const { doc, resolve, validator, sha256 } = load(path.join(root, 'contracts/api', service + '-service.yaml'));
@@ -49,4 +68,5 @@ async function main() {
   report('prism', { passed: true, results });
   console.log(`Prism: ${results.length} exact example responses passed`);
 }
-main().catch(error => { report('prism', { passed: false, error: error.message }); console.error(error); process.exitCode = 1; });
+module.exports = { main, validateCoverage };
+if (require.main === module) main().catch(error => { report('prism', { passed: false, error: error.message }); console.error(error); process.exitCode = 1; });
