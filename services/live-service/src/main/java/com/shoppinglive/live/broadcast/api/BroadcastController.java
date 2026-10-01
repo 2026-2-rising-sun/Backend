@@ -1,6 +1,8 @@
 package com.shoppinglive.live.broadcast.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.application.BroadcastStartService;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -41,6 +44,12 @@ public class BroadcastController {
         final String key,
         @Valid @RequestBody final BroadcastInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.register(key, input)));
+    }
+
+    /** Missing detail IDs are validated only after the existing ADMIN authorization. */
+    @RequestMapping(path = "/", method = {RequestMethod.GET, RequestMethod.PATCH})
+    public ApiResponse<Void> missingBroadcastId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "broadcastId 는 필수입니다.");
     }
 
     @PatchMapping("/{id}")

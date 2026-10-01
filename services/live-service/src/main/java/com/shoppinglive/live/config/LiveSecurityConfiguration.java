@@ -25,11 +25,11 @@ public class LiveSecurityConfiguration {
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
                     "/v1/broadcasts", "/v1/broadcasts/", "/v1/broadcasts/{id}", "/v1/broadcasts/{id}/products").permitAll()
-                .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}",
+                .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}",
                     "/v1/admin/broadcasts/{id}/products").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}/start",
                     "/v1/admin/broadcasts/{id}/end", "/v1/admin/broadcasts/{id}/products").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/v1/admin/broadcasts/{id}").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/v1/admin/broadcasts/{id}/products/order").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/v1/admin/broadcasts/{id}/products/{linkId}").hasRole("ADMIN")
                 .anyRequest().denyAll())

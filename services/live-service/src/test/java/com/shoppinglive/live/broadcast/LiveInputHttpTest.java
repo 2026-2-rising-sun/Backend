@@ -68,6 +68,14 @@ class LiveInputHttpTest extends LiveSecuritySupport {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"GET", "PATCH"})
+    void administratorMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
+        expect(request(method, "/v1/admin/broadcasts/", adminBearer(), null), 400, "INVALID_REQUEST");
+        expect(request(method, "/v1/admin/broadcasts/", null, null), 401, "UNAUTHORIZED");
+        expect(request(method, "/v1/admin/broadcasts/", userBearer(), null), 403, "FORBIDDEN");
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {
         "123", "[]", "true", "null", "{\"unexpectedField\":null}",
         "{\"unexpectedField\":{}}", "{\"title\":\"changed\",\"unexpectedField\":1}",
