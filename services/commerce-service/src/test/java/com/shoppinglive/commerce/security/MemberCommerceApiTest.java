@@ -71,6 +71,26 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
     }
 
     @Test
+    void revokedOrUnavailableSessionsCannotTradeWhileServiceSalesRemainIndependent() throws Exception {
+        String token = bearer(MEMBER_A);
+        mvc.perform(get("/v1/cart/items").header("Authorization", token)).andExpect(status().isOk());
+        accessSessions.revoke();
+        mvc.perform(get("/v1/cart/items").header("Authorization", token)).andExpect(status().isUnauthorized());
+        accessSessions.fail();
+        mvc.perform(get("/v1/cart/items").header("Authorization", token)).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
+            .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mvc.perform(post("/v1/orders").header("Authorization", token)
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isServiceUnavailable());
+        mvc.perform(get("/v1/sales").param("productIds", "1").header("X-Service-Token", SHOPPING_TOKEN))
+            .andExpect(status().isOk());
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+        assertThat(orders.count()).isZero();
+        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
+    }
+
+    @Test
     void anonymousCannotUseAnyTransactionOrOldPasswordFallback() throws Exception {
         for (String path : List.of("/v1/orders", "/v1/orders/checkout?productId=1&quantity=1",
             "/v1/orders/guest", "/v1/orders/guest/payments/1", "/v1/cart/items")) {

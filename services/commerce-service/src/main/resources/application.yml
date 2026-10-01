@@ -13,6 +13,11 @@ spring:
 
 shoppinglive:
   security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:}
+      service-token: ${COMMERCE_MEMBER_SERVICE_TOKEN:}
+      connect-timeout: 1s
+      read-timeout: 1s
     jwt:
       issuer: shoppinglive-member
       audience: shoppinglive-api
@@ -97,6 +102,11 @@ commerce:
   shopping-client:
     base-url: http://localhost:8082
 
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://localhost:8081}
+
 ---
 # k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.
 # 호스트는 같은 네임스페이스의 Service 이름이고 포트는 클러스터 내부 표준 포트다.
@@ -121,3 +131,8 @@ spring:
 commerce:
   shopping-client:
     base-url: http://dev-shopping-service:8080
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://dev-member-service:8080}

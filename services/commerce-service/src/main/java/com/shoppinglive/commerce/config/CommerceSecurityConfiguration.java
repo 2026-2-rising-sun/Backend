@@ -52,7 +52,8 @@ public class CommerceSecurityConfiguration {
                 auth.anyRequest().denyAll();
             })
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
-                .authenticationEntryPoint(errors).accessDeniedHandler(errors))
+                .authenticationEntryPoint(errors).accessDeniedHandler(errors)
+                .withObjectPostProcessor(errors.bearerFailureHandler()))
             .build();
     }
 }
