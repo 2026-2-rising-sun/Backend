@@ -4,6 +4,7 @@ import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.boot.web.client.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.util.StringUtils;
@@ -12,6 +13,11 @@ import org.springframework.web.client.RestClient;
 @AutoConfiguration
 @ConditionalOnClass(name = "jakarta.servlet.Filter")
 public class CommonWebAutoConfiguration {
+
+    @Bean
+    public Jackson2ObjectMapperBuilderCustomizer jsonTypePolicy() {
+        return new JsonTypePolicy();
+    }
 
     @Bean
     @ConditionalOnMissingBean
