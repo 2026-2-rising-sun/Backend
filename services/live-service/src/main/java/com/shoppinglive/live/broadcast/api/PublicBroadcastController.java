@@ -1,6 +1,8 @@
 package com.shoppinglive.live.broadcast.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.live.broadcast.application.PublicBroadcastService;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,12 @@ public class PublicBroadcastController {
         @RequestParam(defaultValue = "0") final int page,
         @RequestParam(defaultValue = "20") final int size) {
         return ApiResponse.ok(service.list(page, size));
+    }
+
+    /** A missing detail ID is an input error; the collection URL remains /v1/broadcasts. */
+    @GetMapping("/")
+    public ApiResponse<Void> missingBroadcastId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "broadcastId 는 필수입니다.");
     }
 
     @GetMapping("/{id}")

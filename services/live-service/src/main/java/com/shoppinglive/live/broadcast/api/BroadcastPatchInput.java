@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 생략된 필드는 null(=기존 값 유지), 본문에 명시적으로 null 을 준 필드는
@@ -26,6 +28,8 @@ public record BroadcastPatchInput(
 ) {
     /** record 생성자의 Optional 기본 역직렬화는 생략과 null을 구분하지 못한다. */
     public static final class Deserializer extends JsonDeserializer<BroadcastPatchInput> {
+        private static final Set<String> FIELDS =
+            Set.of("title", "scheduledAt", "channelArn", "playbackUrl");
         @Override
         public BroadcastPatchInput deserialize(final JsonParser parser,
                                                 final DeserializationContext context)
@@ -34,6 +38,12 @@ public record BroadcastPatchInput(
             if (!node.isObject()) {
                 return (BroadcastPatchInput) context.handleUnexpectedToken(
                     BroadcastPatchInput.class, parser);
+            }
+            // Tree deserialization must enforce the same unknown-field boundary as the contract.
+            for (var names = node.fieldNames(); names.hasNext();) {
+                if (!FIELDS.contains(names.next())) {
+                    throw JsonMappingException.from(parser, "허용되지 않은 방송 수정 필드입니다.");
+                }
             }
             return new BroadcastPatchInput(
                 field(parser, node, "title", String.class),
@@ -48,6 +58,10 @@ public record BroadcastPatchInput(
             final JsonNode value = object.get(name);
             if (value == null) {
                 return null;
+            }
+            // All four fields are JSON strings. Never coerce numbers/booleans or epoch timestamps.
+            if (!value.isNull() && !value.isTextual()) {
+                throw JsonMappingException.from(parser, name + "는 문자열이어야 합니다.");
             }
             return value.isNull() ? Optional.empty()
                 : Optional.ofNullable(parser.getCodec().treeToValue(value, type));

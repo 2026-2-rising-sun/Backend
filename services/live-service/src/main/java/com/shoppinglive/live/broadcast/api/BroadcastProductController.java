@@ -5,6 +5,7 @@ import com.shoppinglive.live.broadcast.application.BroadcastProductService;
 import com.shoppinglive.live.broadcast.domain.BroadcastProduct;
 import java.util.List;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -47,7 +48,7 @@ public class BroadcastProductController {
     @DeleteMapping("/{linkId}")
     public ResponseEntity<Void> unlink(@PathVariable final long id,
                                        @PathVariable final long linkId,
-                                       @RequestParam final long expectedVersion) {
+                                       @RequestParam @PositiveOrZero final long expectedVersion) {
         service.unlink(id, linkId, expectedVersion);
         return ResponseEntity.noContent().build();
     }

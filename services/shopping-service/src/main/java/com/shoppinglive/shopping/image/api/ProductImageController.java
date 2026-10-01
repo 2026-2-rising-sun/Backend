@@ -1,6 +1,8 @@
 package com.shoppinglive.shopping.image.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.image.application.ImageFile;
 import com.shoppinglive.shopping.image.application.ImageStorageException;
 import com.shoppinglive.shopping.image.application.ImageUrlResolver;
@@ -58,6 +60,12 @@ public class ProductImageController {
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
                 .header("X-Content-Type-Options", "nosniff")
                 .body(file.content());
+    }
+
+    /** 이미지 파일 ID를 비운 요청도 인증 오류 대신 입력 오류로 응답한다. */
+    @GetMapping("/v1/product-images/")
+    public ApiResponse<Void> missingImageId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "imageId 는 필수입니다.");
     }
 
     /** multipart 임시 파일을 못 읽는 건 사용자 파일이 아니라 서버 문제라 저장 실패(500)로 알린다. */

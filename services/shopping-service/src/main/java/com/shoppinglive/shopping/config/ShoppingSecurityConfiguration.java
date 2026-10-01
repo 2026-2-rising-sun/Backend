@@ -26,7 +26,7 @@ public class ShoppingSecurityConfiguration {
                                          JsonSecurityErrorHandler errors) throws Exception {
         return stateless(http, errors).securityMatcher("/v1/internal/**")
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/v1/internal/products", "/v1/internal/products/{id}")
+                .requestMatchers(HttpMethod.GET, "/v1/internal/products", "/v1/internal/products/", "/v1/internal/products/{id}")
                 .hasAnyAuthority("SERVICE_commerce", "SERVICE_live")
                 .anyRequest().denyAll())
             .addFilterBefore(new ServiceTokenAuthenticationFilter(callers, errors), AnonymousAuthenticationFilter.class)
@@ -43,11 +43,11 @@ public class ShoppingSecurityConfiguration {
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
-                        "/v1/products", "/v1/products/{id}", "/v1/products/{id}/purchase-check",
-                        "/v1/product-images/{id}").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/{id}").hasRole("ADMIN")
+                        "/v1/products", "/v1/products/", "/v1/products/{id}", "/v1/products/{id}/purchase-check",
+                        "/v1/product-images/", "/v1/product-images/{id}").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.POST, "/v1/admin/products", "/v1/admin/product-images").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/{id}").hasRole("ADMIN");
+                    .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("ADMIN");
                 if (devEnabled) auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images").hasRole("ADMIN");
                 auth.anyRequest().denyAll();
             })

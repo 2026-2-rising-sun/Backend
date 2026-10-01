@@ -1,12 +1,15 @@
 package com.shoppinglive.live.broadcast.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.application.BroadcastStartService;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import org.springframework.data.domain.Page;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,10 +46,17 @@ public class BroadcastController {
         return ApiResponse.ok(BroadcastResponse.from(service.register(key, input)));
     }
 
+    /** Missing detail IDs are validated only after the existing ADMIN authorization. */
+    @RequestMapping(path = "/", method = {RequestMethod.GET, RequestMethod.PATCH})
+    public ApiResponse<Void> missingBroadcastId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "broadcastId 는 필수입니다.");
+    }
+
     @PatchMapping("/{id}")
     public ApiResponse<BroadcastResponse> edit(
         @PathVariable final long id,
         @RequestParam @NotNull(message = "version 파라미터는 필수입니다.")
+        @PositiveOrZero(message = "version은 0 이상이어야 합니다.")
         final long version,
         @Valid @RequestBody final BroadcastPatchInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.edit(id, version, input)));
@@ -53,7 +64,7 @@ public class BroadcastController {
 
     @PostMapping("/{id}/start")
     public ApiResponse<BroadcastResponse> start(@PathVariable final long id,
-                                                @RequestParam final long expectedVersion) {
+                                                @RequestParam @PositiveOrZero final long expectedVersion) {
         return ApiResponse.ok(BroadcastResponse.from(startService.start(id, expectedVersion)));
     }
 

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.web.firewall.RequestRejectedHandler;
 
 class CommonSecurityAutoConfigurationTest {
     @TempDir Path directory;
@@ -35,7 +36,8 @@ class CommonSecurityAutoConfigurationTest {
         }
         context.withPropertyValues(required)
             .run(result -> assertThat(result).hasNotFailed().hasSingleBean(JwtDecoder.class)
-                .hasSingleBean(MemberJwtAuthenticationConverter.class).hasSingleBean(ServiceCallerTokenValidator.class));
+                .hasSingleBean(MemberJwtAuthenticationConverter.class).hasSingleBean(ServiceCallerTokenValidator.class)
+                .hasSingleBean(RequestRejectedHandler.class));
         context.withPropertyValues(required).withPropertyValues(
             "shoppinglive.security.jwt.public-key-set-location=https://example.invalid/keys.jwks")
             .run(result -> assertThat(result).hasFailed());

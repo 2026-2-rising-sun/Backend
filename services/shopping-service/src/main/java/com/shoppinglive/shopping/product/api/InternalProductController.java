@@ -40,6 +40,12 @@ public class InternalProductController {
         return ApiResponse.ok(productQueryService.findSnapshots(parseIds(ids)));
     }
 
+    /** 상세 경로의 누락 ID도 허용된 서비스 caller 확인 후 입력 오류로 응답한다. */
+    @GetMapping("/")
+    public ApiResponse<Void> missingProductId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
+    }
+
     /** 없으면 404 NOT_FOUND. */
     @GetMapping("/{productId}")
     public ApiResponse<ProductSnapshot> get(@PathVariable Long productId) {
