@@ -1,4 +1,15 @@
 {
   "formatVersion": 1,
-  "reviews": []
+  "reviews": [
+    {
+      "baseSnapshotSha256": "c25f7053ab093d83cb6930afbef7f1b9564feeb2c4362ee9e949ec0a1537262a",
+      "headSnapshotSha256": "2ffe5550f3a9eb10892c65a200c477534ec73917e023405a808710d951d061d1",
+      "reason": "P2 intentionally replaces guest commerce access with member ownership, adds cart and Member APIs, and protects management/internal calls. Existing public catalog and broadcast reads remain public.",
+      "independentReview": {
+        "reviewer": "Codex root review lane (separate from A4 contract author)",
+        "reviewedAt": "2026-10-01",
+        "evidence": "contracts/docs/p2-review-2026-10-01.md"
+      }
+    }
+  ]
 }
