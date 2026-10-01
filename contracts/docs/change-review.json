@@ -8,7 +8,7 @@
       "independentReview": {
         "reviewer": "Codex root review lane (separate from A4 contract author)",
         "reviewedAt": "2026-10-01",
-        "evidence": "contracts/docs/p2-review-2026-10-01.md"
+        "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
       }
     },
     {
@@ -18,7 +18,7 @@
       "independentReview": {
         "reviewer": "Codex root review lane, independent from A4 contract author",
         "reviewedAt": "2026-10-01",
-        "evidence": "contracts/docs/p2-session-review-2026-10-01.md"
+        "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
       }
     }
   ]
