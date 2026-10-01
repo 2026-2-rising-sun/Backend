@@ -82,8 +82,8 @@ jobs:
             database: member_test
             task: ':services:member-service:postgresTest'
             report: services/member-service/build/test-results/postgresTest/TEST-*.xml
-            suites: '*.MemberPostgresTest *.MemberLoginPostgresTest'
-            minimums: '*.MemberPostgresTest=1 *.MemberLoginPostgresTest=5'
+            suites: '*.MemberPostgresTest *.MemberLoginPostgresTest *.MemberSessionPostgresTest'
+            minimums: '*.MemberPostgresTest=1 *.MemberLoginPostgresTest=5 *.MemberSessionPostgresTest=16'
           - service: commerce
             database: commerce_test
             task: ':services:commerce-service:postgresCommerceTest'
