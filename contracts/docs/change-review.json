@@ -20,6 +20,16 @@
         "reviewedAt": "2026-10-01",
         "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
       }
+    },
+    {
+      "baseSnapshotSha256": "2a86fa7f4679c3a740cf60e0dbfa83ab5aa7dc505fc2e7b4ff79778d9feac104",
+      "headSnapshotSha256": "3999cdda26cc3e66134eb4b60224c4d42a4a49d26ad0191acd4369cf18a2733f",
+      "reason": "Declare the existing or corrected 400 INVALID_REQUEST responses for invalid Shopping and Live path IDs. The nine additions reuse the existing BadRequest envelope and do not change success schemas or authentication requirements.",
+      "independentReview": {
+        "reviewer": "Codex root review lane, independent from the Shopping and Live contract author",
+        "reviewedAt": "2026-10-01",
+        "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
+      }
     }
   ]
 }
