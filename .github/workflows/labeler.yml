@@ -37,5 +37,5 @@ jobs:
             *.md *.mdx *.rst *.adoc
             README*.txt */README*.txt docs/*.txt contracts/docs/*.txt
             contracts/api/*.yaml contracts/api/*.yml contracts/api/*.json
-            contracts/docs/*.json contracts/docs/*.yaml contracts/docs/*.yml
+            contracts/docs/change-review.json
             contracts/exports/*.json contracts/exports/*.yaml contracts/exports/*.yml
