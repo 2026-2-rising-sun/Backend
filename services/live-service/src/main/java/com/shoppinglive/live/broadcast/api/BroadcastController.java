@@ -7,6 +7,7 @@ import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import org.springframework.data.domain.Page;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +47,7 @@ public class BroadcastController {
     public ApiResponse<BroadcastResponse> edit(
         @PathVariable final long id,
         @RequestParam @NotNull(message = "version 파라미터는 필수입니다.")
+        @PositiveOrZero(message = "version은 0 이상이어야 합니다.")
         final long version,
         @Valid @RequestBody final BroadcastPatchInput input) {
         return ApiResponse.ok(BroadcastResponse.from(service.edit(id, version, input)));
@@ -53,7 +55,7 @@ public class BroadcastController {
 
     @PostMapping("/{id}/start")
     public ApiResponse<BroadcastResponse> start(@PathVariable final long id,
-                                                @RequestParam final long expectedVersion) {
+                                                @RequestParam @PositiveOrZero final long expectedVersion) {
         return ApiResponse.ok(BroadcastResponse.from(startService.start(id, expectedVersion)));
     }
 

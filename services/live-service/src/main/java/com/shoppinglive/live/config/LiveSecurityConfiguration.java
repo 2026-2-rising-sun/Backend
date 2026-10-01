@@ -24,7 +24,7 @@ public class LiveSecurityConfiguration {
             .authorizeHttpRequests(auth -> auth
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
-                    "/v1/broadcasts", "/v1/broadcasts/{id}", "/v1/broadcasts/{id}/products").permitAll()
+                    "/v1/broadcasts", "/v1/broadcasts/", "/v1/broadcasts/{id}", "/v1/broadcasts/{id}/products").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}",
                     "/v1/admin/broadcasts/{id}/products").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}/start",

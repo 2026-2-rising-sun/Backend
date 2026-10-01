@@ -2,6 +2,7 @@ package com.shoppinglive.live.broadcast.api;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 public record ReorderProductsInput(
@@ -9,6 +10,7 @@ public record ReorderProductsInput(
     List<Long> linkIds,
 
     @NotNull(message = "expectedVersion은 필수입니다.")
+    @PositiveOrZero(message = "expectedVersion은 0 이상이어야 합니다.")
     Long expectedVersion
 ) {
 }
