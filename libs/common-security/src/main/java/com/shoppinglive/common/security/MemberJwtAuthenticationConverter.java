@@ -1,15 +1,27 @@
 package com.shoppinglive.common.security;
 
 import java.util.Set;
+import java.util.Objects;
+import java.util.UUID;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /** oauth2ResourceServer의 검증된 JWT를 기존 도메인 principal 계약으로 변환한다. */
 public final class MemberJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
+    private final AccessSessionVerifier sessions;
+
+    public MemberJwtAuthenticationConverter(AccessSessionVerifier sessions) {
+        this.sessions = Objects.requireNonNull(sessions);
+    }
+
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
+        if (!sessions.isActive(UUID.fromString(jwt.getSubject()), UUID.fromString(jwt.getClaimAsString("sid")))) {
+            throw new BadCredentialsException("Member access session is inactive");
+        }
         AuthenticatedUser user = new AuthenticatedUser(jwt.getSubject(),
             Set.copyOf(jwt.getClaimAsStringList("roles")), jwt.getExpiresAt());
         return new MemberAuthentication(user);

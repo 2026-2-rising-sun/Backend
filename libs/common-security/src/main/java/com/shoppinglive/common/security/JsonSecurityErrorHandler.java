@@ -8,6 +8,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.config.ObjectPostProcessor;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
@@ -22,8 +25,27 @@ public final class JsonSecurityErrorHandler implements AuthenticationEntryPoint,
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
         throws IOException {
+        if (exception instanceof AccessSessionUnavailableException) {
+            write(response, ErrorCode.SERVICE_UNAVAILABLE);
+            return;
+        }
         response.setHeader("WWW-Authenticate", "Bearer");
         write(response, ErrorCode.UNAUTHORIZED);
+    }
+
+    /** Spring's default failure handler rethrows AuthenticationServiceException before this entry point. */
+    public ObjectPostProcessor<BearerTokenAuthenticationFilter> bearerFailureHandler() {
+        return new ObjectPostProcessor<>() {
+            @Override
+            public <O extends BearerTokenAuthenticationFilter> O postProcess(O filter) {
+                filter.setAuthenticationFailureHandler((request, response, exception) -> {
+                    if (exception instanceof AuthenticationServiceException
+                        && !(exception instanceof AccessSessionUnavailableException)) throw exception;
+                    commence(request, response, exception);
+                });
+                return filter;
+            }
+        };
     }
 
     @Override

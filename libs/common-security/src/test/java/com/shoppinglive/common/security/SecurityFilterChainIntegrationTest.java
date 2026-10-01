@@ -4,10 +4,12 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.security.test.JwtTestTokens;
+import com.shoppinglive.common.security.test.StubAccessSessionVerifier;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +41,11 @@ class SecurityFilterChainIntegrationTest {
     private static final String SHOPPING_KEY = "test-shopping-credential-32-characters-minimum";
     private static final String COMMERCE_KEY = "test-commerce-credential-32-characters-minimum";
     @Autowired WebApplicationContext context;
+    @Autowired StubAccessSessionVerifier sessions;
     private MockMvc mvc;
 
     @BeforeEach
-    void setUp() { mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build(); }
+    void setUp() { sessions.reset(); mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build(); }
 
     @Test
     void publicEndpointAllowsAnonymousAndInvalidCredentialsStillFail() throws Exception {
@@ -59,6 +62,28 @@ class SecurityFilterChainIntegrationTest {
         mvc.perform(get("/member").header("Authorization", "Bearer " + new JwtTestTokens()
                 .token(JwtTestTokens.MEMBER_A, Set.of("USER"))))
             .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void revokedSessionRejectsAnAlreadyIssuedTokenOnItsNextRequest() throws Exception {
+        String bearer = userBearer();
+        mvc.perform(get("/member").header("Authorization", bearer)).andExpect(status().isOk());
+        sessions.revoke();
+        mvc.perform(get("/member").header("Authorization", bearer)).andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void authorityOutageIs503WhileAnonymousPublicAndServiceCallersStayIndependent() throws Exception {
+        sessions.fail();
+        mvc.perform(get("/member").header("Authorization", userBearer())).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
+            .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mvc.perform(get("/public").header("Authorization", userBearer())).andExpect(status().isServiceUnavailable());
+        mvc.perform(get("/public")).andExpect(status().isOk());
+        mvc.perform(get("/member")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/member").header("Authorization", "Bearer invalid")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/sales").header("X-Service-Token", SHOPPING_KEY)).andExpect(status().isOk());
     }
 
     @Test
@@ -97,6 +122,7 @@ class SecurityFilterChainIntegrationTest {
     @EnableWebMvc
     @EnableWebSecurity
     static class Config {
+        @Bean StubAccessSessionVerifier sessions() { return new StubAccessSessionVerifier(); }
         @Bean Endpoints endpoints() { return new Endpoints(); }
         @Bean JsonSecurityErrorHandler errors() { return new JsonSecurityErrorHandler(new ObjectMapper()); }
 
@@ -113,7 +139,7 @@ class SecurityFilterChainIntegrationTest {
         }
 
         @Bean @Order(2)
-        SecurityFilterChain members(HttpSecurity http, JsonSecurityErrorHandler errors) throws Exception {
+        SecurityFilterChain members(HttpSecurity http, JsonSecurityErrorHandler errors, StubAccessSessionVerifier sessions) throws Exception {
             return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(errors).accessDeniedHandler(errors))
@@ -122,8 +148,9 @@ class SecurityFilterChainIntegrationTest {
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt
                     .decoder(MemberJwtDecoderFactory.create(TOKENS.publicJwkSet(), JwtTestTokens.ISSUER, JwtTestTokens.AUDIENCE))
-                    .jwtAuthenticationConverter(new MemberJwtAuthenticationConverter()))
-                    .authenticationEntryPoint(errors).accessDeniedHandler(errors))
+                    .jwtAuthenticationConverter(new MemberJwtAuthenticationConverter(sessions)))
+                    .authenticationEntryPoint(errors).accessDeniedHandler(errors)
+                    .withObjectPostProcessor(errors.bearerFailureHandler()))
                 .build();
         }
     }

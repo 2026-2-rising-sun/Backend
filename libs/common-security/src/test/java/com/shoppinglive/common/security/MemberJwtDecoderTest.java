@@ -18,6 +18,8 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -32,15 +34,36 @@ class MemberJwtDecoderTest {
 
     @Test
     void verifiesSignatureAndCreatesImmutableDomainPrincipal() {
-        var validator = new JwtTokenValidator(decoder);
+        var validator = new JwtTokenValidator(decoder, new MemberJwtAuthenticationConverter((member, session) -> true));
         var user = validator.validate(TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER", "ADMIN")));
         assertThat(user.memberId()).isEqualTo(JwtTestTokens.MEMBER_A);
         assertThat(user.roles()).containsExactlyInAnyOrder("USER", "ADMIN");
         assertThatThrownBy(() -> user.roles().add("OTHER")).isInstanceOf(UnsupportedOperationException.class);
-        var authentication = new MemberJwtAuthenticationConverter().convert(
+        var authentication = new MemberJwtAuthenticationConverter((member, session) -> true).convert(
             decoder.decode(TOKENS.token(JwtTestTokens.ADMIN, Set.of("ADMIN"))));
         assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
         assertThat(authentication.getCredentials()).isEqualTo("");
+    }
+
+    @Test
+    void tokenValidatorCannotBypassSessionChecksAndInvalidJwtNeverCallsAuthority() {
+        String sessionId = UUID.randomUUID().toString();
+        var calls = new AtomicInteger();
+        var converter = new MemberJwtAuthenticationConverter((member, session) -> {
+            calls.incrementAndGet();
+            assertThat(member.toString()).isEqualTo(JwtTestTokens.MEMBER_A);
+            assertThat(session.toString()).isEqualTo(sessionId);
+            return false;
+        });
+        var validator = new JwtTokenValidator(decoder, converter);
+        String token = TOKENS.sign(claims().claim("sid", sessionId).build());
+        assertThatThrownBy(() -> validator.validate(token)).isInstanceOf(InvalidTokenException.class);
+        assertThatThrownBy(() -> validator.validate("invalid")).isInstanceOf(InvalidTokenException.class);
+        assertThat(calls.get()).isEqualTo(1);
+        var unavailable = new JwtTokenValidator(decoder, new MemberJwtAuthenticationConverter((member, session) -> {
+            throw new AccessSessionUnavailableException("unavailable", null);
+        }));
+        assertThatThrownBy(() -> unavailable.validate(token)).isInstanceOf(AccessSessionUnavailableException.class);
     }
 
     @TestFactory
@@ -48,6 +71,9 @@ class MemberJwtDecoderTest {
         Instant now = Instant.now();
         return Stream.of(
             bad("missing subject", claims().subject(null)),
+            bad("missing sid", claims().claim("sid", null)),
+            bad("malformed sid", claims().claim("sid", "1-1-1-1-1")),
+            bad("non-string sid", claims().claim("sid", 1)),
             bad("malformed UUID", claims().subject("1-1-1-1-1")),
             bad("wrong issuer", claims().issuer("another-member")),
             bad("wrong audience", claims().audience("other-api")),
@@ -85,7 +111,7 @@ class MemberJwtDecoderTest {
         hmac.sign(new MACSigner(new byte[32]));
         assertRejected(hmac.serialize());
         assertRejected(new PlainJWT(claims().build()).serialize());
-        assertThatThrownBy(() -> new JwtTokenValidator(decoder).validate("not-a-token"))
+        assertThatThrownBy(() -> new JwtTokenValidator(decoder, new MemberJwtAuthenticationConverter((member, session) -> true)).validate("not-a-token"))
             .isInstanceOf(InvalidTokenException.class);
     }
 
