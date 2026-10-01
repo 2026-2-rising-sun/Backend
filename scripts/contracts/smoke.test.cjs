@@ -1,0 +1,18 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { main, validateCoverage } = require('./smoke.cjs');
+const scenarios = require('../../contracts/scenarios/prism.json');
+
+test('empty scenario input fails the actual smoke entry before starting Docker', async () => {
+  await assert.rejects(main([]), /Prism coverage: scenarios must be nonempty/);
+});
+test('removing any contract service fails instead of reporting partial smoke success', async () => {
+  for (const service of ['member', 'shopping', 'commerce', 'live']) {
+    await assert.rejects(main(scenarios.filter(item => item.service !== service)), new RegExp(`Prism coverage: ${service} needs a success scenario`));
+  }
+});
+test('success and required failure categories cannot silently disappear', async () => {
+  assert.doesNotThrow(() => validateCoverage(scenarios));
+  await assert.rejects(main(scenarios.filter(item => item.service !== 'commerce' || item.code !== 503)), /commerce missing error 503/);
+  await assert.rejects(main(scenarios.filter(item => item.service !== 'member' || item.code >= 400)), /member needs a success scenario/);
+});

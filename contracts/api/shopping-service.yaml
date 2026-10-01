@@ -1,21 +1,20 @@
 openapi: 3.1.0
 info:
   title: Shopping Service API
-  version: 1.0.0
+  version: 2.0.0
   license: { name: UNLICENSED }
   description: |
     Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
     가격, 재고, 판매 상태는 Commerce 소유이며 공개와 관리자 조회에서 조회 시점에 결합한다.
-    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 내부 경로는 클러스터 내부 서비스 전용이다.
-# P1에는 인증이 구현되지 않았다. 인증을 도입하면 이 값을 security scheme으로 교체한다.
-security: []
+    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 ADMIN이 필요하다.
+    공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
+    현재 상품 관리 모델은 공통 ADMIN 권한이며 판매자 역할이나 상품별 판매자 소유권을 가정하지 않는다.
+security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8082
     description: Shopping 서비스 로컬 실행 주소 (port 8082)
   - url: http://dev-shopping-service:8080
     description: Shopping 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
-  - url: https://api.example.com/api/shopping
-    description: Shopping 서비스 게이트웨이 경유 주소 (placeholder)
 tags:
   - name: Admin Product
     description: 관리자 상품 등록, 수정, 조회
@@ -28,6 +27,7 @@ tags:
 paths:
   /v1/admin/products:
     post:
+      x-required-roles: [ADMIN]
       tags: [Admin Product]
       summary: 상품 기본정보 등록
       operationId: registerProduct
@@ -40,6 +40,8 @@ paths:
             schema: { $ref: '#/components/schemas/RegisterProductRequest' }
             example: { name: 가을 니트, description: 울 혼방 니트, mainImageId: 10 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '201':
           description: 등록됨. 같은 멱등 키의 재전송은 최초 상품을 같은 상태 코드로 반환한다.
           content:
@@ -48,6 +50,7 @@ paths:
               example: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z' }, error: null }
         '400': { $ref: '#/components/responses/BadRequest' }
     get:
+      x-required-roles: [ADMIN]
       tags: [Admin Product]
       summary: 관리자 상품 목록
       operationId: listAdminProducts
@@ -59,6 +62,8 @@ paths:
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: Commerce 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
           content:
@@ -73,10 +78,13 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
+      x-required-roles: [ADMIN]
       tags: [Admin Product]
       summary: 관리자 상품 상세
       operationId: getAdminProduct
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: Commerce 조회 실패 시 salesStatus는 UNKNOWN이다.
           content:
@@ -87,6 +95,7 @@ paths:
                 notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null }, error: null } }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
+      x-required-roles: [ADMIN]
       tags: [Admin Product]
       summary: 상품 기본정보 부분 수정
       operationId: updateProduct
@@ -97,6 +106,8 @@ paths:
             schema: { $ref: '#/components/schemas/UpdateProductRequest' }
             example: { name: 가을 니트 수정, version: 0 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 수정됨
           content:
@@ -108,6 +119,7 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
   /v1/products:
     get:
+      security: []
       tags: [Public Product]
       summary: 공개 상품 목록
       operationId: listPublicProducts
@@ -120,6 +132,7 @@ paths:
           in: query
           schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: ON_SALE 또는 SOLD_OUT 상품을 최신 등록순으로 반환한다.
           content:
@@ -134,10 +147,12 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
+      security: []
       tags: [Public Product]
       summary: 공개 상품 상세
       operationId: getPublicProduct
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 상품과 Commerce 판매정보를 결합한 조회 시점 스냅샷이다.
           content:
@@ -152,6 +167,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
+      security: []
       tags: [Public Product]
       summary: 주문 전 구매 가능 수량 확인
       operationId: checkPurchase
@@ -162,6 +178,7 @@ paths:
           description: 부호·선행 0·소수점 없이 1~999999999를 전송한다.
           schema: { type: integer, minimum: 1, maximum: 999999999 }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 재고를 예약하거나 차감하지 않는다. 최종 가격과 재고 확인은 Commerce 주문 생성 시 수행한다.
           content:
@@ -176,6 +193,7 @@ paths:
         '503': { $ref: '#/components/responses/SalesUnavailable' }
   /v1/admin/product-images:
     post:
+      x-required-roles: [ADMIN]
       tags: [Product Image]
       summary: 상품 이미지 업로드
       operationId: uploadProductImage
@@ -190,6 +208,8 @@ paths:
               properties:
                 file: { type: string, format: binary }
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '201':
           description: 업로드됨
           content:
@@ -205,10 +225,12 @@ paths:
         required: true
         schema: { type: integer, format: int64, minimum: 1 }
     get:
+      security: []
       tags: [Product Image]
       summary: 공개 이미지 파일 조회
       operationId: getProductImage
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
           description: 저장된 원본 파일. 1년 immutable cache와 nosniff 헤더를 포함한다.
           content:
@@ -217,6 +239,8 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
   /v1/internal/products:
     get:
+      security: [{ ServiceToken: [] }]
+      x-allowed-callers: [commerce, live]
       tags: [Internal Product]
       summary: 내부 상품 스냅샷 벌크 조회
       operationId: getInternalProducts
@@ -235,6 +259,8 @@ paths:
           explode: true
           example: [1, 2]
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 판매 상태와 무관한 기본정보 스냅샷 목록
           content:
@@ -248,10 +274,14 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
+      security: [{ ServiceToken: [] }]
+      x-allowed-callers: [commerce, live]
       tags: [Internal Product]
       summary: 내부 상품 스냅샷 단건 조회
       operationId: getInternalProduct
       responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '200':
           description: 판매 상태와 무관한 기본정보 스냅샷
           content:
@@ -259,7 +289,35 @@ paths:
               schema: { $ref: '#/components/schemas/ProductSnapshotEnvelope' }
               example: { success: true, data: { id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10 }, error: null }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/dev/product-images:
+    delete:
+      tags: [Product Image]
+      summary: 미참조 상품 이미지 정리 (로컬 테스트 전용)
+      operationId: deleteLocalUnreferencedImages
+      description: local 또는 test 프로필 AND dev/prod 비활성 AND shopping.dev-api.enabled=true에서만 제공. 외부 dev/prod는 금지한다.
+      x-required-roles: [ADMIN]
+      x-availability: opt-in local/test only
+      responses:
+        '200':
+          description: 삭제 수. 참조 중인 이미지는 유지한다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DevImageResetEnvelope' }
+              examples: { normal: { value: { success: true, data: { deletedCount: 2 }, error: null } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api. ADMIN API는 ADMIN 역할 필수.
+    ServiceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: 서버 설정의 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT는 대체 수단이 아니다.
   parameters:
     ProductId:
       name: productId
@@ -272,6 +330,18 @@ components:
       required: true
       schema: { type: string, minLength: 1, maxLength: 64 }
   responses:
+    Unauthorized:
+      description: 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { unauthorized: { value: { success: false, data: null, error: { code: UNAUTHORIZED, message: 인증이 필요합니다., requestId: request-001 } } } }
+    Forbidden:
+      description: 검증된 사용자 또는 서비스 호출자에게 필요한 권한이 없음
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples: { forbidden: { value: { success: false, data: null, error: { code: FORBIDDEN, message: 권한이 없습니다., requestId: request-001 } } } }
     BadRequest:
       description: 요청 형식 또는 값이 올바르지 않음
       content:
@@ -303,6 +373,13 @@ components:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
           examples: { internalError: { value: { success: false, data: null, error: { code: INTERNAL_ERROR, message: 서버 내부 오류가 발생했습니다., requestId: request-001 } } } }
   schemas:
+    DevImageResetEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data: { type: object, required: [deletedCount], properties: { deletedCount: { type: integer, minimum: 0 } } }
+        error: { type: 'null' }
     RegisterProductRequest:
       type: object
       required: [name, description, mainImageId]

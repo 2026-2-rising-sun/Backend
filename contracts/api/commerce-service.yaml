@@ -1,0 +1,705 @@
+openapi: 3.1.0
+info:
+  title: Commerce Service API
+  version: 2.0.0
+  license: { name: UNLICENSED }
+  description: |
+    회원 전용 주문·결제·장바구니와 관리자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
+    USER와 ADMIN의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
+    정상 응답은 봉투 없는 DTO/배열, 오류만 ApiResponse 봉투이다. 204는 본문 없음.
+    현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
+security: [{ BearerAuth: [] }]
+servers:
+  - url: http://localhost:8083
+    description: Commerce Service API 로컬 직접 호출
+  - url: http://dev-commerce-service:8080
+    description: dev 네임스페이스 내부 Service 주소
+tags:
+  - name: Orders
+    description: 회원 본인 주문
+  - name: Payments
+    description: 회원 본인 결제 시도
+  - name: Cart
+    description: Commerce 소유 장바구니
+  - name: Sales Admin
+    description: ADMIN 판매·재고 관리
+  - name: Internal Sales
+    description: Shopping/Live 서비스 호출
+  - name: Local Test
+    description: 명시 활성화한 로컬 테스트 전용
+paths:
+  /v1/orders/checkout:
+    get:
+      tags: ["Orders"]
+      summary: "주문 가능 여부와 최신 금액 확인"
+      operationId: "previewOrder"
+      description: "재고 예약 없음. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
+      parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}]
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/OrderCheckout"}
+              examples:
+                normal: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null}}
+                soldOut: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 0, "salesStatus": "SOLD_OUT", "orderable": false, "reason": "SOLD_OUT"}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+  /v1/orders:
+    post:
+      tags: ["Orders"]
+      summary: "회원 단건 주문 생성"
+      operationId: "createOrder"
+      description: "서로 다른 회원은 같은 키를 독립 사용한다. 같은 회원의 키 재사용은 상품·수량·배송 정보·expectedTotalAmount의 값과 존재 여부까지 비교한다. 새 주문 저장과 재고 예약은 원자적이다."
+      parameters: [{"$ref": "#/components/parameters/OptionalIdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CreateOrderRequest"}
+            example: {"productId": 1, "quantity": 2, "buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000}
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "201":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Order"}
+              examples:
+                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+        "200":
+          description: "동일 회원·멱등키·입력 재전송"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Order"}
+              examples:
+                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}}
+    get:
+      tags: ["Orders"]
+      summary: "본인 주문 내역"
+      operationId: "listMyOrders"
+      description: "createdAt 및 id 내림차순. ADMIN도 본인 거래만 조회한다."
+      parameters: [{"name": "page", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0}}, {"name": "size", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}}]
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/OrderHistory"}
+              examples:
+                normal: {"value": {"items": [{"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}], "page": 0, "size": 20, "totalElements": 1, "totalPages": 1}}
+                empty: {"value": {"items": [], "page": 0, "size": 20, "totalElements": 0, "totalPages": 0}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+  /v1/orders/{orderNumber}:
+    parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
+    get:
+      tags: ["Orders"]
+      summary: "본인 주문 조회"
+      operationId: "getMyOrder"
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Order"}
+              examples:
+                normal: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+  /v1/orders/{orderNumber}/cancel:
+    parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
+    post:
+      tags: ["Orders"]
+      summary: "결제 전 본인 주문 취소"
+      operationId: "cancelMyOrder"
+      description: "진행 중·완료·취소·만료 주문은 409. 비회원 조회 비밀번호로 접근할 수 없다."
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "204": {"description": "취소 및 예약 재고 복구, 본문 없음"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+  /v1/orders/{orderNumber}/payments:
+    parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
+    post:
+      tags: ["Payments"]
+      summary: "본인 주문 결제 시작"
+      operationId: "startMyPayment"
+      description: "결제 결과는 Mock gateway가 결정한다. 응답은 요청 접수 시점 상태이며 이후 조회로 확인한다."
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/StartPaymentRequest"}
+            example: {}
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/PaymentAttempt"}
+              examples:
+                pending: {"value": {"paymentId": 1, "orderId": 1, "scenario": "INSTANT_SUCCESS", "status": "PROCESSING", "requestedAt": "2026-10-01T00:00:00Z", "resolvedAt": null, "scheduledResolveAt": "2026-10-01T00:00:00Z"}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+  /v1/orders/{orderNumber}/payments/{paymentId}:
+    parameters: [{"$ref": "#/components/parameters/OrderNumber"}, {"$ref": "#/components/parameters/PaymentId"}]
+    get:
+      tags: ["Payments"]
+      summary: "본인 주문의 결제 시도 조회"
+      operationId: "getMyPayment"
+      description: "다른 회원 주문 또는 다른 주문의 paymentId는 모두 404."
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/PaymentAttempt"}
+              examples:
+                pending: {"value": {"paymentId": 1, "orderId": 1, "scenario": "INSTANT_SUCCESS", "status": "PROCESSING", "requestedAt": "2026-10-01T00:00:00Z", "resolvedAt": null, "scheduledResolveAt": "2026-10-01T00:00:00Z"}}
+                success: {"value": {"paymentId": 1, "orderId": 1, "scenario": "INSTANT_SUCCESS", "status": "SUCCESS", "requestedAt": "2026-10-01T00:00:00Z", "resolvedAt": "2026-10-01T00:00:01Z", "scheduledResolveAt": "2026-10-01T00:00:00Z"}}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+  /v1/cart/items:
+    get:
+      tags: ["Cart"]
+      summary: "본인 장바구니 목록"
+      operationId: "listMyCart"
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"type": "array", "items": {"$ref": "#/components/schemas/CartItem"}}
+              examples:
+                normal: {"value": [{"id": 1, "productId": 1, "quantity": 2, "version": 0}]}
+                empty: {"value": []}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+    post:
+      tags: ["Cart"]
+      summary: "장바구니 상품 추가"
+      operationId: "addMyCartItem"
+      description: "상품당 한 항목. 중복 409. 담기는 재고 예약이나 가격 확정이 아니다."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/AddCartItemRequest"}
+            example: {"productId": 1, "quantity": 2}
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "201":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CartItem"}
+              examples:
+                created: {"value": {"id": 1, "productId": 1, "quantity": 2, "version": 0}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+  /v1/cart/items/{itemId}:
+    parameters: [{"$ref": "#/components/parameters/ItemId"}]
+    patch:
+      tags: ["Cart"]
+      summary: "본인 항목 절대 수량 변경"
+      operationId: "updateMyCartQuantity"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/QuantityRequest"}
+            example: {"quantity": 3}
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/CartItem"}
+              examples:
+                updated: {"value": {"id": 1, "productId": 1, "quantity": 3, "version": 1}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+    delete:
+      tags: ["Cart"]
+      summary: "본인 항목 삭제"
+      operationId: "deleteMyCartItem"
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "204": {"description": "삭제, 본문 없음"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+  /v1/cart/items/{itemId}/orders:
+    parameters: [{"$ref": "#/components/parameters/ItemId"}]
+    post:
+      tags: ["Cart"]
+      summary: "장바구니 한 항목 주문"
+      operationId: "orderMyCartItem"
+      description: "다중 항목 동시 결제는 지원하지 않는다. 선택 항목의 상품·수량 변경 및 현재 가격·판매·재고를 재검증한다. 주문·예약·선택 항목 삭제는 같은 트랜잭션이며 실패 시 항목을 유지한다. 성공 후 동일 키 재전송은 항목 삭제 뒤에도 원래 주문을 반환한다."
+      parameters: [{"$ref": "#/components/parameters/RequiredIdempotencyKey"}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CartOrderRequest"}
+            example: {"buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000}
+      x-required-roles: ["USER", "ADMIN"]
+      responses:
+        "201":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Order"}
+              examples:
+                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+        "200":
+          description: "동일 회원·멱등키·입력 재전송"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Order"}
+              examples:
+                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null}}
+  /v1/sales:
+    get:
+      tags: ["Internal Sales"]
+      summary: "서비스용 판매정보 배치 조회"
+      operationId: "getSalesForServices"
+      description: "Shopping/Live 전용. 미등록 상품은 결과에서 제외하며 순서 미보장. 파라미터 누락은 400, 빈 값은 빈 배열. 반복 또는 단일 쉼표 목록을 지원하며 중복 제거 후 100개 제한. 반복과 쉼표를 섞은 형식은 보장하지 않는다."
+      security: [{"ServiceToken": []}]
+      parameters: [{"name": "productIds", "in": "query", "required": true, "schema": {"type": "array", "items": {"type": "integer", "format": "int64"}}, "style": "form", "explode": true, "description": "정규 형식 productIds=1&productIds=2. 단일 productIds=1,2도 지원. uniqueItems/maxItems는 중복 제거 전 요청 배열에 적용하지 않는다."}]
+      x-allowed-callers: ["shopping", "live"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"type": "array", "items": {"$ref": "#/components/schemas/SalesLookup"}}
+              examples:
+                normal: {"value": [{"productId": 1, "salesId": 1, "price": 15000, "status": "ON_SALE", "available": 10}]}
+                empty: {"value": []}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+    post:
+      tags: ["Sales Admin"]
+      summary: "판매·초기 재고 등록"
+      operationId: "registerSales"
+      description: "Shopping 상품 존재 확인 후 READY로 등록한다."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/RegisterSalesRequest"}
+            example: {"productId": 1, "price": 15000, "initialStock": 10}
+      x-required-roles: ["ADMIN"]
+      responses:
+        "201":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Sales"}
+              examples:
+                created: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "READY", "version": 0}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+  /v1/sales/{id}/price:
+    parameters: [{"$ref": "#/components/parameters/SalesId"}]
+    patch:
+      tags: ["Sales Admin"]
+      summary: "판매가 변경"
+      operationId: "changeSalesPrice"
+      description: "클라이언트 version을 받지 않는다. 서버 트랜잭션 간 낙관적 충돌은 409."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/ChangePriceRequest"}
+            example: {"price": 16000}
+      x-required-roles: ["ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Sales"}
+              examples:
+                updated: {"value": {"id": 1, "productId": 1, "price": 16000, "status": "READY", "version": 1}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+  /v1/sales/{id}/stock:
+    parameters: [{"$ref": "#/components/parameters/SalesId"}]
+    get:
+      tags: ["Sales Admin"]
+      summary: "판매 재고 조회"
+      operationId: "getSalesStock"
+      x-required-roles: ["ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/SalesStock"}
+              examples:
+                normal: {"value": {"salesInfoId": 1, "available": 10, "reserved": 0}}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+    patch:
+      tags: ["Sales Admin"]
+      summary: "판매 가능 재고 증감"
+      operationId: "adjustSalesStock"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/AdjustStockRequest"}
+            example: {"delta": 5}
+      x-required-roles: ["ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/SalesStock"}
+              examples:
+                updated: {"value": {"salesInfoId": 1, "available": 15, "reserved": 0}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+  /v1/sales/{id}/status:
+    parameters: [{"$ref": "#/components/parameters/SalesId"}]
+    patch:
+      tags: ["Sales Admin"]
+      summary: "판매 상태 변경"
+      operationId: "changeSalesStatus"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/ChangeStatusRequest"}
+            example: {"status": "ON_SALE"}
+      x-required-roles: ["ADMIN"]
+      responses:
+        "200":
+          description: "성공"
+          content:
+            application/json:
+              schema: {"$ref": "#/components/schemas/Sales"}
+              examples:
+                updated: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "ON_SALE", "version": 1}}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
+  /v1/dev/payment-scenarios/{orderNumber}:
+    parameters: [{"$ref": "#/components/parameters/OrderNumber"}]
+    put:
+      tags: ["Local Test"]
+      summary: "본인 주문 Mock 결과 지정"
+      operationId: "setLocalPaymentScenario"
+      description: "local 또는 test 프로필 AND dev/prod 비활성 AND commerce.dev.payment-scenario.enabled=true에서만 제공. ADMIN도 본인 주문만 허용. 외부 dev/prod는 금지."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/SetPaymentScenarioRequest"}
+            example: {"scenario": "DELAYED_SUCCESS"}
+      x-required-roles: ["ADMIN"]
+      x-availability: "opt-in local/test only"
+      responses:
+        "204": {"description": "지정, 본문 없음"}
+        "400": {"$ref": "#/components/responses/BadRequest"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+    delete:
+      tags: ["Local Test"]
+      summary: "본인 주문 Mock 결과 지정 제거"
+      operationId: "clearLocalPaymentScenario"
+      description: "PUT과 동일한 opt-in 프로필 및 본인 ADMIN 조건."
+      x-required-roles: ["ADMIN"]
+      x-availability: "opt-in local/test only"
+      responses:
+        "204": {"description": "지정 제거, 본문 없음"}
+        "401": {"$ref": "#/components/responses/Unauthorized"}
+        "403": {"$ref": "#/components/responses/Forbidden"}
+        "404": {"$ref": "#/components/responses/NotFound"}
+components:
+  securitySchemes:
+    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api; USER/ADMIN. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    ServiceToken: {"type": "apiKey", "in": "header", "name": "X-Service-Token", "description": "대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다."}
+  parameters:
+    OrderNumber: {"name": "orderNumber", "in": "path", "required": true, "schema": {"type": "string"}}
+    PaymentId: {"name": "paymentId", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
+    ItemId: {"name": "itemId", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
+    SalesId: {"name": "id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
+    OptionalIdempotencyKey: {"name": "X-Idempotency-Key", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "회원별 멱등키. 공백만 허용하지 않으며 동일 키의 입력 변경은 409."}
+    RequiredIdempotencyKey: {"name": "X-Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "회원별 멱등키. 성공 후 카트 항목이 없어도 동일 입력 재전송은 기존 주문 200. 다른 입력은 409."}
+  responses:
+    BadRequest:
+      description: "요청 값·형식 또는 금액 범위 오류"
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            invalidRequest: {"value": {"success": false, "data": null, "error": {"code": "INVALID_REQUEST", "message": "잘못된 요청입니다.", "requestId": "request-001"}}}
+    Unauthorized:
+      description: "인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다."
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            unauthorized: {"value": {"success": false, "data": null, "error": {"code": "UNAUTHORIZED", "message": "인증이 필요합니다.", "requestId": "request-001"}}}
+    Forbidden:
+      description: "검증된 주체의 권한 부족 또는 비활성 개발 API"
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            forbidden: {"value": {"success": false, "data": null, "error": {"code": "FORBIDDEN", "message": "권한이 없습니다.", "requestId": "request-001"}}}
+    NotFound:
+      description: "대상이 없거나 다른 회원 소유. ADMIN도 동일한 본인 조건 적용."
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            notFound: {"value": {"success": false, "data": null, "error": {"code": "NOT_FOUND", "message": "대상을 찾을 수 없습니다.", "requestId": "request-001"}}}
+    Conflict:
+      description: "중복·상태·동시 수정·멱등키 입력 충돌"
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            conflict: {"value": {"success": false, "data": null, "error": {"code": "CONFLICT", "message": "요청이 현재 상태와 충돌합니다.", "requestId": "request-001"}}}
+            insufficientStock: {"value": {"success": false, "data": null, "error": {"code": "CONFLICT", "message": "재고가 부족합니다.", "requestId": "request-001"}}}
+            amountChanged: {"value": {"success": false, "data": null, "error": {"code": "CONFLICT", "message": "주문 금액이 변경되었습니다.", "requestId": "request-001"}}}
+            duplicateCartItem: {"value": {"success": false, "data": null, "error": {"code": "CONFLICT", "message": "이미 장바구니에 있는 상품입니다. 수량을 변경해 주세요.", "requestId": "request-001"}}}
+    ShoppingUnavailable:
+      description: "Shopping HTTP 오류·타임아웃·응답 계약 위반. 상품 미존재와 구분한다."
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            shoppingUnavailable: {"value": {"success": false, "data": null, "error": {"code": "SHOPPING_UNAVAILABLE", "message": "상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "requestId": "request-001"}}}
+    InternalError:
+      description: "서버 내부 오류"
+      content:
+        application/json:
+          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
+          examples:
+            internalError: {"value": {"success": false, "data": null, "error": {"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "requestId": "request-001"}}}
+  schemas:
+    CreateOrderRequest:
+      type: "object"
+      required: ["productId", "quantity", "buyerName", "buyerPhone"]
+      properties:
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+        buyerName: {"type": "string", "minLength": 1, "maxLength": 64}
+        buyerPhone: {"type": "string", "pattern": "^[0-9-]{9,32}$", "writeOnly": true}
+        expectedTotalAmount: {"type": ["integer", "null"], "format": "int64", "minimum": 1}
+      description: "소유자는 JWT sub이다. 비회원 조회 비밀번호는 지원하지 않는다. expectedTotalAmount는 직접 주문에서 선택이며 보내면 최신 금액과 일치해야 한다."
+    CartOrderRequest:
+      type: "object"
+      required: ["buyerName", "buyerPhone", "expectedTotalAmount"]
+      properties:
+        buyerName: {"type": "string", "minLength": 1, "maxLength": 64}
+        buyerPhone: {"type": "string", "pattern": "^[0-9-]{9,32}$", "writeOnly": true}
+        expectedTotalAmount: {"type": "integer", "format": "int64", "minimum": 1}
+      description: "선택 항목 하나를 단건 주문으로 전환한다. expectedTotalAmount 필수."
+    AddCartItemRequest:
+      type: "object"
+      required: ["productId", "quantity"]
+      properties:
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+    QuantityRequest:
+      type: "object"
+      required: ["quantity"]
+      properties:
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+      description: "증감량이 아닌 최종 절대 수량."
+    CartItem:
+      type: "object"
+      required: ["id", "productId", "quantity", "version"]
+      properties:
+        id: {"type": "integer", "format": "int64", "minimum": 1}
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+        version: {"type": "integer", "format": "int64", "minimum": 0}
+    Order:
+      type: "object"
+      required: ["orderNumber", "productName", "quantity", "unitPrice", "totalAmount", "status", "buyerName", "createdAt", "expiresAt", "cancelledAt"]
+      properties:
+        orderNumber: {"type": "string"}
+        productName: {"type": "string"}
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+        unitPrice: {"type": "integer", "format": "int64", "minimum": 1}
+        totalAmount: {"type": "integer", "format": "int64", "minimum": 1}
+        status: {"type": "string", "enum": ["PENDING_PAYMENT", "PAYMENT_CONFIRMING", "PAID", "FAILED", "CANCELLED", "EXPIRED"]}
+        buyerName: {"type": "string"}
+        createdAt: {"type": "string", "format": "date-time"}
+        expiresAt: {"type": ["string", "null"], "format": "date-time"}
+        cancelledAt: {"type": ["string", "null"], "format": "date-time"}
+    OrderHistory:
+      type: "object"
+      required: ["items", "page", "size", "totalElements", "totalPages"]
+      properties:
+        items: {"type": "array", "items": {"$ref": "#/components/schemas/Order"}}
+        page: {"type": "integer", "format": "int64", "minimum": 0}
+        size: {"type": "integer", "minimum": 1, "maximum": 100}
+        totalElements: {"type": "integer", "format": "int64", "minimum": 0}
+        totalPages: {"type": "integer", "format": "int64", "minimum": 0}
+    OrderCheckout:
+      type: "object"
+      required: ["productId", "salesId", "productName", "unitPrice", "quantity", "totalAmount", "available", "salesStatus", "orderable", "reason"]
+      properties:
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        salesId: {"type": "integer", "format": "int64", "minimum": 1}
+        productName: {"type": "string"}
+        unitPrice: {"type": "integer", "format": "int64", "minimum": 1}
+        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+        totalAmount: {"type": "integer", "format": "int64", "minimum": 1}
+        available: {"type": "integer", "format": "int64", "minimum": 0}
+        salesStatus: {"$ref": "#/components/schemas/SalesStatus"}
+        orderable: {"type": "boolean"}
+        reason: {"type": ["string", "null"], "enum": ["NOT_ON_SALE", "SOLD_OUT", "EXCEEDS_STOCK", null]}
+    PaymentAttempt:
+      type: "object"
+      required: ["paymentId", "orderId", "scenario", "status", "requestedAt", "resolvedAt", "scheduledResolveAt"]
+      properties:
+        paymentId: {"type": "integer", "format": "int64", "minimum": 1}
+        orderId: {"type": "integer", "format": "int64", "minimum": 1}
+        scenario: {"$ref": "#/components/schemas/PaymentScenario", "readOnly": true}
+        status: {"type": "string", "enum": ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "TIMEOUT"]}
+        requestedAt: {"type": "string", "format": "date-time"}
+        resolvedAt: {"type": ["string", "null"], "format": "date-time"}
+        scheduledResolveAt: {"type": ["string", "null"], "format": "date-time"}
+      description: "현재 결제 게이트웨이는 Mock이다. scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
+    PaymentScenario:
+      type: "string"
+      enum: ["INSTANT_SUCCESS", "INSTANT_FAIL", "DELAYED_SUCCESS", "DELAYED_FAIL"]
+    SetPaymentScenarioRequest:
+      type: "object"
+      required: ["scenario"]
+      properties:
+        scenario: {"$ref": "#/components/schemas/PaymentScenario"}
+    StartPaymentRequest:
+      type: [object, 'null']
+      maxProperties: 0
+      additionalProperties: false
+      description: "본문 생략, JSON null 또는 빈 객체만 허용. scenario 등 필드가 하나라도 있으면 400."
+    RegisterSalesRequest:
+      type: "object"
+      required: ["productId", "price", "initialStock"]
+      properties:
+        productId: {"type": "integer", "format": "int64"}
+        price: {"type": "integer", "format": "int64", "minimum": 1}
+        initialStock: {"type": "integer", "format": "int32", "minimum": 0, "maximum": 2147483647}
+    ChangePriceRequest:
+      type: "object"
+      required: ["price"]
+      properties:
+        price: {"type": "integer", "format": "int64", "minimum": 1}
+    AdjustStockRequest:
+      type: "object"
+      required: ["delta"]
+      properties:
+        delta: {"type": "integer", "format": "int32", "minimum": -2147483648, "maximum": 2147483647}
+      description: "양수 추가·음수 감소·0 허용. 결과 available이 음수가 되면 409."
+    ChangeStatusRequest:
+      type: "object"
+      required: ["status"]
+      properties:
+        status: {"type": "string", "enum": ["ON_SALE", "PRIVATE"]}
+      description: "READY/SOLD_OUT은 관리자 입력 불가(400); 재고에 따른 SOLD_OUT은 시스템이 결정한다."
+    SalesStatus:
+      type: "string"
+      enum: ["READY", "ON_SALE", "SOLD_OUT", "PRIVATE"]
+    Sales:
+      type: "object"
+      required: ["id", "productId", "price", "status", "version"]
+      properties:
+        id: {"type": "integer", "format": "int64", "minimum": 1}
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        price: {"type": "integer", "format": "int64", "minimum": 1}
+        status: {"$ref": "#/components/schemas/SalesStatus"}
+        version: {"type": "integer", "format": "int64", "minimum": 0}
+    SalesStock:
+      type: "object"
+      required: ["salesInfoId", "available", "reserved"]
+      properties:
+        salesInfoId: {"type": "integer", "format": "int64", "minimum": 1}
+        available: {"type": "integer", "format": "int64", "minimum": 0}
+        reserved: {"type": "integer", "format": "int64", "minimum": 0}
+    SalesLookup:
+      type: "object"
+      required: ["productId", "salesId", "price", "status", "available"]
+      properties:
+        productId: {"type": "integer", "format": "int64", "minimum": 1}
+        salesId: {"type": "integer", "format": "int64", "minimum": 1}
+        price: {"type": "integer", "format": "int64", "minimum": 1}
+        status: {"$ref": "#/components/schemas/SalesStatus"}
+        available: {"type": "integer", "format": "int64", "minimum": 0}
+    ApiError:
+      type: "object"
+      required: ["code", "message", "requestId"]
+      properties:
+        code: {"type": "string"}
+        message: {"type": "string"}
+        requestId: {"type": ["string", "null"]}
+    ErrorEnvelope:
+      type: "object"
+      required: ["success", "data", "error"]
+      properties:
+        success: {"type": "boolean", "const": false}
+        data: {"type": "null"}
+        error: {"$ref": "#/components/schemas/ApiError"}
