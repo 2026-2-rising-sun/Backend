@@ -5,13 +5,13 @@ info:
   license: { name: UNLICENSED }
   description: |-
     Live 방송 API. 컨트롤러 경로는 `/v1` 이며 서비스가 직접 JWT를 검증한다.
-    
+
     - 성공 응답은 공통 `ApiResponse` 봉투를 쓰고 DELETE 성공은 204 무본문이다.
     - 오류는 입력 400 / 미존재 404 / 상태·version·중복 409 / 외부 장애 503 으로 구분한다.
     - 공개 응답에는 채널 ARN·등록 키·fingerprint·송출키·자격증명을 넣지 않는다.
     - 공개 방송 조회·입장은 비회원 허용. 생성·수정·시작·종료·상품 연결 관리에는 ADMIN 역할이 필요하다.
     - 현재 관리 모델은 공통 ADMIN 권한이다. 판매자 역할이나 방송별 판매자 소유권을 가정하지 않는다.
-    
+
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 
 security: [{ BearerAuth: [] }]

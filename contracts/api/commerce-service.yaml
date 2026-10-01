@@ -8,7 +8,7 @@ info:
     USER와 ADMIN의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
     정상 응답은 봉투 없는 DTO/배열, 오류만 ApiResponse 봉투이다. 204는 본문 없음.
     현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
-    
+
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 security: [{ BearerAuth: [] }]
 servers:

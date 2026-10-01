@@ -9,7 +9,7 @@ info:
     JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 ADMIN이 필요하다.
     공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
     현재 상품 관리 모델은 공통 ADMIN 권한이며 판매자 역할이나 상품별 판매자 소유권을 가정하지 않는다.
-    
+
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 security: [{ BearerAuth: [] }]
 servers:

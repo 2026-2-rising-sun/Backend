@@ -309,7 +309,7 @@ components:
           examples:
             unauthorized: {"value": {"success": false, "data": null, "error": {"code": "UNAUTHORIZED", "message": "인증이 필요합니다.", "requestId": "request-001"}}}
     NotFound:
-      description: "JWT의 회원 레코드가 없음"
+      description: "대상 회원 레코드가 없음"
       content:
         application/json:
           schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
