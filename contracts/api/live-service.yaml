@@ -3,7 +3,7 @@ info:
   title: Live Service API
   version: 2.0.0
   license: { name: UNLICENSED }
-  description: |
+  description: |-
     Live 방송 API. 컨트롤러 경로는 `/v1` 이며 서비스가 직접 JWT를 검증한다.
 
     - 성공 응답은 공통 `ApiResponse` 봉투를 쓰고 DELETE 성공은 204 무본문이다.
@@ -11,6 +11,8 @@ info:
     - 공개 응답에는 채널 ARN·등록 키·fingerprint·송출키·자격증명을 넣지 않는다.
     - 공개 방송 조회·입장은 비회원 허용. 생성·수정·시작·종료·상품 연결 관리에는 ADMIN 역할이 필요하다.
     - 현재 관리 모델은 공통 ADMIN 권한이다. 판매자 역할이나 방송별 판매자 소유권을 가정하지 않는다.
+
+    JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 
 security: [{ BearerAuth: [] }]
 
@@ -74,6 +76,8 @@ paths:
                   code: CONFLICT
                   message: 같은 등록 키에 다른 요청을 사용할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     get:
       x-required-roles: [ADMIN]
       summary: 관리 방송 목록 (#60)
@@ -98,6 +102,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BroadcastPageEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/admin/broadcasts/{id}:
     parameters:
@@ -116,6 +122,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BroadcastEnvelope' }
         '404': { $ref: '#/components/responses/NotFound' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
     patch:
       x-required-roles: [ADMIN]
       summary: 방송 기본정보 수정 (#59)
@@ -148,6 +156,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/admin/broadcasts/{id}/start:
     post:
@@ -212,6 +222,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/admin/broadcasts/{id}/products:
     parameters:
@@ -301,6 +313,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/admin/broadcasts/{id}/products/{linkId}:
     delete:
@@ -341,6 +355,8 @@ paths:
                   code: CONFLICT
                   message: 진행 중 방송의 마지막 연결 상품은 해제할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/broadcasts:
     get:
@@ -362,6 +378,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PublicBroadcastPageEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/broadcasts/{id}:
     get:
@@ -397,6 +415,8 @@ paths:
                   videoStatus: READY
                   createdAt: '2026-09-22T05:00:00Z'
         '404': { $ref: '#/components/responses/NotFound' }
+        "503":
+          $ref: "#/components/responses/AuthUnavailable"
 
   /v1/broadcasts/{id}/products:
     get:
@@ -451,7 +471,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api. ADMIN API는 ADMIN 역할 필수.
+      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
   parameters:
     BroadcastId:
       name: id
@@ -539,6 +559,21 @@ components:
               code: SERVICE_UNAVAILABLE
               message: 상품 정보를 조회할 수 없습니다.
               requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+    AuthUnavailable:
+      description: JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          examples:
+            authUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 인증 상태를 확인할 수 없습니다.
+                  requestId: request-001
 
   schemas:
     BroadcastStatus:
