@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -34,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>시나리오 B: 취소 요청과 결제 시작 시뮬레이션(transitionStatus) 동시 → 정확히 한쪽만 성공.
  */
 @SpringBootTest
-class OrderCancellationConcurrencyTest {
+class OrderCancellationConcurrencyTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private OrderService orderService;
@@ -49,13 +48,10 @@ class OrderCancellationConcurrencyTest {
     private SalesStockJpaRepository salesStockRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private PlatformTransactionManager transactionManager;
 
     private String orderNumber;
-    private String rawPassword;
+    private String memberId;
     private Long salesInfoId;
 
     @BeforeEach
@@ -70,7 +66,7 @@ class OrderCancellationConcurrencyTest {
         salesStockRepository.save(new SalesStock(salesInfoId, 4, 1));
 
         orderNumber = "OD-CANCEL-TEST-1";
-        rawPassword = "secret";
+        memberId = "11111111-1111-4111-8111-111111111111";
         Order order = new Order(
             orderNumber,
             salesInfoId,
@@ -78,7 +74,7 @@ class OrderCancellationConcurrencyTest {
             10_000L,
             "홍길동",
             "010-1234-5678",
-            passwordEncoder.encode(rawPassword),
+            "11111111-1111-4111-8111-111111111111",
             "테스트 상품",
             null,
             Instant.now().plusSeconds(900));
@@ -106,7 +102,7 @@ class OrderCancellationConcurrencyTest {
             executor.submit(() -> {
                 try {
                     startGate.await();
-                    orderService.cancelBeforePayment(orderNumber, rawPassword);
+                    orderService.cancelBeforePayment(orderNumber, memberId);
                     successCount.incrementAndGet();
                 } catch (OrderCannotBeCancelledException e) {
                     conflictCount.incrementAndGet();
@@ -150,7 +146,7 @@ class OrderCancellationConcurrencyTest {
         executor.submit(() -> {
             try {
                 startGate.await();
-                orderService.cancelBeforePayment(orderNumber, rawPassword);
+                orderService.cancelBeforePayment(orderNumber, memberId);
                 cancelSuccess.incrementAndGet();
             } catch (OrderCannotBeCancelledException e) {
                 // OK 상대편 이겼음

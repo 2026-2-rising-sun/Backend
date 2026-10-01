@@ -24,7 +24,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -36,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 확정되는지 확인. 재기동으로 in-process 스케줄러 콜백이 유실된 상황을 재현.
  */
 @SpringBootTest
-class PaymentDelayReconcilerTest {
+class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private PaymentDelayReconciler reconciler;
@@ -57,9 +56,6 @@ class PaymentDelayReconcilerTest {
     private SalesStockJpaRepository salesStockRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private PlatformTransactionManager transactionManager;
 
     private Long salesInfoId;
@@ -78,7 +74,7 @@ class PaymentDelayReconcilerTest {
 
         Order order = new Order(
             "OD-RECON-1", salesInfoId, 1, 10_000L, "홍길동", "010-1234-5678",
-            passwordEncoder.encode("secret"), "테스트", null, Instant.now().plusSeconds(900));
+            "11111111-1111-4111-8111-111111111111", "테스트", null, Instant.now().plusSeconds(900));
         // Order 를 PAYMENT_CONFIRMING 상태로 (결제 시작 완료 후) 세팅
         Order saved = orderRepository.save(order);
         orderId = saved.getId();

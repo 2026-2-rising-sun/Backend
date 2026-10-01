@@ -16,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -26,9 +25,6 @@ class OrderServiceTest {
 
     @Mock
     private SalesService salesService;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private OrderService orderService;
@@ -41,57 +37,53 @@ class OrderServiceTest {
             5_000L,
             "홍길동",
             "010-1234-5678",
-            "hashed-password",
+            "11111111-1111-4111-8111-111111111111",
             "테스트 상품",
             null,
             Instant.parse("2026-09-20T15:00:00Z"));
     }
 
-    // ----- findByOrderNumberAndPassword (주문 3) -----
+    // ----- findByOrderNumberAndMemberId (주문 3) -----
 
     @Test
-    void findByOrderNumberAndPassword_존재하고_비밀번호_일치시_반환() {
+    void findByOrderNumberAndMemberId_존재하고_회원_일치시_반환() {
         Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
 
         Order result = orderService
-            .findByOrderNumberAndPassword("OD-20260920-000001", "secret");
+            .findByOrderNumberAndMemberId("OD-20260920-000001", "11111111-1111-4111-8111-111111111111");
 
         assertThat(result).isSameAs(order);
     }
 
     @Test
-    void findByOrderNumberAndPassword_주문번호_없으면_OrderNotFoundException() {
-        given(orderRepository.findByOrderNumber("OD-NOT-EXIST"))
+    void findByOrderNumberAndMemberId_주문번호_없으면_OrderNotFoundException() {
+        given(orderRepository.findByOrderNumberAndMemberId("OD-NOT-EXIST", "11111111-1111-4111-8111-111111111111"))
             .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService
-            .findByOrderNumberAndPassword("OD-NOT-EXIST", "secret"))
+            .findByOrderNumberAndMemberId("OD-NOT-EXIST", "11111111-1111-4111-8111-111111111111"))
             .isInstanceOf(OrderNotFoundException.class);
     }
 
     @Test
-    void findByOrderNumberAndPassword_비밀번호_불일치도_OrderNotFoundException() {
-        Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
-            .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("wrong", "hashed-password")).willReturn(false);
+    void findByOrderNumberAndMemberId_타인_주문도_OrderNotFoundException() {
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
+            .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService
-            .findByOrderNumberAndPassword("OD-20260920-000001", "wrong"))
+            .findByOrderNumberAndMemberId("OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
             .isInstanceOf(OrderNotFoundException.class);
     }
 
     @Test
-    void findByOrderNumberAndPassword_null_비밀번호도_OrderNotFoundException() {
-        Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
-            .willReturn(Optional.of(order));
+    void findByOrderNumberAndMemberId_null_회원도_OrderNotFoundException() {
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", null))
+            .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService
-            .findByOrderNumberAndPassword("OD-20260920-000001", null))
+            .findByOrderNumberAndMemberId("OD-20260920-000001", null))
             .isInstanceOf(OrderNotFoundException.class);
     }
 
@@ -100,54 +92,49 @@ class OrderServiceTest {
     @Test
     void cancelBeforePayment_성공하면_취소_UPDATE와_재고복구_UPDATE_모두_호출() {
         Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
         given(orderRepository.cancelOrder(order.getId())).willReturn(1);
 
-        orderService.cancelBeforePayment("OD-20260920-000001", "secret");
+        orderService.cancelBeforePayment("OD-20260920-000001", "11111111-1111-4111-8111-111111111111");
 
         verify(orderRepository).cancelOrder(order.getId());
         verify(salesService).restoreReserved(order.getSalesInfoId(), order.getQuantity());
     }
 
     @Test
-    void cancelBeforePayment_비밀번호_불일치시_OrderNotFoundException() {
-        Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
-            .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("wrong", "hashed-password")).willReturn(false);
+    void cancelBeforePayment_타인_주문이면_OrderNotFoundException() {
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
+            .willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService
-            .cancelBeforePayment("OD-20260920-000001", "wrong"))
+            .cancelBeforePayment("OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
             .isInstanceOf(OrderNotFoundException.class);
     }
 
     @Test
     void cancelBeforePayment_상태_전이_실패시_OrderCannotBeCancelledException() {
         Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
         given(orderRepository.cancelOrder(order.getId())).willReturn(0);
 
         assertThatThrownBy(() -> orderService
-            .cancelBeforePayment("OD-20260920-000001", "secret"))
+            .cancelBeforePayment("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .isInstanceOf(OrderCannotBeCancelledException.class);
     }
 
     @Test
     void cancelBeforePayment_재고_복구_실패시_IllegalStateException() {
         Order order = sampleOrder();
-        given(orderRepository.findByOrderNumber("OD-20260920-000001"))
+        given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .willReturn(Optional.of(order));
-        given(passwordEncoder.matches("secret", "hashed-password")).willReturn(true);
         given(orderRepository.cancelOrder(order.getId())).willReturn(1);
         doThrow(new IllegalStateException("stock restoration failed"))
             .when(salesService).restoreReserved(order.getSalesInfoId(), order.getQuantity());
 
         assertThatThrownBy(() -> orderService
-            .cancelBeforePayment("OD-20260920-000001", "secret"))
+            .cancelBeforePayment("OD-20260920-000001", "11111111-1111-4111-8111-111111111111"))
             .isInstanceOf(IllegalStateException.class);
     }
 }

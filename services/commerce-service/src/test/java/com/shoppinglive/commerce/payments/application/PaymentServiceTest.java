@@ -47,13 +47,16 @@ class PaymentServiceTest {
     @Mock
     private MockPaymentEngine mockPaymentEngine;
 
+    @Mock
+    private org.springframework.beans.factory.ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
+
     @InjectMocks
     private PaymentService paymentService;
 
     private Order sampleOrder() {
         Order order = new Order(
             "OD-PAY-1", 10L, 1, 10_000L, "홍길동", "010-1234-5678",
-            "hashed", "테스트", null, Instant.now().plusSeconds(900));
+            "11111111-1111-4111-8111-111111111111", "테스트", null, Instant.now().plusSeconds(900));
         ReflectionTestUtils.setField(order, "id", 1L);
         return order;
     }
@@ -70,7 +73,7 @@ class PaymentServiceTest {
     @Test
     void startPayment_성공하면_저장하고_엔진에_예약() {
         Order order = sampleOrder();
-        given(orderService.findByOrderNumberAndPassword("OD-PAY-1", "secret")).willReturn(order);
+        given(orderService.findByOrderNumberAndMemberId("OD-PAY-1", "11111111-1111-4111-8111-111111111111")).willReturn(order);
         given(orderRepository.transitionStatus(order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"))
             .willReturn(1);
         given(paymentAttemptRepository.save(any(PaymentAttempt.class)))
@@ -80,7 +83,7 @@ class PaymentServiceTest {
                 return a;
             });
 
-        paymentService.startPayment("OD-PAY-1", "secret", PaymentScenario.INSTANT_SUCCESS);
+        paymentService.startPayment("OD-PAY-1", "11111111-1111-4111-8111-111111111111");
 
         verify(mockPaymentEngine).schedule(eq(100L), eq(PaymentScenario.INSTANT_SUCCESS));
     }
@@ -88,12 +91,12 @@ class PaymentServiceTest {
     @Test
     void startPayment_전이_실패시_OrderNotEligibleForPaymentException() {
         Order order = sampleOrder();
-        given(orderService.findByOrderNumberAndPassword("OD-PAY-1", "secret")).willReturn(order);
+        given(orderService.findByOrderNumberAndMemberId("OD-PAY-1", "11111111-1111-4111-8111-111111111111")).willReturn(order);
         given(orderRepository.transitionStatus(order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"))
             .willReturn(0);
 
         assertThatThrownBy(() -> paymentService
-            .startPayment("OD-PAY-1", "secret", PaymentScenario.INSTANT_SUCCESS))
+            .startPayment("OD-PAY-1", "11111111-1111-4111-8111-111111111111"))
             .isInstanceOf(OrderNotEligibleForPaymentException.class);
     }
 

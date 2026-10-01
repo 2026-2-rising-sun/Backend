@@ -7,6 +7,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import jakarta.persistence.UniqueConstraint;
+import java.util.UUID;
 import java.time.Instant;
 
 /**
@@ -15,7 +17,7 @@ import java.time.Instant;
  * <p>P1 은 단건 상품 주문 스코프라 {@code order_items} 없이 {@code sales_info_id} 로 참조한다.
  *
  * <p><b>불변 필드 (updatable=false):</b> orderNumber · salesInfoId · quantity · unitPrice ·
- * totalAmount · productNameSnapshot · buyerName · buyerPhone · lookupPasswordHash ·
+ * totalAmount · productNameSnapshot · buyerName · buyerPhone · memberId ·
  * idempotencyKey · expiresAt. 주문 생성 시점의 스냅샷이며 이후 어떤 유스케이스도 이를
  * 바꾸지 않는다 (상품 3 · 판매 2 등 후속 변경은 기존 주문에 영향 없음).
  *
@@ -23,7 +25,8 @@ import java.time.Instant;
  * UPDATE 로 수행한다.
  */
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", uniqueConstraints = @UniqueConstraint(
+    name = "uk_orders_member_idempotency", columnNames = {"member_id", "idempotency_key"}))
 public class Order extends BaseEntity {
 
     @Column(name = "order_number", nullable = false, unique = true, updatable = false, length = 64)
@@ -51,14 +54,20 @@ public class Order extends BaseEntity {
     @Column(name = "buyer_phone", nullable = false, updatable = false, length = 32)
     private String buyerPhone;
 
-    @Column(name = "lookup_password_hash", nullable = false, updatable = false, length = 255)
-    private String lookupPasswordHash;
+    @Column(name = "member_id", nullable = false, updatable = false, length = 36)
+    private String memberId;
 
     @Column(name = "product_name_snapshot", nullable = false, updatable = false, length = 255)
     private String productNameSnapshot;
 
     @Column(name = "idempotency_key", updatable = false, length = 64)
     private String idempotencyKey;
+
+    @Column(name = "source_cart_item_id", updatable = false)
+    private Long sourceCartItemId;
+
+    @Column(name = "requested_total_amount", updatable = false)
+    private Long requestedTotalAmount;
 
     @Column(name = "expires_at", updatable = false)
     private Instant expiresAt;
@@ -87,10 +96,17 @@ public class Order extends BaseEntity {
         long unitPrice,
         String buyerName,
         String buyerPhone,
-        String lookupPasswordHash,
+        String memberId,
         String productNameSnapshot,
         String idempotencyKey,
         Instant expiresAt) {
+        this(orderNumber, salesInfoId, quantity, unitPrice, buyerName, buyerPhone, memberId,
+            productNameSnapshot, idempotencyKey, expiresAt, null, null);
+    }
+
+    public Order(String orderNumber, Long salesInfoId, int quantity, long unitPrice, String buyerName,
+        String buyerPhone, String memberId, String productNameSnapshot, String idempotencyKey,
+        Instant expiresAt, Long sourceCartItemId, Long requestedTotalAmount) {
         if (orderNumber == null || orderNumber.isBlank()) {
             throw new IllegalArgumentException("orderNumber must not be blank");
         }
@@ -109,8 +125,8 @@ public class Order extends BaseEntity {
         if (buyerPhone == null || buyerPhone.isBlank()) {
             throw new IllegalArgumentException("buyerPhone must not be blank");
         }
-        if (lookupPasswordHash == null || lookupPasswordHash.isBlank()) {
-            throw new IllegalArgumentException("lookupPasswordHash must not be blank");
+        if (memberId == null || memberId.isBlank()) {
+            throw new IllegalArgumentException("memberId must not be blank");
         }
         if (productNameSnapshot == null || productNameSnapshot.isBlank()) {
             throw new IllegalArgumentException("productNameSnapshot must not be blank");
@@ -119,11 +135,13 @@ public class Order extends BaseEntity {
         this.salesInfoId = salesInfoId;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
-        this.totalAmount = unitPrice * quantity;
+        this.totalAmount = OrderAmounts.total(unitPrice, quantity);
         this.status = OrderStatus.PENDING_PAYMENT;
         this.buyerName = buyerName;
         this.buyerPhone = buyerPhone;
-        this.lookupPasswordHash = lookupPasswordHash;
+        this.memberId = UUID.fromString(memberId).toString();
+        this.sourceCartItemId = sourceCartItemId;
+        this.requestedTotalAmount = requestedTotalAmount;
         this.productNameSnapshot = productNameSnapshot;
         this.idempotencyKey = idempotencyKey;
         this.expiresAt = expiresAt;
@@ -161,8 +179,14 @@ public class Order extends BaseEntity {
         return buyerPhone;
     }
 
-    public String getLookupPasswordHash() {
-        return lookupPasswordHash;
+    public String getMemberId() {
+        return memberId;
+    }
+
+    public Long getRequestedTotalAmount() { return requestedTotalAmount; }
+
+    public Long getSourceCartItemId() {
+        return sourceCartItemId;
     }
 
     public String getProductNameSnapshot() {

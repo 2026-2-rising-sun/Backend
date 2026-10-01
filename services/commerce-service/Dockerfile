@@ -27,12 +27,11 @@ COPY services/notification-service/build.gradle.kts services/notification-servic
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :services:commerce-service:dependencies --configuration runtimeClasspath
 
-# commerce-service가 실제로 의존하는 모듈 소스만 복사한다(common-security 등 의존하지 않는
-# 모듈은 build.gradle.kts만 있으면 되고 전체 소스가 필요 없다). 이렇게 하면 이 서비스가 안 쓰는
-# 모듈이 바뀌었을 때 이 레이어의 캐시가 불필요하게 깨지지 않는다.
+# commerce-service가 사용하는 모듈 소스만 복사한다.
 COPY contracts/events contracts/events
 COPY libs/common-core libs/common-core
 COPY libs/common-web libs/common-web
+COPY libs/common-security libs/common-security
 COPY libs/common-persistence libs/common-persistence
 COPY libs/common-resilience libs/common-resilience
 COPY libs/common-kafka libs/common-kafka

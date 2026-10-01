@@ -29,7 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  * 만든다.
  */
 @SpringBootTest
-class SalesStockConcurrencyTest {
+class SalesStockConcurrencyTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     @Autowired
     private SalesJpaRepository salesRepository;

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.shoppinglive.commerce.orders.domain.Order;
+import com.shoppinglive.commerce.cart.infrastructure.CartItemRepository;
 import com.shoppinglive.commerce.orders.domain.OrderStatus;
 import com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository;
 import com.shoppinglive.commerce.sales.application.InsufficientStockException;
@@ -35,7 +36,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -64,7 +64,7 @@ class OrderCreationServiceTest {
     private OrderNumberGenerator orderNumberGenerator;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private CartItemRepository cartItems;
 
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -75,12 +75,12 @@ class OrderCreationServiceTest {
     void setUp() {
         orderCreationService = new OrderCreationService(
             orderRepository, salesRepository, salesStockRepository, shoppingClient,
-            orderNumberGenerator, passwordEncoder, transactionTemplate, Duration.ofMinutes(15));
+            orderNumberGenerator, cartItems, transactionTemplate, Duration.ofMinutes(15));
     }
 
     private CreateOrderCommand command(int quantity, Long expectedTotalAmount) {
         return new CreateOrderCommand(
-            PRODUCT_ID, quantity, "홍길동", "010-1234-5678", "secret", expectedTotalAmount);
+            PRODUCT_ID, quantity, "홍길동", "010-1234-5678", "11111111-1111-4111-8111-111111111111", expectedTotalAmount);
     }
 
     @SuppressWarnings("unchecked")
@@ -107,7 +107,6 @@ class OrderCreationServiceTest {
         given(salesStockRepository.findById(SALES_ID))
             .willReturn(Optional.of(new SalesStock(SALES_ID, remainingAvailable, 1)));
         given(orderNumberGenerator.generate()).willReturn("OD-20260922-000001");
-        given(passwordEncoder.encode("secret")).willReturn("hashed");
         given(orderRepository.saveAndFlush(any(Order.class)))
             .willAnswer(invocation -> invocation.getArgument(0));
     }
@@ -151,10 +150,10 @@ class OrderCreationServiceTest {
     }
 
     /**
-     * 조회 비밀번호는 평문으로 저장하지 않는다.
+     * 검증된 회원 식별자를 주문에 저장한다.
      */
     @Test
-    void create_조회_비밀번호는_해시로_저장한다() {
+    void create_회원_소유권을_저장한다() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -162,8 +161,7 @@ class OrderCreationServiceTest {
 
         Order order = orderCreationService.create(command(1, null), null).order();
 
-        assertThat(order.getLookupPasswordHash()).isEqualTo("hashed");
-        assertThat(order.getLookupPasswordHash()).isNotEqualTo("secret");
+        assertThat(order.getMemberId()).isEqualTo("11111111-1111-4111-8111-111111111111");
     }
 
     /**
@@ -263,7 +261,6 @@ class OrderCreationServiceTest {
         salesExists(SalesStatus.ON_SALE);
         given(salesStockRepository.reserve(SALES_ID, 5)).willReturn(0);
         given(orderNumberGenerator.generate()).willReturn("OD-20260922-000001");
-        given(passwordEncoder.encode("secret")).willReturn("hashed");
         given(orderRepository.saveAndFlush(any(Order.class)))
             .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -295,7 +292,6 @@ class OrderCreationServiceTest {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
-        given(passwordEncoder.encode("secret")).willReturn("hashed");
 
         assertThatThrownBy(() -> orderCreationService.create(command(2, 25_000L), null))
             .isInstanceOf(OrderAmountMismatchException.class)
@@ -322,8 +318,7 @@ class OrderCreationServiceTest {
         Order existing = existingOrder();
         given(salesRepository.findById(SALES_ID))
             .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
-        given(passwordEncoder.matches("secret", "hashed")).willReturn(true);
-        given(orderRepository.findByIdempotencyKey("key-1")).willReturn(Optional.of(existing));
+        given(orderRepository.findByMemberIdAndIdempotencyKey("11111111-1111-4111-8111-111111111111", "key-1")).willReturn(Optional.of(existing));
 
         OrderCreationResult result = orderCreationService.create(command(2, null), "key-1");
 
@@ -340,12 +335,10 @@ class OrderCreationServiceTest {
     @Test
     void create_멱등키_UNIQUE_충돌시_기존_주문으로_연결한다() {
         productExists();
-        given(passwordEncoder.encode("secret")).willReturn("hashed");
         Order existing = existingOrder();
         given(salesRepository.findById(SALES_ID))
             .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
-        given(passwordEncoder.matches("secret", "hashed")).willReturn(true);
-        given(orderRepository.findByIdempotencyKey("key-1"))
+        given(orderRepository.findByMemberIdAndIdempotencyKey("11111111-1111-4111-8111-111111111111", "key-1"))
             .willReturn(Optional.empty())
             .willReturn(Optional.of(existing));
         given(transactionTemplate.execute(any()))
@@ -370,7 +363,7 @@ class OrderCreationServiceTest {
 
         orderCreationService.create(command(1, null), null);
 
-        verify(orderRepository, never()).findByIdempotencyKey(any());
+        verify(orderRepository, never()).findByMemberIdAndIdempotencyKey(any(), any());
     }
 
     /**
@@ -380,7 +373,6 @@ class OrderCreationServiceTest {
     @Test
     void create_주문번호가_겹치면_새_번호로_재시도한다() {
         productExists();
-        given(passwordEncoder.encode("secret")).willReturn("hashed");
         given(transactionTemplate.execute(any()))
             .willThrow(new DataIntegrityViolationException("uk_orders_order_number"))
             .willAnswer(invocation -> existingOrder());
@@ -395,7 +387,7 @@ class OrderCreationServiceTest {
     @Test
     void create_필수값이_없으면_400이고_아무것도_조회하지_않는다() {
         CreateOrderCommand noName = new CreateOrderCommand(
-            PRODUCT_ID, 1, " ", "010-1234-5678", "secret", null);
+            PRODUCT_ID, 1, " ", "010-1234-5678", "11111111-1111-4111-8111-111111111111", null);
 
         assertThatThrownBy(() -> orderCreationService.create(noName, null))
             .isInstanceOf(BusinessException.class)
@@ -416,7 +408,7 @@ class OrderCreationServiceTest {
     private Order existingOrder() {
         return new Order(
             "OD-20260922-000001", SALES_ID, 2, PRICE, "홍길동", "010-1234-5678",
-            "hashed", "테스트 상품", "key-1", Instant.now().plus(Duration.ofMinutes(15)));
+            "11111111-1111-4111-8111-111111111111", "테스트 상품", "key-1", Instant.now().plus(Duration.ofMinutes(15)));
     }
 
     /** 스냅샷 필드가 요청 값 그대로 저장되는지 확인용. */
@@ -435,4 +427,25 @@ class OrderCreationServiceTest {
         assertThat(captor.getValue().getBuyerPhone()).isEqualTo("010-1234-5678");
         assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("key-1");
     }
+    @Test
+    void cartChangedDuringShoppingLookupDoesNotCreateOrReserveOrder() {
+        String member = "11111111-1111-4111-8111-111111111111";
+        var snapshot = new com.shoppinglive.commerce.cart.domain.CartItem(member, PRODUCT_ID, 1);
+        var changed = new com.shoppinglive.commerce.cart.domain.CartItem(member, PRODUCT_ID, 2);
+        ReflectionTestUtils.setField(snapshot, "version", 0L);
+        ReflectionTestUtils.setField(changed, "version", 1L);
+        given(cartItems.findByIdAndMemberId(1L, member)).willReturn(Optional.of(snapshot));
+        given(cartItems.lockOwned(1L, member)).willReturn(Optional.of(changed));
+        productExists();
+        executeTransactionInline();
+
+        assertThatThrownBy(() -> orderCreationService.createFromCart(member, 1L,
+            new com.shoppinglive.commerce.cart.application.CartOrderCommand("회원", "01012345678", PRICE), "cart-key"))
+            .isInstanceOf(BusinessException.class)
+            .extracting(e -> ((BusinessException) e).errorCode()).isEqualTo(ErrorCode.CONFLICT);
+        verify(orderRepository, never()).saveAndFlush(any());
+        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(cartItems, never()).delete(any());
+    }
+
 }

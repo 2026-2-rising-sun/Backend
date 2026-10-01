@@ -1,5 +1,7 @@
 package com.shoppinglive.commerce.orders.application;
 
+import com.shoppinglive.commerce.orders.domain.OrderAmounts;
+
 import com.shoppinglive.commerce.sales.domain.SalesStatus;
 
 /**
@@ -69,7 +71,7 @@ public record OrderCheckout(
             productName,
             unitPrice,
             quantity,
-            unitPrice * quantity,
+            OrderAmounts.total(unitPrice, quantity),
             available,
             salesStatus,
             reason == null,

@@ -1,17 +1,20 @@
 package com.shoppinglive.commerce.orders.api;
 
+import com.shoppinglive.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.shoppinglive.commerce.orders.application.OrderService;
 import com.shoppinglive.commerce.orders.domain.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import java.util.List;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 주문 REST 컨트롤러. 비회원 주문자 대상 조회·취소 API.
+ * 주문 REST 컨트롤러. 회원 본인 대상 조회·취소 API.
  *
  * <p>컨트롤러 경로는 {@code /v1/...} 로 시작. Infra Ingress 가 {@code /api/commerce/} prefix
  * 를 벗김.
@@ -26,13 +29,24 @@ public class OrderQueryController {
         this.orderService = orderService;
     }
 
+    @GetMapping
+    public OrderHistoryResponse history(@AuthenticationPrincipal AuthenticatedUser member,
+        @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        var result = orderService.history(member.memberId(), page, size);
+        return new OrderHistoryResponse(result.map(OrderResponse::from).getContent(), page, size,
+            result.getTotalElements(), result.getTotalPages());
+    }
+
+    public record OrderHistoryResponse(List<OrderResponse> items, int page, int size,
+        long totalElements, int totalPages) {}
+
     /**
      * 주문 상세를 조회한다 (주문 3).
      */
     @GetMapping("/{orderNumber}")
     public OrderResponse getOrder(
-        @PathVariable String orderNumber, @RequestHeader("X-Order-Password") String password) {
-        Order order = orderService.findByOrderNumberAndPassword(orderNumber, password);
+        @PathVariable String orderNumber, @AuthenticationPrincipal AuthenticatedUser member) {
+        Order order = orderService.findByOrderNumberAndMemberId(orderNumber, member.memberId());
         return OrderResponse.from(order);
     }
 
@@ -43,8 +57,8 @@ public class OrderQueryController {
      */
     @PostMapping("/{orderNumber}/cancel")
     public ResponseEntity<Void> cancelOrder(
-        @PathVariable String orderNumber, @RequestHeader("X-Order-Password") String password) {
-        orderService.cancelBeforePayment(orderNumber, password);
+        @PathVariable String orderNumber, @AuthenticationPrincipal AuthenticatedUser member) {
+        orderService.cancelBeforePayment(orderNumber, member.memberId());
         return ResponseEntity.noContent().build();
     }
 }

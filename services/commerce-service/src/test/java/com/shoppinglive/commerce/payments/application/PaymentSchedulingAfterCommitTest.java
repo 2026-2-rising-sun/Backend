@@ -25,19 +25,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 커밋 전/롤백 시 예약하지 않고, 커밋 후에만 실제 비동기 결제를 시작하는지 검증한다. */
 @SpringBootTest
-class PaymentSchedulingAfterCommitTest {
+class PaymentSchedulingAfterCommitTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 510L;
     private static final String ORDER_NUMBER = "OD-COMMIT-1";
 
     @MockitoSpyBean
     private MockPaymentEngine mockPaymentEngine;
+
+    @Autowired
+    private DevPaymentScenarioRegistry devRegistry;
 
     @Autowired
     private PaymentService paymentService;
@@ -55,9 +57,6 @@ class PaymentSchedulingAfterCommitTest {
     private SalesStockJpaRepository salesStockRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
     private TransactionTemplate transactionTemplate;
 
     private Long salesInfoId;
@@ -73,7 +72,7 @@ class PaymentSchedulingAfterCommitTest {
 
         orderRepository.save(new Order(
             ORDER_NUMBER, salesInfoId, 1, 10_000L, "홍길동", "010-1234-5678",
-            passwordEncoder.encode("secret"), "테스트", null, Instant.now().plusSeconds(900)));
+            "11111111-1111-4111-8111-111111111111", "테스트", null, Instant.now().plusSeconds(900)));
     }
 
     @AfterEach
@@ -132,8 +131,8 @@ class PaymentSchedulingAfterCommitTest {
     void 롤백되면_결제_처리가_예약되지_않는다() {
         try {
             transactionTemplate.executeWithoutResult(status -> {
-                paymentService.startPayment(
-                    ORDER_NUMBER, "secret", PaymentScenario.INSTANT_SUCCESS);
+                startPaymentWithScenario(
+                    ORDER_NUMBER, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_SUCCESS);
                 throw new IllegalStateException("의도적 롤백");
             });
         } catch (IllegalStateException expected) {
@@ -154,9 +153,15 @@ class PaymentSchedulingAfterCommitTest {
      */
     private void startPaymentInsideLongTransaction(PaymentScenario scenario) {
         transactionTemplate.executeWithoutResult(status -> {
-            paymentService.startPayment(ORDER_NUMBER, "secret", scenario);
+            startPaymentWithScenario(ORDER_NUMBER, "11111111-1111-4111-8111-111111111111", scenario);
             verify(mockPaymentEngine, never()).schedule(anyLong(), any());
         });
         verify(mockPaymentEngine).schedule(anyLong(), any());
     }
+    private com.shoppinglive.commerce.payments.domain.PaymentAttempt startPaymentWithScenario(
+        String number, String memberId, PaymentScenario scenario) {
+        if (scenario != null) devRegistry.set(number, scenario);
+        return paymentService.startPayment(number, memberId);
+    }
+
 }

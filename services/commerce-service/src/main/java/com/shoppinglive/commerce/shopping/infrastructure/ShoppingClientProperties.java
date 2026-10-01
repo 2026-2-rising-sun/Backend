@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** 운영 어댑터는 항상 HTTP를 사용한다. URL은 실행 환경에서 반드시 지정한다. */
 @ConfigurationProperties("commerce.shopping-client")
-public record ShoppingClientProperties(String baseUrl, Duration connectTimeout, Duration readTimeout) {
+public record ShoppingClientProperties(String baseUrl, Duration connectTimeout, Duration readTimeout, String serviceToken) {
 
     public ShoppingClientProperties {
         connectTimeout = boundedTimeout(connectTimeout);

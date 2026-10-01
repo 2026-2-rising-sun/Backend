@@ -34,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class CommerceReviewRegressionTest {
+class CommerceReviewRegressionTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired OrderExpirationScheduler expiration;
@@ -68,12 +68,12 @@ class CommerceReviewRegressionTest {
     }
 
     private Order create() {
-        return creation.create(new CreateOrderCommand(920L, 1, "구매자", "010-1234-5678", "secret", 10_000L), null).order();
+        return creation.create(new CreateOrderCommand(920L, 1, "구매자", "010-1234-5678", "11111111-1111-4111-8111-111111111111", 10_000L), null).order();
     }
 
     private void release(Order order, String path) {
         switch (path) {
-            case "cancel" -> orders.cancelBeforePayment(order.getOrderNumber(), "secret");
+            case "cancel" -> orders.cancelBeforePayment(order.getOrderNumber(), "11111111-1111-4111-8111-111111111111");
             case "expire" -> {
                 jdbc.update("UPDATE orders SET expires_at = ? WHERE id = ?",
                     java.sql.Timestamp.from(Instant.now().minusSeconds(1)), order.getId());
@@ -141,7 +141,7 @@ class CommerceReviewRegressionTest {
     void 재고0이면_ON_SALE로_변경되지_않는다(SalesStatus current) throws Exception {
         jdbc.update("UPDATE sales_info SET status = ? WHERE id = ?", current.name(), salesId);
         jdbc.update("UPDATE sales_stock SET available = 0 WHERE sales_info_id = ?", salesId);
-        var result = mvc.perform(patch("/v1/sales/{id}/status", salesId)
+        var result = mvc.perform(patch("/v1/sales/{id}/status", salesId).header("Authorization", adminBearer())
             .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ON_SALE\"}"));
         if (current == SalesStatus.READY || current == SalesStatus.ON_SALE) {
             result.andExpect(status().isConflict());
@@ -163,17 +163,17 @@ class CommerceReviewRegressionTest {
 
     @Test
     void 비즈니스_거절은_500이_아닌_400_404_409이다() throws Exception {
-        mvc.perform(patch("/v1/sales/{id}/status", salesId).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(patch("/v1/sales/{id}/status", salesId).header("Authorization", adminBearer()).contentType(MediaType.APPLICATION_JSON)
             .content("{\"status\":\"SOLD_OUT\"}")).andExpect(status().isBadRequest());
         Order order = create();
-        mvc.perform(get("/v1/orders/{number}", order.getOrderNumber()).header("X-Order-Password", "wrong"))
+        mvc.perform(get("/v1/orders/{number}", order.getOrderNumber()).header("Authorization", bearer(MEMBER_B)))
             .andExpect(status().isNotFound());
-        mvc.perform(get("/v1/orders/{number}/payments/999", order.getOrderNumber()).header("X-Order-Password", "secret"))
+        mvc.perform(get("/v1/orders/{number}/payments/999", order.getOrderNumber()).header("Authorization", bearer(MEMBER_A)))
             .andExpect(status().isNotFound());
-        orders.cancelBeforePayment(order.getOrderNumber(), "secret");
-        mvc.perform(post("/v1/orders/{number}/cancel", order.getOrderNumber()).header("X-Order-Password", "secret"))
+        orders.cancelBeforePayment(order.getOrderNumber(), "11111111-1111-4111-8111-111111111111");
+        mvc.perform(post("/v1/orders/{number}/cancel", order.getOrderNumber()).header("Authorization", bearer(MEMBER_A)))
             .andExpect(status().isConflict());
-        mvc.perform(post("/v1/orders/{number}/payments", order.getOrderNumber()).header("X-Order-Password", "secret"))
+        mvc.perform(post("/v1/orders/{number}/payments", order.getOrderNumber()).header("Authorization", bearer(MEMBER_A)))
             .andExpect(status().isConflict());
     }
 }

@@ -15,6 +15,7 @@ class ShoppingClientConfigurationTest {
 
     private final ApplicationContextRunner context = new ApplicationContextRunner()
         .withUserConfiguration(ShoppingClientConfiguration.class)
+        .withPropertyValues("commerce.shopping-client.service-token=test-outbound-commerce-shopping-token-32")
         .withBean(RestClient.Builder.class, RestClient::builder)
         .withBean(CircuitBreakerRegistry.class, CircuitBreakerRegistry::ofDefaults)
         .withBean(RetryRegistry.class, RetryRegistry::ofDefaults);
@@ -63,4 +64,12 @@ class ShoppingClientConfigurationTest {
             .run(application -> assertThat(application.getBean(ShoppingClient.class))
                 .isInstanceOf(InMemoryShoppingClientStub.class));
     }
+    @ParameterizedTest
+    @ValueSource(strings = {"", "short"})
+    void service_token이_없거나_짧으면_기동실패한다(String token) {
+        context.withPropertyValues("commerce.shopping-client.base-url=http://localhost:8082",
+                "commerce.shopping-client.service-token=" + token)
+            .run(application -> assertThat(application).hasFailed());
+    }
+
 }

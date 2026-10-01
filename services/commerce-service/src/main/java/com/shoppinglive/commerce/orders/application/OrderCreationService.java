@@ -1,6 +1,11 @@
 package com.shoppinglive.commerce.orders.application;
 
 import com.shoppinglive.commerce.orders.domain.Order;
+import com.shoppinglive.commerce.orders.domain.OrderAmounts;
+import com.shoppinglive.commerce.cart.application.CartItemNotFoundException;
+import com.shoppinglive.commerce.cart.application.CartOrderCommand;
+import com.shoppinglive.commerce.cart.domain.CartItem;
+import com.shoppinglive.commerce.cart.infrastructure.CartItemRepository;
 import com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository;
 import com.shoppinglive.commerce.sales.application.InsufficientStockException;
 import com.shoppinglive.commerce.sales.application.SalesNotFoundException;
@@ -22,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -62,7 +66,7 @@ public class OrderCreationService {
     private final SalesStockJpaRepository salesStockRepository;
     private final ShoppingClient shoppingClient;
     private final OrderNumberGenerator orderNumberGenerator;
-    private final PasswordEncoder passwordEncoder;
+    private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
     private final Duration expiration;
 
@@ -72,7 +76,7 @@ public class OrderCreationService {
         SalesStockJpaRepository salesStockRepository,
         ShoppingClient shoppingClient,
         OrderNumberGenerator orderNumberGenerator,
-        PasswordEncoder passwordEncoder,
+        CartItemRepository cartItems,
         TransactionTemplate transactionTemplate,
         // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
         // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
@@ -82,7 +86,7 @@ public class OrderCreationService {
         this.salesStockRepository = salesStockRepository;
         this.shoppingClient = shoppingClient;
         this.orderNumberGenerator = orderNumberGenerator;
-        this.passwordEncoder = passwordEncoder;
+        this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
         this.expiration = expiration;
     }
@@ -103,20 +107,61 @@ public class OrderCreationService {
      */
     public OrderCreationResult create(CreateOrderCommand command, String idempotencyKey) {
         command.validate();
+        validateKey(idempotencyKey, false);
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return doCreate(command, null);
         }
         // 같은 멱등키 요청을 한 줄로 세운다. 이유는 lockFor 주석 참고.
-        synchronized (lockFor(idempotencyKey)) {
+        synchronized (lockFor(command.memberId() + ":" + idempotencyKey)) {
             return doCreate(command, idempotencyKey);
+        }
+    }
+
+    /** One selected item becomes one order; replay remains valid after the item was deleted. */
+    public OrderCreationResult createFromCart(String memberId, Long itemId,
+        CartOrderCommand request, String idempotencyKey) {
+        validateKey(idempotencyKey, true);
+        synchronized (lockFor(memberId + ":" + idempotencyKey)) {
+            Optional<Order> replay = findByIdempotencyKey(memberId, idempotencyKey);
+            if (replay.isPresent()) return replayCart(itemId, request, replay.get());
+            try {
+                CartItem item = cartItems.findByIdAndMemberId(itemId, memberId)
+                    .orElseThrow(CartItemNotFoundException::new);
+                CreateOrderCommand command = new CreateOrderCommand(item.getProductId(), item.getQuantity(),
+                    request.buyerName(), request.buyerPhone(), memberId, request.expectedTotalAmount(),
+                    itemId, item.getVersion());
+                command.validate();
+                return doCreate(command, idempotencyKey);
+            } catch (CartItemNotFoundException e) {
+                // Another instance may have committed this same request and deleted the item.
+                Optional<Order> concurrent = findByIdempotencyKey(memberId, idempotencyKey);
+                if (concurrent.isPresent()) return replayCart(itemId, request, concurrent.get());
+                throw e;
+            }
+        }
+    }
+
+    private OrderCreationResult replayCart(Long itemId, CartOrderCommand request, Order order) {
+        if (!Objects.equals(order.getSourceCartItemId(), itemId)
+            || !Objects.equals(order.getBuyerName(), request.buyerName())
+            || !Objects.equals(order.getBuyerPhone(), request.buyerPhone())
+            || !Objects.equals(order.getRequestedTotalAmount(), request.expectedTotalAmount())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
+        }
+        return OrderCreationResult.replayed(order);
+    }
+
+    private void validateKey(String key, boolean required) {
+        if ((required && (key == null || key.isBlank())) || (key != null && (key.isBlank() || key.length() > 64))) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "멱등키는 1~64자여야 합니다.");
         }
     }
 
     private OrderCreationResult doCreate(CreateOrderCommand command, String idempotencyKey) {
         // 재전송이면 새 주문을 만들지 않고 기존 결과로 연결한다. 응답을 놓친 사용자가 다시
         // 눌러도 주문이 둘로 늘지 않는다.
-        Optional<Order> replay = findByIdempotencyKey(idempotencyKey);
+        Optional<Order> replay = findByIdempotencyKey(command.memberId(), idempotencyKey);
         if (replay.isPresent()) {
             return replayMatching(command, replay.get());
         }
@@ -125,16 +170,14 @@ public class OrderCreationService {
         ProductSnapshot product = shoppingClient.findProduct(command.productId())
             .orElseThrow(() -> new ProductNotFoundException(command.productId()));
 
-        String passwordHash = passwordEncoder.encode(command.lookupPassword());
-
         for (int attempt = 1; attempt <= ORDER_NUMBER_RETRY; attempt++) {
             try {
                 return OrderCreationResult.created(
-                    persist(command, product.name(), passwordHash, idempotencyKey));
+                    persist(command, product.name(), idempotencyKey));
             } catch (DataIntegrityViolationException e) {
                 // 멱등키 충돌이면 같은 키로 이미 만들어진 주문이 있다는 뜻이다. 동시에 들어온
                 // 두 재전송 중 진 쪽이 여기로 온다.
-                Optional<Order> concurrent = findByIdempotencyKey(idempotencyKey);
+                Optional<Order> concurrent = findByIdempotencyKey(command.memberId(), idempotencyKey);
                 if (concurrent.isPresent()) {
                     return replayMatching(command, concurrent.get());
                 }
@@ -157,10 +200,19 @@ public class OrderCreationService {
     private Order persist(
         CreateOrderCommand command,
         String productName,
-        String passwordHash,
         String idempotencyKey) {
 
         return transactionTemplate.execute(status -> {
+            CartItem selected = null;
+            if (command.sourceCartItemId() != null) {
+                selected = cartItems.lockOwned(command.sourceCartItemId(), command.memberId())
+                    .orElseThrow(CartItemNotFoundException::new);
+                if (!Objects.equals(selected.getProductId(), command.productId())
+                    || !Objects.equals(selected.getQuantity(), command.quantity())
+                    || !Objects.equals(selected.getVersion(), command.sourceCartItemVersion())) {
+                    throw new BusinessException(ErrorCode.CONFLICT, "장바구니가 변경되었습니다. 다시 확인해 주세요.");
+                }
+            }
             Sales sales = salesRepository.findByProductId(command.productId())
                 .orElseThrow(() -> new SalesNotFoundException(
                     "sales not found for product: productId=" + command.productId()));
@@ -170,7 +222,7 @@ public class OrderCreationService {
             }
 
             long unitPrice = sales.getPrice();
-            long totalAmount = unitPrice * command.quantity();
+            long totalAmount = OrderAmounts.total(unitPrice, command.quantity());
             command.verifyExpectedAmount(totalAmount);
 
             // 재고 배정보다 주문 INSERT 를 먼저 한다. Postgres 는 미커밋 중복 INSERT 에서
@@ -185,10 +237,10 @@ public class OrderCreationService {
                 unitPrice,
                 command.buyerName(),
                 command.buyerPhone(),
-                passwordHash,
+                command.memberId(),
                 productName,
                 idempotencyKey,
-                Instant.now().plus(expiration)));
+                Instant.now().plus(expiration), command.sourceCartItemId(), command.expectedTotalAmount()));
 
             // 조건부 UPDATE. 이 한 줄이 초과 판매를 막는다. 동시에 들어온 요청들은 행 잠금으로
             // 줄을 서고, 재고가 모자란 순간부터 대상 행이 0 이 되어 여기서 걸러진다. 실패하면
@@ -200,6 +252,7 @@ public class OrderCreationService {
             }
 
             markSoldOutIfDepleted(sales);
+            if (selected != null) cartItems.delete(selected);
             return order;
         });
     }
@@ -228,22 +281,22 @@ public class OrderCreationService {
     private OrderCreationResult replayMatching(CreateOrderCommand command, Order order) {
         boolean sameProduct = salesRepository.findById(order.getSalesInfoId())
             .map(sales -> Objects.equals(sales.getProductId(), command.productId())).orElse(false);
-        if (!sameProduct || !Objects.equals(order.getQuantity(), command.quantity())
+        if (!Objects.equals(order.getMemberId(), command.memberId())
+            || !Objects.equals(order.getSourceCartItemId(), command.sourceCartItemId())
+            || !sameProduct || !Objects.equals(order.getQuantity(), command.quantity())
             || !Objects.equals(order.getBuyerName(), command.buyerName())
             || !Objects.equals(order.getBuyerPhone(), command.buyerPhone())
-            || (command.expectedTotalAmount() != null
-                && !Objects.equals(order.getTotalAmount(), command.expectedTotalAmount()))
-            || !passwordEncoder.matches(command.lookupPassword(), order.getLookupPasswordHash())) {
+            || !Objects.equals(order.getRequestedTotalAmount(), command.expectedTotalAmount())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
         }
         return OrderCreationResult.replayed(order);
     }
 
-    private Optional<Order> findByIdempotencyKey(String idempotencyKey) {
+    private Optional<Order> findByIdempotencyKey(String memberId, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return Optional.empty();
         }
-        return orderRepository.findByIdempotencyKey(idempotencyKey);
+        return orderRepository.findByMemberIdAndIdempotencyKey(memberId, idempotencyKey);
     }
 
     /**

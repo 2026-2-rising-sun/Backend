@@ -1,8 +1,12 @@
 package com.shoppinglive.commerce.payments.api;
 
+import com.shoppinglive.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.shoppinglive.commerce.payments.application.PaymentService;
 import com.shoppinglive.commerce.payments.domain.PaymentAttempt;
-import com.shoppinglive.commerce.payments.domain.PaymentScenario;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,10 +37,12 @@ public class PaymentController {
     @PostMapping
     public PaymentAttemptResponse startPayment(
         @PathVariable String orderNumber,
-        @RequestHeader("X-Order-Password") String password,
-        @RequestBody(required = false) StartPaymentRequest request) {
-        PaymentScenario scenario = request != null ? request.scenario() : null;
-        PaymentAttempt attempt = paymentService.startPayment(orderNumber, password, scenario);
+        @AuthenticationPrincipal AuthenticatedUser member,
+        @RequestBody(required = false) Map<String, Object> request) {
+        if (request != null && !request.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "결제 요청에는 결과 선택 필드를 보낼 수 없습니다.");
+        }
+        PaymentAttempt attempt = paymentService.startPayment(orderNumber, member.memberId());
         return PaymentAttemptResponse.from(attempt);
     }
 
@@ -47,8 +53,8 @@ public class PaymentController {
     public PaymentAttemptResponse getPayment(
         @PathVariable String orderNumber,
         @PathVariable Long paymentId,
-        @RequestHeader("X-Order-Password") String password) {
-        PaymentAttempt attempt = paymentService.getPayment(orderNumber, password, paymentId);
+        @AuthenticationPrincipal AuthenticatedUser member) {
+        PaymentAttempt attempt = paymentService.getPayment(orderNumber, member.memberId(), paymentId);
         return PaymentAttemptResponse.from(attempt);
     }
 }
