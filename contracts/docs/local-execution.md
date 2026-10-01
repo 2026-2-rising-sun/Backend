@@ -6,7 +6,7 @@ Gateway와 프론트엔드는 이 실행 범위에 포함하지 않는다.
 
 | 모드 | 실제 프로세스와 DB | Mock | 확인할 수 있는 범위 |
 |---|---|---|---|
-| 서비스 단독 | 검사할 서비스와 전용 PostgreSQL | 필요한 Shopping/Commerce/Live 의존만 Prism | 도메인 로직, 실제 JWT 검증기의 허용·차단. 미리 서명한 테스트 토큰은 로그인 성공 증거가 아님 |
+| 서비스 단독 | 검사할 서비스와 전용 PostgreSQL | 필요한 도메인 의존만 Prism | 세션을 사용하는 사용자 인증은 실제 Member도 필요. 미리 서명한 테스트 토큰과 Prism active=true는 로그인·철회 성공 증거가 아님 |
 | 실제 인증 결합 | Member와 검사할 서비스, 각각 PostgreSQL | 미기동 의존 서비스만 Prism | 실제 가입·로그인·JWT·권한. Mock 판매/재고 응답은 실제 재고 증거가 아님 |
 | 전체 통합 | 네 서비스 및 각각 PostgreSQL | 결제 외부 gateway와 AWS IVS만 기존 Mock/stub | 상품→판매→장바구니→주문→결제 상태·예약/복구·타인 404 등 실제 서비스 흐름 |
 
@@ -25,9 +25,12 @@ npm ci --prefix scripts/contracts --ignore-scripts
 node scripts/local/auth-env.cjs create --access-ttl PT15M --refresh-ttl P30D
 ```
 
-위 TTL은 이 명령에서 선택한 로컬 실험 입력이다. 운영 기본값·최종 수명 정책을 정하는 값이 아니다.
-명령은 TTL 두 값을 생략하면 실패하고, 새 디렉터리에만 PKCS8 private PEM·public JWKS·kid와 호출 방향별 4개 난수 토큰을 만든다.
+위 값은 승인된 access 15분·refresh family 최초 로그인부터 절대 30일 정책과 같다.
+로컬 도구는 TTL 입력을 명시적으로 받으며, 짧은 수명의 시험용 설정을 운영 정책으로 재사용하지 않는다.
+명령은 TTL 두 값을 생략하면 실패하고, 새 디렉터리에만 PKCS8 private PEM·public JWKS·kid와 호출 방향별 7개 난수 토큰을 만든다.
 키·env 파일은 0600, 디렉터리는 0700이며 `build/local` 아래 생성한 파일은 Git에 넣지 않는다.
+Member 세션 확인 주소는 기본 `http://localhost:8081`이며 컨테이너 조합에서는 `--member-url http://member:8080`처럼 지정한다.
+이 URL은 자격증명·query·추가 path가 없는 HTTP(S) origin이어야 한다.
 기존 키를 덮어쓰지 않는다. 새 키로 바꾸면 기존 access JWT 검증이 실패하므로 실행 중인 서비스에 조용히 교체하지 않는다.
 출력된 `env.json` 경로를 아래의 `P2_AUTH_ENV`로 사용한다. 실제 토큰 발급이나 계정 생성은 이 명령이 하지 않는다.
 
@@ -58,9 +61,9 @@ node scripts/local/auth-env.cjs exec member --env "$P2_AUTH_ENV" -- "$JAVA21_HOM
 
 | 실행 대상 | 의존 서비스 주소 옵션 | 실제 HTTP 모드 |
 |---|---|---|
-| Shopping | `--shopping.sales-client.base-url=http://localhost:8083` | 항상 HTTP |
-| Commerce | `--commerce.shopping-client.base-url=http://localhost:8082` | 항상 HTTP |
-| Live | `--live.products.shopping-url=http://localhost:8082` 및 `--live.products.commerce-url=http://localhost:8083` | `--live.products.mode=http` |
+| Shopping | `--shopping.sales-client.base-url=http://localhost:8083` 및 `--shoppinglive.security.session.base-url=http://localhost:8081` | 항상 HTTP |
+| Commerce | `--commerce.shopping-client.base-url=http://localhost:8082` 및 Member 세션 주소 | 항상 HTTP |
+| Live | `--live.products.shopping-url=http://localhost:8082`, `--live.products.commerce-url=http://localhost:8083` 및 Member 세션 주소 | `--live.products.mode=http` |
 
 예를 들어 실제 Member+Shopping만 검증하면 Commerce 프로세스 대신 아래 명령을 실행한다.
 Prism은 고정 계약 예시를 반환하며 요청 상품과 일치하는 상태 저장소를 제공하지 않는다. 테스트 fixture의 ID/가격과 선택 예시를 맞춘다.
@@ -84,7 +87,19 @@ Live local의 IVS stub과 Commerce의 Mock 결제는 실제 AWS 송출·PG 승�
 두 요청은 JSON `{email,password,displayName}`(가입) 및 `{email,password}`(로그인)이며 unknown field는 400이다.
 로그인 응답 `data.accessToken`을 `Authorization: Bearer ...`로 보내 `GET /v1/members/me`와 회원 거래 API를 호출한다.
 토큰·비밀번호를 계약 예시, Git, 리뷰 로그에 남기지 않는다. signup은 토큰을 발급하지 않는다.
-Member의 access/refresh TTL 설정은 필수이고 쿠키 인증은 없다. 현재 refresh는 최초 발급만 존재하며 갱신·로그아웃·탈퇴·소셜은 미구현이다.
+쿠키 인증은 없다. access에는 canonical UUID `sub`와 `sid`가 있으며 실제 Member 로그인 세션과 연결된다.
+`POST /v1/auth/refresh`와 `/logout`은 `{refreshToken}` JSON으로 호출하며 access를 요구하지 않는다.
+refresh는 매번 교체되지만 family의 최초 로그인 +30일 만료는 유지한다. 알려진 사용 완료 토큰 재사용은 family 보안 폐기 후 401이다.
+일반 logout은 refresh만 폐기하므로 기존 access는 남은 15분 이내 수명 동안 허용될 수 있다.
+`DELETE /v1/members/me`는 Bearer와 `{password}`를 요구하며 soft withdrawal과 모든 세션 보안 폐기를 수행한다.
+ADMIN의 `POST /v1/admin/members/{id}/sessions/revoke`는 기존 세션만 폐기하며 새 로그인을 막는 계정 정지가 아니다.
+refresh 재사용·강제 폐기·탈퇴는 이후 신규 인증 검사부터 access도 401로 거부한다. 이미 검사한 요청을 소급 취소하지 않는다.
+소셜 로그인은 이 계약·도구의 완료 범위에 포함하지 않는다.
+
+세 consumer는 로컬 JWT 서명 검증 후 `MEMBER_SESSION_BASE_URL`의 Member 내부 상태 API를 매번 호출한다.
+`SHOPPING_MEMBER_SERVICE_TOKEN`, `COMMERCE_MEMBER_SERVICE_TOKEN`, `LIVE_MEMBER_SERVICE_TOKEN`은 각 발신자와 Member만 공유한다.
+상태를 캐시하지 않으며 connect/read timeout은 각 1초, retry·redirect는 하지 않는다. Member 확인 불가는 `SERVICE_UNAVAILABLE` 503이다.
+무토큰 공개 요청과 기존 서비스 caller 내부 호출은 이 확인에 의존하지 않는다. Member를 Prism으로 대체한 응답은 인증 완료 증거로 세지 않는다.
 
 ADMIN은 가입 body의 roles나 임의 헤더로 얻을 수 없다. 준비된 Member 스키마에 다음 환경변수를 명시하여 별도 CLI로 신규 ADMIN만 생성한다.
 
