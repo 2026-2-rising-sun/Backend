@@ -8,34 +8,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.member.members.infrastructure.MemberRepository;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthContributor;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-@SpringBootTest
-@AutoConfigureMockMvc
 class MemberServiceApplicationTests extends MemberAuthTestSupport {
-    @Autowired protected MockMvc mvc;
-    @Autowired protected ObjectMapper mapper;
-    @Autowired protected MemberRepository members;
-    @Autowired PasswordEncoder passwords;
     @MockitoSpyBean(name = "dbHealthContributor") HealthContributor databaseHealth;
-
-    @BeforeEach
-    void resetMembers() { members.deleteAll(); }
 
     @Test
     void signupNormalizesEmailStoresOnlyPasswordHashAndAssignsUser() throws Exception {
@@ -101,10 +84,6 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         mvc.perform(get("/v1/members/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/members/me").header("Authorization", "Bearer bad"))
             .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
-    }
-
-    protected String signup(String email) throws Exception {
-        return mapper.writeValueAsString(Map.of("email", email, "password", "password123", "displayName", "member"));
     }
 
     @Test

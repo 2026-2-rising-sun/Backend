@@ -59,5 +59,6 @@ public final class JwtTestTokens {
         }
     }
 
-    byte[] privateKeyPkcs8() throws JOSEException { return key.toRSAPrivateKey().getEncoded(); }
+    /** Member 발급기 테스트에만 사용하는 런타임 생성 개인키다. 운영 소스/JAR에는 포함되지 않는다. */
+    public byte[] privateKeyPkcs8() throws JOSEException { return key.toRSAPrivateKey().getEncoded(); }
 }

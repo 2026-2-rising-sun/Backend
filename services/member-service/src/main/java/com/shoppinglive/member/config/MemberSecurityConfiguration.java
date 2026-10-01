@@ -24,7 +24,7 @@ public class MemberSecurityConfiguration {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness").permitAll()
-                .requestMatchers(HttpMethod.POST, "/v1/auth/signup").permitAll()
+                .requestMatchers(HttpMethod.POST, "/v1/auth/signup", "/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/members/me").authenticated()
                 .requestMatchers(HttpMethod.PATCH, "/v1/members/me").authenticated()
                 .anyRequest().denyAll())
