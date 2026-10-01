@@ -633,10 +633,10 @@ components:
       properties:
         scenario: {"$ref": "#/components/schemas/PaymentScenario"}
     StartPaymentRequest:
-      type: "object"
+      type: [object, 'null']
       maxProperties: 0
       additionalProperties: false
-      description: "본문 생략 또는 빈 객체만 허용. scenario 등 필드가 하나라도 있으면 400."
+      description: "본문 생략, JSON null 또는 빈 객체만 허용. scenario 등 필드가 하나라도 있으면 400."
     RegisterSalesRequest:
       type: "object"
       required: ["productId", "price", "initialStock"]

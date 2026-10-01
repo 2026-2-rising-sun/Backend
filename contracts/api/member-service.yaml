@@ -1,12 +1,13 @@
 openapi: 3.1.0
 info:
   title: Member Service API
-  version: 0.1.0
+  version: 0.2.0
   license: { name: UNLICENSED }
   description: |
-    현재 구현된 회원가입·본인 프로필 계약이다. 성공과 오류 모두 ApiResponse 봉투를 사용한다.
-    로그인·refresh·logout·탈퇴·소셜은 정책 및 구현 인계 전이며 이 파일의 완료 범위에 포함하지 않는다.
-    가입 성공은 access/refresh token 발급이 아니다. 토큰 TTL·폐기 정책도 이 파일에서 확정하지 않는다.
+    현재 구현된 회원가입·로그인·본인 프로필 계약이다. 성공과 오류 모두 ApiResponse 봉투를 사용한다.
+    refresh·logout·탈퇴·소셜은 정책 및 구현 인계 전이며 이 파일의 완료 범위에 포함하지 않는다.
+    가입 성공은 토큰 발급이 아니다. 로그인은 access JWT와 최초 refresh token을 발급한다.
+    access/refresh TTL은 실행 시 필수 설정이며 이 파일은 운영 기본값을 정하지 않는다. refresh 사용·폐기 API는 아직 없다.
 security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8081
@@ -41,6 +42,31 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "409": {"$ref": "#/components/responses/Conflict"}
         "500": {"$ref": "#/components/responses/InternalError"}
+  /v1/auth/login:
+    post:
+      tags: [Member]
+      summary: 이메일 로그인 및 토큰 발급
+      operationId: loginMember
+      security: []
+      description: 이메일 정규화 후 인증한다. 없는 계정·틀린 비밀번호·잠긴 계정은 모두 같은 401. 쿠키를 사용하지 않고 응답 JSON으로 토큰을 돌려준다. 연속 실패 제한과 잠금 기간은 서버 설정이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example: { email: member@example.com, password: test-password-123 }
+      responses:
+        '200':
+          description: access JWT 및 초기 refresh token 발급. 예시 문자열은 인증에 사용할 수 없다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenEnvelope' }
+              examples:
+                issued: { value: { success: true, data: { accessToken: contract-example-not-a-signed-jwt, tokenType: Bearer, expiresIn: 900, refreshToken: contract-example-not-a-refresh-credential }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+        '500': { $ref: '#/components/responses/InternalError' }
   /v1/members/me:
     get:
       tags: ["Member"]
@@ -83,6 +109,13 @@ components:
   securitySchemes:
     BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub=UUID, iss=shoppinglive-member, aud=shoppinglive-api; USER/ADMIN. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
   responses:
+    AuthUnavailable:
+      description: 로그인 저장소 연결 또는 일시 오류. 잘못된 자격증명과 구분한다.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          examples:
+            authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: 외부 서비스를 사용할 수 없습니다., requestId: request-001 } } }
     BadRequest:
       description: "요청 값·형식 또는 금액 범위 오류"
       content:
@@ -119,6 +152,28 @@ components:
           examples:
             internalError: {"value": {"success": false, "data": null, "error": {"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "requestId": "request-001"}}}
   schemas:
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, format: password, minLength: 1, maxLength: 72, writeOnly: true, description: UTF-8 72바이트 이하. 공백만 있는 값 금지. }
+    TokenPair:
+      type: object
+      required: [accessToken, tokenType, expiresIn, refreshToken]
+      properties:
+        accessToken: { type: string, minLength: 1, readOnly: true, description: RS256 JWT. 실제 토큰을 계약 예시에 저장하지 않는다. }
+        tokenType: { type: string, const: Bearer }
+        expiresIn: { type: integer, format: int64, minimum: 1, description: 실행 시 명시한 access TTL의 초수. JWT exp-iat와 같다. 예시 900초는 운영 기본값이 아니다. }
+        refreshToken: { type: string, minLength: 1, readOnly: true, description: family UUID와 opaque random secret. DB에는 해시만 저장. 현재 최초 발급만 구현되었다. }
+    TokenEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/TokenPair' }
+        error: { type: 'null' }
     SignupRequest:
       type: "object"
       additionalProperties: false
