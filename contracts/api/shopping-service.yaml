@@ -99,6 +99,7 @@ paths:
               examples:
                 normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }, error: null } }
                 notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
@@ -171,6 +172,7 @@ paths:
               examples:
                 normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, available: 5, purchasable: true, maxQuantity: 5 }, error: null } }
                 soldOut: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: SOLD_OUT, available: 0, purchasable: false, maxQuantity: 0 }, error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/SalesUnavailable' }
   /v1/products/{productId}/purchase-check:
@@ -248,6 +250,7 @@ paths:
           content:
             image/png: { schema: { type: string, format: binary } }
             image/jpeg: { schema: { type: string, format: binary } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
@@ -302,6 +305,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ProductSnapshotEnvelope' }
               example: { success: true, data: { id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10 }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
   /v1/dev/product-images:
     delete:
