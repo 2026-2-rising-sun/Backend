@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.config;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.web.CorrelationId;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
@@ -61,7 +62,8 @@ public class RequestErrorExceptionHandler {
 
     private static ResponseEntity<ApiResponse<Void>> toResponse(HttpStatusCode status, String message) {
         HttpStatus resolved = HttpStatus.resolve(status.value());
-        String code = resolved != null ? resolved.name() : "HTTP_" + status.value();
+        String code = status.value() == 400 ? ErrorCode.INVALID_REQUEST.name()
+                : resolved != null ? resolved.name() : "HTTP_" + status.value();
         ApiResponse<Void> body = new ApiResponse<>(false, null,
                 new ApiResponse.ApiError(code, message, CorrelationId.current()));
         return ResponseEntity.status(status).body(body);

@@ -58,6 +58,12 @@ public class AdminProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
     }
 
+    /** 수정 경로의 누락 ID는 ADMIN 인가 후 입력 오류로 응답한다. */
+    @PatchMapping("/")
+    public ApiResponse<Void> missingProductId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
+    }
+
     /** 기본정보 부분 수정·대표 이미지 교체. 응답의 version 을 다음 수정 요청에 그대로 보내야 한다. */
     @PatchMapping("/{productId}")
     public ApiResponse<ProductResponse> update(@PathVariable Long productId,
