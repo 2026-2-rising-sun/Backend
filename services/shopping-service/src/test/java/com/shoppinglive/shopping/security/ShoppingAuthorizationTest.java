@@ -82,6 +82,22 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    void sessionRevocationAndAuthorityOutageFailClosedWithoutBlockingPublicOrInternalReads() throws Exception {
+        String token = adminBearer();
+        mvc.perform(get("/v1/admin/products").header("Authorization", token)).andExpect(status().isOk());
+        accessSessions.revoke();
+        mvc.perform(get("/v1/admin/products").header("Authorization", token)).andExpect(status().isUnauthorized());
+        accessSessions.fail();
+        mvc.perform(get("/v1/admin/products").header("Authorization", token)).andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
+            .andExpect(header().doesNotExist("WWW-Authenticate"));
+        mvc.perform(get("/v1/products")).andExpect(status().isOk());
+        mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
+        mvc.perform(get("/v1/internal/products/" + productId).header("X-Service-Token", COMMERCE_KEY))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void allAdminMethodsDenyAnonymousAndUserBeforeSideEffects() throws Exception {
         for (String route : List.of("GET /v1/admin/products", "GET /v1/admin/products/1",
             "POST /v1/admin/products", "PATCH /v1/admin/products/1", "POST /v1/admin/product-images")) {

@@ -1,6 +1,12 @@
 package com.shoppinglive.commerce.support;
 
 import com.shoppinglive.common.security.test.JwtTestTokens;
+import com.shoppinglive.common.security.test.StubAccessSessionVerifier;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.junit.jupiter.api.BeforeEach;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,7 +15,18 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /** Uses the production decoder and filters with a temporary RSA key; no mock authentication. */
+@Import(CommerceSecurityTestSupport.SessionTestConfiguration.class)
 public abstract class CommerceSecurityTestSupport {
+    @Autowired protected StubAccessSessionVerifier accessSessions;
+
+    @BeforeEach
+    void resetAccessSessionFixture() { accessSessions.reset(); }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class SessionTestConfiguration {
+        @Bean StubAccessSessionVerifier accessSessionVerifier() { return new StubAccessSessionVerifier(); }
+    }
+
     protected static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
     protected static final String MEMBER_B = "22222222-2222-4222-8222-222222222222";
     protected static final String ADMIN = "33333333-3333-4333-8333-333333333333";

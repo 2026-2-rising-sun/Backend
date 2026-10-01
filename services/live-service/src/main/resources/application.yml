@@ -12,6 +12,11 @@ server:
 
 shoppinglive:
   security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:}
+      service-token: ${LIVE_MEMBER_SERVICE_TOKEN:}
+      connect-timeout: 1s
+      read-timeout: 1s
     jwt:
       issuer: shoppinglive-member
       audience: shoppinglive-api
@@ -81,6 +86,11 @@ live:
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
 
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://localhost:8081}
+
 ---
 # k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.
 # 호스트는 같은 네임스페이스의 Service 이름이고 포트는 클러스터 내부 표준 포트다.
@@ -114,3 +124,8 @@ live:
     mode: http
     shopping-url: http://dev-shopping-service:8080
     commerce-url: http://dev-commerce-service:8080
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://dev-member-service:8080}
