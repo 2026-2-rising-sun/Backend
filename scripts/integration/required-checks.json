@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "groups": {
+    "member": ["signup-a", "signup-b", "login-a", "login-b", "login-admin", "member-issued-token-signature", "profile-owned-by-token", "signup-cannot-assign-role", "jwt-expired", "jwt-tampered"],
+    "admin": ["image-upload-admin", "product-create-0", "sale-create-0", "shopping-admin-user", "commerce-admin-user", "live-admin-user", "denied-product-writes", "denied-sale-writes"],
+    "cart_order_payment": ["cart-selected-order", "cart-removes-only-selected", "cart-replay-same-order", "same-key-different-members-isolated", "paid-order", "order-paid-state", "payment-body-json-null", "invalid-payment-body-no-write", "cancel-restores-once", "cart-price-mismatch-no-write"],
+    "ownership": ["cart-other-b-patch", "cart-other-admin-delete", "order-other-b", "order-other-admin", "payment-query-other-b", "payment-query-other-admin", "body-header-cannot-replace-member", "history-excludes-other-member"],
+    "service_callers": ["caller-valid-commerce-shopping", "caller-valid-live-shopping", "caller-valid-shopping-commerce", "caller-valid-live-commerce", "caller-admin-jwt-commerce-shopping", "caller-missing-shopping-commerce", "caller-token-cannot-buy", "wrong-target-credential"],
+    "dependencies": ["commerce-down-public-503", "commerce-down-internal-still-real", "shopping-down-cart-order-503", "shopping-outage-preserves-cart-order-stock", "member-db-down-readiness", "shopping-db-down-readiness", "commerce-db-down-readiness", "live-db-down-readiness", "live-db-down-liveness"],
+    "live": ["broadcast-create", "broadcast-link-0", "broadcast-start", "broadcast-public-detail", "broadcast-end", "live-real-products-and-sales", "live-repeated-ids-reached-shopping", "live-bulk-reached-commerce"],
+    "database": ["cart-does-not-reserve-stock", "sold-out-preserves-cart-and-stock", "one-concurrent-winner", "last-stock-never-negative", "cancel-replay-no-restock"]
+  }
+}
