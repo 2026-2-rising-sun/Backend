@@ -10,7 +10,7 @@
     "examples": "node validate.cjs",
     "smoke": "node smoke.cjs",
     "check": "npm run test && npm run lint && npm run examples",
-    "test": "node --test base-diff.test.cjs smoke.test.cjs ../local/auth-env.test.cjs apidog-bundle.test.cjs"
+    "test": "node --test base-diff.test.cjs smoke.test.cjs ../local/auth-env.test.cjs apidog-bundle.test.cjs apidog-normalize.test.cjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
