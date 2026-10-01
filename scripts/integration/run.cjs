@@ -7,6 +7,7 @@ const { Context } = require('./context.cjs');
 const { memberAdmin } = require('./member-admin.cjs');
 const { commerce } = require('./commerce.cjs');
 const { liveFailures } = require('./live-failures.cjs');
+const { mockFailures } = require('./mock-failures.cjs');
 
 async function run() {
   const runtime = new Runtime(); let context;
@@ -16,12 +17,12 @@ async function run() {
   };
   process.once('SIGINT', interrupted); process.once('SIGTERM', interrupted);
   try {
-    command('git', ['diff', '--quiet']); command('git', ['diff', '--cached', '--quiet']);
+    if (command('git', ['status', '--porcelain', '--untracked-files=normal']))
+      throw new Error('Integration requires a clean checkout including untracked source files');
     context = new Context(runtime);
     context.result.deferred = [
       'Refresh rotation/reuse/logout/withdrawal require the agreed revocation policy and implementation',
-      'Social login implementation and provider fixtures are not yet available',
-      'Prism consumer mapping and separate network read-timeout injection are not yet in this HTTP run'
+      'Social login implementation and provider fixtures are not yet available'
     ];
     context.save();
     const usePrebuilt = process.argv.includes('--use-prebuilt') || process.env.CI === 'true';
@@ -32,6 +33,7 @@ async function run() {
     await runtime.setup();
     await memberAdmin(context);
     await commerce(context);
+    await mockFailures(context);
     await liveFailures(context);
     context.result.implementedFlowsPassed = true;
   } catch (error) {

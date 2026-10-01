@@ -24,3 +24,5 @@ DB 장애는 소유 PostgreSQL을 pause/unpause하여 재현한다. 테스트 JD
 현재 구현된 필수 HTTP 흐름의 성공은 `passed`로, 정책 대기와 P2 전체 완료 여부는 `deferred`/`p2Complete`로 구분한다.
 0건·실패·skip·누락을 성공으로 바꾸지 않으며 부분 실행을 P2 또는 CI 완료로 보고하지 않는다.
 PostgreSQL migration·locking의 전체 회귀는 CI의 별도 필수 PostgreSQL job이 수행한다. 그 개수를 HTTP check 개수에 합산하지 않는다.
+
+Prism provider examples are exercised only in explicit dependency-failure cases. Temporary copied schemas add transport 503 examples without changing published contracts. A separate proxy delays headers to verify real read timeouts; real upstream URLs are restored afterward. All tracked and untracked source files must be committed before execution (ignored build outputs are allowed).

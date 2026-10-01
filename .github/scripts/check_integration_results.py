@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 
-GROUPS = {"member", "admin", "cart_order_payment", "ownership", "service_callers", "dependencies", "live", "database"}
+GROUPS = {"member", "admin", "cart_order_payment", "ownership", "service_callers", "dependencies", "live", "database", "mock_failures"}
 
 
 def verify(result, sha, manifest):
