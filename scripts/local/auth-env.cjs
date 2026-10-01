@@ -12,7 +12,7 @@ const serviceKeys = {
   live: ['LIVE_SHOPPING_SERVICE_TOKEN', 'LIVE_COMMERCE_SERVICE_TOKEN']
 };
 function duration(value, name) {
-  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value || '');
+  const match = /^P(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value || '');
   const seconds = match && Number(match[1] || 0) * 86400 + Number(match?.[2] || 0) * 3600
     + Number(match?.[3] || 0) * 60 + Number(match?.[4] || 0);
   if (!match || !Number.isSafeInteger(seconds) || seconds < 1) {
@@ -56,7 +56,9 @@ function execute(args) {
   if (!serviceKeys[service] || option !== '--env' || !envPath || separator !== '--' || !command) {
     throw new Error('Usage: auth-env.cjs exec <member|shopping|commerce|live> --env <env.json> -- <command> [args]');
   }
-  const record = JSON.parse(fs.readFileSync(path.resolve(envPath), 'utf8'));
+  let record;
+  try { record = JSON.parse(fs.readFileSync(path.resolve(envPath), 'utf8')); }
+  catch { throw new Error('Cannot read or parse local credential configuration'); }
   if (record.purpose !== 'isolated local development only') throw new Error('Expected generated local credentials');
   const env = { ...process.env };
   for (const name of new Set([...publicKeys, ...Object.values(serviceKeys).flat()])) delete env[name];
