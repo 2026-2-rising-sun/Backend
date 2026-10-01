@@ -132,7 +132,7 @@ class Runtime {
     args.push('eclipse-temurin:21-jdk', 'java', ...this.jvm, '-jar', '/app.jar', ...extra);
     return [name, args];
   }
-  async start(service) {
+  async start(service, overrides = {}) {
     const prefix = this.mode === 'docker' ? '/run/integration' : this.private;
     const upstream = name => this.mode === 'docker' ? `http://${name}:8080` : `http://127.0.0.1:${this.ports[name].api}`;
     const env = { SPRING_PROFILES_ACTIVE: 'local', SERVER_PORT: String(this.mode === 'docker' ? 8080 : this.ports[service].api),
@@ -152,6 +152,7 @@ class Runtime {
     for (const pair of needed[service]) env[pair + '_SERVICE_TOKEN'] = this.credentials[pair + '_SERVICE_TOKEN'];
     if (service === 'member') Object.assign(env, { MEMBER_JWT_PRIVATE_KEY_LOCATION: `file:${prefix}/member-private.pem`,
       MEMBER_JWT_KEY_ID: this.kid, MEMBER_ACCESS_TOKEN_TTL: 'PT15M', MEMBER_REFRESH_TOKEN_TTL: 'P30D' });
+    Object.assign(env, overrides);
     this.environments[service] = env;
     const [file, args, hostEnv] = this.javaOptions(service, env);
     if (this.mode === 'docker') this.docker(file, args);
@@ -217,6 +218,20 @@ class Runtime {
     else await this.start(service);
     await this.waitReady(service);
   }
+  async reconfigure(service, overrides) {
+    assert(services.includes(service));
+    await this.stop(service);
+    if (this.mode === 'docker') {
+      const name = this.id + '-' + service;
+      if (this.owned(name)) {
+        const logs = spawnSync('docker', ['logs', name], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+        fs.appendFileSync(path.join(this.private, service + '.previous.log'), (logs.stdout || '') + (logs.stderr || ''), { mode: 0o600 });
+        command('docker', ['rm', name]);
+      }
+    }
+    await this.start(service, overrides);
+    await this.waitReady(service);
+  }
   async cleanup() {
     if (!this.cleanupPromise) this.cleanupPromise = this.cleanOwnedResources();
     return this.cleanupPromise;
@@ -230,6 +245,8 @@ class Runtime {
           const logs = spawnSync('docker', ['logs', this.id + '-' + service], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
           log = (logs.stdout || '') + (logs.stderr || '');
         } else if (this.mode === 'host' && fs.existsSync(path.join(this.private, service + '.log'))) log = fs.readFileSync(path.join(this.private, service + '.log'), 'utf8');
+        const previous = path.join(this.private, service + '.previous.log');
+        if (fs.existsSync(previous)) log = fs.readFileSync(previous, 'utf8') + log;
         fs.writeFileSync(path.join(this.output, service + '.log'), this.sanitize(log));
         await this.stop(service);
       } catch (error) { errors.push(this.sanitize(error.message)); }

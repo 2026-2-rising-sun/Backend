@@ -40,6 +40,8 @@ async function commerce(ctx) {
     await req(`payment-other-${name}`, 'commerce', 'POST', `/v1/orders/${selected.orderNumber}/payments`, { token, status: 404 });
   }
   const paymentBefore = snapshot();
+  await req('admin-cannot-set-user-payment-scenario', 'commerce', 'PUT', `/v1/dev/payment-scenarios/${selected.orderNumber}`,
+    { token: ctx.admin, body: { scenario: 'INSTANT_FAIL' }, status: 404 });
   for (const [name, body] of [['scenario', { scenario: 'INSTANT_FAIL' }], ['nonempty', { ignored: true }]])
     await req(`payment-reject-${name}`, 'commerce', 'POST', `/v1/orders/${selected.orderNumber}/payments`, { token: ctx.a, body, status: 400 });
   ctx.check('invalid-payment-body-no-write', snapshot(), paymentBefore);
@@ -60,16 +62,17 @@ async function commerce(ctx) {
   ctx.check('cancelled-state', canceled.status, 'CANCELLED');
   ctx.check('cancel-restores-once', stock(s[1]), { available: reservedBeforeCancel.available + 1, reserved: reservedBeforeCancel.reserved - 1 });
   const afterCancel = stock(s[1]);
-  await req('cancel-replay', 'commerce', 'POST', `/v1/orders/${cancel.orderNumber}/cancel`, { token: ctx.a, status: 204 });
+  await req('cancel-replay', 'commerce', 'POST', `/v1/orders/${cancel.orderNumber}/cancel`, { token: ctx.a, status: 409 });
   ctx.check('cancel-replay-no-restock', stock(s[1]), afterCancel);
   for (const [name, paymentBody] of [['absent', undefined], ['json-null', null], ['delayed-success', {}], ['delayed-fail', {}]]) {
-    const order = await ctx.direct('direct-' + name);
+    const payer = name.startsWith('delayed') ? ctx.admin : ctx.a;
+    const order = await ctx.direct('direct-' + name, { token: payer });
     if (name.startsWith('delayed')) await req('mock-select-' + name, 'commerce', 'PUT', `/v1/dev/payment-scenarios/${order.orderNumber}`,
       { token: ctx.admin, body: { scenario: name === 'delayed-success' ? 'DELAYED_SUCCESS' : 'DELAYED_FAIL' }, status: 204 });
     const pay = await req('payment-body-' + name, 'commerce', 'POST', `/v1/orders/${order.orderNumber}/payments`,
-      { token: ctx.a, ...(paymentBody === undefined ? {} : { body: paymentBody }) });
+      { token: payer, ...(paymentBody === undefined ? {} : { body: paymentBody }) });
     const expected = name === 'delayed-fail' ? 'FAILED' : 'SUCCESS';
-    await ctx.poll('settled-' + name, 'commerce', `/v1/orders/${order.orderNumber}/payments/${pay.paymentId}`, ctx.a, b => b.status === expected);
+    await ctx.poll('settled-' + name, 'commerce', `/v1/orders/${order.orderNumber}/payments/${pay.paymentId}`, payer, b => b.status === expected);
     await req('payment-wrong-order-' + name, 'commerce', 'GET', `/v1/orders/${cancel.orderNumber}/payments/${pay.paymentId}`, { token: ctx.a, status: 404 });
   }
   const empty = await req('sold-out-cart-add', 'commerce', 'POST', '/v1/cart/items', { token: ctx.a, body: { productId: p[3], quantity: 1 }, status: 201 });

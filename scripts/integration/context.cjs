@@ -69,7 +69,7 @@ class Context {
       record.status = response.status; record.elapsedMs = Date.now() - begin;
       const contentType = response.headers.get('content-type') || '';
       const bytes = Buffer.from(await response.arrayBuffer());
-      const parsed = !bytes.length ? null : contentType.includes('application/json') ? JSON.parse(bytes.toString()) :
+      const parsed = !bytes.length ? null : contentType.includes('json') ? JSON.parse(bytes.toString()) :
         contentType.startsWith('image/') ? { binaryBytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') } : bytes.toString();
       if (parsed?.data?.accessToken) this.runtime.remember(parsed.data.accessToken, parsed.data.refreshToken);
       record.body = this.runtime.sanitize(parsed);
