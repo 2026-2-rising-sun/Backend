@@ -1,6 +1,375 @@
 [
-  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 200, "example": "normal" },
-  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 200, "example": "soldOut" },
-  { "service": "shopping", "path": "/v1/products/999", "contractPath": "/v1/products/{productId}", "code": 404, "example": "notFound" },
-  { "service": "shopping", "path": "/v1/products/1", "contractPath": "/v1/products/{productId}", "code": 503, "example": "salesUnavailable" }
+  {
+    "service": "shopping",
+    "path": "/v1/products/1",
+    "contractPath": "/v1/products/{productId}",
+    "code": 200,
+    "example": "normal"
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/products/1",
+    "contractPath": "/v1/products/{productId}",
+    "code": 200,
+    "example": "soldOut"
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/products/999",
+    "contractPath": "/v1/products/{productId}",
+    "code": 404,
+    "example": "notFound"
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/products/1",
+    "contractPath": "/v1/products/{productId}",
+    "code": 503,
+    "example": "salesUnavailable"
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/admin/products",
+    "contractPath": "/v1/admin/products",
+    "code": 401,
+    "example": "unauthorized",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/admin/products",
+    "contractPath": "/v1/admin/products",
+    "code": 403,
+    "example": "forbidden",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "shopping",
+    "path": "/v1/internal/products?ids=1",
+    "contractPath": "/v1/internal/products",
+    "code": 200,
+    "example": "normal",
+    "headers": {
+      "X-Service-Token": "contract-caller-example-only"
+    }
+  },
+  {
+    "service": "member",
+    "path": "/v1/auth/signup",
+    "contractPath": "/v1/auth/signup",
+    "code": 201,
+    "example": "created",
+    "method": "POST",
+    "body": {
+      "email": "member@example.com",
+      "password": "test-password-123",
+      "displayName": "회원"
+    }
+  },
+  {
+    "service": "member",
+    "path": "/v1/auth/signup",
+    "contractPath": "/v1/auth/signup",
+    "code": 409,
+    "example": "duplicateEmail",
+    "method": "POST",
+    "body": {
+      "email": "member@example.com",
+      "password": "test-password-123",
+      "displayName": "회원"
+    }
+  },
+  {
+    "service": "member",
+    "path": "/v1/members/me",
+    "contractPath": "/v1/members/me",
+    "code": 200,
+    "example": "normal",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "member",
+    "path": "/v1/members/me",
+    "contractPath": "/v1/members/me",
+    "code": 401,
+    "example": "unauthorized",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/cart/items",
+    "contractPath": "/v1/cart/items",
+    "code": 200,
+    "example": "normal",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/cart/items",
+    "contractPath": "/v1/cart/items",
+    "code": 201,
+    "example": "created",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/cart/items",
+    "contractPath": "/v1/cart/items",
+    "code": 409,
+    "example": "duplicateCartItem",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/cart/items/99",
+    "contractPath": "/v1/cart/items/{itemId}",
+    "code": 404,
+    "example": "notFound",
+    "method": "PATCH",
+    "body": {
+      "quantity": 3
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders",
+    "contractPath": "/v1/orders",
+    "code": 201,
+    "example": "created",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2,
+      "buyerName": "구매자",
+      "buyerPhone": "010-1234-5678",
+      "expectedTotalAmount": 30000
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "X-Idempotency-Key": "contract-order-example"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders",
+    "contractPath": "/v1/orders",
+    "code": 200,
+    "example": "replay",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2,
+      "buyerName": "구매자",
+      "buyerPhone": "010-1234-5678",
+      "expectedTotalAmount": 30000
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "X-Idempotency-Key": "contract-order-example"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders",
+    "contractPath": "/v1/orders",
+    "code": 409,
+    "example": "insufficientStock",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2,
+      "buyerName": "구매자",
+      "buyerPhone": "010-1234-5678",
+      "expectedTotalAmount": 30000
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "X-Idempotency-Key": "contract-order-example"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders",
+    "contractPath": "/v1/orders",
+    "code": 409,
+    "example": "amountChanged",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2,
+      "buyerName": "구매자",
+      "buyerPhone": "010-1234-5678",
+      "expectedTotalAmount": 30000
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "X-Idempotency-Key": "contract-order-example"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders",
+    "contractPath": "/v1/orders",
+    "code": 503,
+    "example": "shoppingUnavailable",
+    "method": "POST",
+    "body": {
+      "productId": 1,
+      "quantity": 2,
+      "buyerName": "구매자",
+      "buyerPhone": "010-1234-5678",
+      "expectedTotalAmount": 30000
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "X-Idempotency-Key": "contract-order-example"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders/20261001-000001/cancel",
+    "contractPath": "/v1/orders/{orderNumber}/cancel",
+    "code": 204,
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/sales?productIds=1",
+    "contractPath": "/v1/sales",
+    "code": 200,
+    "example": "normal",
+    "headers": {
+      "X-Service-Token": "contract-caller-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/sales?productIds=1",
+    "contractPath": "/v1/sales",
+    "code": 401,
+    "example": "unauthorized",
+    "headers": {
+      "X-Service-Token": "contract-caller-example-only"
+    }
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/sales/1/stock",
+    "contractPath": "/v1/sales/{id}/stock",
+    "code": 403,
+    "example": "forbidden",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1",
+    "contractPath": "/v1/broadcasts/{id}",
+    "code": 200
+  },
+  {
+    "service": "live",
+    "path": "/v1/admin/broadcasts",
+    "contractPath": "/v1/admin/broadcasts",
+    "code": 401,
+    "example": "unauthorized",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/admin/broadcasts",
+    "contractPath": "/v1/admin/broadcasts",
+    "code": 403,
+    "example": "forbidden",
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/products",
+    "contractPath": "/v1/broadcasts/{id}/products",
+    "code": 503
+  },
+  {
+    "service": "member",
+    "path": "/v1/auth/login",
+    "contractPath": "/v1/auth/login",
+    "method": "POST",
+    "body": {
+      "email": "member@example.com",
+      "password": "test-password-123"
+    },
+    "code": 200,
+    "example": "issued"
+  },
+  {
+    "service": "member",
+    "path": "/v1/auth/login",
+    "contractPath": "/v1/auth/login",
+    "method": "POST",
+    "body": {
+      "email": "member@example.com",
+      "password": "test-password-123"
+    },
+    "code": 401,
+    "example": "unauthorized"
+  },
+  {
+    "service": "member",
+    "path": "/v1/auth/login",
+    "contractPath": "/v1/auth/login",
+    "method": "POST",
+    "body": {
+      "email": "member@example.com",
+      "password": "test-password-123"
+    },
+    "code": 503,
+    "example": "authUnavailable"
+  },
+  {
+    "service": "commerce",
+    "path": "/v1/orders/20261001-000001/payments",
+    "contractPath": "/v1/orders/{orderNumber}/payments",
+    "method": "POST",
+    "body": null,
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    },
+    "code": 200,
+    "example": "pending"
+  }
 ]
