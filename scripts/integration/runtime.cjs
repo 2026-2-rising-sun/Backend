@@ -101,6 +101,12 @@ class Runtime {
     }
   }
   async setup() {
+    await this.setupPostgres();
+    for (const service of services) this.ports[service] = { api: await freePort(), management: await freePort() };
+    for (const service of services) await this.start(service);
+    for (const service of services) await this.waitReady(service);
+  }
+  async setupPostgres() {
     command('docker', ['network', 'create', '--label', `shoppinglive.integration=${this.id}`, this.id]);
     this.networkCreated = true;
     this.pg = this.id + '-postgres';
@@ -108,13 +114,15 @@ class Runtime {
     this.docker(this.pg, ['-d', '--network', this.id, '--network-alias', 'task-postgres',
       '--tmpfs', '/var/lib/postgresql/data:rw', '-p', '127.0.0.1::5432', '--env-file', pgEnv, 'postgres:16-alpine']);
     this.pgPort = JSON.parse(command('docker', ['inspect', this.pg]))[0].NetworkSettings.Ports['5432/tcp'][0].HostPort;
-    await this.wait(async () => spawnSync('docker', ['exec', this.pg, 'pg_isready', '-U', 'integration'], { stdio: 'ignore' }).status === 0, 'PostgreSQL');
-    for (const service of services) {
-      command('docker', ['exec', this.pg, 'createdb', '-U', 'integration', service]);
-      this.ports[service] = { api: await freePort(), management: await freePort() };
-    }
-    for (const service of services) await this.start(service);
-    for (const service of services) await this.waitReady(service);
+    // The entrypoint's initialization server only accepts Unix sockets. Wait for the final TCP server.
+    const tcp = ['exec', this.pg, 'sh', '-c', 'export PGPASSWORD="$POSTGRES_PASSWORD"; exec "$@"', 'sh'];
+    await this.wait(async () => {
+      if (spawnSync('docker', [...tcp, 'pg_isready', '-h', '127.0.0.1', '-U', 'integration', '-d', 'postgres'], { stdio: 'ignore' }).status !== 0) return false;
+      const sql = spawnSync('docker', [...tcp, 'psql', '-h', '127.0.0.1', '-U', 'integration', '-d', 'postgres', '-Atqc', 'SELECT 1'], { encoding: 'utf8' });
+      return sql.status === 0 && sql.stdout.trim() === '1';
+    }, 'PostgreSQL TCP query readiness');
+    for (const service of services)
+      command('docker', [...tcp, 'createdb', '-h', '127.0.0.1', '-U', 'integration', service]);
   }
   databaseUrl(service) {
     return `jdbc:postgresql://${this.mode === 'docker' ? 'task-postgres:5432' : '127.0.0.1:' + this.pgPort}/${service}?connectTimeout=2&socketTimeout=2`;
@@ -263,6 +271,12 @@ class Runtime {
         await this.stop(service);
       } catch (error) { errors.push(this.sanitize(error.message)); }
     }
+    try {
+      if (this.pg && this.owned(this.pg)) {
+        const log = spawnSync('docker', ['logs', this.pg], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+        fs.writeFileSync(path.join(this.output, 'postgres.log'), this.sanitize((log.stdout || '') + (log.stderr || '')));
+      }
+    } catch (error) { errors.push(this.sanitize(error.message)); }
     for (const name of this.containers) {
       try { if (this.owned(name)) command('docker', ['rm', '-f', name]); } catch (error) { errors.push(error.message); }
     }

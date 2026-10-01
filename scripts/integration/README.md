@@ -20,9 +20,11 @@ DB 장애는 소유 PostgreSQL을 pause/unpause하여 재현한다. 테스트 JD
 정상 응답과 오류 응답 모두 현재 Git YAML을 사용하며, 검토 acknowledgment가 없으면 승인 완료라고 주장하지 않는다.
 네 서비스 관리 포트의 무인증 probe, API 포트의 health 미노출, DB 장애 readiness와 독립 liveness를 검사한다.
 
-현재 refresh/logout/탈퇴/소셜과 Prism 소비자·실제 read-timeout 주입은 `deferred`에 명시되어 있다.
+현재 refresh/logout/탈퇴/소셜의 정책·구현 대기는 `deferred`에 명시되어 있다.
 현재 구현된 필수 HTTP 흐름의 성공은 `passed`로, 정책 대기와 P2 전체 완료 여부는 `deferred`/`p2Complete`로 구분한다.
 0건·실패·skip·누락을 성공으로 바꾸지 않으며 부분 실행을 P2 또는 CI 완료로 보고하지 않는다.
 PostgreSQL migration·locking의 전체 회귀는 CI의 별도 필수 PostgreSQL job이 수행한다. 그 개수를 HTTP check 개수에 합산하지 않는다.
 
-Prism provider examples are exercised only in explicit dependency-failure cases. Temporary copied schemas add transport 503 examples without changing published contracts. A separate proxy delays headers to verify real read timeouts; real upstream URLs are restored afterward. All tracked and untracked source files must be committed before execution (ignored build outputs are allowed).
+Prism 예제는 명시적인 의존 서비스 실패 사례에서만 사용한다. 복사한 임시 명세에 transport 503을 추가하며 공개 계약을 바꾸지 않는다.
+별도 proxy가 응답 헤더를 지연시켜 실제 read timeout을 확인하고, 종료 후 실제 upstream URL을 복원한다.
+추적·미추적 소스 모두 커밋한 뒤 실행해야 한다. Git에서 무시한 빌드 결과만 허용한다.
