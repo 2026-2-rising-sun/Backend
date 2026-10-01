@@ -8,8 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,6 +45,8 @@ class JsonTypePolicyTest {
     @ValueSource(strings = {
         "{\"name\":123}", "{\"name\":1.5}", "{\"name\":true}",
         "{\"quantity\":1.5}", "{\"quantity\":\"2\"}", "{\"quantity\":true}", "{\"quantity\":\"\"}",
+        "{\"quantity\":1.00000000000000000001}", "{\"quantity\":9223372036854775808.0}",
+        "{\"quantity\":-9223372036854775809.0}", "{\"quantity\":NaN}", "{\"quantity\":Infinity}",
         "{\"price\":\"1.5\"}", "{\"price\":true}", "{\"price\":\"\"}",
         "{\"enabled\":\"true\"}", "{\"enabled\":1}", "{\"enabled\":0.5}", "{\"enabled\":\"\"}",
         "{\"scheduledAt\":123}", "{\"scheduledAt\":1.5}", "{\"scheduledAt\":\"123\"}",
@@ -50,7 +54,7 @@ class JsonTypePolicyTest {
         "{\"scheduledAt\":\"not-a-date\"}"
     })
     void wrongJsonTypesFailInTheBootMapperAndMvc(String body) throws Exception {
-        assertThatThrownBy(() -> mapper.readValue(body, Input.class)).isInstanceOf(MismatchedInputException.class);
+        assertThatThrownBy(() -> mapper.readValue(body, Input.class)).isInstanceOf(JsonProcessingException.class);
         mvc.perform(post("/types").contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
@@ -87,7 +91,39 @@ class JsonTypePolicyTest {
     void treeToValueUsesTheSameStrictTypes() throws Exception {
         var invalid = mapper.readTree("{\"quantity\":1.5}");
         assertThatThrownBy(() -> mapper.treeToValue(invalid, Input.class)).isInstanceOf(MismatchedInputException.class);
+        var preciseFraction = mapper.readTree("{\"quantity\":1.00000000000000000001}");
+        assertThatThrownBy(() -> mapper.treeToValue(preciseFraction, Input.class)).isInstanceOf(MismatchedInputException.class);
         assertThat(mapper.treeToValue(mapper.readTree("{\"quantity\":2}"), Input.class).quantity()).isEqualTo(2L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.0", "1e0", "9223372036854775807.0", "-9223372036854775808.0"})
+    void exactIntegerValuesAreAcceptedRegardlessOfJsonNumberNotation(String number) throws Exception {
+        String body = "{\"quantity\":" + number + "}";
+        long expected = new BigDecimal(number).longValueExact();
+        var response = send(body);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readValue(response.getBody(), Input.class).quantity()).isEqualTo(expected);
+        assertThat(mapper.treeToValue(mapper.readTree(body), Input.class).quantity()).isEqualTo(expected);
+    }
+
+    @Test
+    void integerDeserializerKeepsPrimitiveWrapperAndLargeNumberRangeRules() throws Exception {
+        for (Class<?> type : new Class<?>[] {Long.class, long.class, Integer.class, int.class,
+                Short.class, short.class, Byte.class, byte.class, BigInteger.class}) {
+            for (String valid : new String[] {"1", "1.0", "1e0"}) {
+                assertThat(((Number) mapper.readValue(valid, type)).longValue()).isEqualTo(1);
+            }
+            for (String invalid : new String[] {"1.5", "\"1\"", "true"}) {
+                assertThatThrownBy(() -> mapper.readValue(invalid, type)).isInstanceOf(MismatchedInputException.class);
+            }
+        }
+        assertThatThrownBy(() -> mapper.readValue("2147483648.0", Integer.class)).isInstanceOf(MismatchedInputException.class);
+        assertThatThrownBy(() -> mapper.readValue("32768.0", Short.class)).isInstanceOf(MismatchedInputException.class);
+        assertThatThrownBy(() -> mapper.readValue("128.0", Byte.class)).isInstanceOf(MismatchedInputException.class);
+        assertThat(mapper.readValue("9223372036854775808.0", BigInteger.class)).isEqualTo(new BigInteger("9223372036854775808"));
+        assertThat(mapper.readValue("null", Integer.class)).isNull();
+        assertThat(mapper.readValue("null", int.class)).isZero();
     }
 
     private org.springframework.http.ResponseEntity<String> send(String body) {
