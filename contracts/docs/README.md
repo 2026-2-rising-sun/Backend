@@ -91,3 +91,10 @@ CI가 확인하는 것은 이 기록과 hash 일치다. 실제 GitHub 사람 승
 작성자가 스스로 승인 기록을 채우지 않는다. 기록 파일의 초기 빈 배열은 승인 대기 상태이며 통과 우회가 아니다.
 
 로컬 실제 서비스·Mock 조합, 공개키와 ADMIN 초기화는 [로컬 실행 안내](local-execution.md)를 따른다.
+
+## 팀원이 따라 할 안내
+
+- [Apidog 명세 협업과 요청 실행](apidog-team-guide.md)
+- [Prism 정상·오류 예제와 실제 검증의 경계](prism-team-guide.md)
+- [Swagger 실행과 버전 확인](swagger-guide.md)
+- [전용 계정·DB를 준비하는 수동 검수](manual-review.md)
