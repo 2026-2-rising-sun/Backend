@@ -40,6 +40,16 @@
         "reviewedAt": "2026-10-03",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/136"
       }
+    },
+    {
+      "baseSnapshotSha256": "0e3ab3a0703541ca1c21df80ddb6468a73b9a61efedf563853c6c525776e7dd4",
+      "headSnapshotSha256": "c1df85958ec803807b0f87bfa1b039de9a9f35cd6c8bfb2ab917032780c73eb8",
+      "reason": "Add the member-only Live operation POST /v1/broadcasts/{id}/chats (USER/ADMIN, LIVE broadcasts only) with ChatInput, ChatMessageEnvelope and the shared BroadcastNotLive 409 response. Additive only; existing operations and authentication requirements are unchanged.",
+      "independentReview": {
+        "reviewer": "Claude review agent in a context separate from the implementer (first-pass review; human review follows on the PR)",
+        "reviewedAt": "2026-10-03",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/137"
+      }
     }
   ]
 }

@@ -331,6 +331,32 @@
     "code": 200
   },
   {
+    "service": "live",
+    "path": "/v1/broadcasts/1/chats",
+    "contractPath": "/v1/broadcasts/{id}/chats",
+    "method": "POST",
+    "code": 201,
+    "body": {
+      "content": "안녕하세요"
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/chats",
+    "contractPath": "/v1/broadcasts/{id}/chats",
+    "method": "POST",
+    "code": 409,
+    "body": {
+      "content": "안녕하세요"
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
     "service": "member",
     "path": "/v1/auth/login",
     "contractPath": "/v1/auth/login",

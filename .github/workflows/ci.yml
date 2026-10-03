@@ -39,7 +39,7 @@ jobs:
             'services/notification-service/build/test-results/test/TEST-*.xml' \
             'libs/*/build/test-results/test/TEST-*.xml' \
             --require-suite '*.MemberJwtDecoderTest' \
-            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=7 \
+            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=8 \
             --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
@@ -95,7 +95,7 @@ jobs:
             task: ':services:live-service:test --tests *PostgresMigrationTest'
             report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
             suites: '*.PostgresMigrationTest'
-            minimums: '*.PostgresMigrationTest=7'
+            minimums: '*.PostgresMigrationTest=8'
     services:
       postgres:
         image: postgres:16
