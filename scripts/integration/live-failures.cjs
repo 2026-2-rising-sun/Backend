@@ -1,4 +1,4 @@
-const { command, delay, services } = require('./runtime.cjs');
+const { command, delay, instances } = require('./runtime.cjs');
 async function liveFailures(ctx) {
   const req = ctx.request.bind(ctx); const r = ctx.runtime; const p = ctx.products;
   const tokenHeader = key => ({ 'X-Service-Token': r.credentials[key + '_SERVICE_TOKEN'] });
@@ -62,13 +62,13 @@ async function liveFailures(ctx) {
   } finally { await r.restart('shopping'); }
   command('docker', ['pause', r.pg]);
   try {
-    for (const service of services) {
+    for (const service of instances) {
       await req(`${service}-db-down-readiness`, service, 'GET', '/actuator/health/readiness', { management: true, status: 503 });
       await req(`${service}-db-down-liveness`, service, 'GET', '/actuator/health/liveness', { management: true });
     }
   } finally {
     command('docker', ['unpause', r.pg]);
-    for (const service of services) await r.waitReady(service);
+    for (const service of instances) await r.waitReady(service);
   }
   await delay(100);
 }
