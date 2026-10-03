@@ -39,6 +39,15 @@ public class BroadcastChat {
     protected BroadcastChat() {
     }
 
+    public BroadcastChat(final Long broadcastId, final UUID memberId, final String displayName,
+                         final String content, final Instant createdAt) {
+        this.broadcastId = broadcastId;
+        this.memberId = memberId;
+        this.displayName = displayName;
+        this.content = content;
+        this.createdAt = createdAt;
+    }
+
     public Long getId() {
         return id;
     }
