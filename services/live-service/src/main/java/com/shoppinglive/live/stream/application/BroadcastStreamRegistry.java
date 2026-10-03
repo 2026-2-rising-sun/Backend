@@ -61,6 +61,11 @@ public class BroadcastStreamRegistry {
         local(broadcastId).forEach(connection -> connection.offerThenClose(event));
     }
 
+    /** 이 pod 에 연결이 하나 이상 있는 방송. */
+    public Set<Long> broadcastIds() {
+        return Set.copyOf(connections.keySet());
+    }
+
     public int connectionCount(final long broadcastId) {
         return local(broadcastId).size();
     }

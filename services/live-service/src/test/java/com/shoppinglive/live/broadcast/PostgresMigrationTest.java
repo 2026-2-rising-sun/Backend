@@ -43,6 +43,9 @@ class PostgresMigrationTest extends LiveSecuritySupport {
     @Autowired
     BroadcastChatRepository chats;
 
+    @Autowired
+    com.shoppinglive.live.like.application.LikeSnapshotService likeSnapshots;
+
     JdbcTemplate jdbc;
 
     @BeforeEach
@@ -163,6 +166,49 @@ class PostgresMigrationTest extends LiveSecuritySupport {
             .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE broadcast_like_snapshot SET total = -1 WHERE broadcast_id = ?",
             broadcastId)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @DisplayName("좋아요 보관은 여러 번·동시에 실행해도 더 큰 값만 남긴다")
+    @Test
+    void likeSnapshotStoreKeepsTheLargestTotal() throws Exception {
+        insertBroadcast("like-store", "arn:aws:ivs:channel/like-store", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'like-store'", Long.class);
+        final String select = "SELECT total FROM broadcast_like_snapshot WHERE broadcast_id = ?";
+
+        likeSnapshots.store(broadcastId, 10);
+        likeSnapshots.store(broadcastId, 5);
+        likeSnapshots.store(broadcastId, 10);
+        assertThat(jdbc.queryForObject(select, Long.class, broadcastId)).isEqualTo(10);
+
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            for (long total = 1; total <= 200; total++) {
+                final long value = total;
+                pool.submit(() -> likeSnapshots.store(broadcastId, value));
+            }
+        }
+        assertThat(jdbc.queryForObject(select, Long.class, broadcastId)).isEqualTo(200);
+    }
+
+    @DisplayName("같은 순간에 여러 pod 가 첫 보관을 해도 실패하지 않고 한 행만 남는다")
+    @Test
+    void concurrentFirstLikeSnapshotsLeaveOneRow() throws Exception {
+        insertBroadcast("like-first", "arn:aws:ivs:channel/like-first", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'like-first'", Long.class);
+        final List<java.util.concurrent.Future<?>> results = new java.util.ArrayList<>();
+
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            for (int attempt = 0; attempt < 8; attempt++) {
+                results.add(pool.submit(() -> likeSnapshots.store(broadcastId, 7)));
+            }
+        }
+
+        for (final var result : results) {
+            result.get();
+        }
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM broadcast_like_snapshot WHERE broadcast_id = ?",
+            Integer.class, broadcastId)).isEqualTo(1);
     }
 
     void insertChat(final Long broadcastId, final String content, final Instant createdAt) {

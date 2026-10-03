@@ -3,8 +3,10 @@ package com.shoppinglive.live.broadcast.api;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.live.broadcast.application.BroadcastEndNotifier;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.broadcast.application.BroadcastStartService;
+import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import org.springframework.data.domain.Page;
 import jakarta.validation.Valid;
@@ -29,11 +31,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class BroadcastController {
     private final BroadcastService service;
     private final BroadcastStartService startService;
+    private final BroadcastEndNotifier endNotifier;
 
     public BroadcastController(final BroadcastService service,
-                               final BroadcastStartService startService) {
+                               final BroadcastStartService startService,
+                               final BroadcastEndNotifier endNotifier) {
         this.service = service;
         this.startService = startService;
+        this.endNotifier = endNotifier;
     }
 
     @PostMapping
@@ -70,7 +75,9 @@ public class BroadcastController {
 
     @PostMapping("/{id}/end")
     public ApiResponse<BroadcastResponse> end(@PathVariable final long id) {
-        return ApiResponse.ok(BroadcastResponse.from(service.end(id)));
+        final Broadcast ended = service.end(id);
+        endNotifier.ended(ended);
+        return ApiResponse.ok(BroadcastResponse.from(ended));
     }
 
     @GetMapping
