@@ -2,6 +2,8 @@ package com.shoppinglive.live.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
@@ -18,6 +20,7 @@ import com.shoppinglive.live.integration.member.MemberProfileClient;
 import com.shoppinglive.live.integration.member.MemberProfileException;
 import com.shoppinglive.live.integration.member.MemberProfileException.Reason;
 import com.shoppinglive.live.security.LiveSecuritySupport;
+import com.shoppinglive.live.stream.application.StreamRelay;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -30,6 +33,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -42,6 +46,7 @@ class ChatWriteTest extends LiveSecuritySupport {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
     @MockitoBean MemberProfileClient members;
+    @MockitoSpyBean StreamRelay relay;
 
     @BeforeEach
     void memberReturnsDisplayName() {
@@ -177,5 +182,18 @@ class ChatWriteTest extends LiveSecuritySupport {
                 "/v1/broadcasts/{id}/chats", id))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].content").value("전달 실패"));
+    }
+
+    @DisplayName("트랜잭션 안에서 실패하면 이벤트를 발행하지 않고, 저장에 성공하면 한 번 발행한다")
+    @Test
+    void publishesOnlyAfterASuccessfulSave() throws Exception {
+        final long ended = broadcast("write-publish-ended", "ENDED");
+        final long live = broadcast("write-publish-live", "LIVE");
+
+        write(ended, userBearer(), "저장 안 됨").andExpect(status().isConflict());
+        verify(relay, never()).publish(anyLong(), any());
+
+        write(live, userBearer(), "저장됨").andExpect(status().isCreated());
+        verify(relay).publish(eq(live), any());
     }
 }

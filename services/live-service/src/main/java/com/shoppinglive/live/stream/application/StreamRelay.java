@@ -67,7 +67,7 @@ public class StreamRelay implements MessageListener {
      * 구독 뒤의 연결 끊김은 container 가 스스로 복구한다.
      */
     @Scheduled(fixedDelayString = "${live.stream.subscribe-retry:5s}")
-    void subscribe() {
+    synchronized void subscribe() {
         if (subscribed) {
             return;
         }
