@@ -66,19 +66,25 @@ public class LikeSnapshotService {
         }
     }
 
-    /** 기존 값보다 클 때만 쓴다. */
+    /**
+     * 기존 값보다 클 때만 쓴다. 행이 없으면 넣는다. 그 사이 다른 pod 가 먼저 넣었으면
+     * (넣은 행이 0개이거나 중복 키) 그 행을 이 값으로 다시 올린다.
+     */
     public void store(final long broadcastId, final long total) {
         if (raise(broadcastId, total)) {
             return;
         }
+        int inserted;
         try {
-            jdbc.update("""
+            inserted = jdbc.update("""
                 INSERT INTO broadcast_like_snapshot (broadcast_id, total, updated_at)
                 SELECT CAST(? AS BIGINT), CAST(? AS BIGINT), CAST(? AS TIMESTAMP WITH TIME ZONE)
                 WHERE NOT EXISTS (SELECT 1 FROM broadcast_like_snapshot WHERE broadcast_id = ?)
                 """, broadcastId, total, Timestamp.from(Instant.now()), broadcastId);
         } catch (DuplicateKeyException e) {
-            // 다른 pod 가 같은 순간에 첫 행을 넣었다. 그 값이 더 작으면 이 값으로 올린다.
+            inserted = 0;
+        }
+        if (inserted == 0) {
             raise(broadcastId, total);
         }
     }

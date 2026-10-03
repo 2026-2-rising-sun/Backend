@@ -193,7 +193,7 @@ class PostgresMigrationTest extends LiveSecuritySupport {
     @DisplayName("같은 순간에 여러 pod 가 서로 다른 값으로 첫 보관을 해도 한 행에 가장 큰 값이 남는다")
     @Test
     void concurrentFirstLikeSnapshotsKeepTheLargestTotal() throws Exception {
-        for (int round = 0; round < 20; round++) {
+        for (int round = 0; round < 100; round++) {
             final String key = "like-first-" + round;
             insertBroadcast(key, "arn:aws:ivs:channel/" + key, "LIVE");
             final Long broadcastId = jdbc.queryForObject(
