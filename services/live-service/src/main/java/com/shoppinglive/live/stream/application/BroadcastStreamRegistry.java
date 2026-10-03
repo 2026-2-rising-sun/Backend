@@ -22,8 +22,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class BroadcastStreamRegistry {
     private final Map<Long, Set<BroadcastConnection>> connections = new ConcurrentHashMap<>();
     private final StreamProperties properties;
-    // ponytail: 느린 클라이언트는 컨테이너 write timeout 까지 writer 하나를 붙잡는다.
-    // 느린 연결이 writer 수만큼 겹치면 전체 전송이 그동안 밀린다. 측정 후 writer 수 조정 또는 non-blocking 전환.
+    // ponytail: 멈춘 클라이언트는 컨테이너 write timeout(Tomcat connection-timeout)까지 writer 하나를 붙잡는다.
+    // 멈춘 연결이 writer 수만큼 겹치면 그동안 이 pod 의 전송이 모두 밀리고, 밀린 연결은 대기량 초과로 닫힐 수 있다.
+    // 부하·장애 테스트에서 측정한 뒤 writer 수 조정 또는 non-blocking 전송으로 바꾼다.
     private final ExecutorService writers;
 
     public BroadcastStreamRegistry(final StreamProperties properties) {
@@ -34,13 +35,16 @@ public class BroadcastStreamRegistry {
 
     /** timeout·오류·완료 어느 경로로 끝나도 등록을 지운다. */
     BroadcastConnection register(final long broadcastId, final SseEmitter emitter) {
-        final Set<BroadcastConnection> local =
-            connections.computeIfAbsent(broadcastId, id -> ConcurrentHashMap.newKeySet());
         final BroadcastConnection[] holder = new BroadcastConnection[1];
         final BroadcastConnection connection = new BroadcastConnection(emitter, properties.queueCapacity(),
             writers, () -> remove(broadcastId, holder[0]));
         holder[0] = connection;
-        local.add(connection);
+        // 추가와 remove 의 빈 set 삭제가 같은 key 잠금 안에서 일어나야 삭제된 set 에 연결이 들어가지 않는다.
+        connections.compute(broadcastId, (id, local) -> {
+            final Set<BroadcastConnection> target = local != null ? local : ConcurrentHashMap.newKeySet();
+            target.add(connection);
+            return target;
+        });
         emitter.onCompletion(connection::close);
         emitter.onTimeout(connection::close);
         emitter.onError(error -> connection.close());

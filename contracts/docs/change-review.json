@@ -50,6 +50,16 @@
         "reviewedAt": "2026-10-03",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/137"
       }
+    },
+    {
+      "baseSnapshotSha256": "c1df85958ec803807b0f87bfa1b039de9a9f35cd6c8bfb2ab917032780c73eb8",
+      "headSnapshotSha256": "7be11150a38db96527578932986d7fa95cb20f9fb232045719ed612037fdec8a",
+      "reason": "Add the public Live operation GET /v1/broadcasts/{id}/events (text/event-stream, LIVE broadcasts only, JSON error envelopes before the stream starts) with the StreamReadyEvent schema. Additive only; existing operations and authentication requirements are unchanged.",
+      "independentReview": {
+        "reviewer": "Claude review agent in a context separate from the implementer (first-pass review; human review follows on the PR)",
+        "reviewedAt": "2026-10-04",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/138"
+      }
     }
   ]
 }
