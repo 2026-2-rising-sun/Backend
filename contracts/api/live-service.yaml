@@ -33,6 +33,8 @@ tags:
     description: 비회원 방송 상품 조회·구매 진입 (#67)
   - name: Broadcast Chat
     description: 방송 채팅 작성·최근 내역 조회 (#129 #130)
+  - name: Broadcast Event Stream
+    description: 방송 실시간 이벤트 SSE (#131)
 
 paths:
   /v1/admin/broadcasts:
@@ -557,6 +559,47 @@ paths:
                   message: 작성자 정보를 확인할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
 
+  /v1/broadcasts/{id}/events:
+    get:
+      security: []
+      summary: 방송 실시간 이벤트 SSE (#131)
+      description: |
+        로그인 없이 연결한다. LIVE 방송에만 연결할 수 있고 그 외 상태는 409 다.
+        연결 전 오류는 `Accept` 헤더와 무관하게 JSON 오류 봉투이고, 연결 후에는 오류 본문 없이 연결이 닫힌다.
+
+        이벤트(`event:` 이름과 `data:` JSON. data 는 `ApiResponse` 봉투가 아니다):
+
+        | event | data | 시점 |
+        |---|---|---|
+        | `stream.ready` | `StreamReadyEvent` | 연결 직후 한 번 |
+
+        클라이언트 규칙:
+        - `stream.ready` 를 받은 뒤 최근 채팅을 GET 으로 조회한다.
+        - 전달은 보장하지 않는다. `Last-Event-ID` 로 놓친 이벤트를 다시 보내지 않는다.
+        - 약 15초마다 comment 줄(`:heartbeat`)이 온다. 수신이 느려 대기량을 넘으면 서버가 연결을 닫는다.
+        - 서버는 연결을 최대 30분 유지한다. 닫히면 다시 연결한다. 재연결이 409 이면 방송 상태를 조회한다.
+      operationId: streamBroadcastEvents
+      tags: [Broadcast Event Stream]
+      parameters:
+        - $ref: '#/components/parameters/BroadcastId'
+      responses:
+        '200':
+          description: 이벤트 스트림
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: stream.ready
+                data: {"broadcastId":12}
+
+                : heartbeat
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BroadcastNotLive' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+
 components:
   securitySchemes:
     BearerAuth:
@@ -844,6 +887,12 @@ components:
         content: { type: string, minLength: 1, maxLength: 200 }
         createdAt: { type: string, format: date-time, description: 서버 작성 시각 }
 
+    StreamReadyEvent:
+      type: object
+      description: SSE `stream.ready` 의 data.
+      required: [broadcastId]
+      properties:
+        broadcastId: { type: integer, format: int64 }
     BroadcastEnvelope:
       type: object
       required: [success, data, error]
