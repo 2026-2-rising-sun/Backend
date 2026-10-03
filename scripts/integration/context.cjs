@@ -8,9 +8,11 @@ class Context {
   constructor(runtime) {
     this.runtime = runtime;
     this.contracts = Object.fromEntries(services.map(service => [service, load(path.join(root, `contracts/api/${service}-service.yaml`))]));
+    this.contracts.live2 = this.contracts.live;
     this.result = { sha: runtime.sha, startedAt: new Date().toISOString(), runtime: runtime.mode, checks: [],
       contracts: Object.fromEntries(services.map(s => [s, this.contracts[s].sha256])),
       mocks: { payments: 'existing MockPaymentEngine', ivs: 'explicit local IVS stub', internalHttp: 'real services; no Prism fallback' },
+      realtime: 'two live-service processes (live, live2) sharing one PostgreSQL database and one real Redis',
       excludedInfrastructure: ['Kafka: no current producer/consumer usage in the four services; listener/admin auto-start disabled', 'Gateway', 'Frontend', 'deployed Kubernetes', 'Social login and email ownership verification: explicitly excluded from P2'],
       tokenPolicy: { access: 'PT15M', refresh: 'P30D', refreshExpiry: 'absolute from login',
         ordinaryLogout: 'refresh family only', securityRevocation: 'reject subsequent authentication checks' },

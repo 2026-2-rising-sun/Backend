@@ -74,7 +74,15 @@
       "broadcast-end",
       "live-real-products-and-sales",
       "live-repeated-ids-reached-shopping",
-      "live-bulk-reached-commerce"
+      "live-bulk-reached-commerce",
+      "realtime-sse-b-ready",
+      "realtime-chat-a-reaches-b",
+      "realtime-likes-same-total",
+      "realtime-likes-updated-reaches-b",
+      "realtime-end-a-reaches-b",
+      "realtime-end-a-closes-b",
+      "realtime-sse-after-end-409",
+      "realtime-likes-kept-and-stored-after-end"
     ],
     "database": [
       "cart-does-not-reserve-stock",

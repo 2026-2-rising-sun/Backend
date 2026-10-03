@@ -7,6 +7,10 @@ const { spawn, spawnSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '../..');
 const services = ['member', 'shopping', 'commerce', 'live'];
+// live2 is a second live-service process on the same database and Redis, used to prove cross-instance delivery.
+const replicas = { live2: 'live' };
+const instances = [...services, ...Object.keys(replicas)];
+const base = instance => replicas[instance] || instance;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 function command(file, args, options = {}) {
   const result = spawnSync(file, args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
@@ -100,12 +104,16 @@ class Runtime {
       assert.equal(files.length, 1, `${service} requires exactly one bootJar`);
       this.jars[service] = path.join(directory, files[0]);
     }
+    for (const replica of Object.keys(replicas)) this.jars[replica] = this.jars[base(replica)];
   }
   async setup() {
     await this.setupPostgres();
-    for (const service of services) this.ports[service] = { api: await freePort(), management: await freePort() };
+    await this.setupRedis();
+    for (const service of instances) this.ports[service] = { api: await freePort(), management: await freePort() };
     for (const service of services) await this.start(service);
     for (const service of services) await this.waitReady(service);
+    // Replicas start after their base instance has finished the Flyway migration.
+    for (const replica of Object.keys(replicas)) { await this.start(replica); await this.waitReady(replica); }
   }
   async setupPostgres() {
     command('docker', ['network', 'create', '--label', `shoppinglive.integration=${this.id}`, this.id]);
@@ -124,6 +132,15 @@ class Runtime {
     }, 'PostgreSQL TCP query readiness');
     for (const service of services)
       command('docker', [...tcp, 'createdb', '-h', '127.0.0.1', '-U', 'integration', service]);
+  }
+  async setupRedis() {
+    this.redis = this.id + '-redis';
+    this.docker(this.redis, ['-d', '--network', this.id, '--network-alias', 'task-redis', '-p', '127.0.0.1::6379', 'redis:7-alpine']);
+    this.redisPort = JSON.parse(command('docker', ['inspect', this.redis]))[0].NetworkSettings.Ports['6379/tcp'][0].HostPort;
+    await this.wait(async () => {
+      const ping = spawnSync('docker', ['exec', this.redis, 'redis-cli', 'ping'], { encoding: 'utf8' });
+      return ping.status === 0 && ping.stdout.trim() === 'PONG';
+    }, 'Redis readiness');
   }
   databaseUrl(service) {
     return `jdbc:postgresql://${this.mode === 'docker' ? 'task-postgres:5432' : '127.0.0.1:' + this.pgPort}/${service}?connectTimeout=2&socketTimeout=2`;
@@ -150,7 +167,7 @@ class Runtime {
     const upstream = name => this.mode === 'docker' ? `http://${name}:8080` : `http://127.0.0.1:${this.ports[name].api}`;
     const env = { SPRING_PROFILES_ACTIVE: 'local', SERVER_PORT: String(this.mode === 'docker' ? 8080 : this.ports[service].api),
       MANAGEMENT_SERVER_PORT: String(this.mode === 'docker' ? 9090 : this.ports[service].management),
-      SPRING_DATASOURCE_URL: this.databaseUrl(service), SPRING_DATASOURCE_USERNAME: 'integration', SPRING_DATASOURCE_PASSWORD: this.databasePassword,
+      SPRING_DATASOURCE_URL: this.databaseUrl(base(service)), SPRING_DATASOURCE_USERNAME: 'integration', SPRING_DATASOURCE_PASSWORD: this.databasePassword,
       SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: '2000', SPRING_DATASOURCE_HIKARI_VALIDATION_TIMEOUT: '1000',
       SPRING_KAFKA_BOOTSTRAP_SERVERS: '127.0.0.1:1', SPRING_KAFKA_ADMIN_AUTO_CREATE: 'false', SPRING_KAFKA_LISTENER_AUTO_STARTUP: 'false',
       MEMBER_JWT_PUBLIC_KEY_SET_LOCATION: `file:${prefix}/member-public.jwks`,
@@ -164,7 +181,9 @@ class Runtime {
       shopping: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_SHOPPING', 'SHOPPING_MEMBER'],
       commerce: ['SHOPPING_COMMERCE', 'COMMERCE_SHOPPING', 'LIVE_COMMERCE', 'COMMERCE_MEMBER'],
       live: ['LIVE_SHOPPING', 'LIVE_COMMERCE', 'LIVE_MEMBER'] };
-    for (const pair of needed[service]) env[pair + '_SERVICE_TOKEN'] = this.credentials[pair + '_SERVICE_TOKEN'];
+    if (base(service) === 'live') Object.assign(env, { SPRING_DATA_REDIS_HOST: this.mode === 'docker' ? 'task-redis' : '127.0.0.1',
+      SPRING_DATA_REDIS_PORT: String(this.mode === 'docker' ? 6379 : this.redisPort) });
+    for (const pair of needed[base(service)]) env[pair + '_SERVICE_TOKEN'] = this.credentials[pair + '_SERVICE_TOKEN'];
     if (service !== 'member') env.MEMBER_SESSION_BASE_URL = upstream('member');
     if (service === 'member') Object.assign(env, { MEMBER_JWT_PRIVATE_KEY_LOCATION: `file:${prefix}/member-private.pem`,
       MEMBER_JWT_KEY_ID: this.kid, MEMBER_ACCESS_TOKEN_TTL: 'PT15M', MEMBER_REFRESH_TOKEN_TTL: 'P30D' });
@@ -262,7 +281,7 @@ class Runtime {
       await Promise.race([new Promise(resolve => this.buildChild.once('exit', resolve)), delay(5000)]);
       if (this.buildChild.exitCode === null && this.buildChild.signalCode === null) this.buildChild.kill('SIGKILL');
     }
-    for (const service of services) {
+    for (const service of instances) {
       try {
         let log = '';
         if (this.mode === 'docker' && this.owned(this.id + '-' + service)) {
@@ -295,4 +314,4 @@ class Runtime {
     assert.equal(errors.length, 0, 'Owned runtime cleanup failed: ' + errors.join('; '));
   }
 }
-module.exports = { Runtime, root, services, delay, command };
+module.exports = { Runtime, root, services, instances, delay, command };

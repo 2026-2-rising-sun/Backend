@@ -7,6 +7,7 @@ const { Context } = require('./context.cjs');
 const { memberAdmin } = require('./member-admin.cjs');
 const { commerce } = require('./commerce.cjs');
 const { liveFailures } = require('./live-failures.cjs');
+const { liveRealtime } = require('./live-realtime.cjs');
 const { mockFailures } = require('./mock-failures.cjs');
 const { sessions } = require('./sessions.cjs');
 
@@ -42,6 +43,7 @@ async function run() {
     await memberAdmin(context);
     await commerce(context);
     await mockFailures(context);
+    await liveRealtime(context);
     await liveFailures(context);
     await sessions(context);
     context.result.implementedFlowsPassed = true;
