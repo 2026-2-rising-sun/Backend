@@ -164,4 +164,18 @@ class ChatWriteTest extends LiveSecuritySupport {
 
         assertThat(chatCount()).isEqualTo(before);
     }
+
+    @DisplayName("Redis 에 연결할 수 없어 실시간 전달에 실패해도 201 이고 저장된 채팅을 조회할 수 있다")
+    @Test
+    void writeSucceedsWhenRealtimeDeliveryFails() throws Exception {
+        // 테스트 설정의 Redis 포트는 닫혀 있다.
+        final long id = broadcast("write-no-redis", "LIVE");
+
+        write(id, userBearer(), "전달 실패").andExpect(status().isCreated());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/v1/broadcasts/{id}/chats", id))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data[0].content").value("전달 실패"));
+    }
 }

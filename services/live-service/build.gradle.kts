@@ -12,6 +12,7 @@ dependencies {
     implementation(project(":libs:common-kafka"))
     implementation(project(":contracts:events"))
 
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)

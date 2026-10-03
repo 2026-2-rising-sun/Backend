@@ -40,6 +40,7 @@ jobs:
             'libs/*/build/test-results/test/TEST-*.xml' \
             --require-suite '*.MemberJwtDecoderTest' \
             --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=8 \
+            --allow-skipped-suite com.shoppinglive.live.stream.application.ChatRealtimeRedisTest=3 \
             --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
@@ -92,10 +93,11 @@ jobs:
             minimums: '*.MemberCommerceMigrationPostgresTest=3'
           - service: live
             database: live_test
-            task: ':services:live-service:test --tests *PostgresMigrationTest'
-            report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
-            suites: '*.PostgresMigrationTest'
-            minimums: '*.PostgresMigrationTest=8'
+            # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.
+            task: ':services:live-service:test --tests *PostgresMigrationTest --tests *ChatRealtimeRedisTest'
+            report: services/live-service/build/test-results/test/TEST-*.xml
+            suites: '*.PostgresMigrationTest *.ChatRealtimeRedisTest'
+            minimums: '*.PostgresMigrationTest=8 *.ChatRealtimeRedisTest=3'
     services:
       postgres:
         image: postgres:16
@@ -108,6 +110,13 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 56379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
       MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
@@ -118,6 +127,8 @@ jobs:
       COMMERCE_TEST_POSTGRES_PASSWORD: test
       LIVE_PG_TEST: '1'
       LIVE_PG_PORT: '55432'
+      LIVE_REDIS_TEST: '1'
+      LIVE_REDIS_PORT: '56379'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
