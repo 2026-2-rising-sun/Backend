@@ -6,6 +6,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  task:
+    scheduling:
+      pool:
+        # heartbeat·구독 재시도·좋아요 전달·좋아요 보관이 서로를 기다리지 않게 한다.
+        size: 4
   data:
     redis:
       # Redis 는 실시간 전달에만 쓴다. 장애 시 요청이 오래 붙잡히지 않도록 짧게 끊는다.

@@ -43,6 +43,9 @@ class PostgresMigrationTest extends LiveSecuritySupport {
     @Autowired
     BroadcastChatRepository chats;
 
+    @Autowired
+    com.shoppinglive.live.like.application.LikeSnapshotService likeSnapshots;
+
     JdbcTemplate jdbc;
 
     @BeforeEach
@@ -163,6 +166,59 @@ class PostgresMigrationTest extends LiveSecuritySupport {
             .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE broadcast_like_snapshot SET total = -1 WHERE broadcast_id = ?",
             broadcastId)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @DisplayName("좋아요 보관은 여러 번·동시에 실행해도 더 큰 값만 남긴다")
+    @Test
+    void likeSnapshotStoreKeepsTheLargestTotal() throws Exception {
+        insertBroadcast("like-store", "arn:aws:ivs:channel/like-store", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'like-store'", Long.class);
+        final String select = "SELECT total FROM broadcast_like_snapshot WHERE broadcast_id = ?";
+
+        likeSnapshots.store(broadcastId, 10);
+        likeSnapshots.store(broadcastId, 5);
+        likeSnapshots.store(broadcastId, 10);
+        assertThat(jdbc.queryForObject(select, Long.class, broadcastId)).isEqualTo(10);
+
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            for (long total = 1; total <= 200; total++) {
+                final long value = total;
+                pool.submit(() -> likeSnapshots.store(broadcastId, value));
+            }
+        }
+        assertThat(jdbc.queryForObject(select, Long.class, broadcastId)).isEqualTo(200);
+    }
+
+    @DisplayName("같은 순간에 여러 pod 가 서로 다른 값으로 첫 보관을 해도 한 행에 가장 큰 값이 남는다")
+    @Test
+    void concurrentFirstLikeSnapshotsKeepTheLargestTotal() throws Exception {
+        for (int round = 0; round < 100; round++) {
+            final String key = "like-first-" + round;
+            insertBroadcast(key, "arn:aws:ivs:channel/" + key, "LIVE");
+            final Long broadcastId = jdbc.queryForObject(
+                "SELECT id FROM broadcast WHERE request_key = ?", Long.class, key);
+            final var start = new java.util.concurrent.CountDownLatch(1);
+            final List<java.util.concurrent.Future<?>> results = new java.util.ArrayList<>();
+
+            try (var pool = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+                for (long total = 1; total <= 8; total++) {
+                    final long value = total;
+                    results.add(pool.submit(() -> {
+                        start.await();
+                        likeSnapshots.store(broadcastId, value);
+                        return null;
+                    }));
+                }
+                start.countDown();
+            }
+
+            for (final var result : results) {
+                result.get();
+            }
+            assertThat(jdbc.queryForList("SELECT total FROM broadcast_like_snapshot WHERE broadcast_id = ?",
+                Long.class, broadcastId)).containsExactly(8L);
+        }
     }
 
     void insertChat(final Long broadcastId, final String content, final Instant createdAt) {
