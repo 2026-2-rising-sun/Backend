@@ -358,6 +358,32 @@
   },
   {
     "service": "live",
+    "path": "/v1/broadcasts/1/likes",
+    "contractPath": "/v1/broadcasts/{id}/likes",
+    "code": 200
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/likes",
+    "contractPath": "/v1/broadcasts/{id}/likes",
+    "method": "POST",
+    "code": 200,
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/likes",
+    "contractPath": "/v1/broadcasts/{id}/likes",
+    "method": "POST",
+    "code": 409,
+    "headers": {
+      "Authorization": "Bearer contract-example-only"
+    }
+  },
+  {
+    "service": "live",
     "path": "/v1/broadcasts/1/events",
     "contractPath": "/v1/broadcasts/{id}/events",
     "code": 409
