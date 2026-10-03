@@ -39,8 +39,9 @@ jobs:
             'services/notification-service/build/test-results/test/TEST-*.xml' \
             'libs/*/build/test-results/test/TEST-*.xml' \
             --require-suite '*.MemberJwtDecoderTest' \
-            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=8 \
+            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=9 \
             --allow-skipped-suite com.shoppinglive.live.stream.application.ChatRealtimeRedisTest=3 \
+            --allow-skipped-suite com.shoppinglive.live.like.LikeRedisTest=4 \
             --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
@@ -94,10 +95,10 @@ jobs:
           - service: live
             database: live_test
             # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.
-            task: ':services:live-service:test --tests *PostgresMigrationTest --tests *ChatRealtimeRedisTest'
+            task: ':services:live-service:test --tests *PostgresMigrationTest --tests *ChatRealtimeRedisTest --tests *LikeRedisTest'
             report: services/live-service/build/test-results/test/TEST-*.xml
-            suites: '*.PostgresMigrationTest *.ChatRealtimeRedisTest'
-            minimums: '*.PostgresMigrationTest=8 *.ChatRealtimeRedisTest=3'
+            suites: '*.PostgresMigrationTest *.ChatRealtimeRedisTest *.LikeRedisTest'
+            minimums: '*.PostgresMigrationTest=9 *.ChatRealtimeRedisTest=3 *.LikeRedisTest=4'
     services:
       postgres:
         image: postgres:16
