@@ -60,6 +60,16 @@
         "reviewedAt": "2026-10-04",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/138"
       }
+    },
+    {
+      "baseSnapshotSha256": "7be11150a38db96527578932986d7fa95cb20f9fb232045719ed612037fdec8a",
+      "headSnapshotSha256": "9e2684a4deb9045db61733e8a2a21560cd09ba0569a55a0e1b1662a40857714d",
+      "reason": "Document the chat.created SSE event (data = ChatMessage, id = messageId) on GET /v1/broadcasts/{id}/events and the best-effort delivery note on POST /v1/broadcasts/{id}/chats. Descriptions and examples only; no operation, schema or authentication requirement changes.",
+      "independentReview": {
+        "reviewer": "Claude review agent in a context separate from the implementer (first-pass review; human review follows on the PR)",
+        "reviewedAt": "2026-10-04",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/139"
+      }
     }
   ]
 }

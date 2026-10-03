@@ -6,6 +6,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  data:
+    redis:
+      # Redis 는 실시간 전달에만 쓴다. 장애 시 요청이 오래 붙잡히지 않도록 짧게 끊는다.
+      connect-timeout: 1s
+      timeout: 1s
 
 server:
   port: 8084
@@ -61,6 +66,11 @@ spring:
     # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
     hibernate:
       ddl-auto: none
+  data:
+    # 여러 인스턴스가 실시간 이벤트(채팅 등)를 나누는 데 쓴다. Infra local/docker-compose.yml 의 redis.
+    redis:
+      host: localhost
+      port: ${REDIS_PORT:6379}
   kafka:
     # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
     bootstrap-servers: localhost:${KAFKA_PORT:29092}
@@ -83,8 +93,6 @@ live:
     stub-ready: true
     stub-unavailable: false
 
-# Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
-# 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
 
 shoppinglive:
   security:
@@ -108,6 +116,10 @@ spring:
     # 스키마는 Flyway 가 소유할 예정이라 Hibernate 가 건드리지 않게 둔다.
     hibernate:
       ddl-auto: none
+  data:
+    redis:
+      host: redis
+      port: 6379
   kafka:
     # 클러스터 안에서는 브로커의 PLAINTEXT 리스너로 바로 붙는다 (local 의 EXTERNAL 29092 아님).
     bootstrap-servers: kafka:9092
