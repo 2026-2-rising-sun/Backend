@@ -66,6 +66,14 @@ class MemberProfileClientTest {
         assertThat(receivedAuthorization.get()).isEqualTo("Bearer caller-token");
     }
 
+    @DisplayName("이름 길이는 code point 로 세어 이모지 80자를 허용한다")
+    @Test
+    void displayNameLengthIsCountedInCodePoints() {
+        respond(200, null, profile(MEMBER, "\"" + "😀".repeat(80) + "\""));
+
+        assertThat(client.displayName("Bearer caller-token", MEMBER)).isEqualTo("😀".repeat(80));
+    }
+
     @DisplayName("Member 의 401 은 UNAUTHORIZED 다")
     @Test
     void memberRejectionIsUnauthorized() {
@@ -86,6 +94,10 @@ class MemberProfileClientTest {
 
         server.removeContext("/v1/members/me");
         respond(200, null, profile(MEMBER, "null"));
+        assertReason(Reason.UNAVAILABLE);
+
+        server.removeContext("/v1/members/me");
+        respond(200, null, profile(MEMBER, "\"" + "가".repeat(81) + "\""));
         assertReason(Reason.UNAVAILABLE);
 
         server.removeContext("/v1/members/me");

@@ -28,7 +28,8 @@ public record HttpMemberProfileClient(RestClient client) implements MemberProfil
             throw new MemberProfileException(Reason.UNAVAILABLE);
         }
         final String displayName = data.path("displayName").asText();
-        if (displayName.isBlank() || displayName.length() > MAX_DISPLAY_NAME) {
+        // 저장 컬럼 VARCHAR(80) 은 문자(code point) 수를 센다.
+        if (displayName.isBlank() || displayName.codePointCount(0, displayName.length()) > MAX_DISPLAY_NAME) {
             throw new MemberProfileException(Reason.UNAVAILABLE);
         }
         return displayName;
