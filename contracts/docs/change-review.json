@@ -80,6 +80,16 @@
         "reviewedAt": "2026-10-04",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/140"
       }
+    },
+    {
+      "baseSnapshotSha256": "0bc8267ce2d3772b8d19753f64646ceb9402c203a76e7d001c5916f8b8d0e2a4",
+      "headSnapshotSha256": "ef202e35e7aa326f9a917f2fcc7d34416cf14aac13c66b7cf284d5fce054e6a0",
+      "reason": "Document the likes.updated (data = LikeTotal) and broadcast.ended (data = BroadcastEndedEvent) SSE events on GET /v1/broadcasts/{id}/events and add the BroadcastEndedEvent schema. Additive only; no operation or authentication requirement changes.",
+      "independentReview": {
+        "reviewer": "Claude review agent and Codex (gpt-6-luna), each in a context separate from the implementer (first-pass review; human review follows on the PR)",
+        "reviewedAt": "2026-10-04",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/141"
+      }
     }
   ]
 }
