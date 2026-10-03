@@ -102,6 +102,20 @@ class ChatHistoryTest extends LiveSecuritySupport {
             .andExpect(jsonPath("$.data", hasSize(0)));
     }
 
+    @DisplayName("공개 경로라도 토큰을 보내면 검증한다: 잘못된 토큰 401, 세션 확인 장애 503")
+    @Test
+    void suppliedTokenIsStillVerifiedOnThePublicRoute() throws Exception {
+        final long id = broadcast("chat-token");
+
+        mvc.perform(get("/v1/broadcasts/{id}/chats", id).header("Authorization", "Bearer bad"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
+        accessSessions.fail();
+        mvc.perform(get("/v1/broadcasts/{id}/chats", id).header("Authorization", userBearer()))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"));
+    }
+
     @DisplayName("없는 방송은 404, 숫자가 아닌 ID는 400이다")
     @Test
     void missingBroadcastIs404AndMalformedIdIs400() throws Exception {
