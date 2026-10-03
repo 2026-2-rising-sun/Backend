@@ -357,6 +357,12 @@
     }
   },
   {
+    "service": "live",
+    "path": "/v1/broadcasts/1/events",
+    "contractPath": "/v1/broadcasts/{id}/events",
+    "code": 409
+  },
+  {
     "service": "member",
     "path": "/v1/auth/login",
     "contractPath": "/v1/auth/login",
