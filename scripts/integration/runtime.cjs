@@ -194,7 +194,7 @@ class Runtime {
     this.remember(password);
     const env = { ...this.environments.member, MEMBER_BOOTSTRAP_DB_URL: this.databaseUrl('member'), MEMBER_BOOTSTRAP_DB_SCHEMA: 'public',
       MEMBER_BOOTSTRAP_DB_USER: 'integration', MEMBER_BOOTSTRAP_DB_PASSWORD: this.databasePassword,
-      MEMBER_BOOTSTRAP_SELLER_EMAIL: email, MEMBER_BOOTSTRAP_SELLER_PASSWORD: password, MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME: 'Integration Admin' };
+      MEMBER_BOOTSTRAP_SELLER_EMAIL: email, MEMBER_BOOTSTRAP_SELLER_PASSWORD: password, MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME: 'Integration Seller' };
     const [file, args, hostEnv] = this.javaOptions('member', env, ['--bootstrap-seller'], true);
     if (this.mode === 'docker') this.docker(file, args);
     else command(file, args, { env: hostEnv });

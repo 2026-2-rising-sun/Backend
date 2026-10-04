@@ -6,7 +6,7 @@ info:
   description: |-
     회원가입·로그인·프로필과 승인된 세션 수명·철회 정책 계약이다. 성공과 오류는 ApiResponse 봉투를 사용한다.
     Access 수명은 15분, refresh family는 최초 로그인부터 절대 30일이며 rotation으로 연장되지 않는다.
-    일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·관리자 강제 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
+    일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·판매자 본인 세션 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
     이미 인증 검사를 통과한 요청을 소급 취소하지 않는다. 쿠키를 쓰지 않으며 소셜 로그인은 별도 미구현 범위다.
 security: [{ BearerAuth: [] }]
 servers:
@@ -375,7 +375,7 @@ components:
         email: {"type": "string", "format": "email", "maxLength": 254}
         password: {"type": "string", "format": "password", "minLength": 8, "maxLength": 72, "writeOnly": true, "description": "UTF-8 72바이트 이하도 검사. 로그·응답에 반환하지 않는다."}
         displayName: {"type": "string", "minLength": 1, "maxLength": 80}
-      description: "email/displayName 앞뒤 공백 제거, email 소문자 정규화. 역할 입력으로 SELLER을 부여할 수 없다."
+      description: "email/displayName 앞뒤 공백 제거, email 소문자 정규화. 역할 입력으로 SELLER를 부여할 수 없다."
     ProfileUpdateRequest:
       type: "object"
       additionalProperties: false
