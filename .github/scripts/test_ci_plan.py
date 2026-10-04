@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from ci_gate import verify
-from ci_plan import changed_paths, parse_changes, plan_changes, SERVICES, HTTP_SERVICES
+from ci_plan import changed_paths, parse_changes, plan_changes, plan_push, SERVICES, HTTP_SERVICES
 
 
 class PlannerTest(unittest.TestCase):
@@ -70,7 +70,7 @@ class PlannerTest(unittest.TestCase):
     def test_shared_and_unknown_executable_changes_fail_closed_to_full(self):
         for path in ["libs/common-core/src/main/java/Core.java", "contracts/events/src/main/java/Event.java",
                      "build-logic/plugin.gradle.kts", "gradle/libs.versions.toml", "settings.gradle.kts",
-                     ".github/workflows/ci.yml", "new-tool.sh", "application.yaml",
+                     "new-tool.sh", "application.yaml",
                      "services/member/config.ini", ".github/ISSUE_TEMPLATE/unexpected.py"]:
             with self.subTest(path=path):
                 plan = plan_changes([path])
@@ -83,9 +83,37 @@ class PlannerTest(unittest.TestCase):
         self.assertEqual(plan["services"], list(SERVICES))
         self.assertTrue(all(plan["jobs"].values()))
 
-    def test_scripts_cannot_skip_the_verification_they_implement(self):
-        for path in ["scripts/contracts/lib.cjs", "scripts/local/contracts.cjs", "scripts/integration/run.cjs"]:
-            self.assertTrue(plan_changes([path])["jobs"]["integration"])
+    def test_ci_and_tool_changes_use_self_checks_without_application_jobs(self):
+        paths = [".github/workflows/ci.yml", ".github/workflows/docker-build.yml",
+                 ".github/workflows/labeler.yml", ".github/labeler.yml",
+                 ".github/scripts/ci_plan.py", ".github/scripts/check_integration_results.py",
+                 "scripts/contracts/lib.cjs", "scripts/integration/run.cjs",
+                 "scripts/integration/required-checks.json", "scripts/local/auth-env.test.cjs"]
+        for path in paths:
+            with self.subTest(path=path):
+                plan = plan_changes([path])
+                self.assertTrue(plan["guards"])
+                self.assertFalse(plan["full"])
+                self.assertFalse(plan["postgres"])
+                self.assertFalse(any(plan["jobs"].values()))
+        plan = plan_changes(paths)
+        self.assertTrue(plan["tool_tests"])
+        verify(plan, GateTest().evidence(plan))
+        # A runtime change must still run, including code moved into the CI directory.
+        for runtime in ["services/commerce-service/src/main/java/Changed.java", "contracts/api/live-service.yaml"]:
+            self.assertTrue(plan_changes(paths + [runtime])["jobs"]["integration"])
+        self.assertTrue(plan_changes(["scripts/local/auth-env.cjs"])["jobs"]["integration"])
+
+    def test_branch_pushes_run_full_only_when_application_verification_is_needed(self):
+        for paths in [["README.md"], [".github/workflows/ci.yml"], ["scripts/integration/scope.cjs"]]:
+            self.assertFalse(plan_push(paths)["full"])
+            self.assertFalse(any(plan_push(paths)["jobs"].values()))
+        for path in ["services/commerce-service/src/main/java/Changed.java", "contracts/api/live-service.yaml",
+                     "contracts/scenarios/prism.json", "services/live-service/src/test/java/ChangedTest.java"]:
+            plan = plan_push([path])
+            self.assertTrue(plan["full"])
+            self.assertTrue(all(plan["jobs"].values()))
+            self.assertTrue(plan["postgres"])
 
     def test_nul_parser_retains_deleted_and_both_renamed_paths(self):
         self.assertEqual(parse_changes(b"R100\0services/live-service/a\n.java\0docs/a\t.md\0D\0old.sql\0"),
@@ -126,12 +154,14 @@ class PlannerTest(unittest.TestCase):
             try:
                 os.chdir(directory)
                 paths = changed_paths(base, head)
+                push_paths = changed_paths(base, head, merge_base=False)
             finally:
                 os.chdir(previous)
             self.assertIn("services/live-service/src/main/java/old\nname.java", paths)
             self.assertIn("docs/new\tname.md", paths)
             self.assertIn("deleted.sql", paths)
             self.assertNotIn("unrelated.sh", paths)
+            self.assertIn("unrelated.sh", push_paths)
 
 
 class GateTest(unittest.TestCase):

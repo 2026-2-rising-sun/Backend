@@ -2,7 +2,7 @@ name: Naming conventions
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, ready_for_review]
+    types: [opened, edited, synchronize, reopened]
   issues:
     types: [opened, edited, reopened]
 
@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   naming:
+    if: github.event.action != 'edited' || github.event.changes.title
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

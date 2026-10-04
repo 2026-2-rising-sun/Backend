@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   label:
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

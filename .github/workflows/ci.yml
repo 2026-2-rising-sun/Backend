@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       scope:
@@ -43,10 +44,29 @@ jobs:
         id: changes
         run: python3 .github/scripts/ci_plan.py
       - name: Verify CI guards and planner
-        if: steps.changes.outputs.full == 'true'
+        if: steps.changes.outputs.guards == 'true'
         run: |
           python3 -m unittest discover -s .github/scripts -p 'test_*.py'
           node --test .github/scripts/test_size_labeler.cjs
+      - name: Validate workflow syntax and expressions
+        if: steps.changes.outputs.guards == 'true'
+        run: |
+          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" .github/workflows/*.yml
+      - uses: actions/setup-node@v4
+        if: steps.changes.outputs.tool_tests == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: scripts/contracts/package-lock.json
+      - name: Verify contract and integration tooling without application startup
+        if: steps.changes.outputs.tool_tests == 'true'
+        run: |
+          npm ci --prefix scripts/contracts --ignore-scripts
+          npm test --prefix scripts/contracts
+          for script in scripts/integration/*.cjs; do node --check "$script"; done
 
   build:
     name: Build & DB
@@ -237,8 +257,8 @@ jobs:
         run: python3 .github/scripts/ci_gate.py
 
   publish:
-    needs: quality-gate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [plan, quality-gate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.plan.outputs.full == 'true'
     permissions:
       contents: read
       packages: write
