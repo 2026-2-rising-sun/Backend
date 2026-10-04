@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       verified-sha:
-        description: Commit that passed every CI quality gate
+        description: Commit that passed the build and unit tests
         required: true
         type: string
 
