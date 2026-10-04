@@ -1,5 +1,5 @@
 const { command, delay, services } = require('./runtime.cjs');
-async function serviceCallers(ctx) {
+async function liveFailures(ctx) {
   const req = ctx.request.bind(ctx); const r = ctx.runtime; const p = ctx.products;
   const tokenHeader = key => ({ 'X-Service-Token': r.credentials[key + '_SERVICE_TOKEN'] });
   for (const [name, service, endpoint, caller] of [
@@ -15,9 +15,6 @@ async function serviceCallers(ctx) {
   await req('caller-token-cannot-shop-admin', 'shopping', 'POST', '/v1/admin/products', { headers: tokenHeader('COMMERCE_SHOPPING'), body: {}, status: 401 });
   await req('caller-token-cannot-buy', 'commerce', 'GET', '/v1/cart/items', { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
   await req('wrong-target-credential', 'shopping', 'GET', `/v1/internal/products/${p[0]}`, { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
-}
-async function liveFlow(ctx) {
-  const req = ctx.request.bind(ctx); const r = ctx.runtime; const p = ctx.products;
   const create = { title: 'Integration broadcast', scheduledAt: new Date(Date.now() + 60000).toISOString(),
     channelArn: 'arn:aws:ivs:ap-northeast-2:000000000000:channel/local-fixture', playbackUrl: 'https://stub.live-video.net/local-fixture.m3u8' };
   const broadcast = (await req('broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.admin, body: create,
@@ -46,10 +43,6 @@ async function liveFlow(ctx) {
   ctx.check('live-bulk-reached-commerce', commerceAccess.split('\n').some(line => line.includes('productIds=') && line.includes('broadcast-products-real-upstream')));
   ctx.result.upstreamEvidence = r.sanitize({ shopping: shoppingAccess.split('\n').filter(line => line.includes('broadcast-products-real-upstream')),
     commerce: commerceAccess.split('\n').filter(line => line.includes('broadcast-products-real-upstream')) });
-}
-async function dependencyFailures(ctx) {
-  const req = ctx.request.bind(ctx); const r = ctx.runtime; const p = ctx.products;
-  const tokenHeader = key => ({ 'X-Service-Token': r.credentials[key + '_SERVICE_TOKEN'] });
   await r.stop('commerce');
   try {
     await req('commerce-down-public-503', 'shopping', 'GET', `/v1/products/${p[0]}`, { status: 503 });
@@ -67,19 +60,16 @@ async function dependencyFailures(ctx) {
       headers: { 'X-Idempotency-Key': 'outage-cart-order' }, status: 503 });
     ctx.check('shopping-outage-preserves-cart-order-stock', ctx.commerceSnapshot(), before);
   } finally { await r.restart('shopping'); }
-}
-async function databaseFailures(ctx, selected = services) {
-  const req = ctx.request.bind(ctx); const r = ctx.runtime;
   command('docker', ['pause', r.pg]);
   try {
-    for (const service of selected) {
+    for (const service of services) {
       await req(`${service}-db-down-readiness`, service, 'GET', '/actuator/health/readiness', { management: true, status: 503 });
       await req(`${service}-db-down-liveness`, service, 'GET', '/actuator/health/liveness', { management: true });
     }
   } finally {
     command('docker', ['unpause', r.pg]);
-    for (const service of selected) await r.waitReady(service);
+    for (const service of services) await r.waitReady(service);
   }
   await delay(100);
 }
-module.exports = { serviceCallers, liveFlow, dependencyFailures, databaseFailures };
+module.exports = { liveFailures };

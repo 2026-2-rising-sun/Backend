@@ -1,16 +1,13 @@
 import copy
-import json
-from pathlib import Path
 import unittest
 
-from check_integration_results import GROUPS, SCOPES, verify
+from check_integration_results import GROUPS, verify
 
 
 class IntegrationEvidenceGateTest(unittest.TestCase):
     def setUp(self):
-        self.manifest = {"version": 2, "groups": {group: [group + "-flow"] for group in GROUPS},
-                         "scopes": {scope: {"groups": list(groups), "overrides": {}} for scope, groups in SCOPES.items()}}
-        self.valid = {"sha": "source", "scope": "full", "passed": True, "executed": len(GROUPS), "failed": 0, "skipped": 0,
+        self.manifest = {"version": 1, "groups": {group: [group + "-flow"] for group in GROUPS}}
+        self.valid = {"sha": "source", "passed": True, "executed": len(GROUPS), "failed": 0, "skipped": 0,
                       "checks": [{"name": group + "-flow", "passed": True} for group in GROUPS],
                       "cleanupPassed": True, "implementedFlowsPassed": True,
                       "contractCoverage": {"matched": 1, "unmatched": []}, "deferred": ["policy pending"], "p2Complete": False}
@@ -29,28 +26,6 @@ class IntegrationEvidenceGateTest(unittest.TestCase):
                 verify({**self.valid, **updates}, "source", self.manifest)
         manifest = copy.deepcopy(self.manifest)
         del manifest["groups"]["member"]
-        with self.assertRaises(AssertionError):
-            verify(self.valid, "source", manifest)
-
-    def test_actual_scope_policy_requires_every_named_check_and_cannot_impersonate_full(self):
-        manifest = json.loads(Path("scripts/integration/required-checks.json").read_text())
-        for scope, policy in manifest["scopes"].items():
-            names = {name for group in policy["groups"]
-                     for name in policy["overrides"].get(group, manifest["groups"][group])}
-            result = {**self.valid, "scope": scope, "executed": len(names),
-                      "checks": [{"name": name, "passed": True} for name in names]}
-            verify(result, "source", manifest, scope)
-            for missing in names:
-                incomplete = {**result, "executed": len(names) - 1,
-                              "checks": [check for check in result["checks"] if check["name"] != missing]}
-                with self.assertRaises(AssertionError):
-                    verify(incomplete, "source", manifest, scope)
-            if scope != "full":
-                with self.assertRaises(AssertionError):
-                    verify(result, "source", manifest, "full")
-                with self.assertRaises(AssertionError):
-                    verify({**result, "deferred": [], "p2Complete": True}, "source", manifest, scope)
-        manifest["scopes"]["full"]["overrides"]["member"] = [manifest["groups"]["member"][0]]
         with self.assertRaises(AssertionError):
             verify(self.valid, "source", manifest)
 

@@ -97,7 +97,7 @@ class Context {
     const r = this.result;
     r.executed = r.checks.length; r.failed = r.checks.filter(c => !c.passed).length; r.skipped = 0;
     r.passed = r.executed > 0 && r.failed === 0 && !r.error;
-    r.p2Complete = r.passed && r.scope === 'full' && r.deferred.length === 0;
+    r.p2Complete = r.passed && r.deferred.length === 0;
     fs.writeFileSync(path.join(this.runtime.output, 'summary.json'), JSON.stringify(this.runtime.sanitize(r), null, 2) + '\n');
   }
 }

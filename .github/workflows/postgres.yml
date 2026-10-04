@@ -1,0 +1,98 @@
+name: PostgreSQL checks (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgres-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres:
+    name: PostgreSQL (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: member
+            database: member_test
+            task: :services:member-service:postgresTest
+            report: services/member-service/build/test-results/postgresTest/TEST-*.xml
+            suites: '*.MemberPostgresTest *.MemberLoginPostgresTest *.MemberSessionPostgresTest'
+            minimums: '*.MemberPostgresTest=1 *.MemberLoginPostgresTest=5 *.MemberSessionPostgresTest=16'
+          - service: commerce
+            database: commerce_test
+            task: :services:commerce-service:postgresCommerceTest
+            report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
+            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest'
+            minimums: '*.MemberCommerceMigrationPostgresTest=3'
+          - service: live
+            database: live_test
+            task: :services:live-service:test --tests *PostgresMigrationTest
+            report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
+            suites: '*.PostgresMigrationTest'
+            minimums: '*.PostgresMigrationTest=4'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: ${{ matrix.database }}
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
+      MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
+      MEMBER_TEST_DB_USER: postgres
+      MEMBER_TEST_DB_PASSWORD: test
+      COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
+      COMMERCE_TEST_POSTGRES_USER: postgres
+      COMMERCE_TEST_POSTGRES_PASSWORD: test
+      LIVE_PG_TEST: '1'
+      LIVE_PG_PORT: '55432'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Run PostgreSQL suite
+        env:
+          GRADLE_TASK: ${{ matrix.task }}
+        run: |
+          read -ra task <<< "$GRADLE_TASK"
+          ./gradlew "${task[@]}" --no-daemon --max-workers=2
+      - name: Require database evidence
+        if: always()
+        env:
+          REQUIRED_SUITES: ${{ matrix.suites }}
+          MINIMUMS: ${{ matrix.minimums }}
+          REPORT: ${{ matrix.report }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          read -ra suites <<< "$REQUIRED_SUITES"
+          read -ra minimums <<< "$MINIMUMS"
+          required=()
+          for suite in "${suites[@]}"; do required+=(--require-suite "$suite"); done
+          for minimum in "${minimums[@]}"; do required+=(--min-suite-tests "$minimum"); done
+          python3 .github/scripts/check_test_results.py "$REPORT" "${required[@]}" --output "build/ci/postgres-${SERVICE}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-${{ matrix.service }}-${{ github.sha }}
+          path: |
+            services/${{ matrix.service }}-service/build/test-results/
+            build/ci/
+          if-no-files-found: error
+          retention-days: 7
+
