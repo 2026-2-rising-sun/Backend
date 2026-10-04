@@ -5,7 +5,7 @@ info:
   license: { name: UNLICENSED }
   description: |-
     Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
-    가격, 재고, 판매 상태는 Commerce 소유이며 공개와 관리자 조회에서 조회 시점에 결합한다.
+    가격, 재고, 판매 상태는 Commerce 소유이며 공개와 판매자 조회에서 조회 시점에 결합한다.
     JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 SELLER이 필요하다.
     공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
     상품 관리는 SELLER 권한을 요구한다. 상품별 판매자 소유권 모델은 아직 제공하지 않는다.
@@ -19,7 +19,7 @@ servers:
     description: Shopping 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
 tags:
   - name: Admin Product
-    description: 관리자 상품 등록, 수정, 조회
+    description: 판매자 상품 등록, 수정, 조회
   - name: Public Product
     description: 공개 상품 목록, 상세, 구매 진입 확인
   - name: Product Image
@@ -56,7 +56,7 @@ paths:
     get:
       x-required-roles: [SELLER]
       tags: [Admin Product]
-      summary: 관리자 상품 목록
+      summary: 판매자 상품 목록
       operationId: listAdminProducts
       parameters:
         - name: page
@@ -86,7 +86,7 @@ paths:
     get:
       x-required-roles: [SELLER]
       tags: [Admin Product]
-      summary: 관리자 상품 상세
+      summary: 판매자 상품 상세
       operationId: getAdminProduct
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }

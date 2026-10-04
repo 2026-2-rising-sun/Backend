@@ -4,7 +4,7 @@ info:
   version: 2.0.0
   license: { name: UNLICENSED }
   description: |-
-    회원 전용 주문·결제·장바구니와 관리자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
+    회원 전용 주문·결제·장바구니와 판매자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
     USER와 SELLER의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
     정상 응답은 봉투 없는 DTO/배열, 오류만 ApiResponse 봉투이다. 204는 본문 없음.
     현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
@@ -705,7 +705,7 @@ components:
       required: ["status"]
       properties:
         status: {"type": "string", "enum": ["ON_SALE", "PRIVATE"]}
-      description: "READY/SOLD_OUT은 관리자 입력 불가(400); 재고에 따른 SOLD_OUT은 시스템이 결정한다."
+      description: "READY/SOLD_OUT은 판매자 입력 불가(400); 재고에 따른 SOLD_OUT은 시스템이 결정한다."
     SalesStatus:
       type: "string"
       enum: ["READY", "ON_SALE", "SOLD_OUT", "PRIVATE"]

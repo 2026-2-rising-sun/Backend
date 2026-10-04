@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 관리용 상품 목록·상세 조회. 판매정보를 못 불러와도 200 으로 기본정보를 주고 판매 상태만 {@code UNKNOWN} 이다.
- * 아직 인증이 없다 (member 연동 시 관리자 권한 검사 추가).
+ * Member JWT와 세션을 검증하고 SELLER 역할만 허용한다.
  */
 @RestController
 @RequestMapping("/v1/admin/products")
