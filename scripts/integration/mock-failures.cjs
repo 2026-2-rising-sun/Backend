@@ -90,78 +90,82 @@ async function evidence(ctx, pair, name, status, delayed = false) {
   ctx.result.mocks.dependencyFailures.requests.push({ name, kind: delayed ? 'real read timeout before response headers' : 'Prism selected HTTP response', events });
   ctx.save();
 }
-async function mockFailures(ctx) {
+async function mockFailures(ctx, consumers = ['shopping', 'commerce']) {
   const r = ctx.runtime; const req = ctx.request.bind(ctx); const p = ctx.products;
   assert.equal(typeof r.reconfigure, 'function', 'Runtime reconfigure API is required');
   ctx.result.mocks.internalHttp = 'Real services by default; explicit scoped Prism/transport failure cases below';
   ctx.result.mocks.dependencyFailures = { overlays: [], requests: [], restoredRealUpstreams: false,
     circuitIsolation: 'Client owner is recreated before each failure type; proxy records actual requests',
     readTimeoutMs: 1000, delayedResponseMs: DELAY_MS };
-  const sourceSales = await req('mock-source-sales', 'commerce', 'GET', `/v1/sales?productIds=${p[0]}`,
-    { headers: { 'X-Service-Token': r.credentials.SHOPPING_COMMERCE_SERVICE_TOKEN } });
   const originalShopping = { SHOPPING_SALES_CLIENT_BASE_URL: r.environments.shopping.SHOPPING_SALES_CLIENT_BASE_URL };
-  const salesPair = await startPair(ctx, 'commerce', sourceSales);
-  try {
-    await r.reconfigure('shopping', { ...originalShopping, SHOPPING_SALES_CLIENT_BASE_URL: salesPair.consumerUrl });
-    await control(salesPair, 'code=200, example=testNormal');
-    await req('shopping-prism-positive', 'shopping', 'GET', `/v1/products/${p[0]}`);
-    await evidence(ctx, salesPair, 'shopping-prism-positive', 200);
-    for (const delayed of [false, true]) {
-      // Fresh RestClient/Retry/CircuitBreaker state prevents an OPEN circuit masquerading as a timeout.
-      await r.reconfigure('shopping', { ...originalShopping, SHOPPING_SALES_CLIENT_BASE_URL: salesPair.consumerUrl });
-      const name = delayed ? 'shopping-proxy-timeout' : 'shopping-prism-503';
-      await control(salesPair, delayed ? 'code=200, example=testNormal' : 'code=503, example=transportUnavailable', delayed ? DELAY_MS : 0);
-      const before = snapshot(r);
-      const response = await req(name, 'shopping', 'GET', `/v1/products/${p[0]}`, { status: 503 });
-      ctx.check(name + '-error-code', response.error.code, 'SALES_INFO_UNAVAILABLE');
-      await evidence(ctx, salesPair, name, delayed ? 200 : 503, delayed);
-      ctx.check(name + '-no-write', snapshot(r), before);
-    }
-  } finally {
-    try { await r.reconfigure('shopping', originalShopping); } finally { await disposePair(r, salesPair); }
-  }
-  const sourceProduct = await req('mock-source-product', 'shopping', 'GET', `/v1/internal/products/${p[2]}`,
-    { headers: { 'X-Service-Token': r.credentials.COMMERCE_SHOPPING_SERVICE_TOKEN } });
-  const item = await req('mock-cart-fixture', 'commerce', 'POST', '/v1/cart/items',
-    { token: ctx.a, body: { productId: p[2], quantity: 1 }, status: 201 });
   const originalCommerce = { COMMERCE_SHOPPING_CLIENT_BASE_URL: r.environments.commerce.COMMERCE_SHOPPING_CLIENT_BASE_URL };
-  let productPair;
-  try {
-    productPair = await startPair(ctx, 'shopping', sourceProduct);
-    const useProxy = () => r.reconfigure('commerce', { ...originalCommerce, COMMERCE_SHOPPING_CLIENT_BASE_URL: productPair.consumerUrl });
-    await useProxy(); await control(productPair, 'code=200, example=testNormal');
-    const positiveBefore = snapshot(r);
-    await req('commerce-prism-positive', 'commerce', 'GET', `/v1/orders/checkout?productId=${p[2]}&quantity=1`, { token: ctx.a });
-    await evidence(ctx, productPair, 'commerce-prism-positive', 200);
-    ctx.check('commerce-prism-positive-no-reservation', snapshot(r), positiveBefore);
-    for (const scenario of [
-      { prefix: 'commerce-prism-404', code: 404, prefer: 'code=404, example=notFound' },
-      { prefix: 'commerce-prism-503', code: 503, prefer: 'code=503, example=transportUnavailable' },
-      { prefix: 'commerce-proxy-timeout', code: 503, prefer: 'code=200, example=testNormal', delayed: true }
-    ]) {
-      await useProxy();
-      const calls = [
-        { suffix: 'cart-order', path: `/v1/cart/items/${item.id}/orders`, body: ctx.buyer },
-        { suffix: 'direct-order', path: '/v1/orders', body: { productId: p[2], quantity: 1, ...ctx.buyer } },
-        ...(!scenario.delayed ? [{ suffix: 'cart-add', path: '/v1/cart/items', body: { productId: p[0], quantity: 1 } }] : [])
-      ];
-      for (const call of calls) {
-        const name = scenario.prefix + '-' + call.suffix;
-        await control(productPair, scenario.prefer, scenario.delayed ? DELAY_MS : 0);
+  if (consumers.includes('shopping')) {
+    const sourceSales = await req('mock-source-sales', 'commerce', 'GET', `/v1/sales?productIds=${p[0]}`,
+      { headers: { 'X-Service-Token': r.credentials.SHOPPING_COMMERCE_SERVICE_TOKEN } });
+    const salesPair = await startPair(ctx, 'commerce', sourceSales);
+    try {
+      await r.reconfigure('shopping', { ...originalShopping, SHOPPING_SALES_CLIENT_BASE_URL: salesPair.consumerUrl });
+      await control(salesPair, 'code=200, example=testNormal');
+      await req('shopping-prism-positive', 'shopping', 'GET', `/v1/products/${p[0]}`);
+      await evidence(ctx, salesPair, 'shopping-prism-positive', 200);
+      for (const delayed of [false, true]) {
+        // Fresh RestClient/Retry/CircuitBreaker state prevents an OPEN circuit masquerading as a timeout.
+        await r.reconfigure('shopping', { ...originalShopping, SHOPPING_SALES_CLIENT_BASE_URL: salesPair.consumerUrl });
+        const name = delayed ? 'shopping-proxy-timeout' : 'shopping-prism-503';
+        await control(salesPair, delayed ? 'code=200, example=testNormal' : 'code=503, example=transportUnavailable', delayed ? DELAY_MS : 0);
         const before = snapshot(r);
-        const response = await req(name, 'commerce', 'POST', call.path, { token: ctx.a, body: call.body,
-          headers: { 'X-Idempotency-Key': name }, status: scenario.code });
-        ctx.check(name + '-error-code', response.error.code, scenario.code === 404 ? 'NOT_FOUND' : 'SHOPPING_UNAVAILABLE');
-        await evidence(ctx, productPair, name, scenario.delayed ? 200 : scenario.code, scenario.delayed);
+        const response = await req(name, 'shopping', 'GET', `/v1/products/${p[0]}`, { status: 503 });
+        ctx.check(name + '-error-code', response.error.code, 'SALES_INFO_UNAVAILABLE');
+        await evidence(ctx, salesPair, name, delayed ? 200 : 503, delayed);
         ctx.check(name + '-no-write', snapshot(r), before);
       }
+    } finally {
+      try { await r.reconfigure('shopping', originalShopping); } finally { await disposePair(r, salesPair); }
     }
-  } finally {
-    try { await r.reconfigure('commerce', originalCommerce); }
-    finally {
-      if (productPair) await disposePair(r, productPair);
-      if (r.sql('commerce', `SELECT count(*) FROM cart_item WHERE id=${item.id}`) === '1')
-        await req('mock-cart-fixture-cleanup', 'commerce', 'DELETE', `/v1/cart/items/${item.id}`, { token: ctx.a, status: 204 });
+  }
+  if (consumers.includes('commerce')) {
+    const sourceProduct = await req('mock-source-product', 'shopping', 'GET', `/v1/internal/products/${p[2]}`,
+      { headers: { 'X-Service-Token': r.credentials.COMMERCE_SHOPPING_SERVICE_TOKEN } });
+    const item = await req('mock-cart-fixture', 'commerce', 'POST', '/v1/cart/items',
+      { token: ctx.a, body: { productId: p[2], quantity: 1 }, status: 201 });
+    let productPair;
+    try {
+      productPair = await startPair(ctx, 'shopping', sourceProduct);
+      const useProxy = () => r.reconfigure('commerce', { ...originalCommerce, COMMERCE_SHOPPING_CLIENT_BASE_URL: productPair.consumerUrl });
+      await useProxy(); await control(productPair, 'code=200, example=testNormal');
+      const positiveBefore = snapshot(r);
+      await req('commerce-prism-positive', 'commerce', 'GET', `/v1/orders/checkout?productId=${p[2]}&quantity=1`, { token: ctx.a });
+      await evidence(ctx, productPair, 'commerce-prism-positive', 200);
+      ctx.check('commerce-prism-positive-no-reservation', snapshot(r), positiveBefore);
+      for (const scenario of [
+        { prefix: 'commerce-prism-404', code: 404, prefer: 'code=404, example=notFound' },
+        { prefix: 'commerce-prism-503', code: 503, prefer: 'code=503, example=transportUnavailable' },
+        { prefix: 'commerce-proxy-timeout', code: 503, prefer: 'code=200, example=testNormal', delayed: true }
+      ]) {
+        await useProxy();
+        const calls = [
+          { suffix: 'cart-order', path: `/v1/cart/items/${item.id}/orders`, body: ctx.buyer },
+          { suffix: 'direct-order', path: '/v1/orders', body: { productId: p[2], quantity: 1, ...ctx.buyer } },
+          ...(!scenario.delayed ? [{ suffix: 'cart-add', path: '/v1/cart/items', body: { productId: p[0], quantity: 1 } }] : [])
+        ];
+        for (const call of calls) {
+          const name = scenario.prefix + '-' + call.suffix;
+          await control(productPair, scenario.prefer, scenario.delayed ? DELAY_MS : 0);
+          const before = snapshot(r);
+          const response = await req(name, 'commerce', 'POST', call.path, { token: ctx.a, body: call.body,
+            headers: { 'X-Idempotency-Key': name }, status: scenario.code });
+          ctx.check(name + '-error-code', response.error.code, scenario.code === 404 ? 'NOT_FOUND' : 'SHOPPING_UNAVAILABLE');
+          await evidence(ctx, productPair, name, scenario.delayed ? 200 : scenario.code, scenario.delayed);
+          ctx.check(name + '-no-write', snapshot(r), before);
+        }
+      }
+    } finally {
+      try { await r.reconfigure('commerce', originalCommerce); }
+      finally {
+        if (productPair) await disposePair(r, productPair);
+        if (r.sql('commerce', `SELECT count(*) FROM cart_item WHERE id=${item.id}`) === '1')
+          await req('mock-cart-fixture-cleanup', 'commerce', 'DELETE', `/v1/cart/items/${item.id}`, { token: ctx.a, status: 204 });
+      }
     }
   }
   ctx.result.mocks.dependencyFailures.restoredRealUpstreams = true;

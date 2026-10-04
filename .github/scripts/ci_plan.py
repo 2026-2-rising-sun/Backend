@@ -1,4 +1,4 @@
-"""Select PR verification; pushes and manual runs retain the full regression gate."""
+"""Select affected PR verification; branch pushes retain the full regression gate."""
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -20,7 +20,7 @@ PG = {
                          "PaymentDelayReconcilerTest", "OrderExpirationSchedulerTest", "CartOrderIntegrationTest",
                          "MemberCommerceApiTest", "MemberCommerceMigrationPostgresTest")),
                      minimums="*.MemberCommerceMigrationPostgresTest=3"),
-    "live": dict(database="live_test", task=":services:live-service:test --tests *PostgresMigrationTest",
+    "live": dict(database="live_test", task=":services:live-service:test",
                  report="services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml",
                  suites="*.PostgresMigrationTest", minimums="*.PostgresMigrationTest=4"),
 }
@@ -54,7 +54,7 @@ def parse_changes(raw):
 
 
 def plan_changes(paths, full=False):
-    selected, contracts, integration = set(), False, False
+    selected, contracts, domains, contract_services = set(), False, set(), set()
     for path in paths:
         suffix = PurePosixPath(path).suffix.lower()
         if suffix in {".md", ".mdx", ".rst", ".adoc"} or (
@@ -69,29 +69,45 @@ def plan_changes(paths, full=False):
                 full = True
             else:
                 selected.add(service)
-                integration |= service in HTTP_SERVICES
+                # Test-only changes do not change the deployed HTTP application.
+                if service in HTTP_SERVICES and not path.startswith(f"services/{service}-service/src/test/"):
+                    domains.add(service)
         elif path.startswith("contracts/api/"):
-            contracts, integration = True, True
+            contracts = True
+            service = PurePosixPath(path).name.removesuffix("-service.yaml")
+            if path == f"contracts/api/{service}-service.yaml" and service in HTTP_SERVICES:
+                domains.add(service)
+                contract_services.add(service)
+            else:
+                full = True
         elif path.startswith(("contracts/scenarios/", "contracts/exports/")) or path == "contracts/docs/change-review.json":
             contracts = True
+            contract_services.update(HTTP_SERVICES)
         elif path.startswith(("scripts/contracts/", "scripts/local/")):
-            contracts, integration = True, True
+            contracts = True
+            domains.update(HTTP_SERVICES)
+            contract_services.update(HTTP_SERVICES)
         elif path.startswith("scripts/integration/"):
-            integration = True
+            domains.update(HTTP_SERVICES)
         else:
             # New runtime/build/config paths need review rather than a silent CI exemption.
             full = True
     if full:
-        selected, contracts, integration = set(SERVICES), True, True
+        selected, contracts, domains, contract_services = set(SERVICES), True, set(HTTP_SERVICES), set(HTTP_SERVICES)
+    integration = bool(domains)
+    # Member/session authority is shared by every HTTP service. Mixed-domain changes
+    # also retain the full suite, rather than dropping one side of an interaction.
+    scope = next(iter(domains)) if len(domains) == 1 and "member" not in domains else "full"
     selected = [service for service in SERVICES if service in selected]
     postgres = [dict(service=service, **PG[service]) for service in selected if service in PG]
     tasks = ["build"] if full else [f":services:{service}-service:build" for service in selected]
-    if integration and not full:
-        tasks += [f":services:{service}-service:bootJar" for service in HTTP_SERVICES]
-    return dict(full=full, services=selected, tasks=tasks,
-                jobs=dict(build=bool(tasks), postgres=bool(postgres), contracts=contracts, integration=integration),
-                # A skipped matrix job still gets a valid, nonempty matrix during expansion.
-                postgres_matrix=dict(include=postgres or [dict(service="none", database="unused", task="", report="", suites="", minimums="")]))
+    # Live PostgreSQL cases run in its ordinary test task with LIVE_PG_TEST enabled.
+    # Other database suites share the same compilation/Gradle invocation.
+    tasks += [PG[service]["task"] for service in selected if service in PG and service != "live"]
+    return dict(full=full, services=selected, tasks=tasks, integration_scope=scope,
+                contract_services=[service for service in HTTP_SERVICES if service in contract_services],
+                jobs=dict(build=bool(tasks), contracts=contracts, integration=integration),
+                postgres=bool(postgres), postgres_cases=postgres)
 
 
 def main():
@@ -100,13 +116,20 @@ def main():
         event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
         pr = event["pull_request"]
         plan = plan_changes(changed_paths(pr["base"]["sha"], pr["head"]["sha"]))
-    elif event_name in {"push", "workflow_dispatch"}:
+    elif event_name == "push":
         plan = plan_changes([], full=True)
+    elif event_name == "workflow_dispatch":
+        event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+        scope = event.get("inputs", {}).get("scope", "full")
+        if scope not in (*SERVICES, "full"):
+            raise ValueError("Unknown manual verification scope")
+        plan = plan_changes([] if scope == "full" else [f"services/{scope}-service/src/main/"], full=scope == "full")
     else:
         raise ValueError("Unsupported CI event")
     outputs = {"plan": json.dumps(plan, separators=(",", ":")), "full": str(plan["full"]).lower(),
                "services": json.dumps(plan["services"]), "tasks": " ".join(plan["tasks"]),
-               "postgres_matrix": json.dumps(plan["postgres_matrix"]),
+               "integration_scope": plan["integration_scope"], "contract_services": json.dumps(plan["contract_services"]),
+               "postgres": str(plan["postgres"]).lower(), "postgres_cases": json.dumps(plan["postgres_cases"]),
                **{job: str(enabled).lower() for job, enabled in plan["jobs"].items()}}
     with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
         for key, value in outputs.items():

@@ -2,7 +2,7 @@
 import json
 import os
 
-JOBS = {"build", "postgres", "contracts", "integration"}
+JOBS = {"build", "contracts", "integration"}
 
 
 def verify(plan, results):
@@ -11,8 +11,8 @@ def verify(plan, results):
     expected = plan["jobs"]
     if set(expected) != JOBS or any(type(value) is not bool for value in expected.values()):
         raise ValueError("Missing or invalid verification plan")
-    if expected["integration"] and not expected["build"]:
-        raise ValueError("Integration needs application jars")
+    if plan["postgres"] and not expected["build"]:
+        raise ValueError("Database verification needs the build job")
     if plan["full"] and not all(expected.values()):
         raise ValueError("Full regression plan cannot skip jobs")
     for job, enabled in expected.items():

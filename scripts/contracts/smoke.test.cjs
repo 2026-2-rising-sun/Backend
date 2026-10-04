@@ -1,7 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { main, validateCoverage } = require('./smoke.cjs');
+const { main, validateCoverage, selectScenarios } = require('./smoke.cjs');
 const scenarios = require('../../contracts/scenarios/prism.json');
+
+test('focused Prism selection keeps all cases for the selected provider and still validates global coverage', () => {
+  for (const service of ['member', 'shopping', 'commerce', 'live']) {
+    assert.deepEqual(selectScenarios(scenarios, [service]), scenarios.filter(item => item.service === service));
+  }
+  for (const selection of [[], ['unknown'], ['commerce', 'commerce'], 'commerce'])
+    assert.throws(() => selectScenarios(scenarios, selection), /invalid service selection/);
+  assert.throws(() => selectScenarios(scenarios.filter(item => item.service !== 'member'), ['commerce']), /member needs a success scenario/);
+});
 
 test('empty scenario input fails the actual smoke entry before starting Docker', async () => {
   await assert.rejects(main([]), /Prism coverage: scenarios must be nonempty/);

@@ -15,7 +15,7 @@ class PlannerTest(unittest.TestCase):
                              "contracts/docs/decision.adoc", ".github/ISSUE_TEMPLATE/bug.yml"])
         self.assertFalse(any(plan["jobs"].values()))
         self.assertEqual(plan["tasks"], [])
-        self.assertEqual(plan["postgres_matrix"]["include"][0]["service"], "none")
+        self.assertEqual(plan["postgres_cases"], [])
 
     def test_service_changes_run_only_their_build_and_database_suite(self):
         for service in SERVICES:
@@ -24,29 +24,48 @@ class PlannerTest(unittest.TestCase):
                 self.assertEqual(plan["services"], [service])
                 self.assertIn(f":services:{service}-service:build", plan["tasks"])
                 self.assertFalse(plan["jobs"]["contracts"])
-                self.assertEqual(plan["jobs"]["postgres"], service in {"member", "commerce", "live"})
+                self.assertEqual(plan["postgres"], service in {"member", "commerce", "live"})
                 self.assertEqual(plan["jobs"]["integration"], service in HTTP_SERVICES)
-                if plan["jobs"]["postgres"]:
-                    self.assertEqual([entry["service"] for entry in plan["postgres_matrix"]["include"]], [service])
-                if plan["jobs"]["integration"]:
-                    for runtime in HTTP_SERVICES:
-                        self.assertIn(f":services:{runtime}-service:bootJar", plan["tasks"])
+                if plan["postgres"]:
+                    self.assertEqual([entry["service"] for entry in plan["postgres_cases"]], [service])
+                self.assertFalse(any(task.endswith(":bootJar") for task in plan["tasks"]))
 
     def test_migration_is_executable_even_if_size_label_ignores_it(self):
         plan = plan_changes(["services/commerce-service/src/main/resources/db/migration/V4__change.sql"])
         self.assertEqual(plan["services"], ["commerce"])
-        self.assertTrue(plan["jobs"]["postgres"])
+        self.assertTrue(plan["postgres"])
         self.assertTrue(plan["jobs"]["integration"])
 
     def test_api_change_keeps_real_response_contract_verification(self):
         plan = plan_changes(["contracts/api/shopping-service.yaml"])
-        self.assertEqual(plan["jobs"], dict(build=True, postgres=False, contracts=True, integration=True))
+        self.assertEqual(plan["jobs"], dict(build=False, contracts=True, integration=True))
         self.assertEqual(plan["services"], [])
-        self.assertEqual(plan["tasks"], [f":services:{service}-service:bootJar" for service in HTTP_SERVICES])
+        self.assertEqual(plan["tasks"], [])
+        self.assertEqual(plan["contract_services"], ["shopping"])
+        self.assertEqual(plan["integration_scope"], "shopping")
+
+    def test_domain_scopes_and_test_only_changes(self):
+        for service in HTTP_SERVICES:
+            plan = plan_changes([f"services/{service}-service/src/main/java/Changed.java"])
+            self.assertEqual(plan["integration_scope"], "full" if service == "member" else service)
+            tests = plan_changes([f"services/{service}-service/src/test/java/ChangedTest.java"])
+            self.assertFalse(tests["jobs"]["integration"])
+            self.assertEqual(tests["tasks"][0], f":services:{service}-service:build")
+        mixed = plan_changes(["contracts/api/commerce-service.yaml", "services/live-service/src/main/java/Changed.java"])
+        self.assertEqual(mixed["integration_scope"], "full")
+        renamed = plan_changes(["services/commerce-service/src/main/java/Old.java", "services/commerce-service/src/test/java/New.java"])
+        self.assertTrue(renamed["jobs"]["integration"])
+        self.assertTrue(plan_changes(["contracts/api/unknown.yaml"])["full"])
+
+    def test_shared_scenarios_expand_prism_but_do_not_need_applications(self):
+        plan = plan_changes(["contracts/api/commerce-service.yaml", "contracts/scenarios/prism.json"])
+        self.assertEqual(plan["contract_services"], list(HTTP_SERVICES))
+        self.assertEqual(plan["integration_scope"], "commerce")
+        self.assertEqual(plan_changes(["contracts/scenarios/prism.json"])["contract_services"], list(HTTP_SERVICES))
 
     def test_prism_and_review_metadata_need_only_contract_job(self):
         plan = plan_changes(["contracts/scenarios/prism.json", "contracts/docs/change-review.json"])
-        self.assertEqual(plan["jobs"], dict(build=False, postgres=False, contracts=True, integration=False))
+        self.assertEqual(plan["jobs"], dict(build=False, contracts=True, integration=False))
 
     def test_shared_and_unknown_executable_changes_fail_closed_to_full(self):
         for path in ["libs/common-core/src/main/java/Core.java", "contracts/events/src/main/java/Event.java",
@@ -57,7 +76,7 @@ class PlannerTest(unittest.TestCase):
                 plan = plan_changes([path])
                 self.assertTrue(plan["full"])
                 self.assertTrue(all(plan["jobs"].values()))
-                self.assertEqual(plan["tasks"], ["build"])
+                self.assertEqual(plan["tasks"], ["build", ":services:member-service:postgresTest", ":services:commerce-service:postgresCommerceTest"])
 
     def test_push_and_manual_full_plan_ignores_doc_only_scope(self):
         plan = plan_changes(["README.md"], full=True)
@@ -128,7 +147,7 @@ class GateTest(unittest.TestCase):
 
     def test_required_failure_cancel_or_skip_cannot_pass(self):
         plan = plan_changes(["services/commerce-service/src/main/java/Changed.java"])
-        for job in ["plan", "build", "postgres", "integration"]:
+        for job in ["plan", "build", "integration"]:
             for state in ["failure", "cancelled", "skipped"]:
                 evidence = self.evidence(plan)
                 evidence[job]["result"] = state
@@ -142,7 +161,7 @@ class GateTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify(plan, evidence)
         evidence = self.evidence(plan)
-        del evidence["postgres"]
+        del evidence["build"]
         with self.assertRaises(ValueError):
             verify(plan, evidence)
         invalid = copy.deepcopy(plan)

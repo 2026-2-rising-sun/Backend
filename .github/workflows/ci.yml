@@ -5,12 +5,18 @@ on:
     branches: [main, dev]
   pull_request:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope (full regression by default; focused runs never publish)
+        type: choice
+        default: full
+        options: [full, member, shopping, commerce, live, notification]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'auto' }}
   cancel-in-progress: true
 
 jobs:
@@ -24,26 +30,53 @@ jobs:
       tasks: ${{ steps.changes.outputs.tasks }}
       build: ${{ steps.changes.outputs.build }}
       postgres: ${{ steps.changes.outputs.postgres }}
-      postgres_matrix: ${{ steps.changes.outputs.postgres_matrix }}
+      postgres_cases: ${{ steps.changes.outputs.postgres_cases }}
       contracts: ${{ steps.changes.outputs.contracts }}
       integration: ${{ steps.changes.outputs.integration }}
+      integration_scope: ${{ steps.changes.outputs.integration_scope }}
+      contract_services: ${{ steps.changes.outputs.contract_services }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Verify CI guards and planner
-        run: |
-          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-          node --test .github/scripts/test_size_labeler.cjs
       - name: Select required verification
         id: changes
         run: python3 .github/scripts/ci_plan.py
+      - name: Verify CI guards and planner
+        if: steps.changes.outputs.full == 'true'
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          node --test .github/scripts/test_size_labeler.cjs
 
   build:
+    name: Build & DB
     needs: plan
     if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: ${{ needs.plan.outputs.postgres == 'true' && 'postgres:16' || '' }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_CASES: ${{ needs.plan.outputs.postgres_cases }}
+      MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
+      MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
+      MEMBER_TEST_DB_USER: postgres
+      MEMBER_TEST_DB_PASSWORD: test
+      COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
+      COMMERCE_TEST_POSTGRES_USER: postgres
+      COMMERCE_TEST_POSTGRES_PASSWORD: test
+      LIVE_PG_TEST: ${{ contains(fromJSON(needs.plan.outputs.services), 'live') && '1' || '0' }}
+      LIVE_PG_PORT: '55432'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -51,7 +84,17 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Build selected modules and integration jars
+      - name: Create selected disposable PostgreSQL databases
+        if: needs.plan.outputs.postgres == 'true'
+        env:
+          PGPASSWORD: test
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          for case in json.loads(os.environ['POSTGRES_CASES']):
+              subprocess.run(['createdb', '-h', 'localhost', '-p', '55432', '-U', 'postgres', case['database']], check=True)
+          PYTHON
+      - name: Build selected modules and database suites
         env:
           GRADLE_TASKS: ${{ needs.plan.outputs.tasks }}
         run: |
@@ -76,24 +119,24 @@ jobs:
                           '--allow-skipped-suite', 'com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3',
                           '--output', 'build/ci/unit-tests.json'], check=True)
           PYTHON
-      - name: Package integration application jars
-        if: needs.plan.outputs.integration == 'true'
+      - name: Require every selected PostgreSQL suite
+        if: always() && needs.plan.outputs.postgres == 'true'
         run: |
-          mkdir -p build
-          printf '%s\n' "$GITHUB_SHA" > build/integration-jars.sha
-          tar -cf build/integration-jars.tar \
-            build/integration-jars.sha \
-            services/member-service/build/libs/*-SNAPSHOT.jar \
-            services/shopping-service/build/libs/*-SNAPSHOT.jar \
-            services/commerce-service/build/libs/*-SNAPSHOT.jar \
-            services/live-service/build/libs/*-SNAPSHOT.jar
-      - uses: actions/upload-artifact@v4
-        if: needs.plan.outputs.integration == 'true'
-        with:
-          name: integration-jars-${{ github.sha }}
-          path: build/integration-jars.tar
-          if-no-files-found: error
-          retention-days: 2
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          failures = []
+          for case in json.loads(os.environ['POSTGRES_CASES']):
+              args = ['python3', '.github/scripts/check_test_results.py', case['report']]
+              for suite in case['suites'].split():
+                  args += ['--require-suite', suite]
+              for minimum in case['minimums'].split():
+                  args += ['--min-suite-tests', minimum]
+              result = subprocess.run(args + ['--output', f"build/ci/postgres-{case['service']}.json"])
+              if result.returncode:
+                  failures.append(case['service'])
+          if failures:
+              raise SystemExit('PostgreSQL verification failed: ' + ', '.join(failures))
+          PYTHON
       - name: Upload test reports
         if: always() && (needs.plan.outputs.full == 'true' || needs.plan.outputs.services != '[]')
         uses: actions/upload-artifact@v4
@@ -106,82 +149,13 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  postgres:
-    needs: plan
-    if: needs.plan.outputs.postgres == 'true'
-    name: PostgreSQL (${{ matrix.service }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.postgres_matrix) }}
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: ${{ matrix.database }}
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
-      MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
-      MEMBER_TEST_DB_USER: postgres
-      MEMBER_TEST_DB_PASSWORD: test
-      COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
-      COMMERCE_TEST_POSTGRES_USER: postgres
-      COMMERCE_TEST_POSTGRES_PASSWORD: test
-      LIVE_PG_TEST: '1'
-      LIVE_PG_PORT: '55432'
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-      - name: Run required PostgreSQL suite
-        env:
-          GRADLE_TASK: ${{ matrix.task }}
-        run: |
-          read -ra task_args <<< "$GRADLE_TASK"
-          ./gradlew "${task_args[@]}" --no-daemon --max-workers=2
-      - name: Reject absent, skipped or failed database tests
-        if: always()
-        env:
-          REQUIRED_SUITES: ${{ matrix.suites }}
-          MINIMUM_SUITE_TESTS: ${{ matrix.minimums }}
-          REPORT_GLOB: ${{ matrix.report }}
-          SERVICE: ${{ matrix.service }}
-        run: |
-          read -ra suites <<< "$REQUIRED_SUITES"
-          read -ra minimums <<< "$MINIMUM_SUITE_TESTS"
-          required=()
-          for suite in "${suites[@]}"; do required+=(--require-suite "$suite"); done
-          for minimum in "${minimums[@]}"; do required+=(--min-suite-tests "$minimum"); done
-          python3 .github/scripts/check_test_results.py "$REPORT_GLOB" \
-            "${required[@]}" --output "build/ci/postgres-${SERVICE}.json"
-      - name: Upload PostgreSQL reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: postgres-${{ matrix.service }}-${{ github.sha }}
-          path: |
-            services/${{ matrix.service }}-service/build/reports/tests/
-            services/${{ matrix.service }}-service/build/test-results/
-            build/ci/
-          if-no-files-found: error
-          retention-days: 7
-
   contracts:
     needs: plan
     if: needs.plan.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      CONTRACT_SERVICES: ${{ needs.plan.outputs.contract_services }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -212,10 +186,12 @@ jobs:
           retention-days: 7
 
   integration:
-    needs: [plan, build]
+    needs: plan
     if: needs.plan.outputs.integration == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      INTEGRATION_SCOPE: ${{ needs.plan.outputs.integration_scope }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -225,14 +201,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - uses: actions/download-artifact@v4
-        with:
-          name: integration-jars-${{ github.sha }}
-          path: build
-      - run: tar -xf build/integration-jars.tar
+          cache: npm
+          cache-dependency-path: scripts/contracts/package-lock.json
+      - uses: gradle/actions/setup-gradle@v5
       - run: npm ci --prefix scripts/contracts --ignore-scripts
       - name: Run real service HTTP integration
         run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test -f scripts/integration/run.cjs
           node scripts/integration/run.cjs
       - name: Require complete integration evidence
@@ -249,7 +224,7 @@ jobs:
 
   quality-gate:
     name: Quality gate
-    needs: [plan, build, postgres, contracts, integration]
+    needs: [plan, build, contracts, integration]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2

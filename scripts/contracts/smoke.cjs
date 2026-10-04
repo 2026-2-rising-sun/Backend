@@ -26,9 +26,16 @@ function validateCoverage(scenarios) {
       assert.ok(names.includes(name), `Prism coverage: ${service} missing required scenario ${name}`);
   }
 }
+function selectScenarios(scenarios, selected = files().map(file => path.basename(file, '-service.yaml'))) {
+  validateCoverage(scenarios);
+  const available = files().map(file => path.basename(file, '-service.yaml'));
+  assert.ok(Array.isArray(selected) && selected.length > 0 && new Set(selected).size === selected.length
+    && selected.every(service => available.includes(service)), 'Prism coverage: invalid service selection');
+  return scenarios.filter(item => selected.includes(item.service));
+}
 async function main(scenarios = defaultScenarios) {
   // Fail before starting Docker when a deleted/empty scenario file would otherwise look successful.
-  validateCoverage(scenarios);
+  scenarios = selectScenarios(scenarios, process.env.CONTRACT_SERVICES ? JSON.parse(process.env.CONTRACT_SERVICES) : undefined);
   const results = [];
   for (const service of new Set(scenarios.map(item => item.service))) {
     const { doc, resolve, validator, sha256 } = load(path.join(root, 'contracts/api', service + '-service.yaml'));
@@ -69,8 +76,8 @@ async function main(scenarios = defaultScenarios) {
       finally { stop(server.id); }
     }
   }
-  report('prism', { passed: true, results });
+  report('prism', { passed: true, services: [...new Set(scenarios.map(item => item.service))], results });
   console.log(`Prism: ${results.length} exact example responses passed`);
 }
-module.exports = { main, validateCoverage };
+module.exports = { main, validateCoverage, selectScenarios };
 if (require.main === module) main().catch(error => { report('prism', { passed: false, error: error.message }); console.error(error); process.exitCode = 1; });

@@ -6,11 +6,14 @@ const { Runtime, command } = require('./runtime.cjs');
 const { Context } = require('./context.cjs');
 const { memberAdmin } = require('./member-admin.cjs');
 const { commerce } = require('./commerce.cjs');
-const { liveFailures } = require('./live-failures.cjs');
+const { serviceCallers, liveFlow, dependencyFailures, databaseFailures } = require('./live-failures.cjs');
 const { mockFailures } = require('./mock-failures.cjs');
 const { sessions } = require('./sessions.cjs');
+const { selectScope } = require('./scope.cjs');
 
 async function run() {
+  const scope = process.env.INTEGRATION_SCOPE || 'full';
+  const selected = selectScope(scope);
   const runtime = new Runtime(); let context;
   const interrupted = signal => {
     console.error(`Integration interrupted by ${signal}; cleaning only this run's resources`);
@@ -21,6 +24,7 @@ async function run() {
     if (command('git', ['status', '--porcelain', '--untracked-files=normal']))
       throw new Error('Integration requires a clean checkout including untracked source files');
     context = new Context(runtime);
+    context.result.scope = scope;
     // Apidog round-trip is a separately reviewed snapshot, not an automated check in this run.
     context.result.externalVerification = {
       apidog: {
@@ -33,17 +37,20 @@ async function run() {
       }
     };
     context.save();
-    const usePrebuilt = process.argv.includes('--use-prebuilt') || process.env.CI === 'true';
+    const usePrebuilt = process.argv.includes('--use-prebuilt');
     await runtime.build(usePrebuilt);
     context.result.jars = Object.fromEntries(Object.entries(runtime.jars).map(([service, file]) =>
       [service, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
     console.log(`Starting isolated ${runtime.mode} runtime at ${runtime.sha}`);
     await runtime.setup();
     await memberAdmin(context);
-    await commerce(context);
-    await mockFailures(context);
-    await liveFailures(context);
-    await sessions(context);
+    if (selected.commerce) await commerce(context);
+    if (selected.mocks.length) await mockFailures(context, selected.mocks);
+    await serviceCallers(context);
+    await liveFlow(context);
+    if (selected.dependencies) await dependencyFailures(context);
+    await databaseFailures(context, selected.databases);
+    if (selected.sessions) await sessions(context);
     context.result.implementedFlowsPassed = true;
   } catch (error) {
     if (context) context.result.error = runtime.sanitize(error.message);
