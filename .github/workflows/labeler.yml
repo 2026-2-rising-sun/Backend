@@ -2,7 +2,7 @@ name: PR Labeler
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -15,7 +15,6 @@ concurrency:
 
 jobs:
   label:
-    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
