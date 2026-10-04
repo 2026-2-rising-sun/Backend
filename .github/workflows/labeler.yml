@@ -2,40 +2,66 @@ name: PR Labeler
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened]
 
 permissions:
   contents: read
   pull-requests: write
 
+# Finish each update before another run changes this PR's labels.
+concurrency:
+  group: pr-labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
 jobs:
   label:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/labeler@v5
-
-  size-label:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: codelytv/pr-size-labeler@v1.10.0
+      - name: Label implementation size
+        uses: actions/github-script@v8
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          xs_label: "size/XS"
-          xs_max_size: "9"
-          s_label: "size/S"
-          s_max_size: "29"
-          m_label: "size/M"
-          m_max_size: "99"
-          l_label: "size/L"
-          l_max_size: "499"
-          xl_label: "size/XL"
-          fail_if_xl: "false"
-          # Count implementation, tests and executable configuration; omit prose and API documents.
-          # v1.10.0 matches full filenames with Bash globs ('*' also spans directories).
-          files_to_ignore: >-
-            *.lock package-lock.json gradle-wrapper.jar
-            *.md *.mdx *.rst *.adoc
-            README*.txt */README*.txt docs/*.txt contracts/docs/*.txt
-            contracts/api/*.yaml contracts/api/*.yml contracts/api/*.json
-            contracts/docs/change-review.json
-            contracts/exports/*.json contracts/exports/*.yaml contracts/exports/*.yml
+          script: |
+            // No PR checkout: all inputs are data from the GitHub API.
+            const ignored = [
+              /\.(?:md|mdx|rst|adoc)$/i,
+              /(?:^|\/)README[^/]*\.txt$/i,
+              /^(?:docs|contracts\/docs)\/.*\.txt$/i,
+              /(?:^|\/)(?:[^/]*\.lock|package-lock\.json|gradle-wrapper\.jar)$/,
+              /^contracts\/api\/.*\.(?:yaml|yml|json)$/,
+              /^contracts\/docs\/change-review\.json$/,
+              /^contracts\/exports\/.*\.(?:json|yaml|yml)$/,
+              /^services\/[^/]+\/src\/main\/resources\/db\/migration\/.*\.sql$/,
+            ];
+            const isImplementation = path => !ignored.some(pattern => pattern.test(path));
+            const counted = file => isImplementation(file.filename) ||
+              (file.status === 'renamed' && file.previous_filename &&
+                isImplementation(file.previous_filename));
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner, repo, pull_number: issue_number, per_page: 100,
+            });
+            const lines = files.filter(counted).reduce(
+              (total, file) => total + file.additions + file.deletions, 0);
+            const size = lines < 50 ? 'XS' : lines < 200 ? 'S' :
+              lines < 500 ? 'M' : lines < 1000 ? 'L' : 'XL';
+            const target = `size/${size}`;
+            const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            // Change only size/*; retain service, review and manually added labels.
+            for (const label of labels) {
+              if (label.name.startsWith('size/') && label.name !== target) {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number, name: label.name,
+                });
+              }
+            }
+            if (!labels.some(label => label.name === target)) {
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number, labels: [target],
+              });
+            }
+            core.info(`Implementation changes: ${lines} additions + deletions -> ${target}`);

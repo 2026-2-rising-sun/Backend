@@ -14,7 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.changes.outputs.plan }}
+      full: ${{ steps.changes.outputs.full }}
+      services: ${{ steps.changes.outputs.services }}
+      tasks: ${{ steps.changes.outputs.tasks }}
+      build: ${{ steps.changes.outputs.build }}
+      postgres: ${{ steps.changes.outputs.postgres }}
+      postgres_matrix: ${{ steps.changes.outputs.postgres_matrix }}
+      contracts: ${{ steps.changes.outputs.contracts }}
+      integration: ${{ steps.changes.outputs.integration }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify CI guards and planner
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          node --test .github/scripts/test_size_labeler.cjs
+      - name: Select required verification
+        id: changes
+        run: python3 .github/scripts/ci_plan.py
+
   build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -24,25 +51,33 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Verify CI report guards
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-      - name: Build and run all tests
-        run: ./gradlew build --no-daemon --continue --max-workers=2
-      - name: Require regression reports
-        if: always()
+      - name: Build selected modules and integration jars
+        env:
+          GRADLE_TASKS: ${{ needs.plan.outputs.tasks }}
         run: |
-          python3 .github/scripts/check_test_results.py \
-            'services/member-service/build/test-results/test/TEST-*.xml' \
-            'services/shopping-service/build/test-results/test/TEST-*.xml' \
-            'services/commerce-service/build/test-results/test/TEST-*.xml' \
-            'services/live-service/build/test-results/test/TEST-*.xml' \
-            'services/notification-service/build/test-results/test/TEST-*.xml' \
-            'libs/*/build/test-results/test/TEST-*.xml' \
-            --require-suite '*.MemberJwtDecoderTest' \
-            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=4 \
-            --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
-            --output build/ci/unit-tests.json
+          read -ra tasks <<< "$GRADLE_TASKS"
+          ./gradlew "${tasks[@]}" --no-daemon --continue --max-workers=2
+      - name: Require selected regression reports
+        if: always() && (needs.plan.outputs.full == 'true' || needs.plan.outputs.services != '[]')
+        env:
+          FULL: ${{ needs.plan.outputs.full }}
+          SELECTED_SERVICES: ${{ needs.plan.outputs.services }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          patterns = [f'services/{service}-service/build/test-results/test/TEST-*.xml'
+                      for service in json.loads(os.environ['SELECTED_SERVICES'])]
+          required = []
+          if os.environ['FULL'] == 'true':
+              patterns.append('libs/*/build/test-results/test/TEST-*.xml')
+              required = ['--require-suite', '*.MemberJwtDecoderTest']
+          subprocess.run(['python3', '.github/scripts/check_test_results.py', *patterns, *required,
+                          '--allow-skipped-suite', 'com.shoppinglive.live.broadcast.PostgresMigrationTest=4',
+                          '--allow-skipped-suite', 'com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3',
+                          '--output', 'build/ci/unit-tests.json'], check=True)
+          PYTHON
       - name: Package integration application jars
+        if: needs.plan.outputs.integration == 'true'
         run: |
           mkdir -p build
           printf '%s\n' "$GITHUB_SHA" > build/integration-jars.sha
@@ -53,13 +88,14 @@ jobs:
             services/commerce-service/build/libs/*-SNAPSHOT.jar \
             services/live-service/build/libs/*-SNAPSHOT.jar
       - uses: actions/upload-artifact@v4
+        if: needs.plan.outputs.integration == 'true'
         with:
           name: integration-jars-${{ github.sha }}
           path: build/integration-jars.tar
           if-no-files-found: error
           retention-days: 2
       - name: Upload test reports
-        if: always()
+        if: always() && (needs.plan.outputs.full == 'true' || needs.plan.outputs.services != '[]')
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports-${{ github.sha }}
@@ -71,31 +107,14 @@ jobs:
           retention-days: 7
 
   postgres:
+    needs: plan
+    if: needs.plan.outputs.postgres == 'true'
     name: PostgreSQL (${{ matrix.service }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: member
-            database: member_test
-            task: ':services:member-service:postgresTest'
-            report: services/member-service/build/test-results/postgresTest/TEST-*.xml
-            suites: '*.MemberPostgresTest *.MemberLoginPostgresTest *.MemberSessionPostgresTest'
-            minimums: '*.MemberPostgresTest=1 *.MemberLoginPostgresTest=5 *.MemberSessionPostgresTest=16'
-          - service: commerce
-            database: commerce_test
-            task: ':services:commerce-service:postgresCommerceTest'
-            report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=3'
-          - service: live
-            database: live_test
-            task: ':services:live-service:test --tests *PostgresMigrationTest'
-            report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
-            suites: '*.PostgresMigrationTest'
-            minimums: '*.PostgresMigrationTest=4'
+      matrix: ${{ fromJSON(needs.plan.outputs.postgres_matrix) }}
     services:
       postgres:
         image: postgres:16
@@ -159,6 +178,8 @@ jobs:
           retention-days: 7
 
   contracts:
+    needs: plan
+    if: needs.plan.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -191,7 +212,8 @@ jobs:
           retention-days: 7
 
   integration:
-    needs: build
+    needs: [plan, build]
+    if: needs.plan.outputs.integration == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -227,27 +249,17 @@ jobs:
 
   quality-gate:
     name: Quality gate
-    needs: [build, postgres, contracts, integration]
+    needs: [plan, build, postgres, contracts, integration]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Require every verification job to succeed
+      - uses: actions/checkout@v5
+      - name: Require planned jobs to succeed
         env:
           RESULTS: ${{ toJSON(needs) }}
-          VERIFIED_SHA: ${{ github.sha }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          results = json.loads(os.environ['RESULTS'])
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
-              report.write('Verified commit: `' + os.environ['VERIFIED_SHA'] + '`\n\n')
-              for name, job in results.items():
-                  report.write(f"- {name}: {job['result']}\n")
-              report.write('\nUnit and PostgreSQL counts overlap; they are separate evidence, not additive.\n')
-          assert set(results) == {'build', 'postgres', 'contracts', 'integration'}
-          assert all(job['result'] == 'success' for job in results.values()), results
-          PY
+          PLAN_JSON: ${{ needs.plan.outputs.plan }}
+        run: python3 .github/scripts/ci_gate.py
 
   publish:
     needs: quality-gate

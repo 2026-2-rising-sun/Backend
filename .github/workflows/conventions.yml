@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: naming-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
 jobs:
   naming:
     runs-on: ubuntu-latest
@@ -16,6 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Verify naming checker
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+        run: python3 -m unittest discover -s .github/scripts -p 'test_check_conventions.py'
       - name: Check issue or PR naming
         run: python3 .github/scripts/check_conventions.py
