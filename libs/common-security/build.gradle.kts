@@ -17,7 +17,7 @@ dependencies {
 
 tasks.register<JavaExec>("generateLocalAuthFixtures") {
     group = "verification"
-    description = "Generate throwaway local RSA keys and real signed USER/ADMIN tokens (never production credentials)"
+    description = "Generate throwaway local RSA keys and real signed USER/SELLER tokens (never production credentials)"
     classpath = sourceSets["testFixtures"].runtimeClasspath
     mainClass.set("com.shoppinglive.common.security.test.LocalAuthFixtures")
     args(providers.gradleProperty("authFixtureDir").orElse(layout.buildDirectory.dir("local-auth").map {

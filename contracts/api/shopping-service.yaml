@@ -6,9 +6,9 @@ info:
   description: |-
     Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
     가격, 재고, 판매 상태는 Commerce 소유이며 공개와 관리자 조회에서 조회 시점에 결합한다.
-    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 ADMIN이 필요하다.
+    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 SELLER이 필요하다.
     공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
-    현재 상품 관리 모델은 공통 ADMIN 권한이며 판매자 역할이나 상품별 판매자 소유권을 가정하지 않는다.
+    상품 관리는 SELLER 권한을 요구한다. 상품별 판매자 소유권 모델은 아직 제공하지 않는다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 security: [{ BearerAuth: [] }]
@@ -29,7 +29,7 @@ tags:
 paths:
   /v1/admin/products:
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       tags: [Admin Product]
       summary: 상품 기본정보 등록
       operationId: registerProduct
@@ -54,7 +54,7 @@ paths:
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     get:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       tags: [Admin Product]
       summary: 관리자 상품 목록
       operationId: listAdminProducts
@@ -84,7 +84,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       tags: [Admin Product]
       summary: 관리자 상품 상세
       operationId: getAdminProduct
@@ -104,7 +104,7 @@ paths:
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     patch:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       tags: [Admin Product]
       summary: 상품 기본정보 부분 수정
       operationId: updateProduct
@@ -205,7 +205,7 @@ paths:
         '503': { $ref: '#/components/responses/SalesUnavailable' }
   /v1/admin/product-images:
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       tags: [Product Image]
       summary: 상품 이미지 업로드
       operationId: uploadProductImage
@@ -313,7 +313,7 @@ paths:
       summary: 미참조 상품 이미지 정리 (로컬 테스트 전용)
       operationId: deleteLocalUnreferencedImages
       description: local 또는 test 프로필 AND dev/prod 비활성 AND shopping.dev-api.enabled=true에서만 제공. 외부 dev/prod는 금지한다.
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       x-availability: opt-in local/test only
       responses:
         '200':
@@ -332,7 +332,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
+      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
     ServiceToken:
       type: apiKey
       in: header

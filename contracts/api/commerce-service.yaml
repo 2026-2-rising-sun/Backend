@@ -5,7 +5,7 @@ info:
   license: { name: UNLICENSED }
   description: |-
     회원 전용 주문·결제·장바구니와 관리자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
-    USER와 ADMIN의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
+    USER와 SELLER의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
     정상 응답은 봉투 없는 DTO/배열, 오류만 ApiResponse 봉투이다. 204는 본문 없음.
     현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
 
@@ -24,7 +24,7 @@ tags:
   - name: Cart
     description: Commerce 소유 장바구니
   - name: Sales Admin
-    description: ADMIN 판매·재고 관리
+    description: SELLER 판매·재고 관리
   - name: Internal Sales
     description: Shopping/Live 서비스 호출
   - name: Local Test
@@ -37,7 +37,7 @@ paths:
       operationId: "previewOrder"
       description: "재고 예약 없음. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
       parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}]
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -65,7 +65,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/CreateOrderRequest"}
             example: {"productId": 1, "quantity": 2, "buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000}
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "201":
           description: "성공"
@@ -91,9 +91,9 @@ paths:
       tags: ["Orders"]
       summary: "본인 주문 내역"
       operationId: "listMyOrders"
-      description: "createdAt 및 id 내림차순. ADMIN도 본인 거래만 조회한다."
+      description: "createdAt 및 id 내림차순. SELLER도 본인 거래만 조회한다."
       parameters: [{"name": "page", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0, "default": 0}}, {"name": "size", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}}]
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -114,7 +114,7 @@ paths:
       tags: ["Orders"]
       summary: "본인 주문 조회"
       operationId: "getMyOrder"
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -135,7 +135,7 @@ paths:
       summary: "결제 전 본인 주문 취소"
       operationId: "cancelMyOrder"
       description: "진행 중·완료·취소·만료 주문은 409. 비회원 조회 비밀번호로 접근할 수 없다."
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "204": {"description": "취소 및 예약 재고 복구, 본문 없음"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
@@ -157,7 +157,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/StartPaymentRequest"}
             example: {}
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -180,7 +180,7 @@ paths:
       summary: "본인 주문의 결제 시도 조회"
       operationId: "getMyPayment"
       description: "다른 회원 주문 또는 다른 주문의 paymentId는 모두 404."
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -200,7 +200,7 @@ paths:
       tags: ["Cart"]
       summary: "본인 장바구니 목록"
       operationId: "listMyCart"
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -225,7 +225,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/AddCartItemRequest"}
             example: {"productId": 1, "quantity": 2}
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "201":
           description: "성공"
@@ -252,7 +252,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/QuantityRequest"}
             example: {"quantity": 3}
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
           description: "성공"
@@ -271,7 +271,7 @@ paths:
       tags: ["Cart"]
       summary: "본인 항목 삭제"
       operationId: "deleteMyCartItem"
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "204": {"description": "삭제, 본문 없음"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
@@ -293,7 +293,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/CartOrderRequest"}
             example: {"buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000}
-      x-required-roles: ["USER", "ADMIN"]
+      x-required-roles: ["USER", "SELLER"]
       responses:
         "201":
           description: "성공"
@@ -347,7 +347,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/RegisterSalesRequest"}
             example: {"productId": 1, "price": 15000, "initialStock": 10}
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       responses:
         "201":
           description: "성공"
@@ -375,7 +375,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/ChangePriceRequest"}
             example: {"price": 16000}
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       responses:
         "200":
           description: "성공"
@@ -397,7 +397,7 @@ paths:
       tags: ["Sales Admin"]
       summary: "판매 재고 조회"
       operationId: "getSalesStock"
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       responses:
         "200":
           description: "성공"
@@ -421,7 +421,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/AdjustStockRequest"}
             example: {"delta": 5}
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       responses:
         "200":
           description: "성공"
@@ -449,7 +449,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/ChangeStatusRequest"}
             example: {"status": "ON_SALE"}
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       responses:
         "200":
           description: "성공"
@@ -471,14 +471,14 @@ paths:
       tags: ["Local Test"]
       summary: "본인 주문 Mock 결과 지정"
       operationId: "setLocalPaymentScenario"
-      description: "local 또는 test 프로필 AND dev/prod 비활성 AND commerce.dev.payment-scenario.enabled=true에서만 제공. ADMIN도 본인 주문만 허용. 외부 dev/prod는 금지."
+      description: "local 또는 test 프로필 AND dev/prod 비활성 AND commerce.dev.payment-scenario.enabled=true에서만 제공. SELLER도 본인 주문만 허용. 외부 dev/prod는 금지."
       requestBody:
         required: true
         content:
           application/json:
             schema: {"$ref": "#/components/schemas/SetPaymentScenarioRequest"}
             example: {"scenario": "DELAYED_SUCCESS"}
-      x-required-roles: ["ADMIN"]
+      x-required-roles: ["SELLER"]
       x-availability: "opt-in local/test only"
       responses:
         "204": {"description": "지정, 본문 없음"}
@@ -492,8 +492,8 @@ paths:
       tags: ["Local Test"]
       summary: "본인 주문 Mock 결과 지정 제거"
       operationId: "clearLocalPaymentScenario"
-      description: "PUT과 동일한 opt-in 프로필 및 본인 ADMIN 조건."
-      x-required-roles: ["ADMIN"]
+      description: "PUT과 동일한 opt-in 프로필 및 본인 SELLER 조건."
+      x-required-roles: ["SELLER"]
       x-availability: "opt-in local/test only"
       responses:
         "204": {"description": "지정 제거, 본문 없음"}
@@ -504,7 +504,7 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
     ServiceToken: {"type": "apiKey", "in": "header", "name": "X-Service-Token", "description": "대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다."}
   parameters:
     OrderNumber: {"name": "orderNumber", "in": "path", "required": true, "schema": {"type": "string"}}
@@ -536,7 +536,7 @@ components:
           examples:
             forbidden: {"value": {"success": false, "data": null, "error": {"code": "FORBIDDEN", "message": "권한이 없습니다.", "requestId": "request-001"}}}
     NotFound:
-      description: "대상이 없거나 다른 회원 소유. ADMIN도 동일한 본인 조건 적용."
+      description: "대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용."
       content:
         application/json:
           schema: {"$ref": "#/components/schemas/ErrorEnvelope"}

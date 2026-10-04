@@ -58,7 +58,7 @@ public class AdminProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
     }
 
-    /** 수정 경로의 누락 ID는 ADMIN 인가 후 입력 오류로 응답한다. */
+    /** 수정 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
     @PatchMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");

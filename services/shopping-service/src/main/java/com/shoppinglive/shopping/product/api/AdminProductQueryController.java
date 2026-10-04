@@ -39,7 +39,7 @@ public class AdminProductQueryController {
         return ApiResponse.ok(queryService.list(page, size));
     }
 
-    /** 상세 경로의 누락 ID는 ADMIN 인가 후 입력 오류로 응답한다. */
+    /** 상세 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
     @GetMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");

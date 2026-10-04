@@ -104,23 +104,24 @@ class MemberSessionTest extends MemberAuthTestSupport {
     }
 
     @Test
-    void onlyAdminCanForceRevokeAndNewLoginRemainsPossible() throws Exception {
+    void sellerCanRevokeOnlyOwnSessionsAndNewLoginRemainsPossible() throws Exception {
         var target = account("a@example.com");
-        var target2 = loginService.login("a@example.com", "password123");
-        account("admin@example.com");
-        jdbc.update("UPDATE members SET role='ADMIN' WHERE email='admin@example.com'");
-        var admin = loginService.login("admin@example.com", "password123");
-        UUID id = members.findByEmail("a@example.com").orElseThrow().getId();
-        String route = "/v1/admin/members/" + id + "/sessions/revoke";
+        account("seller@example.com");
+        jdbc.update("UPDATE members SET role='SELLER' WHERE email='seller@example.com'");
+        var seller = loginService.login("seller@example.com", "password123");
+        var seller2 = loginService.login("seller@example.com", "password123");
+        UUID targetId = members.findByEmail("a@example.com").orElseThrow().getId();
+        UUID sellerId = members.findByEmail("seller@example.com").orElseThrow().getId();
+        String route = "/v1/admin/members/" + sellerId + "/sessions/revoke";
         mvc.perform(post(route)).andExpect(status().isUnauthorized());
         mvc.perform(post(route).header("Authorization", bearer(target))).andExpect(status().isForbidden());
-        mvc.perform(post(route).header("Authorization", bearer(admin))).andExpect(status().isNoContent());
-        profile(target).andExpect(status().isUnauthorized());
-        profile(target2).andExpect(status().isUnauthorized());
-        profile(admin).andExpect(status().isOk());
-        profile(loginService.login("a@example.com", "password123")).andExpect(status().isOk());
-        mvc.perform(post("/v1/admin/members/" + UUID.randomUUID() + "/sessions/revoke")
-            .header("Authorization", bearer(admin))).andExpect(status().isNotFound());
+        mvc.perform(post("/v1/admin/members/" + targetId + "/sessions/revoke")
+            .header("Authorization", bearer(seller))).andExpect(status().isForbidden());
+        profile(target).andExpect(status().isOk());
+        mvc.perform(post(route).header("Authorization", bearer(seller))).andExpect(status().isNoContent());
+        profile(seller).andExpect(status().isUnauthorized());
+        profile(seller2).andExpect(status().isUnauthorized());
+        profile(loginService.login("seller@example.com", "password123")).andExpect(status().isOk());
     }
 
     @Test
