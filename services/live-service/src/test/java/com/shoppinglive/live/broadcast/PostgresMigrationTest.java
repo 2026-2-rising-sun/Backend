@@ -6,6 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.live.chat.api.ChatMessageResponse;
 import com.shoppinglive.live.chat.application.ChatQueryService;
+import com.shoppinglive.live.chat.domain.BroadcastChat;
+import com.shoppinglive.live.chat.infrastructure.BroadcastChatRepository;
+import java.time.temporal.ChronoUnit;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +38,9 @@ class PostgresMigrationTest extends LiveSecuritySupport {
 
     @Autowired
     ChatQueryService chatQueries;
+
+    @Autowired
+    BroadcastChatRepository chats;
 
     JdbcTemplate jdbc;
 
@@ -121,6 +127,22 @@ class PostgresMigrationTest extends LiveSecuritySupport {
             .map(ChatMessageResponse::content).toList();
 
         assertThat(contents).hasSize(50).startsWith("m1").endsWith("tie-a", "tie-b").doesNotContain("dropped");
+    }
+
+    @DisplayName("저장한 채팅의 이모지 200자와 마이크로초 작성 시각이 재조회에서도 같다")
+    @Test
+    void savedChatRoundTripsEmojiAndMicrosecondTimestamp() {
+        insertBroadcast("chat-save", "arn:aws:ivs:channel/chat-save", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'chat-save'", Long.class);
+        final Instant createdAt = Instant.parse("2026-10-03T11:00:00.123456789Z").truncatedTo(ChronoUnit.MICROS);
+        final String content = "😀".repeat(200);
+
+        chats.saveAndFlush(new BroadcastChat(broadcastId, UUID.randomUUID(), "회원", content, createdAt));
+
+        final ChatMessageResponse saved = chatQueries.recent(broadcastId).getFirst();
+        assertThat(saved.content()).isEqualTo(content);
+        assertThat(saved.createdAt()).isEqualTo(createdAt);
     }
 
     void insertChat(final Long broadcastId, final String content, final Instant createdAt) {
