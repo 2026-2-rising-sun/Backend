@@ -6,6 +6,8 @@ import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.web.CorrelationId;
 import com.shoppinglive.live.stream.application.BroadcastStreamService;
 import java.io.IOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 public class StreamController {
+    private static final Logger log = LoggerFactory.getLogger(StreamController.class);
     private final BroadcastStreamService streams;
 
     public StreamController(final BroadcastStreamService streams) {
@@ -45,6 +48,14 @@ public class StreamController {
         final String message = e instanceof BusinessException ? e.getMessage() : "id 값이 올바르지 않습니다.";
         return ResponseEntity.status(code.status()).contentType(MediaType.APPLICATION_JSON)
             .body(ApiResponse.fail(code, message, CorrelationId.current()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiResponse<Void>> unexpected(final Exception e) {
+        log.error("stream could not start", e);
+        final ErrorCode code = ErrorCode.INTERNAL_ERROR;
+        return ResponseEntity.status(code.status()).contentType(MediaType.APPLICATION_JSON)
+            .body(ApiResponse.fail(code, code.defaultMessage(), CorrelationId.current()));
     }
 
     /** 스트림 시작 뒤의 전송 실패는 시청자 이탈이다. 응답을 다시 쓸 수 없고 서버 오류도 아니므로 무시한다. */

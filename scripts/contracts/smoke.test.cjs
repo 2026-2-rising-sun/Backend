@@ -1,7 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { main, validateCoverage } = require('./smoke.cjs');
+const path = require('node:path');
+const { load } = require('./lib.cjs');
 const scenarios = require('../../contracts/scenarios/prism.json');
+
+test('chat input schema accepts whitespace around the 200-code-point HTTP boundary', () => {
+  const { validator } = load(path.join(__dirname, '../../contracts/api/live-service.yaml'));
+  const validate = validator('#/components/schemas/ChatInput');
+  assert.equal(validate({ content: ' ' + '😀'.repeat(200) + ' ' }), true, JSON.stringify(validate.errors));
+});
 
 test('empty scenario input fails the actual smoke entry before starting Docker', async () => {
   await assert.rejects(main([]), /Prism coverage: scenarios must be nonempty/);

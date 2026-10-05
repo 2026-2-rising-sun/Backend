@@ -9,9 +9,11 @@ import com.shoppinglive.live.like.api.LikeTotalResponse;
 import com.shoppinglive.live.like.domain.BroadcastLikeSnapshot;
 import com.shoppinglive.live.like.infrastructure.BroadcastLikeSnapshotRepository;
 import java.time.Duration;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,6 +25,12 @@ public class LikeService {
     private static final Logger log = LoggerFactory.getLogger(LikeService.class);
     // 방송 종료 뒤에도 조회와 마지막 보관이 끝날 때까지 값이 남아 있게 한다.
     private static final Duration TTL = Duration.ofDays(7);
+    private static final DefaultRedisScript<Long> ADD = new DefaultRedisScript<>("""
+        redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2])
+        local total = redis.call('INCR', KEYS[1])
+        redis.call('EXPIRE', KEYS[1], ARGV[2])
+        return total
+        """, Long.class);
 
     private final BroadcastRepository broadcasts;
     private final BroadcastLikeSnapshotRepository snapshots;
@@ -41,7 +49,7 @@ public class LikeService {
 
     /**
      * 방송 상태는 잠금 없이 읽으므로 종료와 동시에 도착한 좋아요는 반영될 수 있다. 이는 허용한 동작이다.
-     * SET NX 는 Redis 에 값이 없을 때만 DB 보관본으로 시작값을 만든다. 이미 있는 값은 덮어쓰지 않는다.
+     * 초기화·증가·만료를 원자 실행한다. 값이 없을 때만 DB 보관본으로 시작하고 기존 값은 덮어쓰지 않는다.
      */
     public LikeTotalResponse add(final long broadcastId) {
         final Broadcast broadcast = broadcasts.findById(broadcastId)
@@ -53,9 +61,8 @@ public class LikeService {
         final long stored = storedTotal(broadcastId);
         try {
             final String key = key(broadcastId);
-            redis.opsForValue().setIfAbsent(key, String.valueOf(stored));
-            final Long total = redis.opsForValue().increment(key);
-            redis.expire(key, TTL);
+            final Long total = redis.execute(ADD, List.of(key), String.valueOf(stored),
+                String.valueOf(TTL.toSeconds()));
             return new LikeTotalResponse(broadcastId, total);
         } catch (RuntimeException e) {
             log.warn("like not counted: broadcastId={} cause={}", broadcastId, e.toString());

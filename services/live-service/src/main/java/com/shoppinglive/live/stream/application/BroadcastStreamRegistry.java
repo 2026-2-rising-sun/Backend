@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Component
 @EnableConfigurationProperties(StreamProperties.class)
 public class BroadcastStreamRegistry {
+    private static final Logger log = LoggerFactory.getLogger(BroadcastStreamRegistry.class);
     private final Map<Long, Set<BroadcastConnection>> connections = new ConcurrentHashMap<>();
     private final StreamProperties properties;
     // ponytail: 멈춘 클라이언트는 컨테이너 write timeout(Tomcat connection-timeout)까지 writer 하나를 붙잡는다.
@@ -77,8 +80,18 @@ public class BroadcastStreamRegistry {
 
     @PreDestroy
     void shutdown() {
-        connections.values().forEach(local -> List.copyOf(local).forEach(BroadcastConnection::close));
-        writers.shutdownNow();
+        try {
+            connections.values().forEach(local -> List.copyOf(local).forEach(connection -> {
+                try {
+                    connection.close();
+                } catch (RuntimeException e) {
+                    log.warn("stream connection cleanup failed", e);
+                }
+            }));
+        } finally {
+            // close 가 대기 중인 drain 에 완료를 맡길 수 있으므로 예약된 작업도 끝까지 실행한다.
+            writers.shutdown();
+        }
     }
 
     private Set<BroadcastConnection> local(final long broadcastId) {
