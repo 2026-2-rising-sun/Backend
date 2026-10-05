@@ -36,7 +36,7 @@ jobs:
             task: :services:live-service:test --tests *PostgresMigrationTest
             report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
             suites: '*.PostgresMigrationTest'
-            minimums: '*.PostgresMigrationTest=8'
+            minimums: '*.PostgresMigrationTest=9'
     services:
       postgres:
         image: postgres:16

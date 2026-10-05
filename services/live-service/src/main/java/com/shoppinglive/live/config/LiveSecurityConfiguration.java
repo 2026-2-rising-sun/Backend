@@ -25,8 +25,10 @@ public class LiveSecurityConfiguration {
                 .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
                     "/v1/broadcasts", "/v1/broadcasts/", "/v1/broadcasts/{id}", "/v1/broadcasts/{id}/products",
-                    "/v1/broadcasts/{id}/chats", "/v1/broadcasts/{id}/events").permitAll()
-                .requestMatchers(HttpMethod.POST, "/v1/broadcasts/{id}/chats").hasAnyRole("USER", "SELLER")
+                    "/v1/broadcasts/{id}/chats", "/v1/broadcasts/{id}/events",
+                    "/v1/broadcasts/{id}/likes").permitAll()
+                .requestMatchers(HttpMethod.POST, "/v1/broadcasts/{id}/chats", "/v1/broadcasts/{id}/likes")
+                    .hasAnyRole("USER", "SELLER")
                 .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}",
                     "/v1/admin/broadcasts/{id}/products").hasRole("SELLER")
                 .requestMatchers(HttpMethod.POST, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}/start",

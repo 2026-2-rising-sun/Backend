@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -143,6 +144,25 @@ class PostgresMigrationTest extends LiveSecuritySupport {
         final ChatMessageResponse saved = chatQueries.recent(broadcastId).getFirst();
         assertThat(saved.content()).isEqualTo(content);
         assertThat(saved.createdAt()).isEqualTo(createdAt);
+    }
+
+    @DisplayName("좋아요 보관본은 방송당 한 행이고 없는 방송과 음수 합계를 거부한다")
+    @Test
+    void likeSnapshotIsOnePerBroadcastAndNonNegative() {
+        insertBroadcast("like-snapshot", "arn:aws:ivs:channel/like-snapshot", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'like-snapshot'", Long.class);
+        final String insert =
+            "INSERT INTO broadcast_like_snapshot (broadcast_id, total, updated_at) VALUES (?, ?, now())";
+
+        jdbc.update(insert, broadcastId, 0L);
+
+        assertThatThrownBy(() -> jdbc.update(insert, broadcastId, 1L))
+            .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(insert, Long.MAX_VALUE, 1L))
+            .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("UPDATE broadcast_like_snapshot SET total = -1 WHERE broadcast_id = ?",
+            broadcastId)).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     void insertChat(final Long broadcastId, final String content, final Instant createdAt) {
