@@ -21,6 +21,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class StreamRelay implements MessageListener {
     static final String CHANNEL = "live:events";
+    /** 이 이벤트를 받은 pod 는 전달한 뒤 해당 방송의 연결을 닫는다. */
+    public static final String BROADCAST_ENDED = "broadcast.ended";
     private static final Logger log = LoggerFactory.getLogger(StreamRelay.class);
 
     private final StringRedisTemplate redis;
@@ -56,7 +58,12 @@ public class StreamRelay implements MessageListener {
     public void onMessage(final Message message, final byte[] pattern) {
         try {
             final Envelope envelope = mapper.readValue(message.getBody(), Envelope.class);
-            registry.publish(envelope.broadcastId(), new StreamEvent(envelope.type(), envelope.id(), envelope.data()));
+            final StreamEvent event = new StreamEvent(envelope.type(), envelope.id(), envelope.data());
+            if (BROADCAST_ENDED.equals(envelope.type())) {
+                registry.publishAndClose(envelope.broadcastId(), event);
+            } else {
+                registry.publish(envelope.broadcastId(), event);
+            }
         } catch (Exception e) {
             log.warn("stream event ignored: cause={}", e.toString());
         }
