@@ -22,7 +22,7 @@ class ServiceCallerTokenValidatorTest {
     @Test
     void rejectsAmbiguousAndWeakConfiguration() {
         for (var config : java.util.List.of(Map.of("shopping", TOKEN, "live", TOKEN),
-            Map.of("shopping", "short"), Map.of("ADMIN", TOKEN), Map.of("shopping", " " + TOKEN))) {
+            Map.of("shopping", "short"), Map.of("SELLER", TOKEN), Map.of("shopping", " " + TOKEN))) {
             assertThatThrownBy(() -> new ServiceCallerTokenValidator(config)).isInstanceOf(IllegalArgumentException.class);
         }
     }
