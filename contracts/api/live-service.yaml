@@ -509,7 +509,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
     post:
-      x-required-roles: [USER, ADMIN]
+      x-required-roles: [USER, SELLER]
       summary: 채팅 작성 (#130)
       description: |
         LIVE 방송에만 쓸 수 있다. 작성자는 인증 정보에서 얻으며 요청 본문의 회원 ID·이름은 받지 않는다.
