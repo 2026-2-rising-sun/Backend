@@ -10,6 +10,8 @@ import com.shoppinglive.live.chat.domain.BroadcastChat;
 import com.shoppinglive.live.chat.infrastructure.BroadcastChatRepository;
 import com.shoppinglive.live.integration.member.MemberProfileClient;
 import com.shoppinglive.live.integration.member.MemberProfileException;
+import com.shoppinglive.live.stream.application.StreamEvent;
+import com.shoppinglive.live.stream.application.StreamRelay;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -24,19 +26,23 @@ public class ChatWriteService {
     private final BroadcastRepository broadcasts;
     private final BroadcastChatRepository chats;
     private final MemberProfileClient members;
+    private final StreamRelay relay;
     private final TransactionTemplate transaction;
 
     public ChatWriteService(final BroadcastRepository broadcasts, final BroadcastChatRepository chats,
-                            final MemberProfileClient members, final PlatformTransactionManager manager) {
+                            final MemberProfileClient members, final StreamRelay relay,
+                            final PlatformTransactionManager manager) {
         this.broadcasts = broadcasts;
         this.chats = chats;
         this.members = members;
+        this.relay = relay;
         this.transaction = new TransactionTemplate(manager);
     }
 
     /**
      * 표시 이름 조회(외부 호출)는 트랜잭션 밖에서 먼저 한다. 방송 상태는 저장 직전에 잠금 없이 읽으므로
      * 종료와 동시에 도착한 채팅은 저장될 수 있다. 이는 허용한 동작이다.
+     * 실시간 전달은 보장하지 않는다. 전달에 실패해도 저장된 채팅과 201 응답은 그대로다.
      */
     public ChatMessageResponse write(final long broadcastId, final String memberId, final String authorization,
                                      final String rawContent) {
@@ -47,7 +53,7 @@ public class ChatWriteService {
         }
         final String displayName = displayName(authorization, memberId);
 
-        return transaction.execute(status -> {
+        final ChatMessageResponse saved = transaction.execute(status -> {
             final Broadcast broadcast = broadcasts.findById(broadcastId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));
             if (broadcast.getStatus() != BroadcastStatus.LIVE) {
@@ -57,6 +63,9 @@ public class ChatWriteService {
             return ChatMessageResponse.from(chats.save(new BroadcastChat(broadcastId, UUID.fromString(memberId),
                 displayName, content, Instant.now().truncatedTo(ChronoUnit.MICROS))));
         });
+        // 커밋 뒤에만 발행한다. 저장에 실패하면 여기까지 오지 않는다.
+        relay.publish(broadcastId, new StreamEvent("chat.created", String.valueOf(saved.messageId()), saved));
+        return saved;
     }
 
     private String displayName(final String authorization, final String memberId) {

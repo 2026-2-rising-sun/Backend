@@ -15,6 +15,11 @@ spring:
   # 실제 migration 검증은 postgres 프로파일 테스트(LIVE_PG_TEST=1)로 한다.
   flyway:
     enabled: false
+  # 닫힌 포트다. 기본 테스트는 Redis 없이 돌며 "Redis 장애에도 기동·채팅 작성 성공"을 함께 검증한다.
+  # 실제 Redis 검증은 LIVE_REDIS_TEST=1 테스트로 한다.
+  data:
+    redis:
+      port: 1
 
 live:
   products:

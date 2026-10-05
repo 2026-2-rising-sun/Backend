@@ -5,17 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.shoppinglive.live.broadcast.api.BroadcastInput;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.security.LiveSecuritySupport;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,8 +24,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @DisplayName("방송 SSE 연결 (실제 HTTP)")
 class BroadcastStreamHttpTest extends LiveSecuritySupport {
-    private static final String END_OF_STREAM = "<closed>";
-
     @LocalServerPort int port;
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastStreamRegistry registry;
@@ -45,46 +39,9 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
         return id;
     }
 
-    private HttpRequest events(final long id) {
+    private HttpRequest events(final Object id) {
         return HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/v1/broadcasts/" + id + "/events"))
             .header("Accept", "text/event-stream").build();
-    }
-
-    /** 응답 줄을 별도 스레드에서 읽어 모은다. 스트림이 끝나면 END_OF_STREAM 을 넣는다. */
-    private final class Stream implements AutoCloseable {
-        final HttpResponse<InputStream> response;
-        final BlockingQueue<String> lines = new LinkedBlockingQueue<>();
-
-        Stream(final long id) throws Exception {
-            response = http.send(events(id), HttpResponse.BodyHandlers.ofInputStream());
-            Thread.ofVirtual().start(() -> {
-                try (var reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
-                    String line = reader.readLine();
-                    while (line != null) {
-                        lines.add(line);
-                        line = reader.readLine();
-                    }
-                } catch (Exception ignored) {
-                    // 테스트가 연결을 닫았다.
-                } finally {
-                    lines.add(END_OF_STREAM);
-                }
-            });
-        }
-
-        String nextNonEmpty() throws InterruptedException {
-            String line = lines.poll(5, TimeUnit.SECONDS);
-            while (line != null && line.isEmpty()) {
-                line = lines.poll(5, TimeUnit.SECONDS);
-            }
-            return line;
-        }
-
-        @Override
-        public void close() throws Exception {
-            response.body().close();
-        }
     }
 
     @DisplayName("토큰 없이 LIVE 방송에 연결하면 stream.ready 를 받고 프록시 buffering 방지 헤더가 온다")
@@ -93,7 +50,7 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
         final long id = broadcast("stream-ready", "LIVE");
         accessSessions.fail();
 
-        try (Stream stream = new Stream(id)) {
+        try (SseTestClient stream = new SseTestClient(port, id)) {
             assertThat(stream.response.statusCode()).isEqualTo(200);
             assertThat(stream.response.headers().firstValue("Content-Type")).hasValueSatisfying(
                 type -> assertThat(type).startsWith("text/event-stream"));
@@ -120,9 +77,7 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
         final HttpResponse<String> missing = http.send(events(Long.MAX_VALUE), HttpResponse.BodyHandlers.ofString());
         assertThat(missing.statusCode()).isEqualTo(404);
         assertThat(missing.body()).contains("\"code\":\"NOT_FOUND\"");
-        final HttpResponse<String> invalid = http.send(HttpRequest.newBuilder(URI.create(
-            "http://127.0.0.1:" + port + "/v1/broadcasts/abc/events")).header("Accept", "text/event-stream").build(),
-            HttpResponse.BodyHandlers.ofString());
+        final HttpResponse<String> invalid = http.send(events("abc"), HttpResponse.BodyHandlers.ofString());
         assertThat(invalid.statusCode()).isEqualTo(400);
         assertThat(invalid.body()).contains("\"code\":\"INVALID_REQUEST\"");
     }
@@ -133,7 +88,7 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
         final long mine = broadcast("stream-mine", "LIVE");
         final long other = broadcast("stream-other", "LIVE");
 
-        try (Stream stream = new Stream(mine)) {
+        try (SseTestClient stream = new SseTestClient(port, mine)) {
             stream.nextNonEmpty();
             stream.nextNonEmpty();
 
@@ -152,7 +107,7 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
     @Test
     void disconnectedClientIsRemoved() throws Exception {
         final long id = broadcast("stream-disconnect", "LIVE");
-        final Stream stream = new Stream(id);
+        final SseTestClient stream = new SseTestClient(port, id);
         stream.nextNonEmpty();
         stream.close();
 
@@ -169,15 +124,24 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
     void serverCloseEndsTheClientStream() throws Exception {
         final long id = broadcast("stream-close", "LIVE");
 
-        try (Stream stream = new Stream(id)) {
+        try (SseTestClient stream = new SseTestClient(port, id)) {
             stream.nextNonEmpty();
             stream.nextNonEmpty();
             registry.publishAndClose(id, StreamEvent.of("broadcast.ended", Map.of("broadcastId", id)));
 
             assertThat(stream.nextNonEmpty()).isEqualTo("event:broadcast.ended");
             assertThat(stream.nextNonEmpty()).startsWith("data:");
-            assertThat(stream.nextNonEmpty()).isEqualTo(END_OF_STREAM);
+            assertThat(stream.nextNonEmpty()).isEqualTo(SseTestClient.END_OF_STREAM);
             assertThat(registry.connectionCount(id)).isZero();
         }
+    }
+
+    @DisplayName("Redis 에 연결할 수 없어도 앱은 기동하고 구독은 재시도 상태로 남는다")
+    @Test
+    void startsWithoutRedis(@Autowired final StreamRelay relay) {
+        // 테스트 설정의 Redis 포트는 닫혀 있다. 여기까지 온 것이 기동 성공이다.
+        relay.subscribe();
+
+        assertThat(relay.subscribed()).isFalse();
     }
 }
