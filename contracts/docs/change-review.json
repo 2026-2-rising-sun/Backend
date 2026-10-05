@@ -120,6 +120,16 @@
         "reviewedAt": "2026-10-06",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/142"
       }
+    },
+    {
+      "baseSnapshotSha256": "e67ebe2c856d3ae76ad5b6e2a99bc1770d40bcf69b0c592e94b8528f3b83130a",
+      "headSnapshotSha256": "33e98fbf24986563d4a7e23d0fa929bef7bd79a88cfaf0a728a9d7294575d21a",
+      "reason": "Merge the Live chat/likes/SSE stack with current dev SELLER roles. Preserve public reads, use USER/SELLER writes, preserve the trimmed 200-code-point chat limit and all realtime operations.",
+      "independentReview": {
+        "reviewer": "Codex independent read-only agent /root/stack_merge_review; confirmed SELLER rules, SSE/like fixes and cross-instance flow",
+        "reviewedAt": "2026-10-06",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/142"
+      }
     }
   ]
 }
