@@ -949,7 +949,6 @@ components:
         content:
           type: string
           minLength: 1
-          maxLength: 200
           description: 앞뒤 공백 제거 후 code point 기준 1~200자. 공백만 있으면 400 이다.
     ChatMessage:
       type: object

@@ -90,6 +90,16 @@
         "reviewedAt": "2026-10-04",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/141"
       }
+    },
+    {
+      "baseSnapshotSha256": "ef202e35e7aa326f9a917f2fcc7d34416cf14aac13c66b7cf284d5fce054e6a0",
+      "headSnapshotSha256": "7e49470fa5fe8dfdb14d7270b03699962103ac6703c890018e224709ef3a014d",
+      "reason": "Remove the incorrect raw ChatInput.content maxLength of 200. The server validates 1..200 Unicode code points after strip(), so surrounding whitespace must not cause valid requests to fail contract validation. The documented business limit and authentication requirements remain unchanged.",
+      "independentReview": {
+        "reviewer": "Bugbot (/root/bugbot), in a context separate from the fix author; reviewed the YAML and schema regression test and confirmed consistency with server strip/code-point validation",
+        "reviewedAt": "2026-10-05",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/142"
+      }
     }
   ]
 }

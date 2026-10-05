@@ -39,7 +39,7 @@ public class BroadcastStreamService {
             connection.close();
             throw e;
         }
-        connection.offer(StreamEvent.of("stream.ready", Map.of("broadcastId", broadcastId)));
+        connection.activate(StreamEvent.of("stream.ready", Map.of("broadcastId", broadcastId)));
         return emitter;
     }
 }
