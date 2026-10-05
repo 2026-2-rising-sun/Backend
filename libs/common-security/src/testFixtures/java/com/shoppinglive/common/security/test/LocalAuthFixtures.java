@@ -34,7 +34,7 @@ public final class LocalAuthFixtures {
         new ObjectMapper().writeValue(directory.resolve("tokens.json").toFile(), Map.of(
             "memberA", tokens.token(JwtTestTokens.MEMBER_A, Set.of("USER")),
             "memberB", tokens.token(JwtTestTokens.MEMBER_B, Set.of("USER")),
-            "admin", tokens.token(JwtTestTokens.ADMIN, Set.of("USER", "ADMIN")),
+            "seller", tokens.token(JwtTestTokens.SELLER, Set.of("USER", "SELLER")),
             "sampleServiceToken", Base64.getUrlEncoder().withoutPadding().encodeToString(secret),
             "keyId", tokens.keyId(), "warning", "LOCAL TEST ONLY; member tokens expire in five minutes"));
         System.out.println("Generated local-only authentication fixtures in " + directory.toAbsolutePath());

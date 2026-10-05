@@ -48,7 +48,7 @@ public class MemberSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET, "/v1/members/me").authenticated()
                 .requestMatchers(HttpMethod.PATCH, "/v1/members/me").authenticated()
                 .requestMatchers(HttpMethod.DELETE, "/v1/members/me").authenticated()
-                .requestMatchers(HttpMethod.POST, "/v1/admin/members/*/sessions/revoke").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/v1/admin/members/*/sessions/revoke").hasRole("SELLER")
                 .anyRequest().denyAll())
             .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(errors).accessDeniedHandler(errors))
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))

@@ -27,6 +27,7 @@ async function freePort() {
 class Runtime {
   constructor(options = {}) {
     this.id = 'sl-p2-flow-' + crypto.randomBytes(6).toString('hex');
+    this.localTestAccounts = options.localTestAccounts === true;
     this.sha = command('git', ['rev-parse', 'HEAD']);
     this.output = options.output ?? path.join(root, 'build/integration');
     this.containers = new Set(); this.children = new Map(); this.secrets = new Set();
@@ -149,14 +150,14 @@ class Runtime {
     const hostBase = Object.fromEntries(['PATH', 'JAVA_HOME', 'HOME', 'TMPDIR', 'LANG']
       .filter(key => process.env[key]).map(key => [key, process.env[key]]));
     if (this.mode === 'host') return ['java', [...this.jvm, '-jar', this.jars[service], ...extra], { ...hostBase, ...env }];
-    const name = this.id + '-' + service + (oneShot ? '-admin' : '');
+    const name = this.id + '-' + service + (oneShot ? '-seller' : '');
     const mounts = ['-v', `${this.jars[service]}:/app.jar:ro`, '-v', `${this.private}/member-public.jwks:/run/integration/member-public.jwks:ro`];
     if (service === 'shopping') {
       fs.mkdirSync(path.join(this.private, 'images'), { recursive: true, mode: 0o700 });
       mounts.push('-v', `${this.private}/images:/tmp/images`);
     }
     if (service === 'member') mounts.push('-v', `${this.private}/member-private.pem:/run/integration/member-private.pem:ro`);
-    const args = ['--network', this.id, '--network-alias', service, '--env-file', this.envFile(service + (oneShot ? '-admin' : ''), env), ...mounts];
+    const args = ['--network', this.id, '--network-alias', service, '--env-file', this.envFile(service + (oneShot ? '-seller' : ''), env), ...mounts];
     if (oneShot) args.push('--rm');
     else args.push('-d', '-p', `127.0.0.1:${this.ports[service].api}:8080`, '-p', `127.0.0.1:${this.ports[service].management}:9090`);
     args.push('eclipse-temurin:21-jdk', 'java', ...this.jvm, '-jar', '/app.jar', ...extra);
@@ -169,7 +170,7 @@ class Runtime {
       MANAGEMENT_SERVER_PORT: String(this.mode === 'docker' ? 9090 : this.ports[service].management),
       SPRING_DATASOURCE_URL: this.databaseUrl(base(service)), SPRING_DATASOURCE_USERNAME: 'integration', SPRING_DATASOURCE_PASSWORD: this.databasePassword,
       SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: '2000', SPRING_DATASOURCE_HIKARI_VALIDATION_TIMEOUT: '1000',
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: '127.0.0.1:1', SPRING_KAFKA_ADMIN_AUTO_CREATE: 'false', SPRING_KAFKA_LISTENER_AUTO_STARTUP: 'false',
+      MEMBER_LOCAL_TEST_ACCOUNTS_ENABLED: String(this.localTestAccounts), SPRING_KAFKA_BOOTSTRAP_SERVERS: '127.0.0.1:1', SPRING_KAFKA_ADMIN_AUTO_CREATE: 'false', SPRING_KAFKA_LISTENER_AUTO_STARTUP: 'false',
       MEMBER_JWT_PUBLIC_KEY_SET_LOCATION: `file:${prefix}/member-public.jwks`,
       SHOPPING_SALES_CLIENT_BASE_URL: upstream('commerce'), COMMERCE_SHOPPING_CLIENT_BASE_URL: upstream('shopping'),
       LIVE_PRODUCTS_MODE: 'http', LIVE_PRODUCTS_SHOPPING_URL: upstream('shopping'), LIVE_PRODUCTS_COMMERCE_URL: upstream('commerce'),
@@ -208,12 +209,12 @@ class Runtime {
     return this.wait(async () => { try { return (await fetch(this.health[service] + '/actuator/health/readiness',
       { signal: AbortSignal.timeout(2000) })).status === 200; } catch { return false; } }, service);
   }
-  bootstrapAdmin(email, password) {
+  bootstrapSeller(email, password) {
     this.remember(password);
     const env = { ...this.environments.member, MEMBER_BOOTSTRAP_DB_URL: this.databaseUrl('member'), MEMBER_BOOTSTRAP_DB_SCHEMA: 'public',
       MEMBER_BOOTSTRAP_DB_USER: 'integration', MEMBER_BOOTSTRAP_DB_PASSWORD: this.databasePassword,
-      MEMBER_BOOTSTRAP_ADMIN_EMAIL: email, MEMBER_BOOTSTRAP_ADMIN_PASSWORD: password, MEMBER_BOOTSTRAP_ADMIN_DISPLAY_NAME: 'Integration Admin' };
-    const [file, args, hostEnv] = this.javaOptions('member', env, ['--bootstrap-admin'], true);
+      MEMBER_BOOTSTRAP_SELLER_EMAIL: email, MEMBER_BOOTSTRAP_SELLER_PASSWORD: password, MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME: 'Integration Seller' };
+    const [file, args, hostEnv] = this.javaOptions('member', env, ['--bootstrap-seller'], true);
     if (this.mode === 'docker') this.docker(file, args);
     else command(file, args, { env: hostEnv });
   }

@@ -65,7 +65,7 @@ class LikeRedisTest extends LiveSecuritySupport {
             + "VALUES (?, ?, CURRENT_TIMESTAMP)", id, total);
     }
 
-    @DisplayName("좋아요는 요청마다 1 증가하고 증가 직후 합계를 반환하며 같은 회원의 반복과 ADMIN 을 허용한다")
+    @DisplayName("좋아요는 요청마다 1 증가하고 증가 직후 합계를 반환하며 같은 회원의 반복과 SELLER 을 허용한다")
     @Test
     void eachLikeAddsOne() throws Exception {
         final long id = liveBroadcast("like-add");

@@ -43,13 +43,13 @@ async function liveRealtime(ctx) {
   const req = ctx.request.bind(ctx); const r = ctx.runtime;
   const create = { title: 'Realtime broadcast', scheduledAt: new Date(Date.now() + 60000).toISOString(),
     channelArn: 'arn:aws:ivs:ap-northeast-2:000000000000:channel/realtime-fixture', playbackUrl: 'https://stub.live-video.net/realtime-fixture.m3u8' };
-  const broadcast = (await req('realtime-broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.admin, body: create,
+  const broadcast = (await req('realtime-broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.seller, body: create,
     headers: { 'Idempotency-Key': 'realtime-broadcast' }, status: 201 })).data;
   const link = (await req('realtime-broadcast-link', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/products`,
-    { token: ctx.admin, body: { productId: ctx.products[0], expectedVersion: broadcast.version }, status: 201 })).data;
+    { token: ctx.seller, body: { productId: ctx.products[0], expectedVersion: broadcast.version }, status: 201 })).data;
   const base = `/v1/broadcasts/${broadcast.id}`;
   await req('realtime-sse-before-start-409', 'live2', 'GET', base + '/events', { headers: { Accept: 'text/event-stream' }, status: 409 });
-  await req('realtime-broadcast-start', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/start?expectedVersion=${link.broadcastVersion}`, { token: ctx.admin });
+  await req('realtime-broadcast-start', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/start?expectedVersion=${link.broadcastVersion}`, { token: ctx.seller });
 
   const stream = await openStream(r.urls.live2 + base + '/events');
   try {
@@ -73,7 +73,7 @@ async function liveRealtime(ctx) {
     const likes = await stream.next(event => event.name === 'likes.updated' && event.data.total === 3);
     ctx.check('realtime-likes-updated-reaches-b', likes?.data, { broadcastId: broadcast.id, total: 3 });
 
-    const ended = (await req('realtime-broadcast-end-a', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/end`, { token: ctx.admin })).data;
+    const ended = (await req('realtime-broadcast-end-a', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/end`, { token: ctx.seller })).data;
     const notice = await stream.next(event => event.name === 'broadcast.ended');
     ctx.check('realtime-end-a-reaches-b', [notice?.data.broadcastId, new Date(notice?.data.endedAt).getTime()], [broadcast.id, new Date(ended.endedAt).getTime()]);
     ctx.check('realtime-end-a-closes-b', await stream.ended());

@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.member.members.application.MemberService;
-import com.shoppinglive.member.operations.AdminBootstrapCommand;
+import com.shoppinglive.member.operations.SellerBootstrapCommand;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,7 +31,7 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isPositive();
         assertThatThrownBy(() -> insertRaw("UPPER@example.com", "USER"))
             .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> insertRaw("user@example.com", "SELLER"))
+        assertThatThrownBy(() -> insertRaw("user@example.com", "ADMIN"))
             .isInstanceOf(DataIntegrityViolationException.class);
         insertRaw("user@example.com", "USER");
         assertThatThrownBy(() -> insertRaw("user@example.com", "USER"))
@@ -72,13 +72,13 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
     @Test
     void bootstrapOnlyCreatesNewAdminAndNeverPromotesExistingUser() {
         service.register("user@example.com", "password123", "user");
-        var command = new AdminBootstrapCommand();
+        var command = new SellerBootstrapCommand();
         assertThatThrownBy(() -> command.execute(bootstrapEnvironment("user@example.com")))
             .isInstanceOf(IllegalStateException.class);
         assertThat(members.findByEmail("user@example.com").orElseThrow().roles()).containsExactly("USER");
         UUID adminId = command.execute(bootstrapEnvironment("admin@example.com"));
         var admin = members.findById(adminId).orElseThrow();
-        assertThat(admin.roles()).containsExactly("ADMIN");
+        assertThat(admin.roles()).containsExactly("SELLER");
         assertThat(passwords.matches("only-test-password", admin.getPasswordHash())).isTrue();
         assertThatThrownBy(() -> command.execute(bootstrapEnvironment("admin@example.com")))
             .isInstanceOf(IllegalStateException.class);
@@ -90,7 +90,7 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
             "MEMBER_BOOTSTRAP_DB_SCHEMA", POSTGRES_SCHEMA,
             "MEMBER_BOOTSTRAP_DB_USER", System.getenv("MEMBER_TEST_DB_USER"),
             "MEMBER_BOOTSTRAP_DB_PASSWORD", System.getenv("MEMBER_TEST_DB_PASSWORD"),
-            "MEMBER_BOOTSTRAP_ADMIN_EMAIL", email,
-            "MEMBER_BOOTSTRAP_ADMIN_PASSWORD", "only-test-password", "MEMBER_BOOTSTRAP_ADMIN_DISPLAY_NAME", "admin");
+            "MEMBER_BOOTSTRAP_SELLER_EMAIL", email,
+            "MEMBER_BOOTSTRAP_SELLER_PASSWORD", "only-test-password", "MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME", "admin");
     }
 }

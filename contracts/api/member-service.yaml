@@ -6,7 +6,7 @@ info:
   description: |-
     회원가입·로그인·프로필과 승인된 세션 수명·철회 정책 계약이다. 성공과 오류는 ApiResponse 봉투를 사용한다.
     Access 수명은 15분, refresh family는 최초 로그인부터 절대 30일이며 rotation으로 연장되지 않는다.
-    일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·관리자 강제 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
+    일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·판매자 본인 세션 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
     이미 인증 검사를 통과한 요청을 소급 취소하지 않는다. 쿠키를 쓰지 않으며 소셜 로그인은 별도 미구현 범위다.
 security: [{ BearerAuth: [] }]
 servers:
@@ -203,11 +203,11 @@ paths:
     post:
       tags:
         - Member
-      summary: 회원의 모든 기존 세션 강제 폐기
+      summary: 판매자 본인의 모든 기존 세션 폐기
       operationId: revokeMemberSessions
       x-required-roles:
-        - ADMIN
-      description: 대상 회원의 모든 기존 family를 보안 폐기한다. 계정 정지가 아니므로 이후 새 로그인은 가능하다.
+        - SELLER
+      description: SELLER 본인의 모든 기존 family를 보안 폐기한다. 다른 회원 id는 403이며 존재 여부를 노출하지 않는다. 이후 새 로그인은 가능하다.
       parameters:
         - name: id
           in: path
@@ -280,12 +280,12 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
     ServiceToken:
       type: apiKey
       in: header
       name: X-Service-Token
-      description: Shopping/Commerce/Live 방향별 opaque caller 자격증명. 사용자·ADMIN JWT와 대체할 수 없다.
+      description: Shopping/Commerce/Live 방향별 opaque caller 자격증명. 사용자·SELLER JWT와 대체할 수 없다.
   responses:
     AuthUnavailable:
       description: "JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음."
@@ -375,7 +375,7 @@ components:
         email: {"type": "string", "format": "email", "maxLength": 254}
         password: {"type": "string", "format": "password", "minLength": 8, "maxLength": 72, "writeOnly": true, "description": "UTF-8 72바이트 이하도 검사. 로그·응답에 반환하지 않는다."}
         displayName: {"type": "string", "minLength": 1, "maxLength": 80}
-      description: "email/displayName 앞뒤 공백 제거, email 소문자 정규화. 역할 입력으로 ADMIN을 부여할 수 없다."
+      description: "email/displayName 앞뒤 공백 제거, email 소문자 정규화. 역할 입력으로 SELLER를 부여할 수 없다."
     ProfileUpdateRequest:
       type: "object"
       additionalProperties: false
@@ -389,7 +389,7 @@ components:
         memberId: {"type": "string", "format": "uuid"}
         email: {"type": "string", "format": "email"}
         displayName: {"type": "string"}
-        roles: {"type": "array", "uniqueItems": true, "items": {"type": "string", "enum": ["USER", "ADMIN"]}}
+        roles: {"type": "array", "uniqueItems": true, "items": {"type": "string", "enum": ["USER", "SELLER"]}}
     MemberEnvelope:
       type: "object"
       required: ["success", "data", "error"]

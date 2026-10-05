@@ -130,7 +130,7 @@ class SecurityFilterChainIntegrationTest {
     }
 
     private String userBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER")); }
-    private String adminBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.ADMIN, Set.of("ADMIN")); }
+    private String adminBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER")); }
 
     @Configuration(proxyBeanMethods = false)
     @EnableWebMvc
@@ -158,7 +158,7 @@ class SecurityFilterChainIntegrationTest {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(errors).accessDeniedHandler(errors))
                 .authorizeHttpRequests(auth -> auth.requestMatchers("/public").permitAll()
-                    .requestMatchers("/member").authenticated().requestMatchers("/admin").hasRole("ADMIN")
+                    .requestMatchers("/member").authenticated().requestMatchers("/admin").hasRole("SELLER")
                     .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt
                     .decoder(MemberJwtDecoderFactory.create(TOKENS.publicJwkSet(), JwtTestTokens.ISSUER, JwtTestTokens.AUDIENCE))

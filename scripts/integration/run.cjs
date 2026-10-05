@@ -4,7 +4,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { Runtime, command } = require('./runtime.cjs');
 const { Context } = require('./context.cjs');
-const { memberAdmin } = require('./member-admin.cjs');
+const { memberSeller } = require('./member-seller.cjs');
 const { commerce } = require('./commerce.cjs');
 const { liveFailures } = require('./live-failures.cjs');
 const { liveRealtime } = require('./live-realtime.cjs');
@@ -22,17 +22,11 @@ async function run() {
     if (command('git', ['status', '--porcelain', '--untracked-files=normal']))
       throw new Error('Integration requires a clean checkout including untracked source files');
     context = new Context(runtime);
-    // Apidog round-trip is a separately reviewed snapshot, not an automated check in this run.
-    context.result.externalVerification = {
-      apidog: {
-        projectId: 1390127,
-        reviewedAt: '2026-10-01',
-        evidence: 'https://app.notion.com/p/3ec226545d1581978775f3425f4208ea',
-        approvedSha256: '0e404c4630d6431cfc7fb6e68b37d9d356e332d7eae6af805deed1c17f98692e',
-        exportedSha256: '166947ba2fc498ef1f43fe55028c1b8fdeb960b30c1d4768807a00ae470d95e1',
-        scope: '54 operations; equivalent after explicitly reviewed UI normalization; raw export is not lossless'
-      }
-    };
+    // A historical export is not evidence for the current role contract.
+    context.result.externalVerification = { apidog: {
+      verifiedForCurrentCheckout: false,
+      scope: 'Current Apidog import and auth setup require separate verification; this run checks source contracts only.'
+    } };
     context.save();
     const usePrebuilt = process.argv.includes('--use-prebuilt') || process.env.CI === 'true';
     await runtime.build(usePrebuilt);
@@ -40,7 +34,7 @@ async function run() {
       [service, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
     console.log(`Starting isolated ${runtime.mode} runtime at ${runtime.sha}`);
     await runtime.setup();
-    await memberAdmin(context);
+    await memberSeller(context);
     await commerce(context);
     await mockFailures(context);
     await liveRealtime(context);

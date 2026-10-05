@@ -9,34 +9,34 @@ async function liveFailures(ctx) {
     ['live-commerce', 'commerce', `/v1/sales?productIds=${p[0]}`, 'LIVE_COMMERCE']]) {
     await req('caller-valid-' + name, service, 'GET', endpoint, { headers: tokenHeader(caller) });
     await req('caller-missing-' + name, service, 'GET', endpoint, { status: 401 });
-    await req('caller-admin-jwt-' + name, service, 'GET', endpoint, { token: ctx.admin, status: 401 });
+    await req('caller-seller-jwt-' + name, service, 'GET', endpoint, { token: ctx.seller, status: 401 });
     await req('caller-forged-name-' + name, service, 'GET', endpoint, { headers: { 'X-Service-Caller': 'live', 'X-Service-Token': 'untrusted' }, status: 401 });
   }
-  await req('caller-token-cannot-shop-admin', 'shopping', 'POST', '/v1/admin/products', { headers: tokenHeader('COMMERCE_SHOPPING'), body: {}, status: 401 });
+  await req('caller-token-cannot-shop-seller', 'shopping', 'POST', '/v1/admin/products', { headers: tokenHeader('COMMERCE_SHOPPING'), body: {}, status: 401 });
   await req('caller-token-cannot-buy', 'commerce', 'GET', '/v1/cart/items', { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
   await req('wrong-target-credential', 'shopping', 'GET', `/v1/internal/products/${p[0]}`, { headers: tokenHeader('SHOPPING_COMMERCE'), status: 401 });
   const create = { title: 'Integration broadcast', scheduledAt: new Date(Date.now() + 60000).toISOString(),
     channelArn: 'arn:aws:ivs:ap-northeast-2:000000000000:channel/local-fixture', playbackUrl: 'https://stub.live-video.net/local-fixture.m3u8' };
-  const broadcast = (await req('broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.admin, body: create,
+  const broadcast = (await req('broadcast-create', 'live', 'POST', '/v1/admin/broadcasts', { token: ctx.seller, body: create,
     headers: { 'Idempotency-Key': 'broadcast' }, status: 201 })).data;
   let version = broadcast.version; const links = [];
   for (let i = 0; i < 2; i++) {
     const link = (await req('broadcast-link-' + i, 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/products`,
-      { token: ctx.admin, body: { productId: p[i], expectedVersion: version }, status: 201 })).data;
+      { token: ctx.seller, body: { productId: p[i], expectedVersion: version }, status: 201 })).data;
     links.push(link.linkId); version = link.broadcastVersion;
   }
-  const list = (await req('broadcast-products-real-upstream', 'live', 'GET', `/v1/admin/broadcasts/${broadcast.id}/products`, { token: ctx.admin })).data;
+  const list = (await req('broadcast-products-real-upstream', 'live', 'GET', `/v1/admin/broadcasts/${broadcast.id}/products`, { token: ctx.seller })).data;
   ctx.check('live-real-products-and-sales', list.every(item => !item.missing && item.purchasable) && list.length === 2);
   const reordered = (await req('broadcast-reorder', 'live', 'PUT', `/v1/admin/broadcasts/${broadcast.id}/products/order`,
-    { token: ctx.admin, body: { linkIds: [...links].reverse(), expectedVersion: version } })).data;
+    { token: ctx.seller, body: { linkIds: [...links].reverse(), expectedVersion: version } })).data;
   version = reordered[0].broadcastVersion;
-  await req('broadcast-stale-edit', 'live', 'PATCH', `/v1/admin/broadcasts/${broadcast.id}?version=${broadcast.version}`, { token: ctx.admin, body: { title: 'Stale' }, status: 409 });
-  await req('broadcast-start', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/start?expectedVersion=${version}`, { token: ctx.admin });
+  await req('broadcast-stale-edit', 'live', 'PATCH', `/v1/admin/broadcasts/${broadcast.id}?version=${broadcast.version}`, { token: ctx.seller, body: { title: 'Stale' }, status: 409 });
+  await req('broadcast-start', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/start?expectedVersion=${version}`, { token: ctx.seller });
   await req('broadcast-public-list', 'live', 'GET', '/v1/broadcasts');
   const publicBroadcast = (await req('broadcast-public-detail', 'live', 'GET', `/v1/broadcasts/${broadcast.id}`)).data;
   ctx.check('public-broadcast-hides-channel', !Object.hasOwn(publicBroadcast, 'channelArn'));
   await req('broadcast-public-products', 'live', 'GET', `/v1/broadcasts/${broadcast.id}/products`);
-  await req('broadcast-end', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/end`, { token: ctx.admin });
+  await req('broadcast-end', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/end`, { token: ctx.seller });
   await req('normal-purchase-after-broadcast-end', 'commerce', 'GET', `/v1/orders/checkout?productId=${p[0]}&quantity=1`, { token: ctx.a });
   const shoppingAccess = r.access('shopping'); const commerceAccess = r.access('commerce');
   ctx.check('live-repeated-ids-reached-shopping', shoppingAccess.split('\n').some(line => line.includes(`ids=${p[0]}&ids=${p[1]}`) && line.includes('broadcast-products-real-upstream')));
@@ -47,8 +47,8 @@ async function liveFailures(ctx) {
   try {
     await req('commerce-down-public-503', 'shopping', 'GET', `/v1/products/${p[0]}`, { status: 503 });
     await req('commerce-down-internal-still-real', 'shopping', 'GET', `/v1/internal/products/${p[0]}`, { headers: tokenHeader('LIVE_SHOPPING') });
-    const admin = (await req('commerce-down-admin-unknown', 'shopping', 'GET', `/v1/admin/products/${p[0]}`, { token: ctx.admin })).data;
-    ctx.check('admin-keeps-product-on-sales-outage', admin.productId, p[0]);
+    const seller = (await req('commerce-down-seller-unknown', 'shopping', 'GET', `/v1/admin/products/${p[0]}`, { token: ctx.seller })).data;
+    ctx.check('seller-keeps-product-on-sales-outage', seller.productId, p[0]);
   } finally { await r.restart('commerce'); }
   // Recreate the outbound client's circuit state by restarting its owner, not by substituting a mock.
   await r.stop('shopping'); await r.restart('shopping');

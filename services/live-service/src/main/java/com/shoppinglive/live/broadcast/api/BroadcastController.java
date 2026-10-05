@@ -51,7 +51,7 @@ public class BroadcastController {
         return ApiResponse.ok(BroadcastResponse.from(service.register(key, input)));
     }
 
-    /** Missing detail IDs are validated only after the existing ADMIN authorization. */
+    /** Missing detail IDs are validated only after the existing SELLER authorization. */
     @RequestMapping(path = "/", method = {RequestMethod.GET, RequestMethod.PATCH})
     public ApiResponse<Void> missingBroadcastId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "broadcastId 는 필수입니다.");
