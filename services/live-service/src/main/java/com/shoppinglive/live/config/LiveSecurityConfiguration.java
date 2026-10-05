@@ -28,7 +28,7 @@ public class LiveSecurityConfiguration {
                     "/v1/broadcasts/{id}/chats", "/v1/broadcasts/{id}/events",
                     "/v1/broadcasts/{id}/likes").permitAll()
                 .requestMatchers(HttpMethod.POST, "/v1/broadcasts/{id}/chats", "/v1/broadcasts/{id}/likes")
-                    .hasAnyRole("USER", "ADMIN")
+                    .hasAnyRole("USER", "SELLER")
                 .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}",
                     "/v1/admin/broadcasts/{id}/products").hasRole("SELLER")
                 .requestMatchers(HttpMethod.POST, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}/start",
