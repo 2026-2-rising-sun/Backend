@@ -94,7 +94,7 @@ class ChatWriteTest extends LiveSecuritySupport {
         verify(members).displayName(bearer, JwtTestTokens.MEMBER_A);
     }
 
-    @DisplayName("ADMIN 역할도 채팅을 쓸 수 있다")
+    @DisplayName("SELLER 역할도 채팅을 쓸 수 있다")
     @Test
     void adminMayWrite() throws Exception {
         write(broadcast("write-admin", "LIVE"), adminBearer(), "공지입니다").andExpect(status().isCreated());
