@@ -26,6 +26,17 @@ node scripts/local/manual-review.cjs
 수동 검수 도구는 전용 서비스·DB·키·계정을 준비하고, Ctrl-C로 자신의 자원만 정리합니다.
 개별 서비스의 필수 설정과 기존 DB 전환 절차는 위 로컬 실행 문서를 따릅니다.
 
+IntelliJ의 기본 Application 실행은 프로필 미지정 시 `local`을 선택합니다.
+로컬 인프라를 켠 뒤 Backend 루트에서 다음 명령을 한 번 실행하면 5개 서비스의 기본 실행 버튼을 사용할 수 있습니다.
+키·서비스 토큰은 Git에서 제외된 파일에만 저장되며, 기존 파일은 덮어쓰지 않습니다.
+
+```sh
+node scripts/local/auth-env.cjs create --access-ttl PT15M --refresh-ttl P30D --out build/local/ide-auth
+```
+
+명시적으로 지정한 프로필은 기존 실행 방식을 유지하고 로컬 자격 증명 파일을 읽지 않습니다.
+CLI·환경변수로 지정한 설정은 생성 파일보다 우선합니다.
+
 | 목적 | 실행 파일·계약 |
 |---|---|
 | 실제 서비스 HTTP 통합 검사 | [run.cjs](scripts/integration/run.cjs) |

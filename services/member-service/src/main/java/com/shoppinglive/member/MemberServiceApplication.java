@@ -3,7 +3,7 @@ package com.shoppinglive.member;
 import com.shoppinglive.common.persistence.JpaAuditingConfig;
 import com.shoppinglive.member.operations.SellerBootstrapCommand;
 import java.util.Arrays;
-import org.springframework.boot.SpringApplication;
+import com.shoppinglive.common.local.LocalApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
@@ -20,6 +20,6 @@ public class MemberServiceApplication {
             }
             return;
         }
-        SpringApplication.run(MemberServiceApplication.class, args);
+        LocalApplication.run(MemberServiceApplication.class, args);
     }
 }

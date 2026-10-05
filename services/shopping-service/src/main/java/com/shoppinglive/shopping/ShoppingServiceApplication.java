@@ -1,7 +1,7 @@
 package com.shoppinglive.shopping;
 
 import com.shoppinglive.common.persistence.JpaAuditingConfig;
-import org.springframework.boot.SpringApplication;
+import com.shoppinglive.common.local.LocalApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Import;
@@ -12,6 +12,6 @@ import org.springframework.context.annotation.Import;
 public class ShoppingServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ShoppingServiceApplication.class, args);
+        LocalApplication.run(ShoppingServiceApplication.class, args);
     }
 }

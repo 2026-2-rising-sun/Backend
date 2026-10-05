@@ -24,6 +24,7 @@ include(
 )
 
 include(
+    "libs:common-local",
     "libs:common-core",
     "libs:common-web",
     "libs:common-security",

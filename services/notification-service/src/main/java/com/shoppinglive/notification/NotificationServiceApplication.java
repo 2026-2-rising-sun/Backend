@@ -2,7 +2,7 @@ package com.shoppinglive.notification;
 
 import com.shoppinglive.common.persistence.JpaAuditingConfig;
 import com.shoppinglive.common.kafka.KafkaCommonConfig;
-import org.springframework.boot.SpringApplication;
+import com.shoppinglive.common.local.LocalApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
@@ -11,6 +11,6 @@ import org.springframework.context.annotation.Import;
 public class NotificationServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(NotificationServiceApplication.class, args);
+        LocalApplication.run(NotificationServiceApplication.class, args);
     }
 }
