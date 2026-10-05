@@ -70,6 +70,9 @@ spring:
 
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
+member:
+  local-test-accounts:
+    enabled: ${MEMBER_LOCAL_TEST_ACCOUNTS_ENABLED:true}
 
 ---
 # k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.

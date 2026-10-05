@@ -38,7 +38,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
     void signupRejectsRoleAndIdentityInjection() throws Exception {
         for (String field : new String[] {"roles", "memberId"}) {
             String body = mapper.writeValueAsString(Map.of("email", "user@example.com", "password", "password123",
-                "displayName", "member", field, "ADMIN"));
+                "displayName", "member", field, "SELLER"));
             mvc.perform(post("/v1/auth/signup").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest());
         }
@@ -73,7 +73,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
                 .content("{\"displayName\":\"new name\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.displayName").value("new name"));
         mvc.perform(patch("/v1/members/me").header("Authorization", authorization).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"displayName\":\"bad\",\"roles\":[\"ADMIN\"]}"))
+                .content("{\"displayName\":\"bad\",\"roles\":[\"SELLER\"]}"))
             .andExpect(status().isBadRequest());
         assertThat(members.findById(b.getId()).orElseThrow().getDisplayName()).isEqualTo("member");
     }

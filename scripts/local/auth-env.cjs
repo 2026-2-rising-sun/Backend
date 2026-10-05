@@ -56,7 +56,7 @@ function create(args) {
   const envPath = path.join(dest, 'env.json');
   fs.writeFileSync(envPath, JSON.stringify({ purpose: 'isolated local development only', env }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
   console.log(`Local credentials written: ${envPath}`);
-  console.log('No account or token was issued. Use the real Member signup/login flow; do not commit these files.');
+  console.log('No account or token was issued. Local profile initializes user@local.test/user and seller@local.test/seller; use normal Member login; do not commit these files.');
 }
 function execute(args) {
   const [service, option, envPath, separator, command, ...commandArgs] = args;

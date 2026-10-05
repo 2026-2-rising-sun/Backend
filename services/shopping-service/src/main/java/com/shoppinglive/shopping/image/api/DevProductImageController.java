@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 명시적으로 활성화한 local/test 전용 API. ADMIN 인가도 별도로 적용한다. */
+/** 명시적으로 활성화한 local/test 전용 API. SELLER 인가도 별도로 적용한다. */
 @RestController
 @Profile("(local | test) & !dev & !prod")
 @ConditionalOnProperty(name = "shopping.dev-api.enabled", havingValue = "true")

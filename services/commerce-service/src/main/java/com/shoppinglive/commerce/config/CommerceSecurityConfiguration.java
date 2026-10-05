@@ -44,11 +44,11 @@ public class CommerceSecurityConfiguration {
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers(HttpMethod.GET, "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
                     .requestMatchers("/v1/orders", "/v1/orders/**", "/v1/cart/items", "/v1/cart/items/**")
-                    .hasAnyRole("USER", "ADMIN")
-                    .requestMatchers(HttpMethod.POST, "/v1/sales").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.PATCH, "/v1/sales/*/price", "/v1/sales/*/stock", "/v1/sales/*/status").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.GET, "/v1/sales/*/stock").hasRole("ADMIN");
-                if (scenarios) auth.requestMatchers("/v1/dev/payment-scenarios/**").hasRole("ADMIN");
+                    .hasAnyRole("USER", "SELLER")
+                    .requestMatchers(HttpMethod.POST, "/v1/sales").hasRole("SELLER")
+                    .requestMatchers(HttpMethod.PATCH, "/v1/sales/*/price", "/v1/sales/*/stock", "/v1/sales/*/status").hasRole("SELLER")
+                    .requestMatchers(HttpMethod.GET, "/v1/sales/*/stock").hasRole("SELLER");
+                if (scenarios) auth.requestMatchers("/v1/dev/payment-scenarios/**").hasRole("SELLER");
                 auth.anyRequest().denyAll();
             })
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))

@@ -26,12 +26,12 @@ public class LiveSecurityConfiguration {
                 .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
                     "/v1/broadcasts", "/v1/broadcasts/", "/v1/broadcasts/{id}", "/v1/broadcasts/{id}/products").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/admin/broadcasts", "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}",
-                    "/v1/admin/broadcasts/{id}/products").hasRole("ADMIN")
+                    "/v1/admin/broadcasts/{id}/products").hasRole("SELLER")
                 .requestMatchers(HttpMethod.POST, "/v1/admin/broadcasts", "/v1/admin/broadcasts/{id}/start",
-                    "/v1/admin/broadcasts/{id}/end", "/v1/admin/broadcasts/{id}/products").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PATCH, "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/v1/admin/broadcasts/{id}/products/order").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/v1/admin/broadcasts/{id}/products/{linkId}").hasRole("ADMIN")
+                    "/v1/admin/broadcasts/{id}/end", "/v1/admin/broadcasts/{id}/products").hasRole("SELLER")
+                .requestMatchers(HttpMethod.PATCH, "/v1/admin/broadcasts/", "/v1/admin/broadcasts/{id}").hasRole("SELLER")
+                .requestMatchers(HttpMethod.PUT, "/v1/admin/broadcasts/{id}/products/order").hasRole("SELLER")
+                .requestMatchers(HttpMethod.DELETE, "/v1/admin/broadcasts/{id}/products/{linkId}").hasRole("SELLER")
                 .anyRequest().denyAll())
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
                 .authenticationEntryPoint(errors).accessDeniedHandler(errors)
