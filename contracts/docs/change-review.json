@@ -30,6 +30,16 @@
         "reviewedAt": "2026-10-01",
         "evidence": "https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787"
       }
+    },
+    {
+      "baseSnapshotSha256": "3999cdda26cc3e66134eb4b60224c4d42a4a49d26ad0191acd4369cf18a2733f",
+      "headSnapshotSha256": "0e3ab3a0703541ca1c21df80ddb6468a73b9a61efedf563853c6c525776e7dd4",
+      "reason": "Add the public Live operation GET /v1/broadcasts/{id}/chats (latest 50 chat messages, oldest first) with ChatMessage schemas. Additive only; existing operations, schemas and authentication requirements are unchanged.",
+      "independentReview": {
+        "reviewer": "Claude review agent in a context separate from the implementer (first-pass review; human review follows on the PR)",
+        "reviewedAt": "2026-10-03",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/136"
+      }
     }
   ]
 }

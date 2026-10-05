@@ -4,6 +4,12 @@ import com.shoppinglive.live.security.LiveSecuritySupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.shoppinglive.live.chat.api.ChatMessageResponse;
+import com.shoppinglive.live.chat.application.ChatQueryService;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +32,9 @@ class PostgresMigrationTest extends LiveSecuritySupport {
 
     @Autowired
     DataSource dataSource;
+
+    @Autowired
+    ChatQueryService chatQueries;
 
     JdbcTemplate jdbc;
 
@@ -77,6 +86,48 @@ class PostgresMigrationTest extends LiveSecuritySupport {
         assertThatThrownBy(() -> jdbc.update(
             "UPDATE broadcast SET status = 'LIVE' WHERE request_key = 'prep-b'"))
             .hasMessageContaining("uk_broadcast_live_channel");
+    }
+
+    @DisplayName("V4가 채팅 테이블과 최근 조회 인덱스를 만든다")
+    @Test
+    void chatMigrationCreatesTableAndRecentIndex() {
+        assertThat(jdbc.queryForObject(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'idx_broadcast_chat_recent'", String.class))
+            .contains("broadcast_id, created_at DESC, id DESC");
+    }
+
+    @DisplayName("없는 방송의 채팅은 FK 제약에 걸린다")
+    @Test
+    void chatRequiresExistingBroadcast() {
+        assertThatThrownBy(() -> insertChat(Long.MAX_VALUE, "orphan", Instant.now()))
+            .hasMessageContaining("fk_broadcast_chat_broadcast");
+    }
+
+    @DisplayName("실제 PostgreSQL에서 최신 50건을 오래된 순서로, 같은 시각은 id 순서로 조회한다")
+    @Test
+    void recentChatsAreLatestFiftyInStableOrder() {
+        insertBroadcast("chat-key", "arn:aws:ivs:channel/chat", "LIVE");
+        final Long broadcastId = jdbc.queryForObject(
+            "SELECT id FROM broadcast WHERE request_key = 'chat-key'", Long.class);
+        final Instant base = Instant.parse("2026-10-03T11:00:00Z");
+        insertChat(broadcastId, "dropped", base);
+        for (int i = 1; i <= 48; i++) {
+            insertChat(broadcastId, "m" + i, base.plusSeconds(i));
+        }
+        insertChat(broadcastId, "tie-a", base.plusSeconds(100));
+        insertChat(broadcastId, "tie-b", base.plusSeconds(100));
+
+        final List<String> contents = chatQueries.recent(broadcastId).stream()
+            .map(ChatMessageResponse::content).toList();
+
+        assertThat(contents).hasSize(50).startsWith("m1").endsWith("tie-a", "tie-b").doesNotContain("dropped");
+    }
+
+    void insertChat(final Long broadcastId, final String content, final Instant createdAt) {
+        jdbc.update("""
+            INSERT INTO broadcast_chat (broadcast_id, member_id, display_name, content, created_at)
+            VALUES (?, ?, '회원', ?, ?)
+            """, broadcastId, UUID.randomUUID(), content, Timestamp.from(createdAt));
     }
 
     void insertLink(final Long broadcastId, final long productId, final int position) {

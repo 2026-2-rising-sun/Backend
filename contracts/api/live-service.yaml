@@ -31,6 +31,8 @@ tags:
     description: 비회원 공개 방송 조회·시청 연결 (#61 #64)
   - name: Public Broadcast Product
     description: 비회원 방송 상품 조회·구매 진입 (#67)
+  - name: Broadcast Chat
+    description: 방송 최근 채팅 조회 (#129)
 
 paths:
   /v1/admin/broadcasts:
@@ -470,6 +472,43 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
 
+  /v1/broadcasts/{id}/chats:
+    parameters:
+      - $ref: '#/components/parameters/BroadcastId'
+    get:
+      security: []
+      summary: 최근 채팅 조회 (#129)
+      description: |
+        로그인 없이 조회한다. 최신 50건을 골라 오래된 순서로 반환한다. 작성 시각이 같으면
+        messageId 순서다. PREPARING 방송은 빈 배열이고 ENDED 방송도 조회할 수 있다.
+        페이지 이동은 제공하지 않는다. 재접속 복구 범위는 이 50건이다.
+      operationId: listBroadcastChats
+      tags: [Broadcast Chat]
+      responses:
+        '200':
+          description: 최근 채팅(오래된 순)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessageListEnvelope' }
+              example:
+                success: true
+                error: null
+                data:
+                  - messageId: 9001
+                    broadcastId: 12
+                    displayName: 회원
+                    content: 안녕하세요
+                    createdAt: '2026-10-03T11:00:01.123456Z'
+                  - messageId: 9002
+                    broadcastId: 12
+                    displayName: 다른회원
+                    content: 가격이 얼마예요?
+                    createdAt: '2026-10-03T11:00:02.500000Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+
 components:
   securitySchemes:
     BearerAuth:
@@ -721,6 +760,21 @@ components:
           type: boolean
           description: 정상 조회에서 사라진 연결. 관리 응답에서만 true 가 될 수 있다.
 
+    ChatMessage:
+      type: object
+      description: 공개 채팅. 작성자 회원 ID 는 포함하지 않는다.
+      required: [messageId, broadcastId, displayName, content, createdAt]
+      properties:
+        messageId: { type: integer, format: int64 }
+        broadcastId: { type: integer, format: int64 }
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 작성 당시의 표시 이름. 이후 이름을 바꿔도 변하지 않는다.
+        content: { type: string, minLength: 1, maxLength: 200 }
+        createdAt: { type: string, format: date-time, description: 서버 작성 시각 }
+
     BroadcastEnvelope:
       type: object
       required: [success, data, error]
@@ -793,4 +847,14 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/BroadcastProductView' }
+        error: { type: 'null' }
+    ChatMessageListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/ChatMessage' }
         error: { type: 'null' }
