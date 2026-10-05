@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 상품 이미지 API. 업로드는 상품 등록·수정 화면에서만 쓰므로 관리용 경로(/v1/admin/**)에 두어
- * 관리자 인증이 붙을 때 함께 보호되게 한다. 조회는 공개 목록·상세·방송 화면이 쓰므로 공개 경로에 둔다.
+ * SELLER 인증으로 보호한다. 조회는 공개 목록·상세·방송 화면이 쓰므로 공개 경로에 둔다.
  */
 @RestController
 public class ProductImageController {

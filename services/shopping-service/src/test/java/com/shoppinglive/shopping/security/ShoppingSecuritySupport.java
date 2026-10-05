@@ -42,7 +42,7 @@ public abstract class ShoppingSecuritySupport {
         properties.add("shoppinglive.security.service-tokens.member", () -> OTHER_KEY);
     }
 
-    public static String adminBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.ADMIN, Set.of("ADMIN")); }
+    public static String adminBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER")); }
     protected static String userBearer() { return "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER")); }
 
     private static String publicKeys() {
