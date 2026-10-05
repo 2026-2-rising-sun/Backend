@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,22 +39,28 @@ class BroadcastConnectionTest {
 
         @Override
         public void send(final SseEventBuilder builder) {
-            firstSendStarted.countDown();
-            if (gate != null) {
-                try {
-                    gate.await();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
+            writeLock.lock();
+            try {
+                firstSendStarted.countDown();
+                if (gate != null) {
+                    try {
+                        gate.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
                 }
+                final StringBuilder text = new StringBuilder();
+                builder.build().forEach(part -> text.append(part.getData()));
+                sent.add(text.toString());
+            } finally {
+                writeLock.unlock();
             }
-            final StringBuilder text = new StringBuilder();
-            builder.build().forEach(part -> text.append(part.getData()));
-            sent.add(text.toString());
         }
 
         @Override
         public void complete() {
+            super.complete();
             completed.countDown();
         }
     }
@@ -79,11 +87,12 @@ class BroadcastConnectionTest {
             awaitSent(fast, number);
         }
 
-        assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(slow.completed.getCount()).isEqualTo(1);
         assertThat(registry.connectionCount(BROADCAST)).isEqualTo(1);
         assertThat(fast.sent).extracting(text -> text.substring(text.lastIndexOf("data:")).strip())
             .containsExactly("data:1", "data:2", "data:3", "data:4", "data:5");
         gate.countDown();
+        assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
     }
 
     @DisplayName("다른 방송의 이벤트는 전달하지 않는다")
@@ -114,6 +123,49 @@ class BroadcastConnectionTest {
         assertThat(emitter.completed.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(emitter.sent).singleElement().asString().contains("event:broadcast.ended");
         assertThat(registry.connectionCount(BROADCAST)).isZero();
+    }
+
+    @Test
+    void rejectedDrainCompletesEvenWhenAnotherCloseAlreadyWon() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection[] holder = new BroadcastConnection[1];
+        holder[0] = new BroadcastConnection(emitter, 2, task -> {
+            holder[0].close();
+            throw new RejectedExecutionException("writer stopped");
+        }, removed::incrementAndGet);
+
+        holder[0].offer(chat(1));
+        holder[0].close();
+
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
+    }
+
+    @Test
+    void shutdownCompletesConnectionsWhoseDrainIsStillQueued() throws Exception {
+        final BroadcastStreamRegistry singleWriter = new BroadcastStreamRegistry(
+            new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 1));
+        final CountDownLatch gate = new CountDownLatch(1);
+        final RecordingEmitter slow = new RecordingEmitter(gate);
+        final RecordingEmitter queued = new RecordingEmitter(null);
+        try {
+            singleWriter.register(BROADCAST, slow);
+            singleWriter.publish(BROADCAST, chat(1));
+            assertThat(slow.firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            singleWriter.register(2L, queued);
+            singleWriter.publish(2L, chat(1));
+
+            singleWriter.shutdown();
+            gate.countDown();
+
+            assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(queued.completed.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(queued.sent).isEmpty();
+        } finally {
+            gate.countDown();
+            singleWriter.shutdown();
+        }
     }
 
     private static void awaitSent(final RecordingEmitter emitter, final int count) throws InterruptedException {

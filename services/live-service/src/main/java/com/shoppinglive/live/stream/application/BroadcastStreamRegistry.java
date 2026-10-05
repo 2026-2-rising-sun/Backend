@@ -78,7 +78,8 @@ public class BroadcastStreamRegistry {
     @PreDestroy
     void shutdown() {
         connections.values().forEach(local -> List.copyOf(local).forEach(BroadcastConnection::close));
-        writers.shutdownNow();
+        // close 가 대기 중인 drain 에 완료를 맡길 수 있으므로 예약된 작업도 끝까지 실행한다.
+        writers.shutdown();
     }
 
     private Set<BroadcastConnection> local(final long broadcastId) {

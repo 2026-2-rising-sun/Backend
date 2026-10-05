@@ -19,6 +19,7 @@ final class BroadcastConnection {
     private final Runnable onClose;
     private final AtomicBoolean draining = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean completed = new AtomicBoolean();
 
     BroadcastConnection(final SseEmitter emitter, final int capacity, final Executor writers,
                         final Runnable onClose) {
@@ -46,21 +47,27 @@ final class BroadcastConnection {
     }
 
     void close() {
-        if (!closed.compareAndSet(false, true)) {
-            return;
+        if (closed.compareAndSet(false, true)) {
+            pending.clear();
+            onClose.run();
         }
-        pending.clear();
-        onClose.run();
-        emitter.complete();
+        // complete 는 send 와 같은 잠금을 사용한다. 전송 중이면 writer 가 완료하도록 맡긴다.
+        if (!draining.get()) {
+            complete();
+        }
     }
 
     private void scheduleDrain() {
+        if (closed.get()) {
+            return;
+        }
         if (!draining.compareAndSet(false, true)) {
             return;
         }
         try {
             writers.execute(this::drain);
         } catch (RejectedExecutionException e) {
+            draining.set(false);
             close();
         }
     }
@@ -81,9 +88,17 @@ final class BroadcastConnection {
             close();
         } finally {
             draining.set(false);
-            if (!pending.isEmpty() && !closed.get()) {
+            if (closed.get()) {
+                complete();
+            } else if (!pending.isEmpty()) {
                 scheduleDrain();
             }
+        }
+    }
+
+    private void complete() {
+        if (completed.compareAndSet(false, true)) {
+            emitter.complete();
         }
     }
 
