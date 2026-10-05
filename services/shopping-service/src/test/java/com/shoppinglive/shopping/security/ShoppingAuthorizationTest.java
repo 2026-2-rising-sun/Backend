@@ -115,15 +115,15 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
 
     @Test
     void invalidTokensAndClaimHeadersCannotCreateAdministrator() throws Exception {
-        var claims = TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN"));
-        for (String token : List.of("invalid", new JwtTestTokens().token(JwtTestTokens.ADMIN, Set.of("ADMIN")),
+        var claims = TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"));
+        for (String token : List.of("invalid", new JwtTestTokens().token(JwtTestTokens.SELLER, Set.of("SELLER")),
             TOKENS.sign(claims.expirationTime(Date.from(Instant.now().minusSeconds(120))).build()),
-            TOKENS.sign(TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN")).issuer("other").build()),
-            TOKENS.sign(TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN")).audience("other").build()))) {
+            TOKENS.sign(TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER")).issuer("other").build()),
+            TOKENS.sign(TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER")).audience("other").build()))) {
             mvc.perform(get("/v1/admin/products").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
         }
-        mvc.perform(post("/v1/admin/products").header("X-Member-Id", JwtTestTokens.ADMIN).header("X-Roles", "ADMIN"))
+        mvc.perform(post("/v1/admin/products").header("X-Member-Id", JwtTestTokens.SELLER).header("X-Roles", "SELLER"))
             .andExpect(status().isUnauthorized());
     }
 

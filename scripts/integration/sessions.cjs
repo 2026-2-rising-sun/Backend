@@ -62,12 +62,18 @@ async function sessions(ctx) {
   await req('concurrent-reuse-revokes-winner-access', 'commerce', 'GET', '/v1/cart/items', { token: winner.accessToken, status: 401 });
   await refresh('concurrent-reuse-revokes-winner-refresh', winner.refreshToken, 401);
 
-  const force = await register('forced-logout');
+  const foreign = await register('foreign-member');
+  await req('seller-cannot-revoke-another-member', 'member', 'POST',
+    `/v1/admin/members/${foreign.memberId}/sessions/revoke`, { token: ctx.seller, status: 403 });
+  const forceEmail = 'forced-logout@sessions.example.test';
+  r.bootstrapSeller(forceEmail, password);
+  const forceId = r.sql('member', `SELECT id FROM members WHERE email='${forceEmail}'`);
+  const force = { memberId: forceId, email: forceEmail, pair: await login('forced-logout-login', forceEmail) };
   const forceOther = await login('forced-other-device', force.email);
   const revokePath = `/v1/admin/members/${force.memberId}/sessions/revoke`;
   await req('force-logout-anonymous-denied', 'member', 'POST', revokePath, { status: 401 });
-  await req('force-logout-user-denied', 'member', 'POST', revokePath, { token: force.pair.accessToken, status: 403 });
-  await req('force-logout-admin', 'member', 'POST', revokePath, { token: ctx.admin, status: 204 });
+  await req('force-logout-user-denied', 'member', 'POST', revokePath, { token: foreign.pair.accessToken, status: 403 });
+  await req('force-logout-seller', 'member', 'POST', revokePath, { token: force.pair.accessToken, status: 204 });
   await rejectEverywhere('force-revokes-existing-access', force.pair.accessToken);
   await req('force-revokes-other-device-access', 'commerce', 'GET', '/v1/cart/items', { token: forceOther.accessToken, status: 401 });
   await refresh('force-revokes-refresh', force.pair.refreshToken, 401);
@@ -115,7 +121,7 @@ async function sessions(ctx) {
   await r.stop('member');
   try {
     for (const [service, endpoint, token] of [['commerce', '/v1/cart/items', relogin.accessToken],
-      ['shopping', '/v1/admin/products', ctx.admin], ['live', '/v1/admin/broadcasts', ctx.admin]]) {
+      ['shopping', '/v1/admin/products', ctx.seller], ['live', '/v1/admin/broadcasts', ctx.seller]]) {
       const body = await req(`member-down-${service}-fails-closed`, service, 'GET', endpoint, { token, status: 503 });
       ctx.check(`member-down-${service}-error-code`, body.error.code, 'SERVICE_UNAVAILABLE');
     }

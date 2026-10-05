@@ -29,7 +29,7 @@ public abstract class CommerceSecurityTestSupport {
 
     protected static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
     protected static final String MEMBER_B = "22222222-2222-4222-8222-222222222222";
-    protected static final String ADMIN = "33333333-3333-4333-8333-333333333333";
+    protected static final String SELLER = "33333333-3333-4333-8333-333333333333";
     protected static final String SHOPPING_TOKEN = "test-inbound-shopping-commerce-credential-32";
     protected static final String LIVE_TOKEN = "test-inbound-live-commerce-credential-32";
     protected static final JwtTestTokens TOKENS = new JwtTestTokens();
@@ -54,5 +54,5 @@ public abstract class CommerceSecurityTestSupport {
     }
 
     protected static String bearer(String memberId) { return "Bearer " + TOKENS.token(memberId, Set.of("USER")); }
-    protected static String adminBearer() { return "Bearer " + TOKENS.token(ADMIN, Set.of("USER", "ADMIN")); }
+    protected static String adminBearer() { return "Bearer " + TOKENS.token(SELLER, Set.of("USER", "SELLER")); }
 }

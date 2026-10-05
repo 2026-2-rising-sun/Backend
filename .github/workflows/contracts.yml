@@ -1,0 +1,53 @@
+name: OpenAPI YAML
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/api/**/*.yaml'
+      - 'contracts/api/**/*.yml'
+      - '.github/workflows/contracts.yml'
+      - 'scripts/contracts/package.json'
+      - 'scripts/contracts/package-lock.json'
+  push:
+    branches: [main, dev]
+    paths:
+      - 'contracts/api/**/*.yaml'
+      - 'contracts/api/**/*.yml'
+      - '.github/workflows/contracts.yml'
+      - 'scripts/contracts/package.json'
+      - 'scripts/contracts/package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openapi-yaml-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: YAML syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: scripts/contracts/package-lock.json
+      - run: npm ci --prefix scripts/contracts --ignore-scripts
+      - name: Parse OpenAPI YAML files
+        run: |
+          node <<'JS'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const YAML = require('./scripts/contracts/node_modules/yaml');
+          for (const name of fs.readdirSync('contracts/api', { recursive: true }).filter(name => /\.ya?ml$/.test(name))) {
+            const file = path.join('contracts/api', name);
+            const document = YAML.parseDocument(fs.readFileSync(file, 'utf8'), { uniqueKeys: true });
+            if (document.errors.length) throw new Error(file + ': ' + document.errors.map(error => error.message).join('\n'));
+            console.log('YAML syntax valid: ' + file);
+          }
+          JS
