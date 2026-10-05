@@ -50,7 +50,10 @@ public class SessionController {
 
     @PostMapping("/v1/admin/members/{id}/sessions/revoke")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void revoke(@PathVariable UUID id) { sessions.revokeAll(id); }
+    public void revoke(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
+        if (!id.toString().equals(user.memberId())) throw new BusinessException(ErrorCode.FORBIDDEN);
+        sessions.revokeAll(id);
+    }
 
     @PostMapping(value = "/v1/internal/auth/sessions/check", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<SessionStatus> check(@Valid @RequestBody SessionCheckRequest request) {

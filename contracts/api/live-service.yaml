@@ -9,8 +9,8 @@ info:
     - 성공 응답은 공통 `ApiResponse` 봉투를 쓰고 DELETE 성공은 204 무본문이다.
     - 오류는 입력 400 / 미존재 404 / 상태·version·중복 409 / 외부 장애 503 으로 구분한다.
     - 공개 응답에는 채널 ARN·등록 키·fingerprint·송출키·자격증명을 넣지 않는다.
-    - 공개 방송 조회·입장은 비회원 허용. 생성·수정·시작·종료·상품 연결 관리에는 ADMIN 역할이 필요하다.
-    - 현재 관리 모델은 공통 ADMIN 권한이다. 판매자 역할이나 방송별 판매자 소유권을 가정하지 않는다.
+    - 공개 방송 조회·입장은 비회원 허용. 생성·수정·시작·종료·상품 연결 관리에는 SELLER 역할이 필요하다.
+    - 방송 관리는 SELLER 권한을 요구한다. 방송별 판매자 소유권 모델은 아직 제공하지 않는다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 
@@ -39,7 +39,7 @@ tags:
 paths:
   /v1/admin/broadcasts:
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 등록 (#59)
       description: |
         PREPARING 으로 저장한다. 과거 예정 시각도 허용하며 AWS 송출 여부는 조회하지 않는다.
@@ -83,7 +83,7 @@ paths:
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     get:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 관리 방송 목록 (#60)
       description: |
         상품·IVS 호출 없이 기본정보만 읽는다. 기본 정렬은 createdAt DESC, id DESC 이고
@@ -113,7 +113,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/BroadcastId'
     get:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 관리 방송 상세 (#60)
       operationId: getBroadcast
       tags: [Admin Broadcast]
@@ -130,7 +130,7 @@ paths:
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     patch:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 기본정보 수정 (#59)
       description: |
         PREPARING 에서만 허용한다. 생략한 필드는 기존 값을 유지하고 본문에 명시적으로 null 을
@@ -166,7 +166,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/start:
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 시작 (#65)
       description: |
         IVS LIVE+HEALTHY 와 채널-시청 URL 동일성, 현재 ON_SALE/SOLD_OUT 연결 상품 최소 1개를
@@ -204,7 +204,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/end:
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 종료 (#66)
       description: |
         LIVE 를 ENDED 로 바꾸고 최초 endedAt 을 보존한다. 반복 종료는 성공하고 준비 종료는 409 다.
@@ -235,7 +235,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/BroadcastId'
     post:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 상품 연결 (#62)
       description: |
         Shopping 의 상품 존재와 Commerce 판매 상태를 확인한 뒤 ON_SALE/SOLD_OUT 만 연결한다.
@@ -269,7 +269,7 @@ paths:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
     get:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 관리 방송 상품 조회 (#67)
       description: |
         연결 순서로 Shopping 기본정보와 Commerce 최신 판매정보를 결합한다.
@@ -290,7 +290,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/products/order:
     put:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 상품 노출 순서 변경 (#63)
       description: |
         이 방송의 전체 linkId 순열을 받아 한 번에 순서를 바꾼다. 중복·누락·타 방송 ID 는 400 이고
@@ -325,7 +325,7 @@ paths:
 
   /v1/admin/broadcasts/{id}/products/{linkId}:
     delete:
-      x-required-roles: [ADMIN]
+      x-required-roles: [SELLER]
       summary: 방송 상품 연결 해제 (#62)
       description: |
         방송 존재·상태를 먼저 검사한다. 같은 방송에서 이미 사라진 linkId 는 204 이고,
@@ -612,7 +612,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/ADMIN. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
+      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
   parameters:
     BroadcastId:
       name: id

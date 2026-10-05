@@ -21,7 +21,7 @@ public final class JwtTestTokens {
     public static final String AUDIENCE = "shoppinglive-api";
     public static final String MEMBER_A = "00000000-0000-4000-8000-000000000001";
     public static final String MEMBER_B = "00000000-0000-4000-8000-000000000002";
-    public static final String ADMIN = "00000000-0000-4000-8000-000000000003";
+    public static final String SELLER = "00000000-0000-4000-8000-000000000003";
     private final RSAKey key;
 
     public JwtTestTokens() {
