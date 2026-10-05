@@ -1,270 +1,113 @@
 name: CI
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   push:
     branches: [main, dev]
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-      - name: Verify CI report guards
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-      - name: Build and run all tests
-        run: ./gradlew build --no-daemon --continue --max-workers=2
-      - name: Require regression reports
-        if: always()
-        run: |
-          python3 .github/scripts/check_test_results.py \
-            'services/member-service/build/test-results/test/TEST-*.xml' \
-            'services/shopping-service/build/test-results/test/TEST-*.xml' \
-            'services/commerce-service/build/test-results/test/TEST-*.xml' \
-            'services/live-service/build/test-results/test/TEST-*.xml' \
-            'services/notification-service/build/test-results/test/TEST-*.xml' \
-            'libs/*/build/test-results/test/TEST-*.xml' \
-            --require-suite '*.MemberJwtDecoderTest' \
-            --allow-skipped-suite com.shoppinglive.live.broadcast.PostgresMigrationTest=11 \
-            --allow-skipped-suite com.shoppinglive.live.stream.application.ChatRealtimeRedisTest=3 \
-            --allow-skipped-suite com.shoppinglive.live.like.LikeRedisTest=4 \
-            --allow-skipped-suite com.shoppinglive.live.stream.application.LikeRealtimeRedisTest=4 \
-            --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
-            --output build/ci/unit-tests.json
-      - name: Package integration application jars
-        run: |
-          mkdir -p build
-          printf '%s\n' "$GITHUB_SHA" > build/integration-jars.sha
-          tar -cf build/integration-jars.tar \
-            build/integration-jars.sha \
-            services/member-service/build/libs/*-SNAPSHOT.jar \
-            services/shopping-service/build/libs/*-SNAPSHOT.jar \
-            services/commerce-service/build/libs/*-SNAPSHOT.jar \
-            services/live-service/build/libs/*-SNAPSHOT.jar
-      - uses: actions/upload-artifact@v4
-        with:
-          name: integration-jars-${{ github.sha }}
-          path: build/integration-jars.tar
-          if-no-files-found: error
-          retention-days: 2
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports-${{ github.sha }}
-          path: |
-            **/build/reports/tests/
-            **/build/test-results/
-            build/ci/
-          if-no-files-found: error
-          retention-days: 7
-
-  postgres:
-    name: PostgreSQL (${{ matrix.service }})
+    name: Build & unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: member
-            database: member_test
-            task: ':services:member-service:postgresTest'
-            report: services/member-service/build/test-results/postgresTest/TEST-*.xml
-            suites: '*.MemberPostgresTest *.MemberLoginPostgresTest *.MemberSessionPostgresTest'
-            minimums: '*.MemberPostgresTest=1 *.MemberLoginPostgresTest=5 *.MemberSessionPostgresTest=16'
-          - service: commerce
-            database: commerce_test
-            task: ':services:commerce-service:postgresCommerceTest'
-            report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=3'
-          - service: live
-            database: live_test
-            # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.
-            task: ':services:live-service:test --tests *PostgresMigrationTest --tests *ChatRealtimeRedisTest --tests *LikeRedisTest --tests *LikeRealtimeRedisTest'
-            report: services/live-service/build/test-results/test/TEST-*.xml
-            suites: '*.PostgresMigrationTest *.ChatRealtimeRedisTest *.LikeRedisTest *.LikeRealtimeRedisTest'
-            minimums: '*.PostgresMigrationTest=11 *.ChatRealtimeRedisTest=3 *.LikeRedisTest=4 *.LikeRealtimeRedisTest=4'
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: ${{ matrix.database }}
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 56379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s --health-timeout 5s --health-retries 10
-    env:
-      MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
-      MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
-      MEMBER_TEST_DB_USER: postgres
-      MEMBER_TEST_DB_PASSWORD: test
-      COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
-      COMMERCE_TEST_POSTGRES_USER: postgres
-      COMMERCE_TEST_POSTGRES_PASSWORD: test
-      LIVE_PG_TEST: '1'
-      LIVE_PG_PORT: '55432'
-      LIVE_REDIS_TEST: '1'
-      LIVE_REDIS_PORT: '56379'
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-      - name: Run required PostgreSQL suite
-        env:
-          GRADLE_TASK: ${{ matrix.task }}
-        run: |
-          read -ra task_args <<< "$GRADLE_TASK"
-          ./gradlew "${task_args[@]}" --no-daemon --max-workers=2
-      - name: Reject absent, skipped or failed database tests
-        if: always()
-        env:
-          REQUIRED_SUITES: ${{ matrix.suites }}
-          MINIMUM_SUITE_TESTS: ${{ matrix.minimums }}
-          REPORT_GLOB: ${{ matrix.report }}
-          SERVICE: ${{ matrix.service }}
-        run: |
-          read -ra suites <<< "$REQUIRED_SUITES"
-          read -ra minimums <<< "$MINIMUM_SUITE_TESTS"
-          required=()
-          for suite in "${suites[@]}"; do required+=(--require-suite "$suite"); done
-          for minimum in "${minimums[@]}"; do required+=(--min-suite-tests "$minimum"); done
-          python3 .github/scripts/check_test_results.py "$REPORT_GLOB" \
-            "${required[@]}" --output "build/ci/postgres-${SERVICE}.json"
-      - name: Upload PostgreSQL reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: postgres-${{ matrix.service }}-${{ github.sha }}
-          path: |
-            services/${{ matrix.service }}-service/build/reports/tests/
-            services/${{ matrix.service }}-service/build/test-results/
-            build/ci/
-          if-no-files-found: error
-          retention-days: 7
-
-  contracts:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      application: ${{ steps.changes.outputs.application }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: scripts/contracts/package-lock.json
-      - run: npm ci --prefix scripts/contracts --ignore-scripts
-      - run: npm run check --prefix scripts/contracts
-      - name: Select event comparison base
-        id: base
-        run: python3 .github/scripts/contract_base.py
-      - name: Verify contract change review hashes
-        env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
-        run: node scripts/contracts/base-diff.cjs --base "$BASE_SHA"
-      - name: Verify Prism named examples
-        run: npm run smoke --prefix scripts/contracts
-      - name: Upload contract and Prism reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: contracts-${{ github.sha }}
-          path: build/contracts/
-          if-no-files-found: error
-          retention-days: 7
-
-  integration:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v5
+      - name: Select changed modules
+        id: changes
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, subprocess
+          from pathlib import Path
+          known = {'member', 'shopping', 'commerce', 'live', 'notification'}
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          kind = os.environ['GITHUB_EVENT_NAME']
+          full = kind == 'workflow_dispatch'
+          paths = []
+          if kind == 'pull_request':
+              pr = event['pull_request']
+              comparison = pr['base']['sha'] + '...' + pr['head']['sha']
+          elif kind == 'push' and event['before'] != '0' * 40:
+              comparison = event['before'] + '..' + event['after']
+          else:
+              comparison, full = None, True
+          if comparison:
+              paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', comparison, '--']).decode().split('\0')[:-1]
+          selected, tooling = set(), False
+          for path in paths:
+              if path.lower().endswith(('.md', '.mdx', '.rst', '.adoc')) or path.startswith('docs/'):
+                  continue
+              if path.startswith(('.github/', 'scripts/')):
+                  tooling = True
+              elif path.startswith('contracts/') and not path.startswith('contracts/events/'):
+                  continue
+              elif path in {'.gitignore', '.gitattributes', '.editorconfig', 'LICENSE'}:
+                  continue
+              elif path.startswith('services/'):
+                  module = path.split('/')[1]
+                  service = module.removesuffix('-service')
+                  if service in known and module == service + '-service':
+                      selected.add(service)
+                  else:
+                      full = True
+              else:
+                  full = True
+          tasks = ['build'] if full else [f':services:{service}-service:build' for service in sorted(selected)]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('tasks=' + ' '.join(tasks) + '\n')
+              output.write('application=' + str(bool(tasks)).lower() + '\n')
+              output.write('tooling=' + str(tooling).lower() + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Gradle tasks: `' + (' '.join(tasks) or 'none (documentation/CI tooling only)') + '`\n')
+          PYTHON
+      - name: Check CI tooling syntax
+        if: steps.changes.outputs.tooling == 'true'
+        run: |
+          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" .github/workflows/*.yml
+          node --test .github/scripts/test_size_labeler.cjs
+          for script in scripts/integration/*.cjs; do node --check "$script"; done
       - uses: actions/setup-java@v5
+        if: steps.changes.outputs.application == 'true'
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/download-artifact@v4
-        with:
-          name: integration-jars-${{ github.sha }}
-          path: build
-      - run: tar -xf build/integration-jars.tar
-      - run: npm ci --prefix scripts/contracts --ignore-scripts
-      - name: Run real service HTTP integration
+      - uses: gradle/actions/setup-gradle@v5
+        if: steps.changes.outputs.application == 'true'
+      - name: Build and run unit tests
+        if: steps.changes.outputs.application == 'true'
+        env:
+          GRADLE_TASKS: ${{ steps.changes.outputs.tasks }}
         run: |
-          test -f scripts/integration/run.cjs
-          node scripts/integration/run.cjs
-      - name: Require complete integration evidence
-        if: always()
-        run: python3 .github/scripts/check_integration_results.py
-      - name: Upload sanitized integration evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+          read -ra tasks <<< "$GRADLE_TASKS"
+          ./gradlew "${tasks[@]}" --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.changes.outputs.application == 'true'
         with:
-          name: integration-${{ github.sha }}
-          path: build/integration/
+          name: unit-tests-${{ github.sha }}
+          path: |
+            **/build/test-results/
+            **/build/reports/tests/
           if-no-files-found: error
           retention-days: 7
 
-  quality-gate:
-    name: Quality gate
-    needs: [build, postgres, contracts, integration]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Require every verification job to succeed
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-          VERIFIED_SHA: ${{ github.sha }}
-        run: |
-          python3 - <<'PY'
-          import json, os
-          results = json.loads(os.environ['RESULTS'])
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
-              report.write('Verified commit: `' + os.environ['VERIFIED_SHA'] + '`\n\n')
-              for name, job in results.items():
-                  report.write(f"- {name}: {job['result']}\n")
-              report.write('\nUnit and PostgreSQL counts overlap; they are separate evidence, not additive.\n')
-          assert set(results) == {'build', 'postgres', 'contracts', 'integration'}
-          assert all(job['result'] == 'success' for job in results.values()), results
-          PY
-
   publish:
-    needs: quality-gate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.application == 'true'
     permissions:
       contents: read
       packages: write

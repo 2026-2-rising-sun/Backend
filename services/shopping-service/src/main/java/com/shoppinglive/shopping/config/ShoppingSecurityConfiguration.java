@@ -45,10 +45,10 @@ public class ShoppingSecurityConfiguration {
                     .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
                         "/v1/products", "/v1/products/", "/v1/products/{id}", "/v1/products/{id}/purchase-check",
                         "/v1/product-images/", "/v1/product-images/{id}").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.POST, "/v1/admin/products", "/v1/admin/product-images").hasRole("ADMIN")
-                    .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("ADMIN");
-                if (devEnabled) auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images").hasRole("ADMIN");
+                    .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("SELLER")
+                    .requestMatchers(HttpMethod.POST, "/v1/admin/products", "/v1/admin/product-images").hasRole("SELLER")
+                    .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("SELLER");
+                if (devEnabled) auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images").hasRole("SELLER");
                 auth.anyRequest().denyAll();
             })
             .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))

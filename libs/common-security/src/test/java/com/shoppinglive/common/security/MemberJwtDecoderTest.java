@@ -35,13 +35,13 @@ class MemberJwtDecoderTest {
     @Test
     void verifiesSignatureAndCreatesImmutableDomainPrincipal() {
         var validator = new JwtTokenValidator(decoder, new MemberJwtAuthenticationConverter((member, session) -> true));
-        var user = validator.validate(TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER", "ADMIN")));
+        var user = validator.validate(TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER", "SELLER")));
         assertThat(user.memberId()).isEqualTo(JwtTestTokens.MEMBER_A);
-        assertThat(user.roles()).containsExactlyInAnyOrder("USER", "ADMIN");
+        assertThat(user.roles()).containsExactlyInAnyOrder("USER", "SELLER");
         assertThatThrownBy(() -> user.roles().add("OTHER")).isInstanceOf(UnsupportedOperationException.class);
         var authentication = new MemberJwtAuthenticationConverter((member, session) -> true).convert(
-            decoder.decode(TOKENS.token(JwtTestTokens.ADMIN, Set.of("ADMIN"))));
-        assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_ADMIN");
+            decoder.decode(TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER"))));
+        assertThat(authentication.getAuthorities()).extracting("authority").containsExactly("ROLE_SELLER");
         assertThat(authentication.getCredentials()).isEqualTo("");
     }
 
@@ -90,7 +90,7 @@ class MemberJwtDecoderTest {
             bad("blank jti", claims().jwtID(" ")),
             bad("missing roles", claims().claim("roles", null)),
             bad("empty roles", claims().claim("roles", List.of())),
-            bad("unknown role", claims().claim("roles", List.of("USER", "SELLER"))),
+            bad("unknown role", claims().claim("roles", List.of("USER", "ADMIN"))),
             bad("roles is not array", claims().claim("roles", "USER")),
             bad("role is not string", claims().claim("roles", List.of(1)))
         );

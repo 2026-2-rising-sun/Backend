@@ -76,5 +76,5 @@ public class Member {
         if (failedLoginAttempts >= maximum) loginLockedUntil = now.plus(lockDuration);
     }
     public void recordLoginSuccess() { failedLoginAttempts = 0; loginLockedUntil = null; }
-    private enum Role { USER, ADMIN }
+    private enum Role { USER, SELLER }
 }

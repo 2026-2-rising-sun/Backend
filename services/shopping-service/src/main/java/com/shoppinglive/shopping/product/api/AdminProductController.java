@@ -20,8 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 관리자 상품 API. 기본정보만 등록된 상품은 Commerce 판매정보(판매 1)가 생기기 전까지 공개·주문 대상이 아니다.
- * 아직 인증이 없다 (member 연동 시 관리자 권한 검사 추가).
+ * 판매자 상품 API. 기본정보만 등록된 상품은 Commerce 판매정보(판매 1)가 생기기 전까지 공개·주문 대상이 아니다.
+ * Member JWT와 세션을 검증하고 SELLER 역할만 허용한다.
  */
 @RestController
 @RequestMapping("/v1/admin/products")
@@ -58,7 +58,7 @@ public class AdminProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
     }
 
-    /** 수정 경로의 누락 ID는 ADMIN 인가 후 입력 오류로 응답한다. */
+    /** 수정 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
     @PatchMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");

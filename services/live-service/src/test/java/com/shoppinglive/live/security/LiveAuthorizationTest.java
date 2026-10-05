@@ -80,17 +80,17 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
 
     @Test
     void invalidJwtHeadersAndServiceKeysCannotGrantAdmin() throws Exception {
-        for (String token : List.of("bad", new JwtTestTokens().token(JwtTestTokens.ADMIN, Set.of("ADMIN")),
-            TOKENS.sign(TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN"))
+        for (String token : List.of("bad", new JwtTestTokens().token(JwtTestTokens.SELLER, Set.of("SELLER")),
+            TOKENS.sign(TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"))
                 .expirationTime(Date.from(Instant.now().minusSeconds(120))).build()),
-            TOKENS.sign(TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN")).issuer("other").build()),
-            TOKENS.sign(TOKENS.claims(JwtTestTokens.ADMIN, Set.of("ADMIN")).audience("other").build()))) {
+            TOKENS.sign(TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER")).issuer("other").build()),
+            TOKENS.sign(TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER")).audience("other").build()))) {
             mvc.perform(get("/v1/admin/broadcasts").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
         }
         mvc.perform(post("/v1/admin/broadcasts").header("X-Service-Token", "test-live-service-credential-000000000001"))
             .andExpect(status().isUnauthorized());
-        mvc.perform(post("/v1/admin/broadcasts").header("X-Member-Id", JwtTestTokens.ADMIN).header("X-Roles", "ADMIN"))
+        mvc.perform(post("/v1/admin/broadcasts").header("X-Member-Id", JwtTestTokens.SELLER).header("X-Roles", "SELLER"))
             .andExpect(status().isUnauthorized());
     }
 

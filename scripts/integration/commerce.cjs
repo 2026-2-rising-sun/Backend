@@ -12,7 +12,7 @@ async function commerce(ctx) {
   ctx.check('cart-does-not-reserve-stock', stock(s[0]), beforeCart);
   await req('cart-duplicate-product', 'commerce', 'POST', '/v1/cart/items', { token: ctx.a, body: { productId: p[0], quantity: 1 }, status: 409 });
   await req('cart-patch-quantity', 'commerce', 'PATCH', `/v1/cart/items/${other.id}`, { token: ctx.a, body: { quantity: 3 } });
-  for (const [name, token] of [['b', ctx.b], ['admin', ctx.admin]]) {
+  for (const [name, token] of [['b', ctx.b], ['seller', ctx.seller]]) {
     await req(`cart-other-${name}-patch`, 'commerce', 'PATCH', `/v1/cart/items/${item.id}`, { token, body: { quantity: 1 }, status: 404 });
     await req(`cart-other-${name}-delete`, 'commerce', 'DELETE', `/v1/cart/items/${item.id}`, { token, status: 404 });
     await req(`cart-other-${name}-order`, 'commerce', 'POST', `/v1/cart/items/${item.id}/orders`, { token, body: buyer, headers: { 'X-Idempotency-Key': 'foreign-' + name }, status: 404 });
@@ -34,14 +34,14 @@ async function commerce(ctx) {
   await req('cart-delete-own', 'commerce', 'DELETE', `/v1/cart/items/${other.id}`, { token: ctx.a, status: 204 });
   await req('checkout-member', 'commerce', 'GET', `/v1/orders/checkout?productId=${p[0]}&quantity=1`, { token: ctx.a });
   await req('legacy-password-cannot-authorize', 'commerce', 'GET', `/v1/orders/${selected.orderNumber}`, { headers: { 'X-Order-Password': 'old-password' }, status: 401 });
-  for (const [name, token] of [['b', ctx.b], ['admin', ctx.admin]]) {
+  for (const [name, token] of [['b', ctx.b], ['seller', ctx.seller]]) {
     await req(`order-other-${name}`, 'commerce', 'GET', `/v1/orders/${selected.orderNumber}`, { token, headers: { 'X-Order-Password': 'old-password' }, status: 404 });
     await req(`cancel-other-${name}`, 'commerce', 'POST', `/v1/orders/${selected.orderNumber}/cancel`, { token, status: 404 });
     await req(`payment-other-${name}`, 'commerce', 'POST', `/v1/orders/${selected.orderNumber}/payments`, { token, status: 404 });
   }
   const paymentBefore = snapshot();
-  await req('admin-cannot-set-user-payment-scenario', 'commerce', 'PUT', `/v1/dev/payment-scenarios/${selected.orderNumber}`,
-    { token: ctx.admin, body: { scenario: 'INSTANT_FAIL' }, status: 404 });
+  await req('seller-cannot-set-user-payment-scenario', 'commerce', 'PUT', `/v1/dev/payment-scenarios/${selected.orderNumber}`,
+    { token: ctx.seller, body: { scenario: 'INSTANT_FAIL' }, status: 404 });
   for (const [name, body] of [['scenario', { scenario: 'INSTANT_FAIL' }], ['nonempty', { ignored: true }]])
     await req(`payment-reject-${name}`, 'commerce', 'POST', `/v1/orders/${selected.orderNumber}/payments`, { token: ctx.a, body, status: 400 });
   ctx.check('invalid-payment-body-no-write', snapshot(), paymentBefore);
@@ -49,7 +49,7 @@ async function commerce(ctx) {
   await ctx.poll('payment-success', 'commerce', `/v1/orders/${selected.orderNumber}/payments/${paid.paymentId}`, ctx.a, b => b.status === 'SUCCESS');
   const final = await req('paid-order', 'commerce', 'GET', `/v1/orders/${selected.orderNumber}`, { token: ctx.a });
   ctx.check('order-paid-state', final.status, 'PAID');
-  for (const [name, token] of [['b', ctx.b], ['admin', ctx.admin]]) await req(`payment-query-other-${name}`, 'commerce', 'GET', `/v1/orders/${selected.orderNumber}/payments/${paid.paymentId}`, { token, status: 404 });
+  for (const [name, token] of [['b', ctx.b], ['seller', ctx.seller]]) await req(`payment-query-other-${name}`, 'commerce', 'GET', `/v1/orders/${selected.orderNumber}/payments/${paid.paymentId}`, { token, status: 404 });
   const history = await req('member-order-history', 'commerce', 'GET', '/v1/orders?page=0&size=20', { token: ctx.a });
   ctx.check('history-excludes-other-member', history.items.every(o => o.orderNumber !== bOrder.orderNumber));
   ctx.direct = async (name, options = {}) => req(name, 'commerce', 'POST', '/v1/orders', { token: options.token || ctx.a, status: 201,
@@ -65,10 +65,10 @@ async function commerce(ctx) {
   await req('cancel-replay', 'commerce', 'POST', `/v1/orders/${cancel.orderNumber}/cancel`, { token: ctx.a, status: 409 });
   ctx.check('cancel-replay-no-restock', stock(s[1]), afterCancel);
   for (const [name, paymentBody] of [['absent', undefined], ['json-null', null], ['delayed-success', {}], ['delayed-fail', {}]]) {
-    const payer = name.startsWith('delayed') ? ctx.admin : ctx.a;
+    const payer = name.startsWith('delayed') ? ctx.seller : ctx.a;
     const order = await ctx.direct('direct-' + name, { token: payer });
     if (name.startsWith('delayed')) await req('mock-select-' + name, 'commerce', 'PUT', `/v1/dev/payment-scenarios/${order.orderNumber}`,
-      { token: ctx.admin, body: { scenario: name === 'delayed-success' ? 'DELAYED_SUCCESS' : 'DELAYED_FAIL' }, status: 204 });
+      { token: ctx.seller, body: { scenario: name === 'delayed-success' ? 'DELAYED_SUCCESS' : 'DELAYED_FAIL' }, status: 204 });
     const pay = await req('payment-body-' + name, 'commerce', 'POST', `/v1/orders/${order.orderNumber}/payments`,
       { token: payer, ...(paymentBody === undefined ? {} : { body: paymentBody }) });
     const expected = name === 'delayed-fail' ? 'FAILED' : 'SUCCESS';
@@ -79,7 +79,7 @@ async function commerce(ctx) {
   const emptyBefore = snapshot();
   await req('sold-out-cart-order', 'commerce', 'POST', `/v1/cart/items/${empty.id}/orders`, { token: ctx.a, body: buyer, headers: { 'X-Idempotency-Key': 'sold-out' }, status: 409 });
   ctx.check('sold-out-preserves-cart-and-stock', snapshot(), emptyBefore);
-  await req('one-last-stock', 'commerce', 'PATCH', `/v1/sales/${s[3]}/stock`, { token: ctx.admin, body: { delta: 1 } });
+  await req('one-last-stock', 'commerce', 'PATCH', `/v1/sales/${s[3]}/stock`, { token: ctx.seller, body: { delta: 1 } });
   await Promise.all([ctx.a, ctx.b].map((token, i) => req('concurrent-last-stock-' + i, 'commerce', 'POST', '/v1/orders',
     { token, body: { productId: p[3], quantity: 1, ...buyer }, headers: { 'X-Idempotency-Key': 'concurrent-' + i }, status: [201, 409] })));
   ctx.check('one-concurrent-winner', ctx.result.checks.filter(c => c.name.startsWith('concurrent-last-stock-')).map(c => c.status).sort(), [201, 409]);

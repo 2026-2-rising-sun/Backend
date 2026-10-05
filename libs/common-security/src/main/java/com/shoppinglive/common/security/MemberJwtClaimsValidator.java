@@ -12,7 +12,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 /** 추가 필수 claim을 검사한다. exp/nbf 시각 검사는 skew=0인 표준 validator가 함께 수행한다. */
 final class MemberJwtClaimsValidator implements OAuth2TokenValidator<Jwt> {
-    private static final Set<String> ROLES = Set.of("USER", "ADMIN");
+    private static final Set<String> ROLES = Set.of("USER", "SELLER");
     private static final OAuth2Error INVALID = new OAuth2Error("invalid_token", "Invalid member access token", null);
     private final String audience;
     private final Clock clock;
