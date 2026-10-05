@@ -32,7 +32,9 @@ tags:
   - name: Public Broadcast Product
     description: 비회원 방송 상품 조회·구매 진입 (#67)
   - name: Broadcast Chat
-    description: 방송 최근 채팅 조회 (#129)
+    description: 방송 채팅 작성·최근 내역 조회 (#129 #130)
+  - name: Broadcast Event Stream
+    description: 방송 실시간 이벤트 SSE (#131)
 
 paths:
   /v1/admin/broadcasts:
@@ -508,6 +510,95 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
+    post:
+      x-required-roles: [USER, SELLER]
+      summary: 채팅 작성 (#130)
+      description: |
+        LIVE 방송에만 쓸 수 있다. 작성자는 인증 정보에서 얻으며 요청 본문의 회원 ID·이름은 받지 않는다.
+        표시 이름은 작성 시점의 Member 값을 저장한다. `content` 는 앞뒤 공백을 제거한 뒤
+        Unicode code point 기준 1~200자다. 줄바꿈을 허용하며 HTML 로 해석하지 않는다.
+        멱등 키가 없으므로 재시도는 새 채팅을 만든다. 방송 종료와 동시에 도착한 요청은 저장될 수 있다.
+      operationId: createBroadcastChat
+      tags: [Broadcast Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatInput' }
+            example: { content: 안녕하세요 }
+      responses:
+        '201':
+          description: 저장된 채팅
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatMessageEnvelope' }
+              example:
+                success: true
+                error: null
+                data:
+                  messageId: 9001
+                  broadcastId: 12
+                  displayName: 회원
+                  content: 안녕하세요
+                  createdAt: '2026-10-03T11:00:01.123456Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BroadcastNotLive' }
+        '503':
+          description: 인증 상태 또는 작성자 표시 이름을 Member 에서 확인할 수 없음. 채팅은 저장되지 않는다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 작성자 정보를 확인할 수 없습니다.
+                  requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+
+  /v1/broadcasts/{id}/events:
+    get:
+      security: []
+      summary: 방송 실시간 이벤트 SSE (#131)
+      description: |
+        로그인 없이 연결한다. LIVE 방송에만 연결할 수 있고 그 외 상태는 409 다.
+        연결 전 오류는 `Accept` 헤더와 무관하게 JSON 오류 봉투이고, 연결 후에는 오류 본문 없이 연결이 닫힌다.
+
+        이벤트(`event:` 이름과 `data:` JSON. data 는 `ApiResponse` 봉투가 아니다):
+
+        | event | data | 시점 |
+        |---|---|---|
+        | `stream.ready` | `StreamReadyEvent` | 연결 직후 한 번 |
+
+        클라이언트 규칙:
+        - `stream.ready` 를 받은 뒤 최근 채팅을 GET 으로 조회한다.
+        - 전달은 보장하지 않는다. `Last-Event-ID` 로 놓친 이벤트를 다시 보내지 않는다.
+        - 약 15초마다 comment 줄(`:heartbeat`)이 온다. 수신이 느려 대기량을 넘으면 서버가 연결을 닫는다.
+        - 서버는 연결을 최대 30분 유지한다. 닫히면 다시 연결한다. 재연결이 409 이면 방송 상태를 조회한다.
+      operationId: streamBroadcastEvents
+      tags: [Broadcast Event Stream]
+      parameters:
+        - $ref: '#/components/parameters/BroadcastId'
+      responses:
+        '200':
+          description: 이벤트 스트림
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              example: |
+                event: stream.ready
+                data: {"broadcastId":12}
+
+                : heartbeat
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BroadcastNotLive' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
 
 components:
   securitySchemes:
@@ -602,6 +693,18 @@ components:
             error:
               code: SERVICE_UNAVAILABLE
               message: 상품 정보를 조회할 수 없습니다.
+              requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+    BroadcastNotLive:
+      description: 방송이 LIVE 가 아니다(PREPARING 또는 ENDED).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            data: null
+            error:
+              code: CONFLICT
+              message: 진행 중인 방송이 아닙니다.
               requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
     AuthUnavailable:
       description: JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.
@@ -760,6 +863,15 @@ components:
           type: boolean
           description: 정상 조회에서 사라진 연결. 관리 응답에서만 true 가 될 수 있다.
 
+    ChatInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 앞뒤 공백 제거 후 code point 기준 1~200자. 공백만 있으면 400 이다.
     ChatMessage:
       type: object
       description: 공개 채팅. 작성자 회원 ID 는 포함하지 않는다.
@@ -775,6 +887,12 @@ components:
         content: { type: string, minLength: 1, maxLength: 200 }
         createdAt: { type: string, format: date-time, description: 서버 작성 시각 }
 
+    StreamReadyEvent:
+      type: object
+      description: SSE `stream.ready` 의 data.
+      required: [broadcastId]
+      properties:
+        broadcastId: { type: integer, format: int64 }
     BroadcastEnvelope:
       type: object
       required: [success, data, error]
@@ -847,6 +965,13 @@ components:
         data:
           type: array
           items: { $ref: '#/components/schemas/BroadcastProductView' }
+        error: { type: 'null' }
+    ChatMessageEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/ChatMessage' }
         error: { type: 'null' }
     ChatMessageListEnvelope:
       type: object
