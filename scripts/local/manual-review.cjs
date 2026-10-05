@@ -12,7 +12,7 @@ async function main(args = process.argv.slice(2)) {
   fs.mkdirSync(base, { recursive: true, mode: 0o700 });
   const directory = fs.mkdtempSync(path.join(base, 'run-'));
   fs.chmodSync(directory, 0o700);
-  const runtime = new Runtime({ output: path.join(directory, 'logs') });
+  const runtime = new Runtime({ output: path.join(directory, 'logs'), localTestAccounts: true });
   const envFile = path.join(directory, 'env.sh');
   const jsonFile = path.join(directory, 'env.json');
   let cleanupPromise, keepAlive;
@@ -49,25 +49,33 @@ async function main(args = process.argv.slice(2)) {
       const value = await response.json(); assert.equal(value.success, true);
       return value.data;
     }
-    for (const [label, role] of [['USER_A', 'USER'], ['USER_B', 'USER'], ['ADMIN', 'ADMIN']]) {
-      const email = `${runtime.id}-${label.toLowerCase()}@example.test`;
-      const password = 'manual-' + crypto.randomBytes(18).toString('base64url');
-      runtime.remember(password);
-      let profile;
-      if (role === 'ADMIN') await runtime.bootstrapAdmin(email, password);
-      else profile = await post('signup', { email, password, displayName: label }, 201);
+    for (const [label, role] of [['USER_A', 'USER'], ['USER_B', 'USER'], ['SELLER', 'SELLER']]) {
+      const fixed = label !== 'USER_B';
+      const login = role === 'SELLER' ? 'seller' : 'user';
+      const email = fixed ? login + '@local.test' : `${runtime.id}-user-b@example.test`;
+      const password = fixed ? login : 'manual-' + crypto.randomBytes(18).toString('base64url');
+      if (!fixed) {
+        runtime.remember(password);
+        await post('signup', { email, password, displayName: label }, 201);
+      }
       const tokens = await post('login', { email, password }, 200);
       assert(tokens.accessToken && tokens.refreshToken, 'Manual login did not issue token pair');
       runtime.remember(tokens.accessToken, tokens.refreshToken);
       Object.assign(env, { [label + '_EMAIL']: email, [label + '_PASSWORD']: password,
         [label + '_ACCESS_TOKEN']: tokens.accessToken, [label + '_REFRESH_TOKEN']: tokens.refreshToken });
-      if (profile) env[label + '_ID'] = profile.memberId;
+      const me = await fetch(runtime.urls.member + '/v1/members/me', {
+        headers: { Authorization: 'Bearer ' + tokens.accessToken }, signal: AbortSignal.timeout(10000)
+      });
+      assert.equal(me.status, 200);
+      const profile = (await me.json()).data;
+      assert.deepEqual(profile.roles, [role]);
+      env[label + '_ID'] = profile.memberId;
     }
     const quote = value => "'" + String(value).replace(/'/g, "'\\''") + "'";
     fs.writeFileSync(envFile, Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}`).join('\n') + '\n', { mode: 0o600, flag: 'wx' });
     fs.writeFileSync(jsonFile, JSON.stringify(env, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
     fs.writeFileSync(path.join(runtime.output, 'setup.json'), JSON.stringify({ sha: runtime.sha, runtime: runtime.mode,
-      urls: runtime.urls, health: runtime.health, accounts: ['USER_A', 'USER_B', 'ADMIN'],
+      urls: runtime.urls, health: runtime.health, accounts: ['USER_A', 'USER_B', 'SELLER'],
       mocks: ['existing MockPaymentEngine', 'explicit local IVS stub'], automatedFlowVerification: false }, null, 2) + '\n');
     console.log(`Manual review ready at ${runtime.sha} (${runtime.mode}).`);
     console.log(`Shell environment (contains credentials; 0600): ${envFile}`);

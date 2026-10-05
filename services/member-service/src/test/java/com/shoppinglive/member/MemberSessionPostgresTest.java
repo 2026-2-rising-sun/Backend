@@ -88,6 +88,49 @@ class MemberSessionPostgresTest extends MemberSessionTest {
         } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }
 
+    @Test
+    void v4MigrationRenamesOnlyAdminAndRevokesOnlyTheirExistingFamilies() throws Exception {
+        String schema = "member_role_" + UUID.randomUUID().toString().replace("-", "");
+        String url = System.getenv("MEMBER_TEST_DB_URL"), user = System.getenv("MEMBER_TEST_DB_USER"), password = System.getenv("MEMBER_TEST_DB_PASSWORD");
+        UUID seller = UUID.randomUUID(), buyer = UUID.randomUUID();
+        try {
+            Flyway.configure().dataSource(url, user, password).schemas(schema).defaultSchema(schema).target("3").load().migrate();
+            try (var connection = DriverManager.getConnection(url, user, password)) {
+                connection.setSchema(schema);
+                for (UUID id : List.of(seller, buyer)) {
+                    try (var insert = connection.prepareStatement("INSERT INTO members(id,email,password_hash,display_name,role,created_at,updated_at) VALUES (?,?,?,'kept',?,now(),now())")) {
+                        insert.setObject(1, id); insert.setString(2, id + "@example.test");
+                        insert.setString(3, "preserved-hash"); insert.setString(4, id.equals(seller) ? "ADMIN" : "USER"); insert.executeUpdate();
+                    }
+                    try (var insert = connection.prepareStatement("INSERT INTO refresh_families(id,member_id,created_at,expires_at) VALUES (?,?,now(),now()+interval '30 days')")) {
+                        insert.setObject(1, UUID.randomUUID()); insert.setObject(2, id); insert.executeUpdate();
+                    }
+                }
+            }
+            Flyway.configure().dataSource(url, user, password).schemas(schema).defaultSchema(schema).load().migrate();
+            try (var connection = DriverManager.getConnection(url, user, password); var statement = connection.createStatement()) {
+                connection.setSchema(schema);
+                try (var rows = statement.executeQuery("SELECT m.id,m.role,m.password_hash,m.display_name,f.revoked_at,f.security_revoked_at FROM members m JOIN refresh_families f ON f.member_id=m.id")) {
+                    int count = 0;
+                    while (rows.next()) {
+                        count++;
+                        assertThat(rows.getString(3)).isEqualTo("preserved-hash"); assertThat(rows.getString(4)).isEqualTo("kept");
+                        if (seller.equals(rows.getObject(1, UUID.class))) {
+                            assertThat(rows.getString(2)).isEqualTo("SELLER");
+                            assertThat(rows.getTimestamp(5)).isNotNull(); assertThat(rows.getTimestamp(6)).isNotNull();
+                        } else {
+                            assertThat(rows.getObject(1, UUID.class)).isEqualTo(buyer); assertThat(rows.getString(2)).isEqualTo("USER");
+                            assertThat(rows.getTimestamp(5)).isNull(); assertThat(rows.getTimestamp(6)).isNull();
+                        }
+                    }
+                    assertThat(count).isEqualTo(2);
+                }
+                org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate("UPDATE members SET role='ADMIN'"))
+                    .isInstanceOf(java.sql.SQLException.class);
+            }
+        } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
+    }
+
     private Attempt attemptRefresh(TokenPair token) {
         try { return new Attempt(sessionService.refresh(token.refreshToken())); }
         catch (BusinessException exception) {

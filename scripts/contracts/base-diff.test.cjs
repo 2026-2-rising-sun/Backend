@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const { compare, parse } = require('./base-diff.cjs');
 
 test('comments and object key order are equal; array ordering still requires review', () => {
-  const a = { 'a.yaml': parse('x: [USER, ADMIN]\ny: true # comment', 'a') };
-  const b = { 'a.yaml': parse('y: true\nx: [USER, ADMIN]', 'b') };
+  const a = { 'a.yaml': parse('x: [USER, SELLER]\ny: true # comment', 'a') };
+  const b = { 'a.yaml': parse('y: true\nx: [USER, SELLER]', 'b') };
   assert.equal(compare(a, b, []).passed, true);
   b['a.yaml'].x.reverse();
   assert.equal(compare(a, b, []).passed, false);
