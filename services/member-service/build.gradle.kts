@@ -20,6 +20,7 @@ tasks.register<Test>("postgresTest") {
 }
 
 dependencies {
+    implementation(project(":libs:common-local"))
     implementation(project(":libs:common-core"))
     implementation(project(":libs:common-web"))
     implementation(project(":libs:common-security"))

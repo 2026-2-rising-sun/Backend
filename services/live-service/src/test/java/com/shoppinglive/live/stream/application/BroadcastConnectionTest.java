@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -204,6 +205,54 @@ class BroadcastConnectionTest {
         assertThat(emitter.sent).hasSize(2);
         assertThat(emitter.sent.get(1)).contains("event:broadcast.ended");
         assertThat(registry.connectionCount(BROADCAST)).isZero();
+    }
+
+    @DisplayName("종료 이벤트를 넣는 중 다른 publisher가 실행되어도 종료 뒤에 이벤트가 전달되지 않는다")
+    @Test
+    void terminalEventRejectsAnInterleavedPublisher() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicBoolean inject = new AtomicBoolean();
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection[] holder = new BroadcastConnection[1];
+        holder[0] = new BroadcastConnection(emitter, 8, task -> {
+            task.run();
+            // 첫 offer의 writer 예약 직후 다른 publisher가 실행되는 순서를 고정한다.
+            if (inject.getAndSet(false)) {
+                holder[0].offer(StreamEvent.of("likes.updated", "late"));
+            }
+        }, removed::incrementAndGet);
+        holder[0].activate(ready(BROADCAST));
+        inject.set(true);
+
+        holder[0].offerThenClose(StreamEvent.of("broadcast.ended", "bye"));
+        holder[0].offer(chat(9));
+        holder[0].offerThenClose(StreamEvent.of("broadcast.ended", "again"));
+
+        assertThat(emitter.sent).hasSize(2);
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:broadcast.ended", "data:bye");
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
+    }
+
+    @DisplayName("대기 이벤트와 종료 이벤트가 용량 안에 있으면 준비 뒤 모두 보내고 닫는다")
+    @Test
+    void terminalEventNeedsNoExtraQueueSlotAndRejectsLaterOffers() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection connection = new BroadcastConnection(emitter, 2, Runnable::run, removed::incrementAndGet);
+        connection.offer(chat(1));
+        connection.offerThenClose(StreamEvent.of("broadcast.ended", "bye"));
+        connection.offer(StreamEvent.of("likes.updated", "late"));
+        connection.offerThenClose(StreamEvent.of("broadcast.ended", "again"));
+        connection.activate(ready(BROADCAST));
+
+        assertThat(emitter.sent).hasSize(3);
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:chat.created", "data:1");
+        assertThat(emitter.sent.get(2)).contains("event:broadcast.ended", "data:bye");
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
     }
 
     @Test

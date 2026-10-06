@@ -13,6 +13,8 @@ import com.shoppinglive.live.integration.member.MemberProfileClient;
 import com.shoppinglive.live.integration.member.MemberProfileException;
 import com.shoppinglive.live.integration.member.MemberProfileException.Reason;
 import com.shoppinglive.live.security.LiveSecuritySupport;
+import com.shoppinglive.live.like.application.LikeService;
+import com.shoppinglive.live.like.application.LikeBroadcaster;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,6 +34,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * 실제 Redis 와 실제 HTTP 로 채팅 실시간 전달을 검증한다.
@@ -49,6 +52,7 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
     @Autowired StringRedisTemplate redis;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
+    @Autowired LikeBroadcaster likeBroadcaster;
     @MockitoBean MemberProfileClient members;
 
     @DynamicPropertySource
@@ -72,6 +76,8 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
             Instant.parse("2026-10-03T11:00:00Z"), "arn:aws:ivs:ap-northeast-2:1:channel/" + name,
             "https://example.com/" + name + ".m3u8")).getId();
         jdbc.update("UPDATE broadcast SET status = 'LIVE', started_at = CURRENT_TIMESTAMP WHERE id = ?", id);
+        // H2 컨텍스트 재생성으로 같은 방송 ID가 다시 사용될 수 있다. 해당 fixture의 값만 정리한다.
+        redis.delete(LikeService.key(id));
         return id;
     }
 
@@ -88,6 +94,30 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
         assertThat(stream.nextNonEmpty()).startsWith("data:");
     }
 
+    /** 하나의 스트림에 합법적으로 섞이는 좋아요 프레임만 건너뛴다. 채팅은 건너뛰지 않는다. */
+    private static String nextNonLikeLine(final SseTestClient stream) throws Exception {
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        do {
+            final String line = stream.nextNonEmpty();
+            if (!"event:likes.updated".equals(line)) {
+                return line;
+            }
+            assertThat(stream.nextNonEmpty()).startsWith("data:");
+        } while (System.nanoTime() < deadline);
+        throw new AssertionError("좋아요 외의 이벤트를 5초 안에 받지 못했습니다.");
+    }
+
+    private static String nextChatLine(final SseTestClient stream) throws Exception {
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        do {
+            final String line = nextNonLikeLine(stream);
+            if (!":heartbeat".equals(line)) {
+                return line;
+            }
+        } while (System.nanoTime() < deadline);
+        throw new AssertionError("채팅 이벤트를 5초 안에 받지 못했습니다.");
+    }
+
     @DisplayName("저장된 채팅은 응답과 같은 내용으로 해당 방송 연결에만 chat.created 로 전달된다")
     @Test
     void savedChatReachesOnlyItsBroadcast() throws Exception {
@@ -98,20 +128,24 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
              SseTestClient otherStream = new SseTestClient(port, other)) {
             ready(stream);
             ready(otherStream);
+            // 정상적인 좋아요 이벤트가 채팅보다 먼저 와도, 채팅 내용과 방송 격리를 확인한다.
+            redis.opsForValue().set(LikeService.key(mine), "7");
+            redis.opsForValue().set(LikeService.key(other), "9");
+            ReflectionTestUtils.invokeMethod(likeBroadcaster, "publishChanged");
 
             final HttpResponse<String> response = write(mine, "안녕하세요 😀");
             assertThat(response.statusCode()).isEqualTo(201);
             final JsonNode saved = json.readTree(response.body()).get("data");
 
-            assertThat(stream.nextNonEmpty()).isEqualTo("event:chat.created");
+            assertThat(nextChatLine(stream)).isEqualTo("event:chat.created");
             assertThat(stream.nextNonEmpty()).isEqualTo("id:" + saved.get("messageId").asLong());
             final String data = stream.nextNonEmpty();
             assertThat(data).startsWith("data:");
             assertThat(json.readTree(data.substring(5))).isEqualTo(saved);
 
-            // 다른 방송 연결에는 채팅이 오지 않았다. 다음에 오는 것은 heartbeat 다.
+            // 다른 방송에서는 좋아요 외에 채팅 없이 heartbeat를 받아야 한다.
             registry.heartbeat();
-            assertThat(otherStream.nextNonEmpty()).isEqualTo(":heartbeat");
+            assertThat(nextNonLikeLine(otherStream)).isEqualTo(":heartbeat");
         }
     }
 
@@ -128,7 +162,7 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
             assertThat(write(id, " ").statusCode()).isEqualTo(400);
 
             registry.heartbeat();
-            assertThat(stream.nextNonEmpty()).isEqualTo(":heartbeat");
+            assertThat(nextNonLikeLine(stream)).isEqualTo(":heartbeat");
         }
     }
 
@@ -144,12 +178,12 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
                 + ",\"id\":\"77\",\"data\":{\"messageId\":77,\"content\":\"다른 pod\"}}");
             redis.convertAndSend(StreamRelay.CHANNEL, "깨진 메시지");
 
-            assertThat(stream.nextNonEmpty()).isEqualTo("event:chat.created");
+            assertThat(nextChatLine(stream)).isEqualTo("event:chat.created");
             assertThat(stream.nextNonEmpty()).isEqualTo("id:77");
             assertThat(stream.nextNonEmpty()).isEqualTo("data:{\"messageId\":77,\"content\":\"다른 pod\"}");
             // 깨진 메시지는 무시하고 연결과 구독은 유지된다.
             registry.heartbeat();
-            assertThat(stream.nextNonEmpty()).isEqualTo(":heartbeat");
+            assertThat(nextNonLikeLine(stream)).isEqualTo(":heartbeat");
             assertThat(relay.subscribed()).isTrue();
         }
     }

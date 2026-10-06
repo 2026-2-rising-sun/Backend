@@ -2,7 +2,7 @@ package com.shoppinglive.commerce;
 
 import com.shoppinglive.common.persistence.JpaAuditingConfig;
 import com.shoppinglive.common.kafka.KafkaCommonConfig;
-import org.springframework.boot.SpringApplication;
+import com.shoppinglive.common.local.LocalApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -13,6 +13,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class CommerceServiceApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(CommerceServiceApplication.class, args);
+        LocalApplication.run(CommerceServiceApplication.class, args);
     }
 }
