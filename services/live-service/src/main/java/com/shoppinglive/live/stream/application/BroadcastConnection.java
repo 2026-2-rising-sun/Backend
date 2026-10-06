@@ -25,6 +25,7 @@ final class BroadcastConnection {
     private final AtomicBoolean completed = new AtomicBoolean();
     private final AtomicBoolean active = new AtomicBoolean();
     private StreamEvent firstEvent;
+    private volatile StreamEvent terminalEvent;
 
     BroadcastConnection(final SseEmitter emitter, final int capacity, final Executor writers,
                         final Runnable onClose) {
@@ -35,14 +36,18 @@ final class BroadcastConnection {
     }
 
     void offer(final StreamEvent event) {
-        if (closed.get()) {
-            return;
+        final boolean accepted;
+        synchronized (this) {
+            if (closed.get() || terminalEvent != null) {
+                return;
+            }
+            accepted = pending.offer(event);
         }
-        if (!pending.offer(event)) {
+        if (accepted) {
+            scheduleDrain();
+        } else {
             close();
-            return;
         }
-        scheduleDrain();
     }
 
     /** 상태 확인 전 이벤트는 큐에만 쌓고, 준비 이벤트부터 전송을 시작한다. */
@@ -57,15 +62,32 @@ final class BroadcastConnection {
         scheduleDrain();
     }
 
-    /** 대기 중인 이벤트를 보낸 뒤 닫는다. 종료 이벤트처럼 마지막으로 전달할 것이 있을 때 쓴다. */
+    /** 마지막 이벤트 등록과 추가 전송 차단을 함께 처리한다. 전송이 끝나면 writer가 닫는다. */
     void offerThenClose(final StreamEvent event) {
-        offer(event);
-        offer(CLOSE);
+        final boolean accepted;
+        synchronized (this) {
+            if (closed.get() || terminalEvent != null) {
+                return;
+            }
+            terminalEvent = event;
+            accepted = pending.offer(event);
+        }
+        if (accepted) {
+            scheduleDrain();
+        } else {
+            close();
+        }
     }
 
     void close() {
-        if (closed.compareAndSet(false, true)) {
-            pending.clear();
+        final boolean firstClose;
+        synchronized (this) {
+            firstClose = closed.compareAndSet(false, true);
+            if (firstClose) {
+                pending.clear();
+            }
+        }
+        if (firstClose) {
             onClose.run();
         }
         // complete 는 send 와 같은 잠금을 사용한다. 전송 중이면 writer 가 완료하도록 맡긴다.
@@ -97,11 +119,11 @@ final class BroadcastConnection {
                 event = pending.poll();
             }
             while (event != null && !closed.get()) {
-                if (event == CLOSE) {
+                send(event);
+                if (event == terminalEvent) {
                     close();
                     return;
                 }
-                send(event);
                 event = pending.poll();
             }
         } catch (Exception e) {
@@ -140,5 +162,4 @@ final class BroadcastConnection {
         emitter.send(builder.data(event.data(), MediaType.APPLICATION_JSON));
     }
 
-    private static final StreamEvent CLOSE = new StreamEvent("close", null, null);
 }
