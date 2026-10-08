@@ -20,7 +20,8 @@ public record OrderResponse(
     String buyerName,
     Instant createdAt,
     Instant expiresAt,
-    Instant cancelledAt
+    Instant cancelledAt,
+    String groupNumber
 ) {
 
     public static OrderResponse from(Order order) {
@@ -34,7 +35,8 @@ public record OrderResponse(
             order.getBuyerName(),
             order.getCreatedAt(),
             order.getExpiresAt(),
-            order.getCancelledAt()
+            order.getCancelledAt(),
+            order.getPaymentGroup() == null ? null : order.getPaymentGroup().getGroupNumber()
         );
     }
 }

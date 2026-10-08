@@ -45,7 +45,7 @@ jobs:
             --allow-skipped-suite com.shoppinglive.live.stream.application.ChatRealtimeRedisTest=3 \
             --allow-skipped-suite com.shoppinglive.live.like.PostgresLikeTest=5 \
             --allow-skipped-suite com.shoppinglive.live.stream.application.LikeRealtimeRedisTest=2 \
-            --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=3 \
+            --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=5 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
         run: |
@@ -93,8 +93,8 @@ jobs:
             database: commerce_test
             task: ':services:commerce-service:postgresCommerceTest'
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=3'
+            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest'
+            minimums: '*.MemberCommerceMigrationPostgresTest=5 *.PaymentGroupIntegrationTest=14'
           - service: live
             database: live_test
             # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.

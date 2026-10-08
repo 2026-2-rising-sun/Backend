@@ -43,7 +43,7 @@ public class CommerceSecurityConfiguration {
             .exceptionHandling(handler -> handler.authenticationEntryPoint(errors).accessDeniedHandler(errors))
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers(HttpMethod.GET, "/actuator/health/liveness", "/actuator/health/readiness").permitAll()
-                    .requestMatchers("/v1/orders", "/v1/orders/**", "/v1/cart/items", "/v1/cart/items/**")
+                    .requestMatchers("/v1/orders", "/v1/orders/**", "/v1/cart/items", "/v1/cart/items/**", "/v1/cart/checkout", "/v1/cart/orders", "/v1/payment-groups/**")
                     .hasAnyRole("USER", "SELLER")
                     .requestMatchers(HttpMethod.POST, "/v1/sales").hasRole("SELLER")
                     .requestMatchers(HttpMethod.PATCH, "/v1/sales/*/price", "/v1/sales/*/stock", "/v1/sales/*/status").hasRole("SELLER")

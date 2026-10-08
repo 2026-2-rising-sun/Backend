@@ -54,11 +54,12 @@ public class OrderExpirationScheduler {
      */
     @Transactional
     public int processExpiredOrders() {
-        List<Order> candidates = orderRepository.findByStatusAndExpiresAtBefore(
+        List<Order> candidates = orderRepository.findByPaymentGroupIsNullAndStatusAndExpiresAtBefore(
             OrderStatus.PENDING_PAYMENT, Instant.now(), Limit.of(BATCH_SIZE));
 
         int expired = 0;
         for (Order order : candidates) {
+            if (order.getPaymentGroup() != null) continue;
             int updated = orderRepository.expireOrder(order.getId());
             if (updated == 1) {
                 salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());

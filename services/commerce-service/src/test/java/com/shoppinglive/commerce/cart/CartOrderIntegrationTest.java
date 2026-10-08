@@ -43,6 +43,7 @@ class CartOrderIntegrationTest extends com.shoppinglive.commerce.support.Commerc
     @Autowired SalesStockJpaRepository stocks;
     @Autowired InMemoryShoppingClientStub shopping;
     @Autowired TransactionTemplate transaction;
+    @Autowired com.shoppinglive.commerce.payments.application.PaymentService paymentService;
     private Long salesId;
 
     @BeforeEach
@@ -63,18 +64,24 @@ class CartOrderIntegrationTest extends com.shoppinglive.commerce.support.Commerc
     private CartOrderCommand request(long amount) { return new CartOrderCommand("회원", "01012345678", amount); }
 
     @Test
-    void cartDoesNotReserveAndOrderDeletesOnlySelectedItemWithReplay() {
+    void cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay() {
         var selected = cart.add(MEMBER_A, 1L, 2);
         var other = cart.add(MEMBER_A, 2L, 1);
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isZero();
         var first = creation.createFromCart(MEMBER_A, selected.getId(), request(2000), "cart-key");
         assertThat(first.created()).isTrue();
-        assertThat(items.findAll()).extracting(item -> item.getId()).containsExactly(other.getId());
+        assertThat(items.findAll()).extracting(item -> item.getId()).containsExactly(selected.getId(), other.getId());
         var replay = creation.createFromCart(MEMBER_A, selected.getId(), request(2000), "cart-key");
         assertThat(replay.created()).isFalse();
         assertThat(replay.order().getId()).isEqualTo(first.order().getId());
         assertThat(orders.count()).isEqualTo(1);
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        paymentService.startPayment(first.order().getOrderNumber(), MEMBER_A);
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertThat(orders.findById(first.order().getId()).orElseThrow().getStatus())
+                .isEqualTo(com.shoppinglive.commerce.orders.domain.OrderStatus.PAID);
+            assertThat(items.findAll()).extracting(item -> item.getId()).containsExactly(other.getId());
+        });
         assertThatThrownBy(() -> creation.createFromCart(MEMBER_A, selected.getId(), request(3000), "cart-key"))
             .isInstanceOf(BusinessException.class);
     }
@@ -144,7 +151,8 @@ class CartOrderIntegrationTest extends com.shoppinglive.commerce.support.Commerc
         assertThat(failures).isEmpty();
         assertThat(numbers.stream().distinct().count()).isEqualTo(1);
         assertThat(orders.count()).isEqualTo(1);
-        assertThat(items.count()).isZero();
+        assertThat(items.count()).isEqualTo(1);
+        assertThat(items.existsById(item.getId())).isTrue();
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
     }
 }

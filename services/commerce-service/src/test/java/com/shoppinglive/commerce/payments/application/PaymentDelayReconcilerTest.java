@@ -58,6 +58,10 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired private com.shoppinglive.commerce.purchase.application.PaymentGroupService groups;
+    @Autowired private com.shoppinglive.commerce.purchase.application.DurableMockGateway gateway;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private Long salesInfoId;
     private Long orderId;
 
@@ -159,6 +163,53 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
             .thenReturn(List.of(attempt));
         assertThat(new PaymentDelayReconciler(staleScan, paymentService).reconcileOverdue()).isZero();
         assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+    }
+
+    private PaymentAttempt overdueGroupAttempt(Long childId, String key) {
+        return new TransactionTemplate(transactionManager).execute(status -> {
+            Order child = orderRepository.findById(childId).orElseThrow();
+            var group = groups.bindSingle(child, key, null);
+            group.transition(OrderStatus.PAYMENT_CONFIRMING);
+            PaymentAttempt attempt = new PaymentAttempt(childId, PaymentScenario.INSTANT_SUCCESS,
+                Instant.now().minusSeconds(10));
+            attempt.attachGroup(group.getId(), key);
+            attempt = paymentAttemptRepository.saveAndFlush(attempt);
+            group.setPaymentId(attempt.getId());
+            return attempt;
+        });
+    }
+
+    @Test
+    void failedApprovedGroupDoesNotBlockNextPaymentAndRemainsRetryable() {
+        PaymentAttempt failed = overdueGroupAttempt(orderId, "broken-group");
+        jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", salesInfoId);
+        Long healthySales = salesRepository.save(new Sales(401L, 10_000L, SalesStatus.ON_SALE)).getId();
+        salesStockRepository.save(new SalesStock(healthySales, 4, 1));
+        Order healthyOrder = orderRepository.saveAndFlush(new Order("OD-RECON-HEALTHY", healthySales,
+            1, 10_000L, "회원B", "01012345678", MEMBER_B, "상품", null, Instant.now().plusSeconds(900)));
+        new TransactionTemplate(transactionManager).executeWithoutResult(status ->
+            orderRepository.transitionStatus(healthyOrder.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"));
+        PaymentAttempt healthy = overdueGroupAttempt(healthyOrder.getId(), "healthy-group");
+        // Fix scan order while retaining real group, ledger, order and stock transactions.
+        PaymentAttemptJpaRepository orderedScan = mock(PaymentAttemptJpaRepository.class);
+        when(orderedScan.findByStatusAndScheduledResolveAtBefore(any(), any(), any()))
+            .thenReturn(List.of(failed, healthy));
+        PaymentDelayReconciler recovery = new PaymentDelayReconciler(orderedScan, paymentService);
+
+        assertThat(recovery.reconcileOverdue()).isEqualTo(1);
+        assertThat(gateway.lookup(failed.getId())).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(paymentAttemptRepository.findById(failed.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+        assertThat(orderRepository.findById(healthyOrder.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(paymentAttemptRepository.findById(healthy.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(salesStockRepository.findById(healthySales).orElseThrow().getReserved()).isZero();
+
+        jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesInfoId);
+        assertThat(recovery.reconcileOverdue()).isEqualTo(1);
+        assertThat(recovery.reconcileOverdue()).isZero();
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+        assertThat(salesStockRepository.findById(healthySales).orElseThrow().getReserved()).isZero();
     }
 
 }

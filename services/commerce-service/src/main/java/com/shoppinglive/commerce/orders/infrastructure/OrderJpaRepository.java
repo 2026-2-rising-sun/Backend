@@ -21,6 +21,7 @@ import org.springframework.data.repository.query.Param;
 public interface OrderJpaRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByOrderNumber(String orderNumber);
+    List<Order> findByPaymentGroupIdOrderByIdAsc(Long groupId);
 
     /**
      * 멱등키로 기존 주문을 조회한다 (주문 2).
@@ -46,6 +47,7 @@ public interface OrderJpaRepository extends JpaRepository<Order, Long> {
      * 생성 순서와 대체로 일치).
      */
     List<Order> findByStatusAndExpiresAtBefore(OrderStatus status, Instant boundary, Limit limit);
+    List<Order> findByPaymentGroupIsNullAndStatusAndExpiresAtBefore(OrderStatus status, Instant boundary, Limit limit);
 
     /**
      * 주문을 결제 전 취소한다 (주문 4).

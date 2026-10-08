@@ -50,8 +50,17 @@ class PaymentServiceTest {
     @Mock
     private org.springframework.beans.factory.ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
 
+    @Mock private org.springframework.transaction.support.TransactionTemplate transaction;
+
     @InjectMocks
     private PaymentService paymentService;
+
+    @SuppressWarnings("unchecked")
+    private void executeTransactionInline() {
+        given(transaction.execute(any())).willAnswer(invocation ->
+            ((org.springframework.transaction.support.TransactionCallback<Object>) invocation.getArgument(0))
+                .doInTransaction(new org.springframework.transaction.support.SimpleTransactionStatus()));
+    }
 
     private Order sampleOrder() {
         Order order = new Order(
@@ -104,6 +113,7 @@ class PaymentServiceTest {
 
     @Test
     void resolvePayment_SUCCESS_시나리오면_PAID_전이_consumeReserved() {
+        executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
@@ -121,6 +131,7 @@ class PaymentServiceTest {
 
     @Test
     void resolvePayment_FAILED_시나리오면_FAILED_전이_restoreReserved() {
+        executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_FAIL, PaymentStatus.PROCESSING);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
@@ -148,6 +159,7 @@ class PaymentServiceTest {
 
     @Test
     void resolvePayment_조건부_UPDATE_실패시_후속_처리_스킵() {
+        executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
         given(paymentAttemptRepository.resolveIfProcessing(100L, "SUCCESS")).willReturn(0);
