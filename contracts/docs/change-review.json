@@ -150,6 +150,83 @@
         "reviewedAt": "2026-10-06",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/142"
       }
+    },
+    {
+      "baseSnapshotSha256": "33e98fbf24986563d4a7e23d0fa929bef7bd79a88cfaf0a728a9d7294575d21a",
+      "headSnapshotSha256": "071c72371375bac4f3249fb26c07b3657360cb5e0578874b3adfb5b681ed4ba2",
+      "reason": "Backend #149 adds seven cart/payment-group operations, versioned selection and grouped responses while retaining product-level orders. New single orders also use groups and the one-active-purchase restriction; cart deletion moves from creation to payment success and only matching source ID/version rows are removed. Pending groups expire after 15 minutes; confirming groups retain reservations until the durable Mock gateway result is applied. V4 backfills existing single orders and stops for explicit reconciliation when a member already has multiple active orders, without deleting or cancelling those purchases. This record acknowledges intentional behavior changes and nullable Order.groupNumber; it is not proof of an external PG integration.",
+      "independentReview": {
+        "reviewer": "Codex independent read-only agent /root/frontend_analysis, separate from commerce implementation and contract author",
+        "reviewedAt": "2026-10-08",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/issues/149"
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/cart/checkout",
+          "change": "added"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/cart/orders",
+          "change": "added"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/active",
+          "change": "added"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}",
+          "change": "added"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/payments",
+          "change": "added"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/payments/{id}",
+          "change": "added"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/cancel",
+          "change": "added"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/orders",
+          "change": "behavior and/or group linkage"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/cart/items/{itemId}/orders",
+          "change": "behavior and/or group linkage"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/orders/{orderNumber}/cancel",
+          "change": "behavior and/or group linkage"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/orders/{orderNumber}/payments",
+          "change": "behavior and/or group linkage"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/orders",
+          "change": "nullable Order.groupNumber response field"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/orders/{orderNumber}",
+          "change": "nullable Order.groupNumber response field"
+        }
+      ]
     }
   ]
 }
