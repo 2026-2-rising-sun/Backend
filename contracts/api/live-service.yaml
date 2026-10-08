@@ -587,7 +587,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
+        '503': { $ref: '#/components/responses/LikeUnavailable' }
 
   /v1/broadcasts/{id}/likes/mine:
     parameters:
@@ -615,7 +615,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
+        '503': { $ref: '#/components/responses/LikeUnavailable' }
     put:
       x-required-roles: [USER, SELLER]
       summary: 내 좋아요 설정 또는 취소 (#148)
@@ -662,7 +662,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorEnvelope' }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
+              example:
+                success: false
+                data: null
+                error:
+                  code: CONFLICT
+                  message: 진행 중인 방송이 아니거나 같은 요청 키의 입력이 다릅니다.
+                  requestId: request-001
+        '503': { $ref: '#/components/responses/LikeUnavailable' }
 
   /v1/broadcasts/{id}/events:
     get:
@@ -840,6 +847,19 @@ components:
                   code: SERVICE_UNAVAILABLE
                   message: 인증 상태를 확인할 수 없습니다.
                   requestId: request-001
+
+    LikeUnavailable:
+      description: 좋아요 PostgreSQL 저장소 또는 Member 인증 상태 저장소가 일시적으로 불가함. 같은 요청 키로 재시도한다.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            success: false
+            data: null
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: 좋아요 저장소를 사용할 수 없습니다.
+              requestId: request-001
 
   schemas:
     BroadcastStatus:

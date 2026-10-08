@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 
 // Reads one SSE response. Events are collected as they arrive; `closed` resolves when the server ends the stream.
 async function openStream(url) {
@@ -48,6 +49,8 @@ async function liveRealtime(ctx) {
   const link = (await req('realtime-broadcast-link', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/products`,
     { token: ctx.seller, body: { productId: ctx.products[0], expectedVersion: broadcast.version }, status: 201 })).data;
   const base = `/v1/broadcasts/${broadcast.id}`;
+  const firstKey = randomUUID();
+  let firstLike;
   await req('realtime-sse-before-start-409', 'live2', 'GET', base + '/events', { headers: { Accept: 'text/event-stream' }, status: 409 });
   await req('realtime-broadcast-start', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/start?expectedVersion=${link.broadcastVersion}`, { token: ctx.seller });
 
@@ -64,14 +67,27 @@ async function liveRealtime(ctx) {
     ctx.check('realtime-chat-history-b-has-message', history.map(message => message.messageId), [chat.messageId]);
     await req('realtime-chat-anonymous-401', 'live2', 'POST', base + '/chats', { body: { content: 'x' }, status: 401 });
 
-    await req('realtime-like-a-1', 'live', 'POST', base + '/likes', { token: ctx.a });
-    await req('realtime-like-b-2', 'live2', 'POST', base + '/likes', { token: ctx.b });
-    const third = (await req('realtime-like-a-3', 'live', 'POST', base + '/likes', { token: ctx.a })).data;
+    const mine = (await req('realtime-like-mine-initial', 'live', 'GET', base + '/likes/mine', { token: ctx.a })).data;
+    ctx.check('realtime-like-mine-initial-state', mine, { broadcastId: broadcast.id, liked: false, stateVersion: 0, total: 0, version: 0 });
+    const intent = (token, liked, key = randomUUID()) => ({ token, body: { liked }, headers: { 'Idempotency-Key': key } });
+    await req('realtime-like-anonymous-401', 'live2', 'PUT', base + '/likes/mine', { ...intent(undefined, true), status: 401 });
+    firstLike = (await req('realtime-like-a-1', 'live', 'PUT', base + '/likes/mine', intent(ctx.a, true, firstKey))).data;
+    await req('realtime-like-b-2', 'live2', 'PUT', base + '/likes/mine', intent(ctx.b, true));
+    const noop = (await req('realtime-like-a-noop', 'live', 'PUT', base + '/likes/mine', intent(ctx.a, true))).data;
+    const replay = (await req('realtime-like-a-replay-b', 'live2', 'PUT', base + '/likes/mine', intent(ctx.a, true, firstKey))).data;
+    ctx.check('realtime-like-replay-original-response', replay, firstLike);
+    await req('realtime-like-key-conflict-409', 'live2', 'PUT', base + '/likes/mine', { ...intent(ctx.a, false, firstKey), status: 409 });
     const totalA = (await req('realtime-likes-total-a', 'live', 'GET', base + '/likes')).data;
     const totalB = (await req('realtime-likes-total-b', 'live2', 'GET', base + '/likes')).data;
-    ctx.check('realtime-likes-same-total', [third.total, totalA.total, totalB.total], [3, 3, 3]);
-    const likes = await stream.next(event => event.name === 'likes.updated' && event.data.total === 3);
-    ctx.check('realtime-likes-updated-reaches-b', likes?.data, { broadcastId: broadcast.id, total: 3 });
+    ctx.check('realtime-likes-same-total-noop', [noop.total, noop.stateVersion, noop.version, totalA, totalB],
+      [2, 1, 2, { broadcastId: broadcast.id, total: 2, version: 2 }, { broadcastId: broadcast.id, total: 2, version: 2 }]);
+    const likes = await stream.next(event => event.name === 'likes.updated' && event.data.total === 2 && event.data.version === 2);
+    ctx.check('realtime-likes-updated-reaches-b', likes?.data, { broadcastId: broadcast.id, total: 2, version: 2 });
+    const cancelled = (await req('realtime-like-a-cancel', 'live', 'PUT', base + '/likes/mine', intent(ctx.a, false))).data;
+    ctx.check('realtime-like-cancel-personal-and-aggregate', cancelled,
+      { broadcastId: broadcast.id, liked: false, stateVersion: 2, total: 1, version: 3 });
+    const decrease = await stream.next(event => event.name === 'likes.updated' && event.data.total === 1 && event.data.version === 3);
+    ctx.check('realtime-likes-decreasing-sse-reaches-b', decrease?.data, { broadcastId: broadcast.id, total: 1, version: 3 });
 
     const ended = (await req('realtime-broadcast-end-a', 'live', 'POST', `/v1/admin/broadcasts/${broadcast.id}/end`, { token: ctx.seller })).data;
     const notice = await stream.next(event => event.name === 'broadcast.ended');
@@ -81,10 +97,15 @@ async function liveRealtime(ctx) {
 
   await req('realtime-sse-after-end-409', 'live2', 'GET', base + '/events', { headers: { Accept: 'text/event-stream' }, status: 409 });
   await req('realtime-chat-after-end-409', 'live2', 'POST', base + '/chats', { token: ctx.a, body: { content: '종료 후' }, status: 409 });
-  await req('realtime-like-after-end-409', 'live2', 'POST', base + '/likes', { token: ctx.a, status: 409 });
+  await req('realtime-like-after-end-409', 'live2', 'PUT', base + '/likes/mine', { token: ctx.a, body: { liked: true }, headers: { 'Idempotency-Key': randomUUID() }, status: 409 });
+  const endedReplay = (await req('realtime-like-replay-after-end', 'live2', 'PUT', base + '/likes/mine', { token: ctx.a, body: { liked: true }, headers: { 'Idempotency-Key': firstKey } })).data;
+  ctx.check('realtime-like-ended-replay-preserved', endedReplay, firstLike);
   const after = (await req('realtime-likes-total-after-end', 'live2', 'GET', base + '/likes')).data;
   assert.equal(Number.isSafeInteger(broadcast.id), true);
-  ctx.check('realtime-likes-kept-and-stored-after-end', [after.total,
-    r.sql('live', `SELECT total FROM broadcast_like_snapshot WHERE broadcast_id = ${broadcast.id}`)], [3, '3']);
+  ctx.check('realtime-likes-kept-and-stored-after-end', [after.total, after.version,
+    r.sql('live', `SELECT total FROM broadcast_like_aggregate WHERE broadcast_id = ${broadcast.id}`),
+    r.sql('live', `SELECT version FROM broadcast_like_aggregate WHERE broadcast_id = ${broadcast.id}`),
+    r.sql('live', `SELECT COUNT(*) FROM broadcast_member_like WHERE broadcast_id = ${broadcast.id} AND liked = true`),
+    r.sql('live', `SELECT COUNT(*) FROM broadcast_like_request WHERE broadcast_id = ${broadcast.id}`)], [1, 3, '1', '3', '1', '4']);
 }
 module.exports = { liveRealtime };
