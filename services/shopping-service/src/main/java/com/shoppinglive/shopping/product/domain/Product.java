@@ -29,6 +29,9 @@ public class Product extends BaseEntity {
     @Column(length = 64, unique = true, updatable = false)
     private String idempotencyKey;
 
+    @Column(name = "seller_id", length = 36, updatable = false)
+    private String sellerId;
+
     /** 기본정보 수정의 낙관적 락. */
     @Version
     @Column(nullable = false)
@@ -38,10 +41,15 @@ public class Product extends BaseEntity {
     }
 
     public Product(String name, String description, Long mainImageId, String idempotencyKey) {
+        this(name, description, mainImageId, idempotencyKey, null);
+    }
+
+    public Product(String name, String description, Long mainImageId, String idempotencyKey, String sellerId) {
         this.name = name;
         this.description = description;
         this.mainImageId = mainImageId;
         this.idempotencyKey = idempotencyKey;
+        this.sellerId = sellerId;
     }
 
     /** 검증된 값으로 기본정보를 바꾼다. 실제로 바뀐 값이 있으면 flush 때 version 이 오른다. */
@@ -65,6 +73,10 @@ public class Product extends BaseEntity {
 
     public String getIdempotencyKey() {
         return idempotencyKey;
+    }
+
+    public String getSellerId() {
+        return sellerId;
     }
 
     public Long getVersion() {
