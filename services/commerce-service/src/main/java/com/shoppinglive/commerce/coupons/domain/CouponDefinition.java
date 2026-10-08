@@ -18,6 +18,8 @@ public record CouponDefinition(String id, String sellerId, String name, long fix
             Instant expiration, List<Long> products) {
         if (name == null || name.isBlank() || name.length() > 100 || discount <= 0 || limit < 1 || limit > 10000
                 || start == null || end == null || expiration == null || !start.isBefore(end)
+                || start.isBefore(Instant.parse("0001-01-01T00:00:00Z"))
+                || expiration.isAfter(Instant.parse("9999-12-31T23:59:59.999999Z"))
                 || Duration.between(start, end).compareTo(Duration.ofHours(720)) > 0
                 || expiration.isBefore(end) || products == null || products.isEmpty()
                 || products.stream().anyMatch(id -> id == null || id <= 0)

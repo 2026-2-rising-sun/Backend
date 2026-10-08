@@ -6,6 +6,7 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +29,10 @@ public class CouponCreationService {
     public CouponDefinition create(String sellerId, String name, long discount, int limit,
             Instant start, Instant end, Instant expiration, List<Long> products) {
         CouponDefinition.validate(name, discount, limit, start, end, expiration, products);
+        Instant storedStart = start.truncatedTo(ChronoUnit.MICROS);
+        Instant storedEnd = end.truncatedTo(ChronoUnit.MICROS);
+        Instant storedExpiration = expiration.truncatedTo(ChronoUnit.MICROS);
+        CouponDefinition.validate(name, discount, limit, storedStart, storedEnd, storedExpiration, products);
         for (long productId : products) {
             var product = shopping.findProduct(productId).orElseThrow(() ->
                 new BusinessException(ErrorCode.NOT_FOUND, "대상 상품을 찾을 수 없습니다."));
@@ -40,12 +45,12 @@ public class CouponCreationService {
             jdbc.update("""
                 INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,
                     starts_at,ends_at,expires_at,created_at) VALUES (?,?,?,?,?,?,?,?,?)
-                """, id, sellerId, name, discount, limit, Timestamp.from(start), Timestamp.from(end),
-                Timestamp.from(expiration), Timestamp.from(Instant.now()));
+                """, id, sellerId, name, discount, limit, Timestamp.from(storedStart), Timestamp.from(storedEnd),
+                Timestamp.from(storedExpiration), Timestamp.from(Instant.now()));
             for (long productId : products) {
                 jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", id, productId);
             }
-            return new CouponDefinition(id, sellerId, name, discount, limit, 0, start, end, expiration, 0, products);
+            return new CouponDefinition(id, sellerId, name, discount, limit, 0, storedStart, storedEnd, storedExpiration, 0, products);
         });
     }
 }

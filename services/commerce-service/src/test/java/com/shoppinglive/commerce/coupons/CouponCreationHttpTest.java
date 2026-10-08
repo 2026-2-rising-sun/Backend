@@ -84,4 +84,24 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
         mvc.perform(post("/v1/seller/coupons").contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(request()))).andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void rejectsDurationCollapsedAtDatabasePrecisionAndReturnsStoredPrecision() throws Exception {
+        var body=request();
+        body.put("startsAt","2026-10-10T00:00:00.000000001Z");
+        body.put("endsAt","2026-10-10T00:00:00.000000002Z");
+        body.put("expiresAt","2026-10-10T00:00:00.000000002Z");
+        mvc.perform(post("/v1/seller/coupons").header("Authorization",adminBearer())
+            .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+            .andExpect(status().isBadRequest());
+        body.put("endsAt","2026-10-11T00:00:00.000000002Z");
+        body.put("expiresAt","2026-10-11T00:00:00.000000002Z");
+        mvc.perform(post("/v1/seller/coupons").header("Authorization",adminBearer())
+            .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.data.startsAt").value("2026-10-10T00:00:00Z"))
+            .andExpect(jsonPath("$.data.endsAt").value("2026-10-11T00:00:00Z"));
+        assertThat(jdbc.queryForObject("SELECT starts_at FROM coupon_definition",java.sql.Timestamp.class).toInstant())
+            .isEqualTo(Instant.parse("2026-10-10T00:00:00Z"));
+    }
 }
