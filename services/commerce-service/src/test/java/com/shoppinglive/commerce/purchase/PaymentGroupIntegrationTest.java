@@ -32,6 +32,7 @@ import com.shoppinglive.commerce.shopping.domain.ProductSnapshot;
 import com.shoppinglive.commerce.shopping.infrastructure.InMemoryShoppingClientStub;
 import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -338,6 +339,95 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
             assertThat(orders.count()).isEqualTo(1);
             stock(salesA, 9, 1); stock(salesB, 10, 0);
         }
+    }
+
+    @Test
+    void concurrentStartAndCancelCommitExactlyOneTransition() throws Exception {
+        var group = create("start-cancel").group();
+        var accepted = new ConcurrentLinkedQueue<String>();
+        var failures = new ConcurrentLinkedQueue<Throwable>();
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            pool.submit(() -> {
+                try {
+                    ready.countDown(); start.await();
+                    service.start(MEMBER_A, group.groupNumber(), "payment-race");
+                    accepted.add("start");
+                } catch (Throwable failure) { failures.add(failure); }
+                finally { done.countDown(); }
+            });
+            pool.submit(() -> {
+                try {
+                    ready.countDown(); start.await();
+                    service.cancel(MEMBER_A, group.groupNumber());
+                    accepted.add("cancel");
+                } catch (Throwable failure) { failures.add(failure); }
+                finally { done.countDown(); }
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(accepted).hasSize(1);
+        assertThat(failures).hasSize(1).allSatisfy(failure -> {
+            assertThat(failure).isInstanceOf(BusinessException.class);
+            assertThat(((BusinessException) failure).errorCode()).isEqualTo(ErrorCode.CONFLICT);
+        });
+        assertThat(items.count()).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result", Integer.class)).isZero();
+        if (accepted.contains("start")) {
+            assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+            assertThat(orders.findAll()).extracting(order -> order.getStatus()).containsOnly(OrderStatus.PAYMENT_CONFIRMING);
+            assertThat(payments.count()).isEqualTo(1);
+            var attempt = payments.findAll().getFirst();
+            assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+            verify(engine, times(1)).schedule(attempt.getId(), PaymentScenario.INSTANT_SUCCESS);
+            stock(salesA, 8, 2); stock(salesB, 9, 1);
+        } else {
+            assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.CANCELLED);
+            assertThat(orders.findAll()).extracting(order -> order.getStatus()).containsOnly(OrderStatus.CANCELLED);
+            assertThat(payments.count()).isZero();
+            stock(salesA, 10, 0); stock(salesB, 10, 0);
+            service.cancel(MEMBER_A, group.groupNumber());
+            stock(salesA, 10, 0); stock(salesB, 10, 0);
+        }
+    }
+
+    @Test
+    void concurrentResolveRecordsOneApprovalAndConsumesEveryProductOnce() throws Exception {
+        var group = create("resolve-race").group();
+        var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-race");
+        var results = new ConcurrentLinkedQueue<Boolean>();
+        var failures = new ConcurrentLinkedQueue<Throwable>();
+        var ready = new CountDownLatch(4);
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(4);
+        try (var pool = Executors.newFixedThreadPool(4)) {
+            for (int i = 0; i < 4; i++) pool.submit(() -> {
+                try {
+                    ready.countDown(); start.await();
+                    results.add(service.resolve(attempt.getId()));
+                } catch (Throwable failure) { failures.add(failure); }
+                finally { done.countDown(); }
+            });
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(failures).isEmpty();
+        assertThat(results).containsExactlyInAnyOrder(true, false, false, false);
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
+        assertThat(orders.findAll()).extracting(order -> order.getStatus()).containsOnly(OrderStatus.PAID);
+        assertThat(payments.count()).isEqualTo(1);
+        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?", Integer.class, attempt.getId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT outcome FROM mock_gateway_result WHERE attempt_id=?", String.class, attempt.getId())).isEqualTo("SUCCESS");
+        assertThat(items.findAll()).extracting(CartItem::getId).containsExactly(unselected.getId());
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
+        assertThat(service.resolve(attempt.getId())).isFalse();
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
     }
 
 }
