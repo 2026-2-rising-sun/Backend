@@ -39,29 +39,39 @@ public class ProductRegistrationService {
      * 동시 요청이 UNIQUE 제약에 걸렸을 때 여기서 잡고 먼저 커밋된 상품을 다시 읽을 수 있다. 바깥 트랜잭션이
      * 있으면 예외 후 그 트랜잭션이 rollback-only 가 되어 재조회 결과를 돌려줄 수 없다.
      */
-    public Product register(RegisterProductCommand command, String idempotencyKey) {
+    public Product register(RegisterProductCommand command, String idempotencyKey, String sellerId) {
+        if (sellerId == null || sellerId.isBlank() || sellerId.length() > 36) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "판매자 식별자가 올바르지 않습니다.");
+        }
         String name = requireName(command.name());
         String description = requireDescription(command.description());
 
         Objects.requireNonNull(idempotencyKey, "idempotencyKey");
         Optional<Product> existing = productRepository.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
-            return existing.get();
+            return requireSameSeller(existing.get(), sellerId);
         }
         if (command.mainImageId() == null || !productImageRepository.existsById(command.mainImageId())) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, MAIN_IMAGE_NOT_FOUND);
         }
         try {
-            return productRepository.saveAndFlush(new Product(name, description, command.mainImageId(), idempotencyKey));
+            return productRepository.saveAndFlush(new Product(name, description, command.mainImageId(), idempotencyKey, sellerId));
         } catch (DataIntegrityViolationException e) {
             // 같은 키의 동시 요청이 먼저 커밋한 경우. 그 밖의 제약 위반(예: 이미지가 그사이 삭제)은 그대로 던진다.
             return productRepository.findByIdempotencyKey(idempotencyKey)
                     .map(winner -> {
                         log.info("concurrent product registration replayed: key={}", idempotencyKey);
-                        return winner;
+                        return requireSameSeller(winner, sellerId);
                     })
                     .orElseThrow(() -> e);
         }
+    }
+
+    private static Product requireSameSeller(Product product, String sellerId) {
+        if (!sellerId.equals(product.getSellerId())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "다른 상품 등록에 사용된 멱등키입니다.");
+        }
+        return product;
     }
 
     /** 수정에서도 같은 규칙을 쓴다. */

@@ -1,6 +1,8 @@
 package com.shoppinglive.shopping.product.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.image.application.ImageUrlResolver;
@@ -47,6 +49,7 @@ public class AdminProductController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> register(
+            @AuthenticationPrincipal AuthenticatedUser seller,
             @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
             @Valid @RequestBody RegisterProductRequest request) {
         // 헤더 누락을 스프링에 맡기면 공통 핸들러가 500 으로 돌려서 직접 검사한다.
@@ -54,7 +57,7 @@ public class AdminProductController {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
                     IDEMPOTENCY_KEY_HEADER + " 헤더가 필요합니다 (1~" + IDEMPOTENCY_KEY_MAX_LENGTH + "자).");
         }
-        Product product = registrationService.register(request.toCommand(), idempotencyKey);
+        Product product = registrationService.register(request.toCommand(), idempotencyKey, seller.memberId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
     }
 
@@ -66,9 +69,9 @@ public class AdminProductController {
 
     /** 기본정보 부분 수정·대표 이미지 교체. 응답의 version 을 다음 수정 요청에 그대로 보내야 한다. */
     @PatchMapping("/{productId}")
-    public ApiResponse<ProductResponse> update(@PathVariable Long productId,
+    public ApiResponse<ProductResponse> update(@AuthenticationPrincipal AuthenticatedUser seller, @PathVariable Long productId,
             @Valid @RequestBody UpdateProductRequest request) {
-        return ApiResponse.ok(toResponse(updateService.update(productId, request.toCommand())));
+        return ApiResponse.ok(toResponse(updateService.update(productId, request.toCommand(), seller.memberId())));
     }
 
     private ProductResponse toResponse(Product product) {

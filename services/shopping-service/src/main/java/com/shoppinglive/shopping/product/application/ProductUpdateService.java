@@ -39,9 +39,13 @@ public class ProductUpdateService {
      * 참조 중이면 깨진 이미지가 생기기 때문이다.
      */
     @Transactional
-    public Product update(Long productId, UpdateProductCommand command) {
+    public Product update(Long productId, UpdateProductCommand command, String sellerId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다: " + productId));
+        // Legacy products have no recoverable owner; their existing management contract is retained.
+        if (product.getSellerId() != null && !product.getSellerId().equals(sellerId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "본인 상품만 수정할 수 있습니다.");
+        }
         if (!Objects.equals(product.getVersion(), command.version())) {
             throw new BusinessException(ErrorCode.CONFLICT, CONFLICT_MESSAGE);
         }
