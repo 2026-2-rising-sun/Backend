@@ -37,6 +37,29 @@ public class CouponManagementService {
 
     public CouponDefinition get(String seller, String id) { return owned(seller,id,false); }
 
+    public CouponDefinition update(String seller, String id, long expectedVersion, String name, long discount,
+            int limit, Instant start, Instant end, Instant expiration, List<Long> products) {
+        CouponDefinition.validate(name,discount,limit,start,end,expiration,products);
+        Instant storedStart=start.truncatedTo(ChronoUnit.MICROS),storedEnd=end.truncatedTo(ChronoUnit.MICROS),
+            storedExpiration=expiration.truncatedTo(ChronoUnit.MICROS);
+        CouponDefinition.validate(name,discount,limit,storedStart,storedEnd,storedExpiration,products);
+        for(long productId:products) {
+            var product=shopping.findProduct(productId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND,"대상 상품을 찾을 수 없습니다."));
+            if(!seller.equals(product.sellerId()))throw new BusinessException(ErrorCode.FORBIDDEN,"본인 상품만 지정할 수 있습니다.");
+        }
+        return transaction.execute(status -> {
+            CouponDefinition current=owned(seller,id,true);
+            if(!Instant.now().isBefore(current.startsAt()))throw new BusinessException(ErrorCode.CONFLICT,"발급 시작 이후 설정을 변경할 수 없습니다.");
+            if(current.version()!=expectedVersion)throw new BusinessException(ErrorCode.CONFLICT,"쿠폰 설정이 먼저 변경되었습니다.");
+            if(limit<current.issuedCount())throw new BusinessException(ErrorCode.CONFLICT,"이미 발급한 수량보다 줄일 수 없습니다.");
+            jdbc.update("UPDATE coupon_definition SET name=?,fixed_discount=?,issuance_limit=?,starts_at=?,ends_at=?,expires_at=?,version=version+1 WHERE id=?",
+                name,discount,limit,Timestamp.from(storedStart),Timestamp.from(storedEnd),Timestamp.from(storedExpiration),id);
+            jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?",id);
+            for(long productId:products)jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)",id,productId);
+            return owned(seller,id,false);
+        });
+    }
+
     private CouponDefinition owned(String seller,String id,boolean lock) {
         List<CouponDefinition> found=jdbc.query("SELECT * FROM coupon_definition WHERE id=?"+(lock?" FOR UPDATE":""),this::map,id);
         if(found.isEmpty())throw new BusinessException(ErrorCode.NOT_FOUND,"쿠폰을 찾을 수 없습니다.");
