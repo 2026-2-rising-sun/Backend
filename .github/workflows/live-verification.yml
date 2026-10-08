@@ -2,10 +2,10 @@ name: Live stack verification
 
 on:
   pull_request:
-    paths: ["services/live-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
+    paths: ["services/live-service/**", "services/shopping-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
   push:
     branches: [dev]
-    paths: ["services/live-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
+    paths: ["services/live-service/**", "services/shopping-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
   workflow_dispatch:
 
 permissions:
