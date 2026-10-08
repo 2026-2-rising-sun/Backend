@@ -71,11 +71,14 @@ class OrderCreationServiceTest {
 
     private OrderCreationService orderCreationService;
 
+    @Mock private com.shoppinglive.commerce.purchase.application.PurchaseGuard purchaseGuard;
+    @Mock private com.shoppinglive.commerce.purchase.application.PaymentGroupService paymentGroups;
+
     @BeforeEach
     void setUp() {
         orderCreationService = new OrderCreationService(
             orderRepository, salesRepository, salesStockRepository, shoppingClient,
-            orderNumberGenerator, cartItems, transactionTemplate, Duration.ofMinutes(15));
+            orderNumberGenerator, cartItems, transactionTemplate, purchaseGuard, paymentGroups, Duration.ofMinutes(15));
     }
 
     private CreateOrderCommand command(int quantity, Long expectedTotalAmount) {
@@ -375,7 +378,7 @@ class OrderCreationServiceTest {
         productExists();
         given(transactionTemplate.execute(any()))
             .willThrow(new DataIntegrityViolationException("uk_orders_order_number"))
-            .willAnswer(invocation -> existingOrder());
+            .willAnswer(invocation -> new OrderCreationResult(existingOrder(), true));
 
         OrderCreationResult result = orderCreationService.create(command(1, null), null);
 

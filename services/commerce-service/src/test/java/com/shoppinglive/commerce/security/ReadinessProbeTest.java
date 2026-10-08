@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ReadinessProbeTest extends CommerceSecurityTestSupport {
+    @Override protected boolean shouldCleanPurchaseFixtures() { return false; }
+
     @Autowired MockMvc mvc;
     @Autowired DataSource dataSource;
 

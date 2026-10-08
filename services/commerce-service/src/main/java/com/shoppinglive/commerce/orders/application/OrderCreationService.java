@@ -68,7 +68,11 @@ public class OrderCreationService {
     private final OrderNumberGenerator orderNumberGenerator;
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
     private final Duration expiration;
+    private final com.shoppinglive.commerce.purchase.application.PurchaseGuard purchaseGuard;
+    private final com.shoppinglive.commerce.purchase.application.PaymentGroupService paymentGroups;
 
     public OrderCreationService(
         OrderJpaRepository orderRepository,
@@ -78,6 +82,8 @@ public class OrderCreationService {
         OrderNumberGenerator orderNumberGenerator,
         CartItemRepository cartItems,
         TransactionTemplate transactionTemplate,
+        com.shoppinglive.commerce.purchase.application.PurchaseGuard purchaseGuard,
+        com.shoppinglive.commerce.purchase.application.PaymentGroupService paymentGroups,
         // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
         // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
         @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration) {
@@ -89,6 +95,8 @@ public class OrderCreationService {
         this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
         this.expiration = expiration;
+        this.purchaseGuard = purchaseGuard;
+        this.paymentGroups = paymentGroups;
     }
 
     /**
@@ -107,6 +115,7 @@ public class OrderCreationService {
      */
     public OrderCreationResult create(CreateOrderCommand command, String idempotencyKey) {
         command.validate();
+        purchaseGuard.ensure(command.memberId());
         validateKey(idempotencyKey, false);
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -122,6 +131,7 @@ public class OrderCreationService {
     public OrderCreationResult createFromCart(String memberId, Long itemId,
         CartOrderCommand request, String idempotencyKey) {
         validateKey(idempotencyKey, true);
+        purchaseGuard.ensure(memberId);
         synchronized (lockFor(memberId + ":" + idempotencyKey)) {
             Optional<Order> replay = findByIdempotencyKey(memberId, idempotencyKey);
             if (replay.isPresent()) return replayCart(itemId, request, replay.get());
@@ -172,8 +182,7 @@ public class OrderCreationService {
 
         for (int attempt = 1; attempt <= ORDER_NUMBER_RETRY; attempt++) {
             try {
-                return OrderCreationResult.created(
-                    persist(command, product.name(), idempotencyKey));
+                return persist(command, product.name(), idempotencyKey);
             } catch (DataIntegrityViolationException e) {
                 // 멱등키 충돌이면 같은 키로 이미 만들어진 주문이 있다는 뜻이다. 동시에 들어온
                 // 두 재전송 중 진 쪽이 여기로 온다.
@@ -197,16 +206,21 @@ public class OrderCreationService {
      * <p>판매정보를 여기서 다시 읽는 이유: 주문서(주문 1)에서 본 값은 스냅샷일 뿐이고, 그 사이
      * 가격이 바뀌었거나 판매가 중단됐을 수 있다. 명세 주문 2 의 "최종 생성 때 다시 검증한다".
      */
-    private Order persist(
+    private OrderCreationResult persist(
         CreateOrderCommand command,
         String productName,
         String idempotencyKey) {
 
         return transactionTemplate.execute(status -> {
+            purchaseGuard.lock(command.memberId());
+            Optional<Order> existing = findByIdempotencyKey(command.memberId(), idempotencyKey);
+            if (existing.isPresent()) return replayMatching(command, existing.get());
+            purchaseGuard.requireNoActive(command.memberId());
             CartItem selected = null;
             if (command.sourceCartItemId() != null) {
                 selected = cartItems.lockOwned(command.sourceCartItemId(), command.memberId())
                     .orElseThrow(CartItemNotFoundException::new);
+                if (entityManager != null) entityManager.refresh(selected);
                 if (!Objects.equals(selected.getProductId(), command.productId())
                     || !Objects.equals(selected.getQuantity(), command.quantity())
                     || !Objects.equals(selected.getVersion(), command.sourceCartItemVersion())) {
@@ -217,6 +231,8 @@ public class OrderCreationService {
                 .orElseThrow(() -> new SalesNotFoundException(
                     "sales not found for product: productId=" + command.productId()));
 
+            purchaseGuard.lockSales(sales.getId());
+            if (entityManager != null) entityManager.refresh(sales);
             if (!sales.getStatus().canAcceptNewOrder()) {
                 throw new OrderNotAcceptableException(sales.getStatus());
             }
@@ -230,7 +246,7 @@ public class OrderCreationService {
             // uk_orders_idempotency_key 에서 걸린다. 다만 H2 는 커밋 시점에야 위반을 알려
             // 이 순서만으로는 부족하다 — 엔진과 무관한 보장은 lockFor(String) 가 맡는다.
             // 어느 쪽이든 실패하면 트랜잭션 전체가 롤백되므로 결과는 같다.
-            Order order = orderRepository.saveAndFlush(new Order(
+            Order order = new Order(
                 orderNumberGenerator.generate(),
                 sales.getId(),
                 command.quantity(),
@@ -240,7 +256,9 @@ public class OrderCreationService {
                 command.memberId(),
                 productName,
                 idempotencyKey,
-                Instant.now().plus(expiration), command.sourceCartItemId(), command.expectedTotalAmount()));
+                Instant.now().plus(expiration), command.sourceCartItemId(), command.expectedTotalAmount());
+            order.recordSourceCartVersion(command.sourceCartItemVersion());
+            order = orderRepository.saveAndFlush(order);
 
             // 조건부 UPDATE. 이 한 줄이 초과 판매를 막는다. 동시에 들어온 요청들은 행 잠금으로
             // 줄을 서고, 재고가 모자란 순간부터 대상 행이 0 이 되어 여기서 걸러진다. 실패하면
@@ -252,8 +270,8 @@ public class OrderCreationService {
             }
 
             markSoldOutIfDepleted(sales);
-            if (selected != null) cartItems.delete(selected);
-            return order;
+            paymentGroups.bindSingle(order, idempotencyKey, selected == null ? null : selected.getVersion());
+            return OrderCreationResult.created(order);
         });
     }
 

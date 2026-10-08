@@ -38,6 +38,8 @@ class CommerceReviewRegressionTest extends com.shoppinglive.commerce.support.Com
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired OrderExpirationScheduler expiration;
+    @Autowired com.shoppinglive.commerce.purchase.application.PaymentGroupService groups;
+    @Autowired com.shoppinglive.commerce.purchase.application.PaymentGroupExpirationScheduler groupExpiration;
     @Autowired PaymentService payments;
     @Autowired SalesService sales;
     @Autowired OrderJpaRepository orderRepository;
@@ -75,9 +77,9 @@ class CommerceReviewRegressionTest extends com.shoppinglive.commerce.support.Com
         switch (path) {
             case "cancel" -> orders.cancelBeforePayment(order.getOrderNumber(), "11111111-1111-4111-8111-111111111111");
             case "expire" -> {
-                jdbc.update("UPDATE orders SET expires_at = ? WHERE id = ?",
-                    java.sql.Timestamp.from(Instant.now().minusSeconds(1)), order.getId());
-                expiration.runScheduled();
+                jdbc.update("UPDATE payment_group SET expires_at = ? WHERE id = ?",
+                    java.sql.Timestamp.from(Instant.now().minusSeconds(1)), order.getPaymentGroup().getId());
+                groupExpiration.run();
             }
             case "fail" -> {
                 transaction.executeWithoutResult(tx -> orderRepository.transitionStatus(
@@ -115,10 +117,12 @@ class CommerceReviewRegressionTest extends com.shoppinglive.commerce.support.Com
     @Test
     void 실제_스케줄_진입점에서_복원_실패하면_만료도_롤백한다() {
         Order order = create();
-        jdbc.update("UPDATE orders SET expires_at = ? WHERE id = ?",
-            java.sql.Timestamp.from(Instant.now().minusSeconds(1)), order.getId());
+        jdbc.update("UPDATE payment_group SET expires_at = ? WHERE id = ?",
+            java.sql.Timestamp.from(Instant.now().minusSeconds(1)), order.getPaymentGroup().getId());
         jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
-        assertThatThrownBy(expiration::runScheduled).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> groups.expire(order.getPaymentGroup().getId())).isInstanceOf(IllegalStateException.class);
+        // The group scheduler isolates one failed group and logs it; the transaction must remain rolled back.
+        groupExpiration.run();
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isZero();
     }
@@ -172,7 +176,8 @@ class CommerceReviewRegressionTest extends com.shoppinglive.commerce.support.Com
             .andExpect(status().isNotFound());
         orders.cancelBeforePayment(order.getOrderNumber(), "11111111-1111-4111-8111-111111111111");
         mvc.perform(post("/v1/orders/{number}/cancel", order.getOrderNumber()).header("Authorization", bearer(MEMBER_A)))
-            .andExpect(status().isConflict());
+            .andExpect(status().isNoContent());
+        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
         mvc.perform(post("/v1/orders/{number}/payments", order.getOrderNumber()).header("Authorization", bearer(MEMBER_A)))
             .andExpect(status().isConflict());
     }

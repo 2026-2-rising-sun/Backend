@@ -4,6 +4,7 @@ spring:
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
   jpa:
+    open-in-view: false
     # 스키마는 Flyway 가 소유한다. Hibernate 는 엔티티 매핑이 실제 스키마와 맞는지 검증만.
     hibernate:
       ddl-auto: validate

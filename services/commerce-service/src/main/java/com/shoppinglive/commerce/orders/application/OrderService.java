@@ -21,12 +21,15 @@ public class OrderService {
 
     private final OrderJpaRepository orderRepository;
     private final SalesService salesService;
+    private final com.shoppinglive.commerce.purchase.application.PaymentGroupService groups;
 
     public OrderService(
         OrderJpaRepository orderRepository,
-        SalesService salesService) {
+        SalesService salesService,
+        com.shoppinglive.commerce.purchase.application.PaymentGroupService groups) {
         this.orderRepository = orderRepository;
         this.salesService = salesService;
+        this.groups = groups;
     }
 
     @Transactional(readOnly = true)
@@ -69,6 +72,12 @@ public class OrderService {
     public void cancelBeforePayment(String orderNumber, String memberId) {
         Order order = findByOrderNumberAndMemberId(orderNumber, memberId);
 
+        if (order.getPaymentGroup() != null) {
+            if (orderRepository.findByPaymentGroupIdOrderByIdAsc(order.getPaymentGroup().getId()).size() != 1)
+                throw new OrderCannotBeCancelledException(orderNumber);
+            groups.cancel(memberId, order.getPaymentGroup().getGroupNumber());
+            return;
+        }
         int cancelled = orderRepository.cancelOrder(order.getId());
         if (cancelled == 0) {
             throw new OrderCannotBeCancelledException(orderNumber);

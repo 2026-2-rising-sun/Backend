@@ -22,6 +22,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class PaymentService {
 
+    private final com.shoppinglive.commerce.purchase.application.PaymentGroupService groups;
+    private final org.springframework.transaction.support.TransactionTemplate transaction;
     private final OrderService orderService;
     private final OrderJpaRepository orderRepository;
     private final PaymentAttemptJpaRepository paymentAttemptRepository;
@@ -31,6 +33,8 @@ public class PaymentService {
     private final ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
 
     public PaymentService(
+        org.springframework.transaction.support.TransactionTemplate transaction,
+        com.shoppinglive.commerce.purchase.application.PaymentGroupService groups,
         OrderService orderService,
         OrderJpaRepository orderRepository,
         PaymentAttemptJpaRepository paymentAttemptRepository,
@@ -38,6 +42,8 @@ public class PaymentService {
         SalesService salesService,
         MockPaymentEngine mockPaymentEngine,
         ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider) {
+        this.groups = groups;
+        this.transaction = transaction;
         this.orderService = orderService;
         this.orderRepository = orderRepository;
         this.paymentAttemptRepository = paymentAttemptRepository;
@@ -60,6 +66,11 @@ public class PaymentService {
     public PaymentAttempt startPayment(
         String orderNumber, String memberId) {
         Order order = orderService.findByOrderNumberAndMemberId(orderNumber, memberId);
+        if (order.getPaymentGroup() != null) {
+            if (orderRepository.findByPaymentGroupIdOrderByIdAsc(order.getPaymentGroup().getId()).size() != 1)
+                throw new OrderNotEligibleForPaymentException(orderNumber);
+            return groups.start(memberId, order.getPaymentGroup().getGroupNumber(), "legacy-payment-" + order.getId());
+        }
         PaymentScenario effectiveScenario = resolveScenario(orderNumber);
 
         int updated = orderRepository.transitionStatus(
@@ -120,8 +131,14 @@ public class PaymentService {
      *
      * @return 이번 호출에서 결제·주문·재고를 함께 확정했으면 true, 이미 처리된 경우 false
      */
-    @Transactional
     public boolean resolvePayment(Long paymentAttemptId) {
+        PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
+        if (attempt == null || attempt.getStatus().isTerminal()) return false;
+        if (attempt.getPaymentGroupId() != null) return groups.resolve(paymentAttemptId);
+        return transaction.execute(status -> resolveLegacyPayment(paymentAttemptId));
+    }
+
+    private boolean resolveLegacyPayment(Long paymentAttemptId) {
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
         if (attempt == null || attempt.getStatus().isTerminal()) {
             return false;

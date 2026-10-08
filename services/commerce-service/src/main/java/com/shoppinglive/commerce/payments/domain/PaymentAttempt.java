@@ -45,6 +45,14 @@ public class PaymentAttempt extends BaseEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @Column(name="payment_group_id", updatable=false)
+    private Long paymentGroupId;
+    @Column(name="request_key", updatable=false, length=64)
+    private String requestKey;
+    public Long getPaymentGroupId(){return paymentGroupId;}
+    public String getRequestKey(){return requestKey;}
+    public void attachGroup(Long groupId,String key){paymentGroupId=groupId;requestKey=key;}
+
     protected PaymentAttempt() {
         // JPA
     }

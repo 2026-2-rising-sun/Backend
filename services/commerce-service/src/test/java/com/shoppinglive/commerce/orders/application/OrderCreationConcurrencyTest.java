@@ -86,7 +86,7 @@ class OrderCreationConcurrencyTest extends com.shoppinglive.commerce.support.Com
 
     private CreateOrderCommand command(int index) {
         return new CreateOrderCommand(
-            PRODUCT_ID, 1, "구매자" + index, "010-0000-0000", "11111111-1111-4111-8111-111111111111", null);
+            PRODUCT_ID, 1, "구매자" + index, "010-0000-0000", new java.util.UUID(0, index + 1).toString(), null);
     }
 
     /**

@@ -97,6 +97,39 @@ class MemberCommerceMigrationPostgresTest {
         assertThat(count("SELECT available FROM sales_stock WHERE sales_info_id=1")).isEqualTo(10);
     }
 
+    @Test
+    void paymentGroupMigrationBackfillsLegacyOrderAndLatestAttempt() throws Exception {
+        migration("3").migrate();
+        sale();
+        memberOrder(1, "11111111-1111-4111-8111-111111111111", "legacy-member-order");
+        sql("INSERT INTO payment_attempt (id,order_id,scenario,status,requested_at,created_at,updated_at) "
+            + "VALUES (1,1,'INSTANT_FAIL','FAILED',now(),now(),now()),(2,1,'DELAYED_SUCCESS','PROCESSING',now(),now(),now())");
+        sql("UPDATE orders SET status='PAYMENT_CONFIRMING',expires_at=now()+interval '5 minutes' WHERE id=1");
+        migration(null).migrate();
+        assertThat(count("SELECT count(*) FROM payment_group WHERE group_number='PG-LEGACY-1' "
+            + "AND total_amount=1000 AND status='PAYMENT_CONFIRMING' AND payment_id=2")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM orders o JOIN payment_group g ON o.payment_group_id=g.id WHERE o.id=1")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM payment_attempt p JOIN payment_group g ON p.payment_group_id=g.id WHERE p.id=2")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM payment_attempt WHERE id=1 AND payment_group_id IS NULL")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM member_purchase_guard")).isEqualTo(1);
+    }
+
+    @Test
+    void multipleLegacyActiveOrdersFailClosedWithoutChangingOrdersOrReservations() throws Exception {
+        migration("3").migrate();
+        sale();
+        memberOrder(1, "11111111-1111-4111-8111-111111111111", "first");
+        memberOrder(2, "11111111-1111-4111-8111-111111111111", "second");
+        sql("UPDATE sales_stock SET available=8,reserved=2 WHERE sales_info_id=1");
+        assertThatThrownBy(() -> migration(null).migrate()).isInstanceOf(Exception.class)
+            .hasMessageContaining("Multiple active orders per member");
+        assertThat(count("SELECT count(*) FROM orders WHERE status='PENDING_PAYMENT'")).isEqualTo(2);
+        assertThat(count("SELECT available FROM sales_stock WHERE sales_info_id=1")).isEqualTo(8);
+        assertThat(count("SELECT reserved FROM sales_stock WHERE sales_info_id=1")).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM information_schema.tables WHERE table_schema='" + schema
+            + "' AND table_name='payment_group'")).isZero();
+    }
+
     private void sale() throws Exception {
         sql("INSERT INTO sales_info (id,product_id,price,status,created_at,updated_at) VALUES (1,1,1000,'ON_SALE',now(),now())");
         sql("INSERT INTO sales_stock (sales_info_id,available,reserved,created_at,updated_at) VALUES (1,10,0,now(),now())");

@@ -185,11 +185,12 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
     }
 
     @Test
-    void 멱등키가_다르면_별개_주문이_만들어진다() throws Exception {
+    void 활성_주문이_있으면_다른_멱등키도_신규_주문을_거절한다() throws Exception {
         order(body(Map.of("quantity", 1)), "key-1").andExpect(status().isCreated());
-        order(body(Map.of("quantity", 1)), "key-2").andExpect(status().isCreated());
+        order(body(Map.of("quantity", 1)), "key-2").andExpect(status().isConflict());
 
-        assertThat(orderRepository.findAll()).hasSize(2);
+        assertThat(orderRepository.findAll()).hasSize(1);
+        assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
     }
 
     @Test

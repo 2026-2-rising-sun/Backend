@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +22,21 @@ public abstract class CommerceSecurityTestSupport {
 
     @BeforeEach
     void resetAccessSessionFixture() { accessSessions.reset(); }
+
+    @Autowired(required = false) private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+
+    @AfterEach
+    void removeOrphanPurchaseFixtures() {
+        // Subclass cleanup removes orders/payments first. Group keys are durable in production,
+        // so deleting only orders otherwise leaks active/replay state between repeated tests.
+        if (fixtureJdbc != null && shouldCleanPurchaseFixtures()) fixtureJdbc.update("""
+            DELETE FROM payment_group g WHERE NOT EXISTS
+                (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
+            AND NOT EXISTS (SELECT 1 FROM payment_attempt p WHERE p.payment_group_id = g.id)
+            """);
+    }
+
+    protected boolean shouldCleanPurchaseFixtures() { return true; }
 
     @TestConfiguration(proxyBeanMethods = false)
     static class SessionTestConfiguration {

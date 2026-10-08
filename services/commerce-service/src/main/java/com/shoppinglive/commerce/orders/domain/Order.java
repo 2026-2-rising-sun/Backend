@@ -79,6 +79,18 @@ public class Order extends BaseEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.EAGER)
+    @jakarta.persistence.JoinColumn(name = "payment_group_id")
+    private com.shoppinglive.commerce.purchase.domain.PaymentGroup paymentGroup;
+
+    @Column(name = "source_cart_item_version", updatable = false)
+    private Long sourceCartItemVersion;
+
+    public com.shoppinglive.commerce.purchase.domain.PaymentGroup getPaymentGroup() { return paymentGroup; }
+    public void attachGroup(com.shoppinglive.commerce.purchase.domain.PaymentGroup group, Long cartVersion) { paymentGroup = group; sourceCartItemVersion = cartVersion; }
+    public Long getSourceCartItemVersion() { return sourceCartItemVersion; }
+    public void recordSourceCartVersion(Long version) { sourceCartItemVersion = version; }
+
     protected Order() {
         // JPA 전용
     }
