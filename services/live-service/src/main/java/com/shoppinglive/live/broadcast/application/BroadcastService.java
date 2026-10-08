@@ -103,7 +103,8 @@ public class BroadcastService {
     /** 종료는 짧은 트랜잭션의 원자적 상태 전이다. 외부 호출을 하지 않는다. */
     @Transactional
     public Broadcast end(final long id) {
-        final Broadcast broadcast = get(id);
+        final Broadcast broadcast = repository.findForLikeUpdate(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         // DB timestamp 컬럼은 마이크로초 정밀도라, 저장 전에 맞춰 잘라낸다(#65 start()와 동일 이유).
         broadcast.end(java.time.Instant.now().truncatedTo(ChronoUnit.MICROS));
         repository.flush();

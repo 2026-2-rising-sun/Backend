@@ -153,6 +153,16 @@
     },
     {
       "baseSnapshotSha256": "33e98fbf24986563d4a7e23d0fa929bef7bd79a88cfaf0a728a9d7294575d21a",
+      "headSnapshotSha256": "7ec988b5ae90fcb5da311fb725ac669c2d9632682c0219a7dc1991dc85cdc4aa",
+      "reason": "Backend #148 replaces anonymous accumulating POST likes with authenticated desired-state PUT/mine, member participation, replay ledger and independent personal/aggregate versions. Existing public total/SSE reads remain public; cancellations decrease the committed total.",
+      "independentReview": {
+        "reviewer": "Codex independent agent /root/frontend_analysis; reviewed LikeService, LikeController, LikeBroadcaster, same-broadcast end lock and YAML against IMPLEMENTATION_PLAN; authored frontend adapter/integration checks, not backend implementation",
+        "reviewedAt": "2026-10-08",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/issues/148"
+      }
+    },
+    {
+      "baseSnapshotSha256": "33e98fbf24986563d4a7e23d0fa929bef7bd79a88cfaf0a728a9d7294575d21a",
       "headSnapshotSha256": "071c72371375bac4f3249fb26c07b3657360cb5e0578874b3adfb5b681ed4ba2",
       "reason": "Backend #149 adds seven cart/payment-group operations, versioned selection and grouped responses while retaining product-level orders. New single orders also use groups and the one-active-purchase restriction; cart deletion moves from creation to payment success and only matching source ID/version rows are removed. Pending groups expire after 15 minutes; confirming groups retain reservations until the durable Mock gateway result is applied. V4 backfills existing single orders and stops for explicit reconciliation when a member already has multiple active orders, without deleting or cancelling those purchases. This record acknowledges intentional behavior changes and nullable Order.groupNumber; it is not proof of an external PG integration.",
       "independentReview": {
@@ -227,6 +237,16 @@
           "change": "nullable Order.groupNumber response field"
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "33e98fbf24986563d4a7e23d0fa929bef7bd79a88cfaf0a728a9d7294575d21a",
+      "headSnapshotSha256": "3bbb8a4c90c4bb2b16fccf083e99a70d126a3543fb6448971fc60c08c2c7c7f8",
+      "reason": "Integration combines the independently reviewed Backend #148 and #149 contracts without further API changes. Both feature review records are retained; endpoint totals and CI counts are merged.",
+      "independentReview": {
+        "reviewer": "Codex agent /root/frontend_analysis independently reviewed both Backend wire contracts against controllers/services; root verified the integration merge retained those reviewed contracts",
+        "reviewedAt": "2026-10-08",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/issues/148 and https://github.com/2026-2-rising-sun/Backend/issues/149"
+      }
     }
   ]
 }

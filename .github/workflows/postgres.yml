@@ -33,10 +33,10 @@ jobs:
             minimums: '*.MemberCommerceMigrationPostgresTest=5 *.PaymentGroupIntegrationTest=14'
           - service: live
             database: live_test
-            task: :services:live-service:test --tests *PostgresMigrationTest
-            report: services/live-service/build/test-results/test/TEST-*PostgresMigrationTest.xml
-            suites: '*.PostgresMigrationTest'
-            minimums: '*.PostgresMigrationTest=11'
+            task: :services:live-service:test --tests *PostgresMigrationTest --tests *PostgresLikeTest
+            report: services/live-service/build/test-results/test/TEST-*.xml
+            suites: '*.PostgresMigrationTest *.PostgresLikeTest'
+            minimums: '*.PostgresMigrationTest=9 *.PostgresLikeTest=5'
     services:
       postgres:
         image: postgres:16

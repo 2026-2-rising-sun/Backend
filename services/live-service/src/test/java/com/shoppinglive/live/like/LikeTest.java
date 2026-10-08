@@ -1,86 +1,106 @@
 package com.shoppinglive.live.like;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.shoppinglive.live.broadcast.api.BroadcastInput;
 import com.shoppinglive.live.broadcast.application.BroadcastService;
 import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-/** 테스트 설정의 Redis 포트는 닫혀 있다. 권한·상태 검사와 Redis 장애 시 동작을 검증한다. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@DisplayName("좋아요 권한·상태와 Redis 장애 시 동작")
 class LikeTest extends LiveSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired BroadcastService broadcasts;
     @Autowired JdbcTemplate jdbc;
 
-    private long broadcast(final String name, final String status) {
-        final long id = broadcasts.register(UUID.randomUUID().toString(), new BroadcastInput(name,
-            Instant.parse("2026-10-03T11:00:00Z"), "arn:aws:ivs:ap-northeast-2:1:channel/" + name,
-            "https://example.com/" + name + ".m3u8")).getId();
-        jdbc.update("UPDATE broadcast SET status = ?, started_at = CURRENT_TIMESTAMP WHERE id = ?", status, id);
+    private long broadcast(String status) {
+        final String name = UUID.randomUUID().toString();
+        final long id = broadcasts.register(name, new BroadcastInput(name, Instant.now(),
+            "arn:aws:ivs:ap-northeast-2:1:channel/" + name, "https://example.com/" + name)).getId();
+        jdbc.update("UPDATE broadcast SET status = ? WHERE id = ?", status, id);
         return id;
     }
 
-    @DisplayName("비회원의 좋아요는 401 이고 인증 상태를 확인할 수 없으면 503 이다")
-    @Test
-    void anonymousLikeIsRejected() throws Exception {
-        final long id = broadcast("like-anonymous", "LIVE");
-
-        mvc.perform(post("/v1/broadcasts/{id}/likes", id)).andExpect(status().isUnauthorized());
-        accessSessions.fail();
-        mvc.perform(post("/v1/broadcasts/{id}/likes", id).header("Authorization", userBearer()))
-            .andExpect(status().isServiceUnavailable());
+    private MockHttpServletRequestBuilder change(long id, String key, boolean liked) {
+        return put("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", userBearer())
+            .header("Idempotency-Key", key).contentType("application/json").content("{\"liked\":" + liked + "}");
     }
 
-    @DisplayName("LIVE 가 아닌 방송은 409, 없는 방송은 404, 숫자가 아닌 id 는 400 이다")
-    @Test
-    void likeRequiresALiveBroadcast() throws Exception {
-        for (final String status : new String[] {"PREPARING", "ENDED"}) {
-            mvc.perform(post("/v1/broadcasts/{id}/likes", broadcast("like-" + status.toLowerCase(), status))
-                    .header("Authorization", userBearer()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("CONFLICT"));
-        }
-        mvc.perform(post("/v1/broadcasts/{id}/likes", Long.MAX_VALUE).header("Authorization", userBearer()))
-            .andExpect(status().isNotFound());
-        mvc.perform(post("/v1/broadcasts/abc/likes").header("Authorization", userBearer()))
+    @Test void retryAndCancelPreserveLatestStateEvenWithAnOldReplay() throws Exception {
+        final long id = broadcast("LIVE");
+        final String first = UUID.randomUUID().toString();
+        final String cancel = UUID.randomUUID().toString();
+        mvc.perform(get("/v1/broadcasts/{id}/likes", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0)).andExpect(jsonPath("$.data.version").value(0));
+        mvc.perform(get("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", userBearer()))
+            .andExpect(jsonPath("$.data.liked").value(false)).andExpect(jsonPath("$.data.stateVersion").value(0));
+        final String original = mvc.perform(change(id, first, true)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1)).andExpect(jsonPath("$.data.version").value(1))
+            .andReturn().getResponse().getContentAsString();
+        assertThat(mvc.perform(change(id, first, true)).andReturn().getResponse().getContentAsString()).isEqualTo(original);
+        mvc.perform(change(id, UUID.randomUUID().toString(), true)).andExpect(jsonPath("$.data.total").value(1))
+            .andExpect(jsonPath("$.data.stateVersion").value(1)).andExpect(jsonPath("$.data.version").value(1));
+        mvc.perform(change(id, cancel, false)).andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.stateVersion").value(2)).andExpect(jsonPath("$.data.version").value(2));
+        assertThat(mvc.perform(change(id, first, true)).andReturn().getResponse().getContentAsString()).isEqualTo(original);
+        mvc.perform(get("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", userBearer()))
+            .andExpect(jsonPath("$.data.liked").value(false)).andExpect(jsonPath("$.data.version").value(2));
+        mvc.perform(change(id, first, false)).andExpect(status().isConflict());
+    }
+
+    @Test void endedReplayIsAllowedButNewRequestsAreRejected() throws Exception {
+        final long id = broadcast("LIVE");
+        final String key = UUID.randomUUID().toString();
+        mvc.perform(change(id, key, true)).andExpect(status().isOk());
+        broadcasts.end(id);
+        mvc.perform(change(id, key, true)).andExpect(status().isOk());
+        mvc.perform(change(id, UUID.randomUUID().toString(), false)).andExpect(status().isConflict());
+        mvc.perform(get("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", userBearer()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.liked").value(true));
+        mvc.perform(change(broadcast("PREPARING"), UUID.randomUUID().toString(), true)).andExpect(status().isConflict());
+        mvc.perform(change(Long.MAX_VALUE, UUID.randomUUID().toString(), true)).andExpect(status().isNotFound());
+    }
+
+    @Test void validationAndSecurityUseTheExistingErrorEnvelope() throws Exception {
+        final long id = broadcast("LIVE");
+        mvc.perform(put("/v1/broadcasts/{id}/likes/mine", id)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/broadcasts/{id}/likes/mine", id)).andExpect(status().isUnauthorized());
+        mvc.perform(change(id, "bad", true)).andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mvc.perform(change(id, "", true)).andExpect(status().isBadRequest());
+        mvc.perform(change(id, UUID.randomUUID().toString(), true).content("{}"))
             .andExpect(status().isBadRequest());
-        mvc.perform(get("/v1/broadcasts/{id}/likes", Long.MAX_VALUE)).andExpect(status().isNotFound());
-        mvc.perform(get("/v1/broadcasts/abc/likes")).andExpect(status().isBadRequest());
+        mvc.perform(change(id, UUID.randomUUID().toString(), true).content("{\"liked\":null}"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(put("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", userBearer())
+            .contentType("application/json").content("{\"liked\":true}"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(put("/v1/broadcasts/{id}/likes/mine", id).header("Authorization", adminBearer())
+            .header("Idempotency-Key", UUID.randomUUID().toString()).contentType("application/json")
+            .content("{\"liked\":true}"))
+            .andExpect(status().isOk());
+        mvc.perform(post("/v1/broadcasts/{id}/likes", id).header("Authorization", userBearer()))
+            .andExpect(status().isForbidden());
+        accessSessions.fail();
+        mvc.perform(change(id, UUID.randomUUID().toString(), true)).andExpect(status().isServiceUnavailable());
     }
 
-    @DisplayName("Redis 장애 시 좋아요는 503 이고 조회는 마지막 DB 보관 합계로 응답한다")
-    @Test
-    void redisOutageRejectsLikeAndServesTheStoredTotal() throws Exception {
-        final long stored = broadcast("like-stored", "LIVE");
-        final long none = broadcast("like-none", "PREPARING");
-        jdbc.update("INSERT INTO broadcast_like_snapshot (broadcast_id, total, updated_at) "
-            + "VALUES (?, 1284, CURRENT_TIMESTAMP)", stored);
-
-        mvc.perform(post("/v1/broadcasts/{id}/likes", stored).header("Authorization", userBearer()))
-            .andExpect(status().isServiceUnavailable())
-            .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"));
-
-        mvc.perform(get("/v1/broadcasts/{id}/likes", stored))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.broadcastId").value(stored))
-            .andExpect(jsonPath("$.data.total").value(1284));
-        mvc.perform(get("/v1/broadcasts/{id}/likes", none))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.total").value(0));
+    @Test void legacySnapshotsAreIgnoredEvenWithoutRedis() throws Exception {
+        final long id = broadcast("LIVE");
+        jdbc.update("INSERT INTO broadcast_like_snapshot (broadcast_id, total, updated_at) VALUES (?, 1284, CURRENT_TIMESTAMP)", id);
+        mvc.perform(get("/v1/broadcasts/{id}/likes", id)).andExpect(jsonPath("$.data.total").value(0));
+        mvc.perform(change(id, UUID.randomUUID().toString(), true)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(1));
     }
 }
