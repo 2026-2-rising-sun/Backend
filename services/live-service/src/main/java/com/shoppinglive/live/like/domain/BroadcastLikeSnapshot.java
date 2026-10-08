@@ -6,7 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
-/** 방송별 좋아요 합계의 보관본. 실시간 합계는 Redis 에 있고 이 값은 최대 약 10초 뒤따라온다. */
+/** V5 legacy anonymous click snapshot, retained but ignored by the member-like model. */
 @Entity
 @Table(name = "broadcast_like_snapshot")
 public class BroadcastLikeSnapshot {

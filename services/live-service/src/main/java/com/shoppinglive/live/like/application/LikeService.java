@@ -2,91 +2,116 @@ package com.shoppinglive.live.like.application;
 
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
 import com.shoppinglive.live.like.api.LikeTotalResponse;
-import com.shoppinglive.live.like.domain.BroadcastLikeSnapshot;
-import com.shoppinglive.live.like.infrastructure.BroadcastLikeSnapshotRepository;
-import java.time.Duration;
+import com.shoppinglive.live.like.api.MemberLikeResponse;
+import java.util.Collection;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import java.util.UUID;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 실시간 합계는 Redis 에 둔다. 여러 pod 가 같은 key 를 INCR 하므로 잠금 없이 증가분이 모두 합산된다.
- * DB 보관본은 Redis 값이 없을 때의 시작값과 Redis 장애 시 조회값으로 쓴다.
- */
+/** PostgreSQL owns member state, totals and request results in one transaction. */
 @Service
 public class LikeService {
-    private static final Logger log = LoggerFactory.getLogger(LikeService.class);
-    // 방송 종료 뒤에도 조회와 마지막 보관이 끝날 때까지 값이 남아 있게 한다.
-    private static final Duration TTL = Duration.ofDays(7);
-    private static final DefaultRedisScript<Long> ADD = new DefaultRedisScript<>("""
-        redis.call('SET', KEYS[1], ARGV[1], 'NX', 'EX', ARGV[2])
-        local total = redis.call('INCR', KEYS[1])
-        redis.call('EXPIRE', KEYS[1], ARGV[2])
-        return total
-        """, Long.class);
-
     private final BroadcastRepository broadcasts;
-    private final BroadcastLikeSnapshotRepository snapshots;
-    private final StringRedisTemplate redis;
+    private final JdbcTemplate jdbc;
 
-    public LikeService(final BroadcastRepository broadcasts, final BroadcastLikeSnapshotRepository snapshots,
-                       final StringRedisTemplate redis) {
+    public LikeService(BroadcastRepository broadcasts, JdbcTemplate jdbc) {
         this.broadcasts = broadcasts;
-        this.snapshots = snapshots;
-        this.redis = redis;
+        this.jdbc = jdbc;
     }
 
-    public static String key(final long broadcastId) {
-        return "live:broadcast:" + broadcastId + ":likes";
+    @Transactional(readOnly = true)
+    public LikeTotalResponse total(long id) {
+        final List<LikeTotalResponse> rows = totals(List.of(id));
+        if (rows.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다.");
+        return rows.getFirst();
     }
 
-    /**
-     * 방송 상태는 잠금 없이 읽으므로 종료와 동시에 도착한 좋아요는 반영될 수 있다. 이는 허용한 동작이다.
-     * 초기화·증가·만료를 원자 실행한다. 값이 없을 때만 DB 보관본으로 시작하고 기존 값은 덮어쓰지 않는다.
-     */
-    public LikeTotalResponse add(final long broadcastId) {
-        final Broadcast broadcast = broadcasts.findById(broadcastId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));
-        if (broadcast.getStatus() != BroadcastStatus.LIVE) {
-            throw new BusinessException(ErrorCode.CONFLICT, "진행 중인 방송이 아닙니다.");
-        }
-        // ponytail: 요청마다 DB 를 두 번(방송·보관본) 읽는다. 부하 측정 후 필요하면 key 존재 확인이나 상태 cache 로 줄인다.
-        final long stored = storedTotal(broadcastId);
+    public List<LikeTotalResponse> totals(Collection<Long> ids) {
+        if (ids.isEmpty()) return List.of();
         try {
-            final String key = key(broadcastId);
-            final Long total = redis.execute(ADD, List.of(key), String.valueOf(stored),
-                String.valueOf(TTL.toSeconds()));
-            return new LikeTotalResponse(broadcastId, total);
-        } catch (RuntimeException e) {
-            log.warn("like not counted: broadcastId={} cause={}", broadcastId, e.toString());
-            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "좋아요를 처리할 수 없습니다.");
-        }
+            return jdbc.query("SELECT b.id, COALESCE(a.total, 0), COALESCE(a.version, 0) FROM broadcast b "
+                + "LEFT JOIN broadcast_like_aggregate a ON a.broadcast_id = b.id WHERE b.id IN ("
+                + String.join(",", java.util.Collections.nCopies(ids.size(), "?")) + ")",
+                (rs, n) -> new LikeTotalResponse(rs.getLong(1), rs.getLong(2), rs.getLong(3)), ids.toArray());
+        } catch (DataAccessException e) { throw unavailable(); }
     }
 
-    /** Redis 를 읽을 수 없거나 값이 없으면 DB 보관본으로 응답한다. 보관본이 없으면 0 이다. */
-    public LikeTotalResponse total(final long broadcastId) {
-        if (!broadcasts.existsById(broadcastId)) {
-            throw new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다.");
-        }
+    @Transactional(readOnly = true)
+    public MemberLikeResponse mine(long id, String member) {
         try {
-            final String value = redis.opsForValue().get(key(broadcastId));
-            if (value != null) {
-                return new LikeTotalResponse(broadcastId, Long.parseLong(value));
+            final List<MemberLikeResponse> rows = jdbc.query("""
+                SELECT b.id, COALESCE(m.liked, false), COALESCE(m.state_version, 0),
+                       COALESCE(a.total, 0), COALESCE(a.version, 0)
+                FROM broadcast b LEFT JOIN broadcast_like_aggregate a ON a.broadcast_id = b.id
+                LEFT JOIN broadcast_member_like m ON m.broadcast_id = b.id AND m.member_id = ?
+                WHERE b.id = ?
+                """, (rs, n) -> new MemberLikeResponse(rs.getLong(1), rs.getBoolean(2), rs.getLong(3),
+                    rs.getLong(4), rs.getLong(5)), member, id);
+            if (rows.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다.");
+            return rows.getFirst();
+        } catch (DataAccessException e) { throw unavailable(); }
+    }
+
+    @Transactional
+    public MemberLikeResponse set(long id, String member, String key, boolean desired) {
+        final String request = requestKey(key);
+        try {
+            // end() uses the same row lock: a committed end always rejects a new request.
+            final var broadcast = broadcasts.findForLikeUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));
+            final List<MemberLikeResponse> replay = jdbc.query("""
+                SELECT desired, liked, state_version, total, version FROM broadcast_like_request
+                WHERE broadcast_id = ? AND member_id = ? AND request_id = ?
+                """, (rs, n) -> {
+                    if (rs.getBoolean(1) != desired) throw new BusinessException(ErrorCode.CONFLICT,
+                        "같은 요청 키에 다른 좋아요 상태를 사용할 수 없습니다.");
+                    return new MemberLikeResponse(id, rs.getBoolean(2), rs.getLong(3), rs.getLong(4), rs.getLong(5));
+                }, id, member, request);
+            if (!replay.isEmpty()) return replay.getFirst();
+            if (broadcast.getStatus() != BroadcastStatus.LIVE)
+                throw new BusinessException(ErrorCode.CONFLICT, "진행 중인 방송이 아닙니다.");
+
+            final MemberLikeResponse before = mine(id, member);
+            final boolean changed = before.liked() != desired;
+            final long stateVersion = before.stateVersion() + (changed ? 1 : 0);
+            final long total = before.total() + (changed ? (desired ? 1 : -1) : 0);
+            final long version = before.version() + (changed ? 1 : 0);
+            if (changed) {
+                if (jdbc.update("UPDATE broadcast_like_aggregate SET total = ?, version = ? WHERE broadcast_id = ?",
+                    total, version, id) == 0)
+                    jdbc.update("INSERT INTO broadcast_like_aggregate (broadcast_id, total, version) VALUES (?, ?, ?)",
+                        id, total, version);
+                if (jdbc.update("UPDATE broadcast_member_like SET liked = ?, state_version = ? "
+                    + "WHERE broadcast_id = ? AND member_id = ?", desired, stateVersion, id, member) == 0)
+                    jdbc.update("INSERT INTO broadcast_member_like (broadcast_id, member_id, liked, state_version) "
+                        + "VALUES (?, ?, ?, ?)", id, member, desired, stateVersion);
             }
-        } catch (RuntimeException e) {
-            log.warn("like total read from snapshot: broadcastId={} cause={}", broadcastId, e.toString());
-        }
-        return new LikeTotalResponse(broadcastId, storedTotal(broadcastId));
+            jdbc.update("""
+                INSERT INTO broadcast_like_request
+                    (broadcast_id, member_id, request_id, desired, liked, state_version, total, version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, id, member, request, desired, desired, stateVersion, total, version);
+            return new MemberLikeResponse(id, desired, stateVersion, total, version);
+        } catch (DataAccessException e) { throw unavailable(); }
     }
 
-    private long storedTotal(final long broadcastId) {
-        return snapshots.findById(broadcastId).map(BroadcastLikeSnapshot::getTotal).orElse(0L);
+    private String requestKey(String key) {
+        try {
+            final UUID parsed = UUID.fromString(key);
+            if (!parsed.toString().equalsIgnoreCase(key)) throw new IllegalArgumentException();
+            return parsed.toString();
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "Idempotency-Key는 UUID여야 합니다.");
+        }
+    }
+
+    private BusinessException unavailable() {
+        return new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "좋아요 저장소를 사용할 수 없습니다.");
     }
 }
