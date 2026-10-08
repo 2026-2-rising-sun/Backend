@@ -12,10 +12,12 @@ const hash = text => crypto.createHash('sha256').update(text).digest('hex');
 function snapshot(r) {
   return r.sql('commerce', `SELECT json_build_object(
     'cart',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,member_id,product_id,quantity,version FROM cart_item) t),
-    'orders',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,member_id,sales_info_id,quantity,unit_price,total_amount,status,version,source_cart_item_id FROM orders) t),
+    'orders',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,member_id,sales_info_id,quantity,unit_price,total_amount,status,version,source_cart_item_id,source_cart_item_version,payment_group_id FROM orders) t),
+    'groups',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,member_id,request_key,fingerprint,total_amount,status,expires_at,payment_id,version FROM payment_group) t),
     'stock',(SELECT json_agg(t ORDER BY sales_info_id) FROM (SELECT sales_info_id,available,reserved FROM sales_stock) t),
     'sales',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,price,status,version FROM sales_info) t),
-    'payments',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,order_id,status,version FROM payment_attempt) t))`);
+    'payments',(SELECT json_agg(t ORDER BY id) FROM (SELECT id,order_id,status,version,payment_group_id,request_key FROM payment_attempt) t),
+    'approvals',(SELECT json_agg(t ORDER BY attempt_id) FROM (SELECT attempt_id,outcome,authorized_at FROM mock_gateway_result) t))`);
 }
 function hostUrl(name, port) {
   const inspect = JSON.parse(command('docker', ['inspect', name]))[0];
@@ -143,6 +145,8 @@ async function mockFailures(ctx) {
       const calls = [
         { suffix: 'cart-order', path: `/v1/cart/items/${item.id}/orders`, body: ctx.buyer },
         { suffix: 'direct-order', path: '/v1/orders', body: { productId: p[2], quantity: 1, ...ctx.buyer } },
+        { suffix: 'group-checkout', path: '/v1/cart/checkout', body: { items: [{ itemId: item.id, version: item.version }] } },
+        { suffix: 'group-order', path: '/v1/cart/orders', body: { items: [{ itemId: item.id, version: item.version }], ...ctx.buyer } },
         ...(!scenario.delayed ? [{ suffix: 'cart-add', path: '/v1/cart/items', body: { productId: p[0], quantity: 1 } }] : [])
       ];
       for (const call of calls) {
@@ -173,8 +177,8 @@ const mockFailureChecks = [
   'shopping-prism-positive', 'shopping-prism-positive-upstream', 'commerce-prism-positive', 'commerce-prism-positive-upstream',
   'commerce-prism-positive-no-reservation', 'mock-real-upstreams-restored',
   ...['shopping-prism-503', 'shopping-proxy-timeout',
-    ...['commerce-prism-404', 'commerce-prism-503'].flatMap(prefix => ['cart-order', 'direct-order', 'cart-add'].map(s => prefix + '-' + s)),
-    ...['cart-order', 'direct-order'].map(s => 'commerce-proxy-timeout-' + s)]
+    ...['commerce-prism-404', 'commerce-prism-503'].flatMap(prefix => ['cart-order', 'direct-order', 'group-checkout', 'group-order', 'cart-add'].map(s => prefix + '-' + s)),
+    ...['cart-order', 'direct-order', 'group-checkout', 'group-order'].map(s => 'commerce-proxy-timeout-' + s)]
     .flatMap(name => [name, name + '-error-code', name + '-upstream', name + '-no-write', ...(name.includes('timeout') ? [name + '-elapsed'] : [])])
 ];
 module.exports = { mockFailures, mockFailureChecks };
