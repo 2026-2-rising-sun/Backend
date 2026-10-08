@@ -130,6 +130,31 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
+  /v1/seller/products:
+    get:
+      x-required-roles: [SELLER]
+      tags: [Admin Product]
+      summary: 본인 소유 상품 목록
+      description: 인증된 판매자의 상품만 최신 등록순으로 조회한다. 기존 소유자 미지정 상품과 다른 판매자의 상품은 제외한다. 판매정보 조회와 독립이다. page와 size는 정수이며 page × size가 2147483647을 초과하면 400으로 거절한다.
+      operationId: listOwnedProducts
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: 본인 상품 페이지
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SellerProductPageEnvelope' }
+              example: { success: true, data: { items: [{ id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, sellerId: '00000000-0000-0000-0000-000000000003' }], page: 0, size: 20, totalElements: 1, totalPages: 1 }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /v1/products:
     get:
       security: []
@@ -455,6 +480,23 @@ components:
         id: { type: integer, format: int64 }
         name: { type: string }
         mainImageUrl: { type: string, format: uri-reference }
+        sellerId:
+          type: [string, "null"]
+          maxLength: 36
+          description: 등록 판매자 회원 ID. 기존 상품은 null이며 이전 소비자 계약과 호환되는 추가 필드.
+    SellerProductPage:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProductSnapshot' } }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalElements: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    SellerProductPageEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/SellerProductPage' }, error: { type: 'null' } }
     PublicProductItem:
       type: object
       required: [productId, name, mainImageUrl, price, salesStatus, purchasable]

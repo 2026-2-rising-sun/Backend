@@ -6,5 +6,5 @@ package com.shoppinglive.shopping.product.application;
  *
  * @param mainImageUrl 조회 시점에 만든 URL. 저장소가 바뀌면 값도 바뀌므로 받는 쪽은 저장하지 말고 표시용으로만 쓴다
  */
-public record ProductSnapshot(Long id, String name, String mainImageUrl) {
+public record ProductSnapshot(Long id, String name, String mainImageUrl, String sellerId) {
 }

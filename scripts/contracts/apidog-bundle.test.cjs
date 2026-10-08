@@ -57,10 +57,12 @@ test('rejects duplicate paths/methods and broken or external references', () => 
   bad.doc.components.schemas.Item = { $ref: 'external.yaml#/Schema' };
   assert.throws(() => buildBundle([bad]), /local JSON-pointer/);
 });
-test('four committed YAMLs produce 67 endpoint operations with preserved effective security and servers', () => {
+test('four committed YAMLs produce 68 endpoint operations with preserved effective security and servers', () => {
   const inputs = ['member', 'commerce', 'shopping', 'live'].map(s => ({ name: s[0].toUpperCase() + s.slice(1), ...load(path.join(root, 'contracts/api', s + '-service.yaml')) }));
   const { bundle, counts } = buildBundle(inputs);
-  assert.deepEqual(counts, { Member: 9, Commerce: 27, Shopping: 12, Live: 19 });
+  assert.deepEqual(counts, { Member: 9, Commerce: 27, Shopping: 13, Live: 19 });
+  assert.equal(bundle.paths['/v1/seller/products'].get.operationId, 'Shopping_listOwnedProducts');
+  assert.deepEqual(bundle.paths['/v1/seller/products'].get['x-required-roles'], ['SELLER']);
   for (const source of inputs) for (const [route, item] of Object.entries(source.doc.paths)) for (const method of methods) if (item[method]) {
     const actual = bundle.paths[route][method];
     assert.deepEqual(actual.servers, item[method].servers ?? item.servers ?? source.doc.servers);
@@ -75,7 +77,7 @@ test('writes a hash manifest and existing compare detects a lost imported operat
   const previousReport = fs.existsSync(report) ? fs.readFileSync(report) : null;
   try {
     const file = path.join(dir, 'bundle.json'); const result = createArtifact(root, file);
-    assert.equal(result.operations, 67); assert.match(result.sourceSha, /^[a-f0-9]{40}$/);
+    assert.equal(result.operations, 68); assert.match(result.sourceSha, /^[a-f0-9]{40}$/);
     assert.equal(result.bundleSha256, load(file).sha256);
     assert.equal(spawnSync(process.execPath, [path.join(__dirname, 'compare.cjs'), file, file]).status, 0);
     const removed = JSON.parse(fs.readFileSync(file, 'utf8')); delete removed.paths['/v1/auth/login'].post;
