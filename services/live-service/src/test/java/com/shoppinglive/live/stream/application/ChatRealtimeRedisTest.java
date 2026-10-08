@@ -13,7 +13,6 @@ import com.shoppinglive.live.integration.member.MemberProfileClient;
 import com.shoppinglive.live.integration.member.MemberProfileException;
 import com.shoppinglive.live.integration.member.MemberProfileException.Reason;
 import com.shoppinglive.live.security.LiveSecuritySupport;
-import com.shoppinglive.live.like.application.LikeService;
 import com.shoppinglive.live.like.application.LikeBroadcaster;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -76,8 +75,6 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
             Instant.parse("2026-10-03T11:00:00Z"), "arn:aws:ivs:ap-northeast-2:1:channel/" + name,
             "https://example.com/" + name + ".m3u8")).getId();
         jdbc.update("UPDATE broadcast SET status = 'LIVE', started_at = CURRENT_TIMESTAMP WHERE id = ?", id);
-        // H2 컨텍스트 재생성으로 같은 방송 ID가 다시 사용될 수 있다. 해당 fixture의 값만 정리한다.
-        redis.delete(LikeService.key(id));
         return id;
     }
 
@@ -129,8 +126,8 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
             ready(stream);
             ready(otherStream);
             // 정상적인 좋아요 이벤트가 채팅보다 먼저 와도, 채팅 내용과 방송 격리를 확인한다.
-            redis.opsForValue().set(LikeService.key(mine), "7");
-            redis.opsForValue().set(LikeService.key(other), "9");
+            jdbc.update("INSERT INTO broadcast_like_aggregate (broadcast_id, total, version) VALUES (?, 7, 7)", mine);
+            jdbc.update("INSERT INTO broadcast_like_aggregate (broadcast_id, total, version) VALUES (?, 9, 9)", other);
             ReflectionTestUtils.invokeMethod(likeBroadcaster, "publishChanged");
 
             final HttpResponse<String> response = write(mine, "안녕하세요 😀");

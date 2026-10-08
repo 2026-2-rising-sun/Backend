@@ -363,23 +363,56 @@
     "code": 200
   },
   {
+    "name": "live-like-my-state",
     "service": "live",
-    "path": "/v1/broadcasts/1/likes",
-    "contractPath": "/v1/broadcasts/{id}/likes",
-    "method": "POST",
+    "path": "/v1/broadcasts/1/likes/mine",
+    "contractPath": "/v1/broadcasts/{id}/likes/mine",
     "code": 200,
     "headers": {
       "Authorization": "Bearer contract-example-only"
     }
   },
   {
+    "name": "live-like-cancel",
     "service": "live",
-    "path": "/v1/broadcasts/1/likes",
-    "contractPath": "/v1/broadcasts/{id}/likes",
-    "method": "POST",
+    "path": "/v1/broadcasts/1/likes/mine",
+    "contractPath": "/v1/broadcasts/{id}/likes/mine",
+    "method": "PUT",
+    "code": 200,
+    "body": {
+      "liked": false
+    },
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "Idempotency-Key": "bf147af0-3e1d-4d9e-a458-a76d82fd6c5e"
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/likes/mine",
+    "contractPath": "/v1/broadcasts/{id}/likes/mine",
+    "method": "PUT",
+    "code": 200,
+    "headers": {
+      "Authorization": "Bearer contract-example-only",
+      "Idempotency-Key": "a9f6fcf3-cd00-4a79-8dff-55047b090077"
+    },
+    "body": {
+      "liked": true
+    }
+  },
+  {
+    "service": "live",
+    "path": "/v1/broadcasts/1/likes/mine",
+    "contractPath": "/v1/broadcasts/{id}/likes/mine",
+    "method": "PUT",
     "code": 409,
     "headers": {
-      "Authorization": "Bearer contract-example-only"
+      "Authorization": "Bearer contract-example-only",
+      "Idempotency-Key": "a9f6fcf3-cd00-4a79-8dff-55047b090077"
+    },
+    "body": {
+      "liked": true
     }
   },
   {
