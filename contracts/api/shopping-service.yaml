@@ -135,7 +135,7 @@ paths:
       x-required-roles: [SELLER]
       tags: [Admin Product]
       summary: 본인 소유 상품 목록
-      description: 인증된 판매자의 상품만 최신 등록순으로 조회한다. 기존 소유자 미지정 상품과 다른 판매자의 상품은 제외한다. 판매정보 조회와 독립이다.
+      description: 인증된 판매자의 상품만 최신 등록순으로 조회한다. 기존 소유자 미지정 상품과 다른 판매자의 상품은 제외한다. 판매정보 조회와 독립이다. page와 size는 정수이며 page × size가 2147483647을 초과하면 400으로 거절한다.
       operationId: listOwnedProducts
       parameters:
         - name: page

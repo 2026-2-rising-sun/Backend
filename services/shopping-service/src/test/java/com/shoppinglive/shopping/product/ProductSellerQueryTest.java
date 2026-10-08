@@ -41,6 +41,7 @@ class ProductSellerQueryTest {
     void invalidPagingDoesNotQueryDatabase() {
         assertThatThrownBy(() -> query.findOwnedProducts("seller", -1, 20)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> query.findOwnedProducts("seller", 0, 101)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> query.findOwnedProducts("seller", Integer.MAX_VALUE, 100)).isInstanceOf(BusinessException.class);
         verifyNoInteractions(products);
     }
 }

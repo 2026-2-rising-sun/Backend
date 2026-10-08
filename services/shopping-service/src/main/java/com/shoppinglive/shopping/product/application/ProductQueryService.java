@@ -42,8 +42,8 @@ public class ProductQueryService {
     }
 
     public SellerProductPage findOwnedProducts(String sellerId, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "page는 0 이상, size는 1~100이어야 합니다.");
+        if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "page는 0 이상, size는 1~100, page × size는 2147483647 이하여야 합니다.");
         }
         var result = productRepository.findBySellerId(sellerId, PageRequest.of(page, size,
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));

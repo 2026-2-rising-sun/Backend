@@ -85,6 +85,17 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
             .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void rejectsOffsetOverflowAndAcceptsLargestSupportedOffset() throws Exception {
+        mvc.perform(get("/v1/seller/products").header("Authorization", adminBearer())
+                .param("page", "2147483647").param("size", "100"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/v1/seller/products").header("Authorization", adminBearer())
+                .param("page", "2147483647").param("size", "1"))
+            .andExpect(status().isOk());
+    }
+
     private JsonNode register(String key) throws Exception {
         String result = mvc.perform(post("/v1/admin/products").header("Authorization", adminBearer())
                 .header("X-Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON)
