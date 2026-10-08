@@ -2,10 +2,10 @@ name: Live stack verification
 
 on:
   pull_request:
-    paths: ["services/live-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
+    paths: ["services/live-service/**", "services/shopping-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
   push:
     branches: [dev]
-    paths: ["services/live-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
+    paths: ["services/live-service/**", "services/shopping-service/**", "libs/**", "contracts/**", "scripts/integration/**", "scripts/contracts/**", ".github/scripts/**", ".github/workflows/live-verification.yml"]
   workflow_dispatch:
 
 permissions:
@@ -46,6 +46,7 @@ jobs:
             --allow-skipped-suite com.shoppinglive.live.like.PostgresLikeTest=5 \
             --allow-skipped-suite com.shoppinglive.live.stream.application.LikeRealtimeRedisTest=2 \
             --allow-skipped-suite com.shoppinglive.commerce.migration.MemberCommerceMigrationPostgresTest=5 \
+            --allow-skipped-suite com.shoppinglive.shopping.product.ProductSellerMigrationTest=1 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
         run: |
@@ -83,6 +84,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - service: shopping
+            database: shopping_test
+            task: ':services:shopping-service:test --tests *ProductSellerMigrationTest'
+            report: services/shopping-service/build/test-results/test/TEST-*.xml
+            suites: '*.ProductSellerMigrationTest'
+            minimums: '*.ProductSellerMigrationTest=2'
           - service: member
             database: member_test
             task: ':services:member-service:postgresTest'
@@ -129,6 +136,9 @@ jobs:
       COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
       COMMERCE_TEST_POSTGRES_USER: postgres
       COMMERCE_TEST_POSTGRES_PASSWORD: test
+      SHOPPING_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/shopping_test
+      SHOPPING_TEST_POSTGRES_USER: postgres
+      SHOPPING_TEST_POSTGRES_PASSWORD: test
       LIVE_PG_TEST: '1'
       LIVE_PG_PORT: '55432'
       LIVE_REDIS_TEST: '1'
