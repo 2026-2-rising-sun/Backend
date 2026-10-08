@@ -58,9 +58,13 @@ public class PaymentDelayReconciler {
 
         int count = 0;
         for (PaymentAttempt attempt : overdue) {
-            // resolvePayment 는 idempotent. 조건부 UPDATE 로 이미 확정된 것은 자연스럽게 스킵.
-            if (paymentService.resolvePayment(attempt.getId())) {
-                count++;
+            // One inconsistent purchase must not block recovery of other overdue payments.
+            try {
+                if (paymentService.resolvePayment(attempt.getId())) {
+                    count++;
+                }
+            } catch (RuntimeException failure) {
+                log.warn("payment reconciliation failed: attemptId={}, will retry next cycle", attempt.getId(), failure);
             }
         }
         return count;
