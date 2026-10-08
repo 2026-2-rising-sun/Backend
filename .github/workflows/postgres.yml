@@ -29,8 +29,8 @@ jobs:
             database: commerce_test
             task: :services:commerce-service:postgresCommerceTest
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=3'
+            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest'
+            minimums: '*.MemberCommerceMigrationPostgresTest=5 *.PaymentGroupIntegrationTest=12'
           - service: live
             database: live_test
             task: :services:live-service:test --tests *PostgresMigrationTest
