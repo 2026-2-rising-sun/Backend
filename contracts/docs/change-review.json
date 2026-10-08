@@ -277,6 +277,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "S2 HEAD 37700896c8ffd9b80f49b834f268e3dd21cca216; independent Bugbot review found no defects after page-offset correction; source, security, ownership isolation, internal response and HTTP boundaries reviewed."
       }
+    },
+    {
+      "baseSnapshotSha256": "26c4a284de07a6bd20b8349e6e96ef380702b5e77b11c6cb84916feb18aa6eb5",
+      "headSnapshotSha256": "f3b3b42b86a5d73e3f4ffacaecb90805aa94c071ca815e3da09fe2d97d201b2c",
+      "reason": "Add authenticated fixed coupon creation for owned products with quantity and elapsed duration caps, separate expiry and consistent PostgreSQL timestamp precision.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_coupon_create_fixed",
+        "reviewedAt": "2026-10-09",
+        "evidence": "C1A HEAD a97fc460838cbdf883600b7d23e8cecbfd44e3af; reviewed independently after PostgreSQL precision defect fix; no remaining defects."
+      }
     }
   ]
 }
