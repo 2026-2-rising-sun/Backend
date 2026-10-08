@@ -11,5 +11,8 @@ package com.shoppinglive.commerce.shopping.domain;
  * @param name 상품 표시명 (주문 스냅샷용)
  * @param mainImageUrl 대표 이미지 조회 경로. nullable — 이미지 미등록 상품도 존재 가능
  */
-public record ProductSnapshot(Long id, String name, String mainImageUrl) {
+public record ProductSnapshot(Long id, String name, String mainImageUrl, String sellerId) {
+    public ProductSnapshot(Long id, String name, String mainImageUrl) {
+        this(id, name, mainImageUrl, null);
+    }
 }

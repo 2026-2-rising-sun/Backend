@@ -116,6 +116,22 @@ class HttpShoppingClientTest {
     }
 
     @Test
+    void 상품_판매자_식별자를_수신한다() {
+        body = """
+            {"success":true,"data":{"id":7,"name":"상품","mainImageUrl":null,"sellerId":"seller-a"},"error":null}
+            """;
+        assertThat(client.findProduct(7L)).contains(new ProductSnapshot(7L, "상품", null, "seller-a"));
+    }
+
+    @Test
+    void 기존_상품의_null_판매자를_허용한다() {
+        body = """
+            {"success":true,"data":{"id":7,"name":"상품","mainImageUrl":null,"sellerId":null},"error":null}
+            """;
+        assertThat(client.findProduct(7L)).contains(new ProductSnapshot(7L, "상품", null));
+    }
+
+    @Test
     void 상품404만_미존재이며_재시도하거나_서킷실패로_기록하지_않는다() {
         responseStatus = 404;
         assertThat(client.findProduct(7L)).isEmpty();
