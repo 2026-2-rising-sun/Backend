@@ -13,6 +13,7 @@ import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
@@ -21,21 +22,29 @@ public class CouponManagementService {
     private final JdbcTemplate jdbc;
     private final ShoppingClient shopping;
     private final TransactionTemplate transaction;
+    private final TransactionTemplate readTransaction;
 
     public CouponManagementService(JdbcTemplate jdbc, ShoppingClient shopping, PlatformTransactionManager manager) {
         this.jdbc=jdbc; this.shopping=shopping; this.transaction=new TransactionTemplate(manager);
+        this.readTransaction=new TransactionTemplate(manager);
+        this.readTransaction.setReadOnly(true);
+        this.readTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     }
 
     public Page list(String seller, int page, int size) {
         if (page<0 || size<1 || size>100 || (long) page*size>Integer.MAX_VALUE) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,"페이지 범위를 확인해 주세요.");
         }
-        List<CouponDefinition> items=jdbc.query("SELECT * FROM coupon_definition WHERE seller_id=? ORDER BY created_at DESC,id ASC LIMIT ? OFFSET ?",
-            this::map,seller,size,(long)page*size);
-        return new Page(items,page,size,jdbc.queryForObject("SELECT COUNT(*) FROM coupon_definition WHERE seller_id=?",Long.class,seller));
+        return readTransaction.execute(status -> {
+            List<CouponDefinition> items=jdbc.query("SELECT * FROM coupon_definition WHERE seller_id=? ORDER BY created_at DESC,id ASC LIMIT ? OFFSET ?",
+                this::map,seller,size,(long)page*size);
+            return new Page(items,page,size,jdbc.queryForObject("SELECT COUNT(*) FROM coupon_definition WHERE seller_id=?",Long.class,seller));
+        });
     }
 
-    public CouponDefinition get(String seller, String id) { return owned(seller,id,false); }
+    public CouponDefinition get(String seller, String id) {
+        return readTransaction.execute(status -> owned(seller,id,false));
+    }
 
     public CouponDefinition update(String seller, String id, long expectedVersion, String name, long discount,
             int limit, Instant start, Instant end, Instant expiration, List<Long> products) {
