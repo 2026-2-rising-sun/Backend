@@ -38,6 +38,39 @@ tags:
     description: 명시 활성화한 로컬 테스트 전용
 paths:
   /v1/seller/coupons:
+    get:
+      tags: [Sales Admin]
+      operationId: listSellerCoupons
+      summary: 본인 쿠폰 목록
+      description: 본인 쿠폰만 조회한다. page × size가 2147483647을 초과하면 400이다.
+      x-required-roles: [SELLER]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: 본인 쿠폰 페이지
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success: { const: true }
+                  error: { type: 'null' }
+                  data:
+                    type: object
+                    required: [items, page, size, totalElements]
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Coupon' } }
+                      page: { type: integer, minimum: 0 }
+                      size: { type: integer, minimum: 1, maximum: 100 }
+                      totalElements: { type: integer, minimum: 0 }
+              example: { success: true, data: { items: [], page: 0, size: 20, totalElements: 0 }, error: null }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
     post:
       tags: [Sales Admin]
       operationId: createSellerCoupon
@@ -61,6 +94,52 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/ShoppingUnavailable' }
+  /v1/seller/coupons/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Sales Admin]
+      operationId: getSellerCoupon
+      summary: 본인 쿠폰 상세
+      x-required-roles: [SELLER]
+      responses:
+        '200':
+          description: 쿠폰 상세
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CouponEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+    patch:
+      tags: [Sales Admin]
+      operationId: updateSellerCoupon
+      summary: 발급 이벤트 시작 전 쿠폰 설정 수정
+      x-required-roles: [SELLER]
+      description: 현재 version과 전체 settings를 전달한다. 행 잠금 이후 서버 시각을 확인하며 기존 이벤트 시작 시각 이상이거나 version이 다르면 409이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version, settings]
+              properties:
+                version: { type: integer, format: int64, minimum: 0 }
+                settings: { $ref: '#/components/schemas/CreateCoupon' }
+      responses:
+        '200':
+          description: 변경된 쿠폰 설정
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CouponEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '503': { $ref: '#/components/responses/ShoppingUnavailable' }
   /v1/orders/checkout:
     get:
