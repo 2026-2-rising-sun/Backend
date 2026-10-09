@@ -213,8 +213,8 @@ paths:
       tags: ["Orders"]
       summary: "주문 가능 여부와 최신 금액 확인"
       operationId: "previewOrder"
-      description: "재고 예약 없음. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
-      parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}]
+      description: "재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
+      parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}, {"name": "couponId", "in": "query", "required": false, "schema": {"type": "string", "maxLength": 64}}]
       x-required-roles: ["USER", "SELLER"]
       responses:
         "200":
@@ -223,12 +223,14 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/OrderCheckout"}
               examples:
-                normal: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null}}
-                soldOut: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 0, "salesStatus": "SOLD_OUT", "orderable": false, "reason": "SOLD_OUT"}}
+                normal: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
+                couponApplied: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": "33333333-3333-4333-8333-333333333334", "discountAmount": 5000, "payableAmount": 25000}}
+                soldOut: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 0, "salesStatus": "SOLD_OUT", "orderable": false, "reason": "SOLD_OUT", "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
+        "409": {"$ref": "#/components/responses/Conflict"}
         "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
   /v1/orders:
     post:
@@ -498,21 +500,21 @@ paths:
       tags: ["Cart"]
       summary: "선택 상품 통합 주문서 확인"
       operationId: "previewMyCartGroup"
-      description: "1~100개 항목의 소유권·버전·판매 상태·재고와 최신 가격을 확인한다. 중복 ID는 400, 변경된 버전·판매 불가·재고 부족은 409. 조회 단계는 재고를 예약하거나 주문을 만들지 않는다."
+      description: "1~100개 항목의 소유권·버전·판매 상태·재고와 최신 가격을 확인한다. couponId가 있으면 회원 보유·사용 가능 기간과 대상 상품을 서버에서 확인하고 대상 주문에만 정액 할인을 비례 배분한다. 중복 ID는 400, 변경된 버전·판매 불가·재고 부족·사용할 수 없는 쿠폰은 409. 조회 단계는 쿠폰·재고를 예약하거나 주문을 만들지 않는다."
       x-required-roles: ["USER","SELLER"]
       requestBody:
         required: true
         content:
           application/json:
             schema: {"$ref":"#/components/schemas/CartCheckoutRequest"}
-            example: {"items":[{"itemId":1,"version":0},{"itemId":2,"version":0}]}
+            example: {"items":[{"itemId":1,"version":0},{"itemId":2,"version":0}],"couponId":"33333333-3333-4333-8333-333333333334"}
       responses:
         200:
           description: "성공"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/CartCheckout"}
-              example: {"items":[{"itemId":1,"version":0,"productId":1,"productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000},{"itemId":2,"version":0,"productId":2,"productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000}],"totalAmount":25000}
+              example: {"items":[{"itemId":1,"version":0,"productId":1,"productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000,"discountAmount":2000,"payableAmount":18000},{"itemId":2,"version":0,"productId":2,"productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000,"discountAmount":0,"payableAmount":5000}],"totalAmount":25000,"couponId":"33333333-3333-4333-8333-333333333334","discountAmount":2000,"payableAmount":23000}
         400: {"$ref":"#/components/responses/BadRequest"}
         401: {"$ref":"#/components/responses/Unauthorized"}
         403: {"$ref":"#/components/responses/Forbidden"}
@@ -1012,6 +1014,7 @@ components:
       required: ["items"]
       properties:
         items: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/CartSelection"}}
+        couponId: {"type":["string","null"],"maxLength":64}
       description: "항목별 현재 버전이 필수이며 항목 ID 중복은 허용하지 않는다. 배열 순서는 멱등성 비교에 영향을 주지 않는다."
     CreateCartGroupRequest:
       type: "object"
@@ -1023,7 +1026,7 @@ components:
         expectedTotalAmount: {"type":"integer","format":"int64","minimum":1}
     CartCheckoutItem:
       type: "object"
-      required: ["itemId","version","productId","productName","quantity","unitPrice","totalAmount"]
+      required: ["itemId","version","productId","productName","quantity","unitPrice","totalAmount","discountAmount","payableAmount"]
       properties:
         itemId: {"type":"integer","format":"int64","minimum":1}
         version: {"type":"integer","format":"int64","minimum":0}
@@ -1032,12 +1035,17 @@ components:
         quantity: {"type":"integer","format":"int32","minimum":1,"maximum":2147483647}
         unitPrice: {"type":"integer","format":"int64","minimum":1}
         totalAmount: {"type":"integer","format":"int64","minimum":1}
+        discountAmount: {"type":"integer","format":"int64","minimum":0}
+        payableAmount: {"type":"integer","format":"int64","minimum":0}
     CartCheckout:
       type: "object"
-      required: ["items","totalAmount"]
+      required: ["items","totalAmount","discountAmount","payableAmount"]
       properties:
         items: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/CartCheckoutItem"}}
         totalAmount: {"type":"integer","format":"int64","minimum":1}
+        couponId: {"type":["string","null"],"maxLength":64}
+        discountAmount: {"type":"integer","format":"int64","minimum":0}
+        payableAmount: {"type":"integer","format":"int64","minimum":0}
     PaymentGroup:
       type: "object"
       required: ["groupNumber","status","totalAmount","discountAmount","payableAmount","expiresAt","orders","paymentId"]
@@ -1117,7 +1125,7 @@ components:
         totalPages: {"type": "integer", "format": "int64", "minimum": 0}
     OrderCheckout:
       type: "object"
-      required: ["productId", "salesId", "productName", "unitPrice", "quantity", "totalAmount", "available", "salesStatus", "orderable", "reason"]
+      required: ["productId", "salesId", "productName", "unitPrice", "quantity", "totalAmount", "available", "salesStatus", "orderable", "reason", "discountAmount", "payableAmount"]
       properties:
         productId: {"type": "integer", "format": "int64", "minimum": 1}
         salesId: {"type": "integer", "format": "int64", "minimum": 1}
@@ -1129,6 +1137,9 @@ components:
         salesStatus: {"$ref": "#/components/schemas/SalesStatus"}
         orderable: {"type": "boolean"}
         reason: {"type": ["string", "null"], "enum": ["NOT_ON_SALE", "SOLD_OUT", "EXCEEDS_STOCK", null]}
+        couponId: {"type": ["string", "null"], "maxLength": 64}
+        discountAmount: {"type": "integer", "format": "int64", "minimum": 0}
+        payableAmount: {"type": "integer", "format": "int64", "minimum": 0}
     PaymentAttempt:
       type: "object"
       required: ["paymentId", "orderId", "scenario", "status", "requestedAt", "resolvedAt", "scheduledResolveAt"]

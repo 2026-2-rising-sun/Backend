@@ -57,6 +57,23 @@ class CouponPreviewPostgresTest {
             assertThatThrownBy(() -> service.preview(MEMBER, COUPON,
                 List.of(new CouponPreviewService.PricedItem("cart:1", 2, 1000))))
                 .isInstanceOf(BusinessException.class);
+            jdbc.update("UPDATE coupon_definition SET fixed_discount=2 WHERE id=?", COUPON);
+            jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 2L);
+            jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 3L);
+            var tiedQuote = service.preview(MEMBER, COUPON, List.of(
+                new CouponPreviewService.PricedItem("cart:309", 3, 1000),
+                new CouponPreviewService.PricedItem("cart:205", 2, 1000),
+                new CouponPreviewService.PricedItem("cart:101", 1, 1000)));
+            assertThat(tiedQuote.discountAmount()).isEqualTo(2);
+            assertThat(tiedQuote.payableAmount()).isEqualTo(2998);
+            assertThat(tiedQuote.itemDiscounts()).containsEntry("cart:101", 1L)
+                .containsEntry("cart:205", 1L).containsEntry("cart:309", 0L);
+            jdbc.update("UPDATE coupon_definition SET fixed_discount=1 WHERE id=?", COUPON);
+            var numericTieQuote = service.preview(MEMBER, COUPON, List.of(
+                new CouponPreviewService.PricedItem("cart:10", 2, 1000),
+                new CouponPreviewService.PricedItem("cart:2", 3, 1000)));
+            assertThat(numericTieQuote.itemDiscounts()).containsEntry("cart:2", 1L)
+                .containsEntry("cart:10", 0L);
             assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class, COUPON))
                 .isEqualTo("AVAILABLE");
         } finally {

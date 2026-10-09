@@ -16,11 +16,11 @@ import org.springframework.http.ResponseEntity;
 public class PaymentGroupController {
  private final PaymentGroupService service;
  public PaymentGroupController(PaymentGroupService service){this.service=service;}
- public record PreviewRequest(@NotEmpty @Size(max=100) List<Selection> items){}
+ public record PreviewRequest(@NotEmpty @Size(max=100) List<Selection> items,@Size(max=64) String couponId){}
  public record CreateRequest(@NotEmpty @Size(max=100) List<Selection> items,
   @NotBlank @Size(max=64) String buyerName,@NotBlank @Pattern(regexp="^[0-9-]{9,32}$") String buyerPhone,@NotNull @Positive Long expectedTotalAmount){}
  @PostMapping("/v1/cart/checkout")
- public Quote quote(@AuthenticationPrincipal AuthenticatedUser member,@Valid @RequestBody PreviewRequest input){return service.preview(member.memberId(),input.items());}
+ public Quote quote(@AuthenticationPrincipal AuthenticatedUser member,@Valid @RequestBody PreviewRequest input){return service.preview(member.memberId(),input.items(),input.couponId());}
  @PostMapping("/v1/cart/orders")
  public ResponseEntity<GroupResponse> create(@AuthenticationPrincipal AuthenticatedUser member,@RequestHeader("X-Idempotency-Key") String key,@Valid @RequestBody CreateRequest input){
   Creation c=service.create(member.memberId(),input.items(),input.buyerName(),input.buyerPhone(),input.expectedTotalAmount(),key);return ResponseEntity.status(c.created()?201:200).body(c.group());

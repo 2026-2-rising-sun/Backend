@@ -1,6 +1,7 @@
 package com.shoppinglive.commerce.orders.api;
 
 import com.shoppinglive.commerce.orders.application.OrderCheckout;
+import com.shoppinglive.commerce.coupons.application.CouponPreviewService;
 import com.shoppinglive.commerce.sales.domain.SalesStatus;
 
 /**
@@ -19,7 +20,10 @@ public record OrderCheckoutResponse(
     int available,
     SalesStatus salesStatus,
     boolean orderable,
-    OrderCheckout.Reason reason
+    OrderCheckout.Reason reason,
+    String couponId,
+    long discountAmount,
+    long payableAmount
 ) {
 
     public static OrderCheckoutResponse from(OrderCheckout checkout) {
@@ -33,6 +37,16 @@ public record OrderCheckoutResponse(
             checkout.available(),
             checkout.salesStatus(),
             checkout.orderable(),
-            checkout.reason());
+            checkout.reason(),
+            null,
+            0,
+            checkout.totalAmount());
+    }
+
+    public static OrderCheckoutResponse from(OrderCheckout checkout, CouponPreviewService.Preview preview) {
+        return new OrderCheckoutResponse(
+            checkout.productId(), checkout.salesId(), checkout.productName(), checkout.unitPrice(),
+            checkout.quantity(), checkout.totalAmount(), checkout.available(), checkout.salesStatus(),
+            checkout.orderable(), checkout.reason(), preview.couponId(), preview.discountAmount(), preview.payableAmount());
     }
 }

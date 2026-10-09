@@ -1,8 +1,12 @@
 package com.shoppinglive.commerce.orders.api;
 
+import com.shoppinglive.commerce.coupons.application.CouponPreviewService;
 import com.shoppinglive.commerce.orders.application.OrderCheckoutService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -23,9 +27,11 @@ public class OrderCheckoutController {
     private static final String POSITIVE_INT = "[1-9][0-9]{0,8}";
 
     private final OrderCheckoutService orderCheckoutService;
+    private final CouponPreviewService couponPreview;
 
-    public OrderCheckoutController(OrderCheckoutService orderCheckoutService) {
+    public OrderCheckoutController(OrderCheckoutService orderCheckoutService, CouponPreviewService couponPreview) {
         this.orderCheckoutService = orderCheckoutService;
+        this.couponPreview = couponPreview;
     }
 
     /**
@@ -39,10 +45,17 @@ public class OrderCheckoutController {
      */
     @GetMapping
     public OrderCheckoutResponse checkout(
+        @AuthenticationPrincipal AuthenticatedUser member,
         @RequestParam(name = "productId", required = false) Long productId,
-        @RequestParam(name = "quantity", required = false) String quantity) {
-        return OrderCheckoutResponse.from(
-            orderCheckoutService.preview(productId, parseQuantity(quantity)));
+        @RequestParam(name = "quantity", required = false) String quantity,
+        @RequestParam(name = "couponId", required = false) String couponId) {
+        var checkout = orderCheckoutService.preview(productId, parseQuantity(quantity));
+        if (couponId != null && !checkout.orderable()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "쿠폰 대상 상품을 주문할 수 없습니다.");
+        }
+        var discount = couponPreview.preview(member.memberId(), couponId,
+            List.of(new CouponPreviewService.PricedItem("single", productId, checkout.totalAmount())));
+        return OrderCheckoutResponse.from(checkout, discount);
     }
 
     private static int parseQuantity(String quantity) {

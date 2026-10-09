@@ -93,4 +93,34 @@ class CouponPreviewServiceTest {
         assertThat(service.preview(MEMBER, COUPON,
             List.of(new CouponPreviewService.PricedItem("cart-1", 1, 1000))).discountAmount()).isEqualTo(100);
     }
+
+    @Test
+    void allocatesEqualRemainderByStableCartItemId() {
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=2 WHERE id=?", COUPON);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 2L);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 3L);
+
+        var preview = service.preview(MEMBER, COUPON, List.of(
+            new CouponPreviewService.PricedItem("cart:309", 3, 1000),
+            new CouponPreviewService.PricedItem("cart:205", 2, 1000),
+            new CouponPreviewService.PricedItem("cart:101", 1, 1000)));
+
+        assertThat(preview.discountAmount()).isEqualTo(2);
+        assertThat(preview.payableAmount()).isEqualTo(2998);
+        assertThat(preview.itemDiscounts()).containsExactlyInAnyOrderEntriesOf(
+            java.util.Map.of("cart:101", 1L, "cart:205", 1L, "cart:309", 0L));
+    }
+
+    @Test
+    void comparesCartItemIdsNumericallyWhenRemaindersTie() {
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=1 WHERE id=?", COUPON);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 2L);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON, 3L);
+
+        var preview = service.preview(MEMBER, COUPON, List.of(
+            new CouponPreviewService.PricedItem("cart:10", 2, 1000),
+            new CouponPreviewService.PricedItem("cart:2", 3, 1000)));
+
+        assertThat(preview.itemDiscounts()).containsEntry("cart:2", 1L).containsEntry("cart:10", 0L);
+    }
 }
