@@ -430,6 +430,43 @@
           "change": "Read one seller-owned refund request"
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "c55c2d8c3e75bbde8a6ab1ab0b7ddb3474dd2074b1e56aa959e5a53fd837b8c2",
+      "headSnapshotSha256": "93c5ee2c6b8325bcff85c97bce97c0fc8f6ad5f2db8b170ebff277d71195b441",
+      "reason": "Commerce refund response adds group and seller-scoped cumulative successful refund totals; Order and PaymentGroup expose REFUNDED, with a payment group reaching it only after all orders are refunded.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Reviewed #158 working-tree changes over base HEAD 852956bbfe1ca9b8e5e996d92d85ab33438d12c4; no actionable findings."
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/refunds",
+          "change": "Include cumulativeRefundAmount in the refund response."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/refunds",
+          "change": "Include cumulativeRefundAmount in refund history."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/refunds/{id}",
+          "change": "Include cumulativeRefundAmount in refund detail."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/seller/refunds",
+          "change": "Include seller-scoped cumulativeRefundAmount."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/seller/refunds/{id}",
+          "change": "Include seller-scoped cumulativeRefundAmount."
+        }
+      ]
     }
   ]
 }

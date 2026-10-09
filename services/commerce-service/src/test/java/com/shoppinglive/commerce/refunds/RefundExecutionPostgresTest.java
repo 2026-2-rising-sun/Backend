@@ -31,6 +31,10 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(executions.execute(request.id())).isFalse();
 
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).cumulativeRefundAmount()).isEqualTo(20000L);
+        assertThat(refunds.getSeller(SELLER, request.id()).cumulativeRefundAmount()).isEqualTo(20000L);
+        assertThatThrownBy(() -> refunds.getSeller(SELLER_B, request.id()))
+            .isInstanceOf(BusinessException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
             request.id())).isEqualTo(1);
         var groupId = groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId();
