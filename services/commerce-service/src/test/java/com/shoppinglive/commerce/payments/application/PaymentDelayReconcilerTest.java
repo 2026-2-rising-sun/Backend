@@ -61,6 +61,7 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
     @Autowired private com.shoppinglive.commerce.purchase.application.PaymentGroupService groups;
     @Autowired private com.shoppinglive.commerce.purchase.application.DurableMockGateway gateway;
     @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore store;
 
     private Long salesInfoId;
     private Long orderId;
@@ -180,10 +181,9 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
         PaymentAttempt attempt = insertProcessingAttempt(
             PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
         assertThat(paymentService.resolvePayment(attempt.getId())).isTrue();
-        PaymentAttemptJpaRepository staleScan = mock(PaymentAttemptJpaRepository.class);
-        when(staleScan.findByStatusInAndScheduledResolveAtBefore(any(), any(), any()))
-            .thenReturn(List.of(attempt));
-        assertThat(new PaymentDelayReconciler(staleScan, paymentService).reconcileOverdue()).isZero();
+        // A stale in-process callback cannot claim an already completed payment.
+        assertThat(paymentService.resolvePayment(attempt.getId())).isFalse();
+        assertThat(reconciler.reconcileOverdue()).isZero();
         assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
     }
 
@@ -213,10 +213,7 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
             orderRepository.transitionStatus(healthyOrder.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"));
         PaymentAttempt healthy = overdueGroupAttempt(healthyOrder.getId(), "healthy-group");
         // Fix scan order while retaining real group, ledger, order and stock transactions.
-        PaymentAttemptJpaRepository orderedScan = mock(PaymentAttemptJpaRepository.class);
-        when(orderedScan.findByStatusInAndScheduledResolveAtBefore(any(), any(), any()))
-            .thenReturn(List.of(failed, healthy));
-        PaymentDelayReconciler recovery = new PaymentDelayReconciler(orderedScan, paymentService);
+        PaymentDelayReconciler recovery = reconciler;
 
         assertThat(recovery.reconcileOverdue()).isEqualTo(1);
         assertThat(gateway.lookup(failed.getId())).isEqualTo(PaymentStatus.SUCCESS);

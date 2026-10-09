@@ -140,4 +140,25 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         assertThat(jdbc.queryForObject("SELECT retry_count FROM payment_attempt WHERE id=?",Integer.class,p.getId())).isEqualTo(1);
         verify(gateway,times(1)).authorize(p.getId(),p.getScenario());
     }
+    @Autowired PaymentDelayReconciler scanner;
+    @Test void scannerRecoversExpiredProcessingLeaseAndAppliesExistingApprovalOnlyOnce() {
+        var p=start(PaymentScenario.INSTANT_SUCCESS);
+        var lease=recovery.claim(p.getId(),Duration.ofMinutes(1)).orElseThrow();
+        assertThat(recovery.beginInvocation(lease)).contains(0);
+        gateway.authorize(p.getId(),p.getScenario());
+        assertThat(scanner.reconcileOverdue()).isZero();held(p.getId());
+        jdbc.update("UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",p.getId());
+        assertThat(scanner.reconcileOverdue()).isEqualTo(1);assertThat(scanner.reconcileOverdue()).isZero();
+        verify(gateway,times(1)).authorize(p.getId(),p.getScenario());assertThat(coupon()).isEqualTo("USED");
+        assertThat(jdbc.queryForObject("SELECT retry_count FROM payment_attempt WHERE id=?",Integer.class,p.getId())).isZero();
+    }
+    @Test void scannerAtExhaustionQueriesWithoutNewAuthorizationAndSchedulesOneMinute() {
+        var p=start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
+        jdbc.update("UPDATE payment_attempt SET status='UNKNOWN',execution_started_at=requested_at,retry_count=3 WHERE id=?",p.getId());
+        assertThat(scanner.reconcileOverdue()).isZero();held(p.getId());
+        verify(gateway,never()).authorize(p.getId(),p.getScenario());
+        assertThat(jdbc.queryForObject("SELECT EXTRACT(EPOCH FROM scheduled_resolve_at-clock_timestamp()) FROM payment_attempt WHERE id=?",Double.class,p.getId())).isBetween(55.0,60.0);
+        assertThat(scanner.reconcileOverdue()).isZero();
+    }
+
 }
