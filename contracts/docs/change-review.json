@@ -287,6 +287,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "C1A HEAD a97fc460838cbdf883600b7d23e8cecbfd44e3af; reviewed independently after PostgreSQL precision defect fix; no remaining defects."
       }
+    },
+    {
+      "baseSnapshotSha256": "f3b3b42b86a5d73e3f4ffacaecb90805aa94c071ca815e3da09fe2d97d201b2c",
+      "headSnapshotSha256": "44f7f725f93763a90cb2257b00c79fb798b20daafa167bbb94045136eda74997",
+      "reason": "Add seller-owned coupon list/detail and versioned pre-event settings update, with consistent repeatable-read definition/target snapshots and row-locked edit policy.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_coupon_manage_fixed",
+        "reviewedAt": "2026-10-09",
+        "evidence": "C1B HEAD 025f224f6dbeabc9e0d025ca42d0a32feb540afb; independently re-reviewed after mixed-version read fix; no defects, real PostgreSQL concurrent read/edit and version races verified."
+      }
     }
   ]
 }
