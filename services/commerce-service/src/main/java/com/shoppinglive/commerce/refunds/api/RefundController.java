@@ -1,5 +1,6 @@
 package com.shoppinglive.commerce.refunds.api;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService.RefundView;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService.SellerRefundView;
@@ -30,7 +31,12 @@ public class RefundController {
 
     public RefundController(RefundIntakeService refunds) { this.refunds = refunds; }
 
-    public record RefundRequest(@Size(max = 100) List<@Positive Long> cartItemIds) { }
+    public record RefundRequest(@Size(max = 100) List<@Positive Long> cartItemIds) {
+        @JsonAnySetter
+        public void rejectUnknownField(String name, Object value) {
+            throw new IllegalArgumentException("지원하지 않는 환불 요청 필드: " + name);
+        }
+    }
 
     @PostMapping("/v1/payment-groups/{number}/refunds")
     public ResponseEntity<ApiResponse<RefundView>> request(@AuthenticationPrincipal AuthenticatedUser member,
