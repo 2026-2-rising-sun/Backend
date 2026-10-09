@@ -1306,7 +1306,10 @@ components:
         paymentId: {"type": "integer", "format": "int64", "minimum": 1}
         orderId: {"type": "integer", "format": "int64", "minimum": 1}
         scenario: {"$ref": "#/components/schemas/PaymentScenario", "readOnly": true}
-        status: {"type": "string", "enum": ["PENDING", "PROCESSING", "SUCCESS", "FAILED", "TIMEOUT"]}
+        status:
+          type: string
+          enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
+          description: "PROCESSING은 처리 중, UNKNOWN은 승인 결과 미확정이다. UNKNOWN 동안 주문·재고·쿠폰 예약을 유지하며 같은 결제 시도의 결과를 확인한다. PENDING은 호환용 미사용 상태로 신규 결제는 PROCESSING으로 시작한다. TIMEOUT은 기존 데이터/API 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
         scheduledResolveAt: {"type": ["string", "null"], "format": "date-time"}
