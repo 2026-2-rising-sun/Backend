@@ -31,7 +31,7 @@ public class PaymentGroupService {
  public record Selection(Long itemId,Long version) {}
  public record Item(Long itemId,Long version,Long productId,String productName,Integer quantity,Long unitPrice,Long totalAmount) {}
  public record Quote(List<Item> items,Long totalAmount) {}
- public record GroupResponse(String groupNumber,OrderStatus status,Long totalAmount,Instant expiresAt,List<OrderResponse> orders,Long paymentId) {}
+ public record GroupResponse(String groupNumber,OrderStatus status,Long totalAmount,Long discountAmount,Long payableAmount,Instant expiresAt,List<OrderResponse> orders,Long paymentId) {}
  public record Creation(GroupResponse group,boolean created) {}
  private static final List<OrderStatus> ACTIVE=List.of(OrderStatus.PENDING_PAYMENT,OrderStatus.PAYMENT_CONFIRMING);
  private final PaymentGroupRepository groups;
@@ -205,7 +205,7 @@ public class PaymentGroupService {
  }
  private void restore(Order child){if(stock.restoreReserved(child.getSalesInfoId(),child.getQuantity())!=1)throw new IllegalStateException("reserved stock missing");sales.reopenIfStockAvailable(child.getSalesInfoId());}
  private PaymentGroup owned(String member,String number){return groups.findByGroupNumberAndMemberId(number,member).orElseThrow(()->error(ErrorCode.NOT_FOUND,"주문 묶음을 찾을 수 없습니다."));}
- private GroupResponse response(PaymentGroup g){return new GroupResponse(g.getGroupNumber(),g.getStatus(),g.getTotalAmount(),g.getExpiresAt(),orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream().map(OrderResponse::from).toList(),g.getPaymentId());}
+ private GroupResponse response(PaymentGroup g){return new GroupResponse(g.getGroupNumber(),g.getStatus(),g.getTotalAmount(),g.getDiscountAmount(),g.getPayableAmount(),g.getExpiresAt(),orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream().map(OrderResponse::from).toList(),g.getPaymentId());}
  private Creation replay(PaymentGroup g,String hash){if(!g.getFingerprint().equals(hash))throw conflict("다른 주문 요청에 사용된 멱등키입니다.");return new Creation(get(g.getMemberId(),g.getGroupNumber()),false);}
  private List<Selection> validateSelections(List<Selection> inputs){
   if(inputs==null || inputs.isEmpty() || inputs.size()>100)throw error(ErrorCode.INVALID_REQUEST,"상품을 1~100개 선택해 주세요.");

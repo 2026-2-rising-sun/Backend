@@ -50,9 +50,9 @@ class MemberCommerceMigrationPostgresTest {
     void newDatabaseRequiresMemberAndScopesIdempotency() throws Exception {
         migration(null).migrate();
         sale();
-        memberOrder(1, "11111111-1111-4111-8111-111111111111", "key");
-        memberOrder(2, "22222222-2222-4222-8222-222222222222", "key");
-        assertThatThrownBy(() -> memberOrder(3, "11111111-1111-4111-8111-111111111111", "key"))
+        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "key");
+        memberOrderWithDiscountSnapshot(2, "22222222-2222-4222-8222-222222222222", "key");
+        assertThatThrownBy(() -> memberOrderWithDiscountSnapshot(3, "11111111-1111-4111-8111-111111111111", "key"))
             .isInstanceOf(java.sql.SQLException.class).hasMessageContaining("uk_orders_member_idempotency");
         assertThatThrownBy(() -> sql("UPDATE orders SET member_id = NULL WHERE id = 1"))
             .isInstanceOf(java.sql.SQLException.class).hasMessageContaining("null");
@@ -130,6 +130,23 @@ class MemberCommerceMigrationPostgresTest {
             + "' AND table_name='payment_group'")).isZero();
     }
 
+    @Test
+    void discountSnapshotMigrationBackfillsGrossAndPayableAmountsForLegacyOrdersAndGroups() throws Exception {
+        migration("3").migrate();
+        sale();
+        memberOrder(1, "11111111-1111-4111-8111-111111111111", "snapshot-legacy");
+
+        migration(null).migrate();
+
+        assertThat(count("SELECT total_amount FROM orders WHERE id=1")).isEqualTo(1000);
+        assertThat(count("SELECT discount_amount FROM orders WHERE id=1")).isZero();
+        assertThat(count("SELECT payable_amount FROM orders WHERE id=1")).isEqualTo(1000);
+        assertThat(count("SELECT discount_amount FROM payment_group WHERE group_number='PG-LEGACY-1'")).isZero();
+        assertThat(count("SELECT payable_amount FROM payment_group WHERE group_number='PG-LEGACY-1'")).isEqualTo(1000);
+        assertThatThrownBy(() -> sql("UPDATE orders SET discount_amount=1001 WHERE id=1"))
+            .isInstanceOf(java.sql.SQLException.class);
+    }
+
     private void sale() throws Exception {
         sql("INSERT INTO sales_info (id,product_id,price,status,created_at,updated_at) VALUES (1,1,1000,'ON_SALE',now(),now())");
         sql("INSERT INTO sales_stock (sales_info_id,available,reserved,created_at,updated_at) VALUES (1,10,0,now(),now())");
@@ -145,6 +162,13 @@ class MemberCommerceMigrationPostgresTest {
         sql("INSERT INTO orders (id,order_number,sales_info_id,quantity,unit_price,total_amount,status,buyer_name,buyer_phone,"
             + "member_id,idempotency_key,product_name_snapshot,created_at,updated_at) VALUES (" + id + ",'member-" + id
             + "',1,1,1000,1000,'PENDING_PAYMENT','buyer','01012345678','" + memberId + "','" + key + "','product',now(),now())");
+    }
+
+    private void memberOrderWithDiscountSnapshot(int id, String memberId, String key) throws Exception {
+        sql("INSERT INTO orders (id,order_number,sales_info_id,quantity,unit_price,total_amount,discount_amount,payable_amount,"
+            + "status,buyer_name,buyer_phone,member_id,idempotency_key,product_name_snapshot,created_at,updated_at) VALUES ("
+            + id + ",'member-" + id + "',1,1,1000,1000,0,1000,'PENDING_PAYMENT','buyer','01012345678','"
+            + memberId + "','" + key + "','product',now(),now())");
     }
 
     private void sql(String query) throws Exception {
