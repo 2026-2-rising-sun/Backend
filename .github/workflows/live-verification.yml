@@ -58,9 +58,10 @@ jobs:
             --allow-skipped-suite com.shoppinglive.commerce.refunds.DurableMockRefundGatewayPostgresTest=4 \
             --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundExecutionPostgresTest=9 \
             --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundExecutionConcurrencyPostgresTest=1 \
-            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundApiPostgresTest=1 \
+            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundApiPostgresTest=2 \
             --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundRecoveryStorePostgresTest=6 \
             --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundRecoveryExecutionPostgresTest=7 \
+            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundReconcilerPostgresTest=8 \
             --allow-skipped-suite com.shoppinglive.shopping.product.ProductSellerMigrationTest=1 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
@@ -115,8 +116,8 @@ jobs:
             database: commerce_test
             task: ':services:commerce-service:postgresCommerceTest'
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.PaymentRecoveryStorePostgresTest *.PaymentRecoveryPostgresTest *.DurableMockGatewayPostgresTest *.CouponManagementPostgresTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest *.RefundSchemaPostgresTest *.RefundIntakeServicePostgresTest *.DurableMockRefundGatewayPostgresTest *.RefundExecutionPostgresTest *.RefundExecutionConcurrencyPostgresTest *.RefundApiPostgresTest *.RefundRecoveryStorePostgresTest *.RefundRecoveryExecutionPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=8 *.PaymentGroupIntegrationTest=26 *.PaymentRecoveryPostgresTest=9 *.PaymentRecoveryStorePostgresTest=6 *.DurableMockGatewayPostgresTest=4 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=3 *.RefundSchemaPostgresTest=3 *.RefundIntakeServicePostgresTest=7 *.DurableMockRefundGatewayPostgresTest=4 *.RefundExecutionPostgresTest=9 *.RefundExecutionConcurrencyPostgresTest=1 *.RefundApiPostgresTest=1 *.RefundRecoveryStorePostgresTest=6 *.RefundRecoveryExecutionPostgresTest=7'
+            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.PaymentRecoveryStorePostgresTest *.PaymentRecoveryPostgresTest *.DurableMockGatewayPostgresTest *.CouponManagementPostgresTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest *.RefundSchemaPostgresTest *.RefundIntakeServicePostgresTest *.DurableMockRefundGatewayPostgresTest *.RefundExecutionPostgresTest *.RefundExecutionConcurrencyPostgresTest *.RefundApiPostgresTest *.RefundRecoveryStorePostgresTest *.RefundRecoveryExecutionPostgresTest *.RefundReconcilerPostgresTest'
+            minimums: '*.MemberCommerceMigrationPostgresTest=8 *.PaymentGroupIntegrationTest=26 *.PaymentRecoveryPostgresTest=9 *.PaymentRecoveryStorePostgresTest=6 *.DurableMockGatewayPostgresTest=4 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=3 *.RefundSchemaPostgresTest=3 *.RefundIntakeServicePostgresTest=7 *.DurableMockRefundGatewayPostgresTest=4 *.RefundExecutionPostgresTest=9 *.RefundExecutionConcurrencyPostgresTest=1 *.RefundApiPostgresTest=2 *.RefundRecoveryStorePostgresTest=6 *.RefundRecoveryExecutionPostgresTest=7 *.RefundReconcilerPostgresTest=8'
           - service: live
             database: live_test
             # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.
@@ -256,12 +257,38 @@ jobs:
       - name: Require complete integration evidence
         if: always()
         run: python3 .github/scripts/check_integration_results.py
+      - name: Run refund process crash and restart proof
+        run: node scripts/integration/refund-recovery-proof.cjs --use-prebuilt
+      - name: Require all three refund crash boundaries
+        if: always()
+        env:
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads(Path('build/refund-recovery-proof/summary.json').read_text())
+          assert result['sha'] == os.environ['VERIFIED_SHA']
+          assert result['passed'] and result['recoveryProofPassed'] and result['cleanupPassed']
+          assert result['interruptionBoundary'] == {'pauseSeconds': 10, 'socketTimeoutSeconds': 60}
+          assert result['refundActivation'] == 'application-defaults'
+          crashes = result['processCrashes']
+          assert len(crashes) == 3
+          assert {item['phase'] for item in crashes} == {'before-result', 'after-result', 'during-apply'}
+          for item in crashes:
+              assert item['crash']['signal'] == 'SIGKILL' and item['crash']['exited']
+              assert item['newProcess'] != item['crash']['processId']
+              assert item['providerResults'] == 1 and item['status'] == 'SUCCESS'
+              assert 0 <= item['observedToCrashMs'] < 5000
+          PY
       - name: Upload sanitized integration evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-${{ github.sha }}
-          path: build/integration/
+          path: |
+            build/integration/
+            build/refund-recovery-proof/
           if-no-files-found: error
           retention-days: 7
 

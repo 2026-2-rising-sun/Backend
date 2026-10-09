@@ -20,6 +20,9 @@ spring:
 commerce:
   payment:
     recovery-enabled: false
+  refunds:
+    api-enabled: false
+    execution-enabled: false
   dev:
     payment-scenario:
       enabled: true

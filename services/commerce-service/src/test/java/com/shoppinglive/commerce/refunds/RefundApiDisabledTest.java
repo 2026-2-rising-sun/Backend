@@ -10,13 +10,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {"commerce.refunds.api-enabled=false", "commerce.refunds.execution-enabled=false"})
 @AutoConfigureMockMvc
 class RefundApiDisabledTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
 
     @Test
-    void refundRoutesRemainUnavailableByDefault() throws Exception {
+    void operatorCanExplicitlyDisableRefundRoutes() throws Exception {
         mvc.perform(post("/v1/payment-groups/PG-unknown/refunds")
                 .header("Authorization", bearer(MEMBER_A))
                 .header("Idempotency-Key", "disabled")

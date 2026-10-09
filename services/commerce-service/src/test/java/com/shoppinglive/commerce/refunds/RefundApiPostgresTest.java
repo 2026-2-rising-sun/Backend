@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class RefundApiPostgresTest extends RefundTestSupport {
     @Autowired MockMvc mvc;
+    @Autowired com.shoppinglive.commerce.refunds.application.RefundExecutionService executions;
+    @Autowired com.shoppinglive.commerce.refunds.application.DurableMockRefundGateway refundGateway;
 
     @Test
     void memberAndSellersSeeOnlyTheirOwnRefundProjection() throws Exception {
@@ -59,5 +61,45 @@ class RefundApiPostgresTest extends RefundTestSupport {
             .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0))
             .andExpect(jsonPath("$.data[0].targets.length()").value(1))
             .andExpect(jsonPath("$.data[0].targets[0].cartItemId").value(b.getId()));
+    }
+
+    @Test
+    void ownUnknownRecoveryIsVisibleWithoutLeakingKeysLeasesOrAnotherSellersMoney() throws Exception {
+        var group = createAndPay();
+        var request = mvc.perform(post("/v1/payment-groups/{number}/refunds", group.groupNumber())
+                .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-recovery"))
+            .andExpect(status().isCreated()).andReturn();
+        long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(request.getResponse().getContentAsString())
+            .path("data").path("id").asLong();
+        jdbc.update("UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at,"
+            + "next_action_at=clock_timestamp()+INTERVAL '1 minute' WHERE id=?", id);
+
+        mvc.perform(get("/v1/payment-groups/{number}/refunds/{id}", group.groupNumber(), id)
+                .header("Authorization", bearer(MEMBER_A)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.recovery.retryCount").value(3))
+            .andExpect(jsonPath("$.data.recovery.retryExhausted").value(true))
+            .andExpect(jsonPath("$.data.recovery.nextActionAt").isString())
+            .andExpect(jsonPath("$.data.leaseToken").doesNotExist())
+            .andExpect(jsonPath("$.data.idempotencyKey").doesNotExist());
+        mvc.perform(get("/v1/payment-groups/{number}/refunds/{id}", group.groupNumber(), id)
+                .header("Authorization", bearer(MEMBER_B))).andExpect(status().isNotFound());
+        mvc.perform(get("/v1/seller/refunds/{id}", id).header("Authorization", adminBearer()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.refundAmount").value(20000))
+            .andExpect(jsonPath("$.data.targets.length()").value(1))
+            .andExpect(jsonPath("$.data.recovery.retryExhausted").value(true))
+            .andExpect(jsonPath("$.data.paymentGroupNumber").doesNotExist())
+            .andExpect(jsonPath("$.data.leaseToken").doesNotExist());
+        String unrelated = "Bearer " + TOKENS.token("66666666-6666-4666-8666-666666666666", java.util.Set.of("SELLER"));
+        mvc.perform(get("/v1/seller/refunds/{id}", id).header("Authorization", unrelated)).andExpect(status().isNotFound());
+        refundGateway.execute(id, 25000);
+        makeRefundDue(id);
+        org.assertj.core.api.Assertions.assertThat(executions.execute(id)).isTrue();
+        mvc.perform(get("/v1/payment-groups/{number}/refunds/{id}", group.groupNumber(), id)
+                .header("Authorization", bearer(MEMBER_A)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.status").value("SUCCESS"))
+            .andExpect(jsonPath("$.data.recovery").value(org.hamcrest.Matchers.nullValue()));
     }
 }

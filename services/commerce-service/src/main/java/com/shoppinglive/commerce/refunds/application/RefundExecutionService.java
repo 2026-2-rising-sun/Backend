@@ -38,6 +38,7 @@ public class RefundExecutionService {
     }
 
     public boolean executeClaimed(Lease lease, MockRefundScenario scenario) {
+        int currentRetryCount = lease.retryCount();
         try {
             if (!outcomes.prepare(lease)) return false;
             if (lease.refundAmount() == 0) return outcomes.apply(lease, MockRefundOutcome.SUCCESS);
@@ -51,6 +52,7 @@ public class RefundExecutionService {
                 recovery.unknown(lease, RefundRetryPolicy.RESULT_QUERY_DELAY);
                 return false;
             }
+            currentRetryCount = invocation.get();
             MockRefundResult result;
             try {
                 result = gateway.execute(lease.requestId(), lease.refundAmount(), scenario);
@@ -64,7 +66,8 @@ public class RefundExecutionService {
             return apply(lease, result);
         } catch (RuntimeException failure) {
             // The independent Mock result and invocation count survive local application rollback.
-            recovery.release(lease, Duration.ofSeconds(1));
+            recovery.release(lease, currentRetryCount == RefundRetryPolicy.MAX_RETRIES
+                ? RefundRetryPolicy.RESULT_QUERY_DELAY : Duration.ofSeconds(1));
             throw failure;
         }
     }

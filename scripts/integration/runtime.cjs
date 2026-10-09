@@ -254,6 +254,27 @@ class Runtime {
     else await this.start(service);
     await this.waitReady(service);
   }
+  async crash(service) {
+    assert(instances.includes(service), 'Unknown integration process');
+    if (this.mode === 'docker') {
+      const name = this.id + '-' + service;
+      assert(this.owned(name), 'Only this run owns the process being interrupted');
+      const previous = JSON.parse(command('docker', ['inspect', name]))[0].State.Pid;
+      command('docker', ['kill', '--signal', 'KILL', name]);
+      const state = JSON.parse(command('docker', ['inspect', name]))[0].State;
+      assert.equal(state.Running, false);
+      assert.equal(state.ExitCode, 137);
+      return { signal: 'SIGKILL', processId: previous, exited: true };
+    }
+    const child = this.children.get(service);
+    assert(child && child.exitCode === null && child.signalCode === null, 'Owned integration process must be running');
+    const exited = new Promise(resolve => child.once('exit', resolve));
+    assert(child.kill('SIGKILL'), 'Failed to interrupt owned process');
+    await exited;
+    assert.equal(child.signalCode, 'SIGKILL');
+    this.children.delete(service);
+    return { signal: child.signalCode, processId: child.pid, exited: true };
+  }
   async reconfigure(service, overrides) {
     assert(services.includes(service));
     const upstreamKeys = ['SHOPPING_SALES_CLIENT_BASE_URL', 'COMMERCE_SHOPPING_CLIENT_BASE_URL',
