@@ -153,6 +153,27 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
     }
 
     @Test
+    void 단건주문에_대상아닌_쿠폰을_보내면_주문재고쿠폰을_변경하지_않는다() throws Exception {
+        jdbc.update("UPDATE coupon_target SET product_id=? WHERE coupon_id=?", PRODUCT_ID + 1, COUPON_ID);
+        String body = """
+            {"productId":%d,"quantity":2,"buyerName":"구매자","buyerPhone":"010-1234-5678",
+             "expectedTotalAmount":30000,"couponId":"%s"}
+            """.formatted(PRODUCT_ID, COUPON_ID);
+
+        mockMvc.perform(post("/v1/orders")
+                .header("Authorization", bearer(MEMBER_A))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isConflict());
+
+        assertThat(orders.count()).isZero();
+        assertThat(groups.count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class, COUPON_ID))
+            .isEqualTo("AVAILABLE");
+        assertThat(salesStockRepository.findAll()).extracting(SalesStock::getAvailable).containsExactly(5);
+        assertThat(salesStockRepository.findAll()).extracting(SalesStock::getReserved).containsExactly(0);
+    }
+
+    @Test
     void 구매불가_상품에는_쿠폰을_적용할_수_없다() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=6&couponId=" + COUPON_ID)
             .andExpect(status().isConflict());
