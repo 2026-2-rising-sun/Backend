@@ -75,6 +75,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     @Autowired InMemoryShoppingClientStub shopping;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
+    @MockitoSpyBean com.shoppinglive.commerce.purchase.application.DurableMockGateway gateway;
     // Resolve explicitly to assert each committed phase without racing the scheduled callback.
     @MockitoBean MockPaymentEngine engine;
     private Long salesA;
@@ -488,6 +489,42 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(items.findById(a.getId()).orElseThrow().getQuantity()).isEqualTo(3);
         assertThat(orders.findAll()).extracting(order -> order.getQuantity()).containsExactlyInAnyOrder(2, 1);
         stock(salesA, 8, 0); stock(salesB, 9, 0);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = PaymentScenario.class, names = {"INSTANT_SUCCESS", "INSTANT_FAIL"})
+    void unconfirmedGatewayResultRetainsCouponCartAndStockUntilConfirmedOnce(PaymentScenario finalScenario) throws Exception {
+        issueCoupon();
+        var group = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "unknown-order").group();
+        scenarios.set(group.groupNumber(), finalScenario);
+        var attempt = service.start(MEMBER_A, group.groupNumber(), "unknown-payment");
+        doReturn(PaymentStatus.TIMEOUT).when(gateway).authorize(attempt.getId(), attempt.getScenario());
+
+        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(service.resolve(attempt.getId())).isFalse();
+        var unknown = payments.findById(attempt.getId()).orElseThrow();
+        assertThat(unknown.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(unknown.getResolvedAt()).isNull();
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+        assertThat(orders.findAll()).extracting(order -> order.getStatus()).containsOnly(OrderStatus.PAYMENT_CONFIRMING);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(items.count()).isEqualTo(3);
+        stock(salesA, 8, 2); stock(salesB, 9, 1);
+        mvc.perform(post("/v1/payment-groups/{number}/payments", group.groupNumber())
+                .header("Authorization", bearer(MEMBER_A)).header("X-Idempotency-Key", "unknown-payment"))
+            .andExpect(status().isAccepted()).andExpect(jsonPath("$.status").value("UNKNOWN"));
+
+        // Later authoritative result is applied through the same attempt and real durable gateway.
+        org.mockito.Mockito.doCallRealMethod().when(gateway).authorize(attempt.getId(), attempt.getScenario());
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus()).isEqualTo(finalScenario.getOutcome());
+        boolean success = finalScenario == PaymentScenario.INSTANT_SUCCESS;
+        assertThat(couponStatus()).isEqualTo(success ? "USED" : "AVAILABLE");
+        assertThat(items.count()).isEqualTo(success ? 1 : 3);
+        stock(salesA, success ? 8 : 10, 0); stock(salesB, success ? 9 : 10, 0);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?", Integer.class, attempt.getId()))
+            .isEqualTo(1);
     }
 
     @Test

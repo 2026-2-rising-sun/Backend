@@ -467,6 +467,38 @@
           "change": "Include seller-scoped cumulativeRefundAmount."
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "93c5ee2c6b8325bcff85c97bce97c0fc8f6ad5f2db8b170ebff277d71195b441",
+      "headSnapshotSha256": "d38b4e48c9d72ed51a076d32bac5e9154a683e247d706ae22e190a7799b5fe0e",
+      "reason": "PaymentAttempt exposes UNKNOWN for unconfirmed authorization and clarifies PROCESSING plus compatibility-only PENDING/TIMEOUT; UNKNOWN retains stock and coupon reservations until a confirmed outcome.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Reviewed H1 #152 branch/working-tree changes over c8ca5a233ece320d238346f83d70460436e19575 including PaymentAttempt OpenAPI status semantics; no actionable functional findings. EOF whitespace subsequently normalized without behavior changes."
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/payments",
+          "change": "Allow UNKNOWN for idempotent replay of an unconfirmed payment."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/payments/{id}",
+          "change": "Expose UNKNOWN while preserving reservations."
+        },
+        {
+          "method": "POST",
+          "path": "/v1/orders/{orderNumber}/payments",
+          "change": "Clarify PaymentAttempt status semantics."
+        },
+        {
+          "method": "GET",
+          "path": "/v1/orders/{orderNumber}/payments/{paymentId}",
+          "change": "Clarify PaymentAttempt status semantics."
+        }
+      ]
     }
   ]
 }

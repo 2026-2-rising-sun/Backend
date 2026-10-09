@@ -214,19 +214,23 @@ public class PaymentGroupService {
  }
  public boolean resolve(Long id){
   PaymentAttempt attempt=payments.findById(id).orElseThrow();
-  if(attempt.getStatus().isTerminal())return false;
+  if(!attempt.getStatus().isUnconfirmed())return false;
   // Commit approval independently before applying it to order/inventory state.
   PaymentStatus result=gateway.authorize(id,attempt.getScenario());
   PaymentGroup found=groups.findById(attempt.getPaymentGroupId()).orElseThrow();guard.ensure(found.getMemberId());
   return tx.execute(t->{
    guard.lock(found.getMemberId());PaymentGroup g=lockedGroup(found.getId());
    if(g.getStatus()!=OrderStatus.PAYMENT_CONFIRMING)return false;
+   if(!result.isConfirmedOutcome()){
+    payments.markUnknownIfProcessing(id);
+    return false;
+   }
    List<Order> children=orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
    // Cart before stock matches creation; all stock locks follow ascending sales id.
    for(Order child:children)if(child.getSourceCartItemId()!=null)cart.lockOwned(child.getSourceCartItemId(),g.getMemberId());
    for(Order child:children.stream().sorted(Comparator.comparing(Order::getSalesInfoId)).toList())guard.lockSales(child.getSalesInfoId());
    OrderStatus finalStatus=result==PaymentStatus.SUCCESS?OrderStatus.PAID:OrderStatus.FAILED;
-   if(payments.resolveIfProcessing(id,result.name())!=1)throw new IllegalStateException("payment result inconsistent");
+   if(payments.resolveIfUnconfirmed(id,result.name())!=1)throw new IllegalStateException("payment result inconsistent");
    if(result==PaymentStatus.SUCCESS)couponReservations.confirm(g.getMemberId(),g.getCouponId());
    else couponReservations.release(g.getMemberId(),g.getCouponId());
    for(Order child:children){

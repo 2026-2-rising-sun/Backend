@@ -16,13 +16,13 @@ import org.springframework.data.repository.query.Param;
 public interface PaymentAttemptJpaRepository extends JpaRepository<PaymentAttempt, Long> {
 
     /**
-     * Reconciler 스캔용 (결제 3). status = PROCESSING · scheduled_resolve_at 이 기준 시각 이전.
+     * Reconciler 스캔용 (결제 3). status IN (PROCESSING, UNKNOWN) · scheduled_resolve_at 이 기준 시각 이전.
      */
-    List<PaymentAttempt> findByStatusAndScheduledResolveAtBefore(
-        PaymentStatus status, Instant boundary, Limit limit);
+    List<PaymentAttempt> findByStatusInAndScheduledResolveAtBefore(
+        List<PaymentStatus> statuses, Instant boundary, Limit limit);
 
     /**
-     * PROCESSING · resolved_at IS NULL 인 결제 시도의 status 를 확정한다.
+     * PROCESSING/UNKNOWN · resolved_at IS NULL 인 결제 시도의 status 를 확정한다.
      *
      * <p>Mock 엔진 · Reconciler 두 경로에서 동시 호출되어도 조건부 UPDATE 로 하나만 성공.
      *
@@ -37,8 +37,14 @@ public interface PaymentAttemptJpaRepository extends JpaRepository<PaymentAttemp
                 + "       version = version + 1, "
                 + "       updated_at = CURRENT_TIMESTAMP "
                 + " WHERE id = :attemptId "
-                + "   AND status = 'PROCESSING' "
+                + "   AND status IN ('PROCESSING', 'UNKNOWN') "
+                + "   AND :outcome IN ('SUCCESS', 'FAILED') "
                 + "   AND resolved_at IS NULL",
         nativeQuery = true)
-    int resolveIfProcessing(@Param("attemptId") Long attemptId, @Param("outcome") String outcome);
+    int resolveIfUnconfirmed(@Param("attemptId") Long attemptId, @Param("outcome") String outcome);
+    /** Mark a lost/unconfirmed outcome without clearing reservations or a confirmed result. */
+    @Modifying(clearAutomatically = true)
+    @Query(value = "UPDATE payment_attempt SET status='UNKNOWN', version=version+1, updated_at=CURRENT_TIMESTAMP "
+        + "WHERE id=:attemptId AND status='PROCESSING' AND resolved_at IS NULL", nativeQuery = true)
+    int markUnknownIfProcessing(@Param("attemptId") Long attemptId);
 }

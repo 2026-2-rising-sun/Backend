@@ -111,13 +111,14 @@ class PaymentServiceTest {
 
     // ----- resolvePayment (결제 2) -----
 
-    @Test
-    void resolvePayment_SUCCESS_시나리오면_PAID_전이_consumeReserved() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = PaymentStatus.class, names = {"PROCESSING", "UNKNOWN"})
+    void resolvePayment_SUCCESS_시나리오면_PAID_전이_consumeReserved(PaymentStatus initialStatus) {
         executeTransactionInline();
-        PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, initialStatus);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfProcessing(100L, "SUCCESS")).willReturn(1);
+        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "SUCCESS")).willReturn(1);
         given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).willReturn(1);
         given(salesStockRepository.consumeReserved(order.getSalesInfoId(), 1)).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
@@ -135,7 +136,7 @@ class PaymentServiceTest {
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_FAIL, PaymentStatus.PROCESSING);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfProcessing(100L, "FAILED")).willReturn(1);
+        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "FAILED")).willReturn(1);
         given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
@@ -153,7 +154,7 @@ class PaymentServiceTest {
 
         paymentService.resolvePayment(100L);
 
-        verify(paymentAttemptRepository, never()).resolveIfProcessing(any(), any());
+        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
         verify(orderRepository, never()).transitionStatus(any(), any(), any());
     }
 
@@ -162,7 +163,7 @@ class PaymentServiceTest {
         executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfProcessing(100L, "SUCCESS")).willReturn(0);
+        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "SUCCESS")).willReturn(0);
 
         paymentService.resolvePayment(100L);
 
@@ -171,11 +172,37 @@ class PaymentServiceTest {
     }
 
     @Test
+    void unconfirmedLegacyOutcomeNeverFailsOrderOrReleasesStock() {
+        executeTransactionInline();
+        PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
+        PaymentScenario uncertain = org.mockito.Mockito.mock(PaymentScenario.class);
+        given(uncertain.getOutcome()).willReturn(PaymentStatus.TIMEOUT);
+        ReflectionTestUtils.setField(attempt, "scenario", uncertain);
+        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
+
+        assertThat(paymentService.resolvePayment(100L)).isFalse();
+
+        verify(paymentAttemptRepository).markUnknownIfProcessing(100L);
+        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
+        verify(orderRepository, never()).transitionStatus(any(), any(), any());
+        verify(salesService, never()).restoreReserved(any(), any(Integer.class));
+    }
+
+    @Test
+    void compatibilityPendingIsNotSubmittedOrResolved() {
+        given(paymentAttemptRepository.findById(100L))
+            .willReturn(Optional.of(sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PENDING)));
+        assertThat(paymentService.resolvePayment(100L)).isFalse();
+        verify(transaction, never()).execute(any());
+        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
+    }
+
+    @Test
     void resolvePayment_attempt_없으면_no_op() {
         given(paymentAttemptRepository.findById(999L)).willReturn(Optional.empty());
 
         paymentService.resolvePayment(999L);
 
-        verify(paymentAttemptRepository, never()).resolveIfProcessing(any(), any());
+        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
     }
 }

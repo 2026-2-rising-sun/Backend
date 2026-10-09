@@ -124,6 +124,28 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
     }
 
     @Test
+    void unknownAttemptIsRecoveredAndLateUnknownCannotOverwriteConfirmedSuccess() {
+        PaymentAttempt attempt = insertProcessingAttempt(
+            PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
+        var tx = new TransactionTemplate(transactionManager);
+        assertThat(tx.<Integer>execute(status -> paymentAttemptRepository.markUnknownIfProcessing(attempt.getId())))
+            .isEqualTo(1);
+        assertThat(paymentAttemptRepository.findById(attempt.getId()).orElseThrow().getResolvedAt()).isNull();
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isEqualTo(1);
+
+        assertThat(tx.<Integer>execute(status -> paymentAttemptRepository.resolveIfUnconfirmed(attempt.getId(), "TIMEOUT")))
+            .isZero();
+        assertThat(reconciler.reconcileOverdue()).isEqualTo(1);
+        assertThat(tx.<Integer>execute(status -> paymentAttemptRepository.markUnknownIfProcessing(attempt.getId())))
+            .isZero();
+        assertThat(reconciler.reconcileOverdue()).isZero();
+        assertThat(paymentAttemptRepository.findById(attempt.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+    }
+
+    @Test
     void 지연_초과된_INSTANT_FAIL_는_FAILED_로_확정_재고_복구() {
         insertProcessingAttempt(PaymentScenario.INSTANT_FAIL, Instant.now().minusSeconds(10));
 
@@ -159,7 +181,7 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
             PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
         assertThat(paymentService.resolvePayment(attempt.getId())).isTrue();
         PaymentAttemptJpaRepository staleScan = mock(PaymentAttemptJpaRepository.class);
-        when(staleScan.findByStatusAndScheduledResolveAtBefore(any(), any(), any()))
+        when(staleScan.findByStatusInAndScheduledResolveAtBefore(any(), any(), any()))
             .thenReturn(List.of(attempt));
         assertThat(new PaymentDelayReconciler(staleScan, paymentService).reconcileOverdue()).isZero();
         assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
@@ -192,7 +214,7 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
         PaymentAttempt healthy = overdueGroupAttempt(healthyOrder.getId(), "healthy-group");
         // Fix scan order while retaining real group, ledger, order and stock transactions.
         PaymentAttemptJpaRepository orderedScan = mock(PaymentAttemptJpaRepository.class);
-        when(orderedScan.findByStatusAndScheduledResolveAtBefore(any(), any(), any()))
+        when(orderedScan.findByStatusInAndScheduledResolveAtBefore(any(), any(), any()))
             .thenReturn(List.of(failed, healthy));
         PaymentDelayReconciler recovery = new PaymentDelayReconciler(orderedScan, paymentService);
 
