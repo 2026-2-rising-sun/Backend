@@ -10,6 +10,7 @@ import com.shoppinglive.commerce.payments.api.PaymentAttemptResponse;
 import com.shoppinglive.commerce.payments.application.*;
 import com.shoppinglive.commerce.payments.domain.*;
 import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository;
+import com.shoppinglive.commerce.coupons.application.CouponPreviewService;
 import com.shoppinglive.commerce.purchase.domain.PaymentGroup;
 import com.shoppinglive.commerce.purchase.infrastructure.PaymentGroupRepository;
 import com.shoppinglive.commerce.sales.domain.*;
@@ -29,8 +30,8 @@ import java.security.MessageDigest;
 @Service
 public class PaymentGroupService {
  public record Selection(Long itemId,Long version) {}
- public record Item(Long itemId,Long version,Long productId,String productName,Integer quantity,Long unitPrice,Long totalAmount) {}
- public record Quote(List<Item> items,Long totalAmount) {}
+ public record Item(Long itemId,Long version,Long productId,String productName,Integer quantity,Long unitPrice,Long totalAmount,Long discountAmount,Long payableAmount) {}
+ public record Quote(List<Item> items,Long totalAmount,String couponId,Long discountAmount,Long payableAmount) {}
  public record GroupResponse(String groupNumber,OrderStatus status,Long totalAmount,Long discountAmount,Long payableAmount,Instant expiresAt,List<OrderResponse> orders,Long paymentId) {}
  public record Creation(GroupResponse group,boolean created) {}
  private static final List<OrderStatus> ACTIVE=List.of(OrderStatus.PENDING_PAYMENT,OrderStatus.PAYMENT_CONFIRMING);
@@ -47,6 +48,7 @@ public class PaymentGroupService {
  private final ObjectProvider<DevPaymentScenarioRegistry> scenarios;
  private final TransactionTemplate tx;
  private final JdbcTemplate jdbc;
+ private final CouponPreviewService couponPreview;
  private final ObjectMapper mapper;
  private final OrderNumberGenerator numbers;
  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
@@ -54,13 +56,16 @@ public class PaymentGroupService {
  public PaymentGroupService(PaymentGroupRepository groups,OrderJpaRepository orders,CartItemRepository cart,
    SalesJpaRepository sales,SalesStockJpaRepository stock,PaymentAttemptJpaRepository payments,ShoppingClient shopping,
    PurchaseGuard guard,DurableMockGateway gateway,MockPaymentEngine engine,ObjectProvider<DevPaymentScenarioRegistry> scenarios,
-   TransactionTemplate tx,JdbcTemplate jdbc,ObjectMapper mapper,OrderNumberGenerator numbers,
+   TransactionTemplate tx,JdbcTemplate jdbc,ObjectMapper mapper,OrderNumberGenerator numbers,CouponPreviewService couponPreview,
    @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration){
   this.groups=groups;this.orders=orders;this.cart=cart;this.sales=sales;this.stock=stock;this.payments=payments;
   this.shopping=shopping;this.guard=guard;this.gateway=gateway;this.engine=engine;this.scenarios=scenarios;
-  this.tx=tx;this.jdbc=jdbc;this.mapper=mapper;this.numbers=numbers;this.expiration=expiration;
+  this.tx=tx;this.jdbc=jdbc;this.mapper=mapper;this.numbers=numbers;this.couponPreview=couponPreview;this.expiration=expiration;
  }
  public Quote preview(String member,List<Selection> selections){
+  return preview(member,selections,null);
+ }
+ public Quote preview(String member,List<Selection> selections,String couponId){
   List<Selection> selected=validateSelections(selections);
   List<Item> items=new ArrayList<>();long total=0;
   for(Selection input:selected){
@@ -71,9 +76,14 @@ public class PaymentGroupService {
    SalesStock st=stock.findById(s.getId()).orElseThrow(()->error(ErrorCode.NOT_FOUND,"재고를 찾을 수 없습니다."));
    if(!s.getStatus().canAcceptNewOrder() || st.getAvailable()<c.getQuantity())throw conflict("구매할 수 없는 상품 또는 재고 부족입니다.");
    long amount=OrderAmounts.total(s.getPrice(),c.getQuantity());total=add(total,amount);
-   items.add(new Item(c.getId(),c.getVersion(),c.getProductId(),name,c.getQuantity(),s.getPrice(),amount));
+   items.add(new Item(c.getId(),c.getVersion(),c.getProductId(),name,c.getQuantity(),s.getPrice(),amount,0L,amount));
   }
-  return new Quote(List.copyOf(items),total);
+  CouponPreviewService.Preview discount=couponPreview.preview(member,couponId,items.stream()
+   .map(item->new CouponPreviewService.PricedItem("cart:"+item.itemId(),item.productId(),item.totalAmount())).toList());
+  List<Item> priced=items.stream().map(item->{long itemDiscount=discount.itemDiscounts().get("cart:"+item.itemId());
+   return new Item(item.itemId(),item.version(),item.productId(),item.productName(),item.quantity(),item.unitPrice(),item.totalAmount(),itemDiscount,item.totalAmount()-itemDiscount);
+  }).toList();
+  return new Quote(List.copyOf(priced),total,discount.couponId(),discount.discountAmount(),discount.payableAmount());
  }
  public Creation create(String member,List<Selection> selections,String buyer,String phone,long expected,String rawKey){
   validateKey(rawKey);String key="cart:"+fingerprint(rawKey).substring(0,59);List<Selection> selected=validateSelections(selections);

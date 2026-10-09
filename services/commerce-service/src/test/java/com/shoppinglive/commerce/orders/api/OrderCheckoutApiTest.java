@@ -13,12 +13,17 @@ import com.shoppinglive.commerce.sales.infrastructure.SalesJpaRepository;
 import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
 import com.shoppinglive.commerce.shopping.domain.ProductSnapshot;
 import com.shoppinglive.commerce.shopping.infrastructure.InMemoryShoppingClientStub;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -28,8 +33,10 @@ import org.springframework.test.web.servlet.ResultActions;
  * <p>서비스 단위 테스트가 이미 판정 규칙을 덮으므로, 여기서는 상태코드와 라우팅처럼 서비스
  * 계층에서 확인할 수 없는 것만 본다.
  */
-@SpringBootTest
+@SpringBootTest(properties="spring.datasource.url=jdbc:h2:mem:order_checkout_coupon_http;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
+@Sql(scripts={"/db/migration/V5__coupon_definitions.sql", "/db/migration/V6__member_coupons.sql"},
+    executionPhase=Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 700L;
@@ -46,6 +53,11 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
     @Autowired
     private SalesStockJpaRepository salesStockRepository;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    private static final String COUPON_ID = "44444444-4444-4444-8444-444444444444";
+
     @BeforeEach
     void setUp() {
         salesStockRepository.deleteAll();
@@ -55,13 +67,43 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
 
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 15_000L, SalesStatus.ON_SALE));
         salesStockRepository.save(new SalesStock(sales.getId(), 5, 0));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        jdbc.update("""
+            INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,
+                starts_at,ends_at,expires_at,created_at) VALUES (?,?,?,5000,2,1,?,?,?,?)
+            """, COUPON_ID, SELLER, "주문서 쿠폰", Timestamp.from(now.minusSeconds(60)),
+            Timestamp.from(now.plusSeconds(3600)), Timestamp.from(now.plusSeconds(7200)), Timestamp.from(now));
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", COUPON_ID, PRODUCT_ID);
+        jdbc.update("INSERT INTO member_coupon(id,coupon_id,member_id,status,claimed_at) VALUES (?,?,?,'AVAILABLE',?)",
+            "55555555-5555-4555-8555-555555555555", COUPON_ID, MEMBER_A, Timestamp.from(now));
     }
 
     @AfterEach
     void tearDown() {
+        jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_definition WHERE id=?", COUPON_ID);
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
         shoppingClientStub.clear();
+    }
+
+    @Test
+    void 단건주문서에_보유쿠폰_할인을_계산하고_예약하지_않는다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=2&couponId=" + COUPON_ID)
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.couponId").value(COUPON_ID))
+            .andExpect(jsonPath("$.totalAmount").value(30_000))
+            .andExpect(jsonPath("$.discountAmount").value(5_000))
+            .andExpect(jsonPath("$.payableAmount").value(25_000));
+        assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class, COUPON_ID))
+            .isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void 구매불가_상품에는_쿠폰을_적용할_수_없다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=6&couponId=" + COUPON_ID)
+            .andExpect(status().isConflict());
     }
 
     private ResultActions checkout(String query) throws Exception {

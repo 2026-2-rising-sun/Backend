@@ -38,7 +38,7 @@ class CouponDiscountAllocatorTest {
             var result = CouponDiscountAllocator.allocate(discount, items);
             assertThat(result.values().stream().mapToLong(Long::longValue).sum()).isEqualTo(Math.min(discount, subtotal));
             for (Item item : items) {
-                assertThat(result.get(item.orderNumber())).isBetween(0L, item.eligible() ? item.amount() : 0L);
+                assertThat(result.get(item.key())).isBetween(0L, item.eligible() ? item.amount() : 0L);
             }
             Collections.shuffle(items, random);
             assertThat(CouponDiscountAllocator.allocate(discount, items)).isEqualTo(result);
@@ -60,9 +60,19 @@ class CouponDiscountAllocatorTest {
     }
 
     @Test
-    void breaksEqualRemaindersByImmutableOrderNumber() {
-        assertThat(CouponDiscountAllocator.allocate(1, List.of(new Item("b", 10, true), new Item("a", 10, true))))
-            .isEqualTo(Map.of("a", 1L, "b", 0L));
+    void breaksEqualRemaindersByStableAllocationKey() {
+        assertThat(CouponDiscountAllocator.allocate(2, List.of(
+            new Item("cart:309", 1000, true),
+            new Item("cart:205", 1000, true),
+            new Item("cart:101", 1000, true))))
+            .isEqualTo(Map.of("cart:101", 1L, "cart:205", 1L, "cart:309", 0L));
+    }
+
+    @Test
+    void comparesCartItemIdsNumericallyWhenRemaindersTie() {
+        assertThat(CouponDiscountAllocator.allocate(1, List.of(
+            new Item("cart:10", 1000, true), new Item("cart:2", 1000, true))))
+            .isEqualTo(Map.of("cart:2", 1L, "cart:10", 0L));
     }
 
     @Test

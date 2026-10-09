@@ -317,6 +317,28 @@
         "reviewedAt": "2026-10-09",
         "evidence": "PR #183 final review identified and corrected the seller coupon detail 503 response regression; final HEAD includes AuthUnavailable, member API/service, migration, authorization and OpenAPI review."
       }
+    },
+    {
+      "baseSnapshotSha256": "55314f4e46e49691c0559311d0668a7c35014e728210a747c1889706b10768ed",
+      "headSnapshotSha256": "cfd1b3daa5e986e8da63ccd49856f45b3041fce16274335848a2def65305dd28",
+      "reason": "Commerce #172 extends single-order and cart checkout previews with optional couponId, discountAmount and payableAmount, adds per-cart-item discount breakdown, and documents coupon eligibility/conflict responses. Routes and authorization requirements are unchanged. Equal remainders use numeric cart itemId order so preview and eventual order/refund amounts are reproducible.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent /root/bugbot_coupon_preview",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Final branch HEAD 7ee04476ff7c19cf12930ed2e30b3a447067d4a4; Bugbot returned no actionable issues after fixing its P2 numeric cart itemId tie-break finding. Issue: https://github.com/2026-2-rising-sun/Backend/issues/172."
+      },
+      "changedOperations": [
+        {
+          "method": "GET",
+          "path": "/v1/orders/checkout",
+          "change": "optional couponId and discount/payable response fields"
+        },
+        {
+          "method": "POST",
+          "path": "/v1/cart/checkout",
+          "change": "optional couponId and per-item/group discount/payable response fields"
+        }
+      ]
     }
   ]
 }
