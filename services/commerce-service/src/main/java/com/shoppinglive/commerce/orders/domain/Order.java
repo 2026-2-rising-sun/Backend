@@ -17,7 +17,7 @@ import java.time.Instant;
  * <p>P1 은 단건 상품 주문 스코프라 {@code order_items} 없이 {@code sales_info_id} 로 참조한다.
  *
  * <p><b>불변 필드 (updatable=false):</b> orderNumber · salesInfoId · quantity · unitPrice ·
- * totalAmount · productNameSnapshot · buyerName · buyerPhone · memberId ·
+ * totalAmount · discountAmount · payableAmount · productNameSnapshot · buyerName · buyerPhone · memberId ·
  * idempotencyKey · expiresAt. 주문 생성 시점의 스냅샷이며 이후 어떤 유스케이스도 이를
  * 바꾸지 않는다 (상품 3 · 판매 2 등 후속 변경은 기존 주문에 영향 없음).
  *
@@ -43,6 +43,12 @@ public class Order extends BaseEntity {
 
     @Column(name = "total_amount", nullable = false, updatable = false)
     private Long totalAmount;
+
+    @Column(name = "discount_amount", nullable = false, updatable = false)
+    private Long discountAmount;
+
+    @Column(name = "payable_amount", nullable = false, updatable = false)
+    private Long payableAmount;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
@@ -119,6 +125,13 @@ public class Order extends BaseEntity {
     public Order(String orderNumber, Long salesInfoId, int quantity, long unitPrice, String buyerName,
         String buyerPhone, String memberId, String productNameSnapshot, String idempotencyKey,
         Instant expiresAt, Long sourceCartItemId, Long requestedTotalAmount) {
+        this(orderNumber, salesInfoId, quantity, unitPrice, buyerName, buyerPhone, memberId,
+            productNameSnapshot, idempotencyKey, expiresAt, sourceCartItemId, requestedTotalAmount, 0L);
+    }
+
+    public Order(String orderNumber, Long salesInfoId, int quantity, long unitPrice, String buyerName,
+        String buyerPhone, String memberId, String productNameSnapshot, String idempotencyKey,
+        Instant expiresAt, Long sourceCartItemId, Long requestedTotalAmount, long discountAmount) {
         if (orderNumber == null || orderNumber.isBlank()) {
             throw new IllegalArgumentException("orderNumber must not be blank");
         }
@@ -148,6 +161,11 @@ public class Order extends BaseEntity {
         this.quantity = quantity;
         this.unitPrice = unitPrice;
         this.totalAmount = OrderAmounts.total(unitPrice, quantity);
+        if (discountAmount < 0 || discountAmount > this.totalAmount) {
+            throw new IllegalArgumentException("discountAmount must be between zero and totalAmount");
+        }
+        this.discountAmount = discountAmount;
+        this.payableAmount = this.totalAmount - discountAmount;
         this.status = OrderStatus.PENDING_PAYMENT;
         this.buyerName = buyerName;
         this.buyerPhone = buyerPhone;
@@ -178,6 +196,10 @@ public class Order extends BaseEntity {
     public Long getTotalAmount() {
         return totalAmount;
     }
+
+    public Long getDiscountAmount() { return discountAmount; }
+
+    public Long getPayableAmount() { return payableAmount; }
 
     public OrderStatus getStatus() {
         return status;
