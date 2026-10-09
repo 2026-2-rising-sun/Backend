@@ -33,8 +33,8 @@ public class CouponReservationService {
             UPDATE member_coupon m SET status='RESERVED'
             WHERE m.member_id=? AND m.coupon_id=? AND m.status='AVAILABLE'
               AND EXISTS (SELECT 1 FROM coupon_definition c WHERE c.id=m.coupon_id
-                AND c.starts_at<=? AND c.ends_at>? AND c.expires_at>?)
-            """, memberId, couponId, Timestamp.from(now), Timestamp.from(now), Timestamp.from(now));
+                AND c.starts_at<=? AND c.expires_at>?)
+            """, memberId, couponId, Timestamp.from(now), Timestamp.from(now));
         if (changed != 1) throw conflict("쿠폰을 예약할 수 없습니다. 주문서를 다시 확인해 주세요.");
     }
 
