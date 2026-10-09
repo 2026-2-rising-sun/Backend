@@ -133,20 +133,24 @@ public class PaymentService {
      */
     public boolean resolvePayment(Long paymentAttemptId) {
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
-        if (attempt == null || attempt.getStatus().isTerminal()) return false;
+        if (attempt == null || !attempt.getStatus().isUnconfirmed()) return false;
         if (attempt.getPaymentGroupId() != null) return groups.resolve(paymentAttemptId);
         return transaction.execute(status -> resolveLegacyPayment(paymentAttemptId));
     }
 
     private boolean resolveLegacyPayment(Long paymentAttemptId) {
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
-        if (attempt == null || attempt.getStatus().isTerminal()) {
+        if (attempt == null || !attempt.getStatus().isUnconfirmed()) {
             return false;
         }
 
         PaymentStatus outcome = attempt.getScenario().getOutcome();
+        if (!outcome.isConfirmedOutcome()) {
+            paymentAttemptRepository.markUnknownIfProcessing(paymentAttemptId);
+            return false;
+        }
         int updated = paymentAttemptRepository
-            .resolveIfProcessing(paymentAttemptId, outcome.name());
+            .resolveIfUnconfirmed(paymentAttemptId, outcome.name());
         if (updated == 0) {
             return false;
         }
