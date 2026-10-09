@@ -35,7 +35,7 @@ class RefundSchemaPostgresTest {
     void refundTablesKeepRequestAndOrderLevelAmountsAndSellerOwnershipSnapshot() {
         verify(jdbc -> {
             assertThat(columns(jdbc, "refund_request")).contains(
-                "payment_group_id", "member_id", "refund_amount", "status", "requested_at", "resolved_at");
+                "payment_group_id", "member_id", "idempotency_key", "request_fingerprint", "refund_amount", "status", "requested_at", "resolved_at");
             assertThat(columns(jdbc, "refund_target_order")).contains(
                 "refund_request_id", "order_id", "product_id_snapshot", "seller_id_snapshot", "refund_amount");
             assertThat(indexes(jdbc, "refund_target_order")).contains(
@@ -55,6 +55,20 @@ class RefundSchemaPostgresTest {
             assertThat(constraints).anySatisfy(value -> assertThat(value).contains("refund_amount >= 0"));
             assertThat(constraints).anySatisfy(value -> assertThat(value)
                 .contains("PROCESSING", "UNKNOWN", "SUCCESS", "FAILED"));
+        });
+    }
+
+    @Test
+    void refundRequestsRequireIdempotencyKeyAndFingerprint() {
+        verify(jdbc -> {
+            List<String> constraints = jdbc.queryForList("""
+                SELECT pg_get_constraintdef(oid)
+                  FROM pg_constraint
+                 WHERE conrelid = 'refund_request'::regclass
+                """, String.class);
+            assertThat(constraints).anySatisfy(value -> assertThat(value)
+                .contains("member_id", "idempotency_key"));
+            assertThat(columns(jdbc, "refund_request")).contains("request_fingerprint");
         });
     }
 
