@@ -102,7 +102,7 @@ public class RefundIntakeService {
             throw new BusinessException(ErrorCode.CONFLICT, "성공한 결제 이력을 확인할 수 없습니다.");
         }
         Instant now = clock.instant();
-        if (!now.isBefore(attempt.getResolvedAt().plus(REFUND_WINDOW))) {
+        if (!isRefundWindowOpen(now, attempt.getResolvedAt())) {
             throw new BusinessException(ErrorCode.CONFLICT, "환불 접수 가능 기간이 지났습니다.");
         }
 
@@ -251,6 +251,10 @@ public class RefundIntakeService {
 
     private static BusinessException invalid(String message) {
         return new BusinessException(ErrorCode.INVALID_REQUEST, message);
+    }
+
+    static boolean isRefundWindowOpen(Instant now, Instant resolvedAt) {
+        return now.isBefore(resolvedAt.plus(REFUND_WINDOW));
     }
 
     private static String fingerprint(Long groupId, List<Long> cartIds) {
