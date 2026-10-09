@@ -303,9 +303,9 @@
       "headSnapshotSha256": "68c2fbdfe5efd5c7c9067be231e2bf571d5f7cf21026220a099bcc2257848400",
       "reason": "Expose original order amount, fixed coupon discount and payable amount in order and payment-group responses while preserving legacy orders with zero discount.",
       "independentReview": {
-        "reviewer": "Bugbot independent subagent /root/bugbot_185",
+        "reviewer": "Bugbot independent subagent /root/bugbot_coupon_claim_final_fix",
         "reviewedAt": "2026-10-09",
-        "evidence": "PR #185 HEAD f242ef1897239c1a56ded4557f315d17e4c9141a; independently reviewed V7 backfill/constraints, response DTO and OpenAPI; no actionable defects."
+        "evidence": "PR #185 final HEAD e610142fa6f6bace2f17b25ee78b5f1f64748c92; independently reviewed full dev diff including discount snapshot migrations, models, response contract, and PostgreSQL fixture correction; no actionable defects."
       }
     }
   ]
