@@ -42,4 +42,14 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
                 .content("{}"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void rejectsJsonNullWithoutTreatingItAsAnOmittedBody() throws Exception {
+        mvc.perform(post("/v1/payment-groups/{number}/refunds", "PG-unknown")
+                .header("Authorization", bearer(MEMBER_A))
+                .header("Idempotency-Key", "json-null-body")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("null"))
+            .andExpect(status().isBadRequest());
+    }
 }

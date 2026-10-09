@@ -4,12 +4,16 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService.RefundView;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService.SellerRefundView;
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.util.List;
@@ -31,8 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(prefix = "commerce.refunds", name = "api-enabled", havingValue = "true")
 public class RefundController {
     private final RefundIntakeService refunds;
+    private final ObjectMapper mapper;
 
-    public RefundController(RefundIntakeService refunds) { this.refunds = refunds; }
+    public RefundController(RefundIntakeService refunds, ObjectMapper mapper) {
+        this.refunds = refunds;
+        this.mapper = mapper;
+    }
 
     public record RefundRequest(
         @JsonProperty(value = "cartItemIds", required = true)
@@ -47,11 +55,26 @@ public class RefundController {
     @PostMapping("/v1/payment-groups/{number}/refunds")
     public ResponseEntity<ApiResponse<RefundView>> request(@AuthenticationPrincipal AuthenticatedUser member,
         @PathVariable String number, @RequestHeader("Idempotency-Key") String key,
-        @Valid @RequestBody(required = false) RefundRequest input) {
-        List<Long> cartItemIds = input == null || input.cartItemIds() == null ? List.of() : input.cartItemIds();
+        @RequestBody(required = false) JsonNode body) {
+        List<Long> cartItemIds = parseCartItemIds(body);
         RefundIntakeService.RequestResult result = refunds.request(member.memberId(), number, key, cartItemIds);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
             .body(ApiResponse.ok(result.refund()));
+    }
+
+    private List<Long> parseCartItemIds(JsonNode body) {
+        if (body == null) return List.of();
+        if (!body.isObject()) throw invalidRefundBody();
+        try {
+            RefundRequest request = mapper.treeToValue(body, RefundRequest.class);
+            return request.cartItemIds();
+        } catch (JsonProcessingException | IllegalArgumentException exception) {
+            throw invalidRefundBody();
+        }
+    }
+
+    private static BusinessException invalidRefundBody() {
+        return new BusinessException(ErrorCode.INVALID_REQUEST, "환불 요청 본문은 cartItemIds 배열을 포함하는 객체여야 합니다.");
     }
 
     @GetMapping("/v1/payment-groups/{number}/refunds")
