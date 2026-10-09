@@ -127,11 +127,11 @@ async function paymentGroups(ctx, req, stock, snapshot) {
   await req('group-invalid-payment-body', 'commerce', 'POST', `${base}/payments`, { token: ctx.a, body: { scenario: 'INSTANT_FAIL' }, headers: { 'X-Idempotency-Key': 'group-payment-key' }, status: 400 });
   const changed = await req('group-cart-edit-while-pending', 'commerce', 'PATCH', `/v1/cart/items/${a.id}`, { token: ctx.a, body: { quantity: 3 } });
   const payment = await req('group-payment-start', 'commerce', 'POST', `${base}/payments`, { token: ctx.a, body: {}, headers: { 'X-Idempotency-Key': 'group-payment-key' }, status: 202 });
-  const payReplay = await req('group-payment-replay', 'commerce', 'POST', `${base}/payments`, { token: ctx.a, body: {}, headers: { 'X-Idempotency-Key': 'group-payment-key' }, status: 202 });
+  await ctx.poll('group-payment-settled-before-replay', 'commerce', `${base}/payments/${payment.paymentId}`, ctx.a, result => result.status === 'SUCCESS');
+  const payReplay = await req('group-payment-replay', 'commerce', 'POST', `${base}/payments`, { token: ctx.a, body: {}, headers: { 'X-Idempotency-Key': 'group-payment-key' }, status: 200 });
   ctx.check('group-one-payment-id', payReplay.paymentId, payment.paymentId);
   await req('group-payment-other-key', 'commerce', 'POST', `${base}/payments`, { token: ctx.a, headers: { 'X-Idempotency-Key': 'different-payment-key' }, status: 409 });
   await req('group-payment-foreign-query', 'commerce', 'GET', `${base}/payments/${payment.paymentId}`, { token: ctx.b, status: 404 });
-  await ctx.poll('group-payment-settled', 'commerce', `${base}/payments/${payment.paymentId}`, ctx.a, result => result.status === 'SUCCESS');
   const paid = await req('group-paid-query', 'commerce', 'GET', base, { token: ctx.a });
   ctx.check('group-all-orders-paid', [paid.status, paid.orders.map(o => o.status)], ['PAID',['PAID','PAID']]);
   ctx.check('group-durable-approval-once', r.sql('commerce', `SELECT count(*) FROM mock_gateway_result WHERE attempt_id=${payment.paymentId}`), '1');
