@@ -1,0 +1,68 @@
+package com.shoppinglive.commerce.refunds.api;
+
+import com.shoppinglive.commerce.refunds.application.RefundIntakeService;
+import com.shoppinglive.commerce.refunds.application.RefundIntakeService.RefundView;
+import com.shoppinglive.commerce.refunds.application.RefundIntakeService.SellerRefundView;
+import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@Validated
+@ConditionalOnProperty(prefix = "commerce.refunds", name = "api-enabled", havingValue = "true")
+public class RefundController {
+    private final RefundIntakeService refunds;
+
+    public RefundController(RefundIntakeService refunds) { this.refunds = refunds; }
+
+    public record RefundRequest(@Size(max = 100) List<@Positive Long> cartItemIds) { }
+
+    @PostMapping("/v1/payment-groups/{number}/refunds")
+    public ResponseEntity<ApiResponse<RefundView>> request(@AuthenticationPrincipal AuthenticatedUser member,
+        @PathVariable String number, @RequestHeader("Idempotency-Key") String key,
+        @Valid @RequestBody(required = false) RefundRequest input) {
+        List<Long> cartItemIds = input == null || input.cartItemIds() == null ? List.of() : input.cartItemIds();
+        RefundIntakeService.RequestResult result = refunds.request(member.memberId(), number, key, cartItemIds);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+            .body(ApiResponse.ok(result.refund()));
+    }
+
+    @GetMapping("/v1/payment-groups/{number}/refunds")
+    public ApiResponse<List<RefundView>> list(@AuthenticationPrincipal AuthenticatedUser member,
+        @PathVariable String number) {
+        return ApiResponse.ok(refunds.list(member.memberId(), number));
+    }
+
+    @GetMapping("/v1/payment-groups/{number}/refunds/{id}")
+    public ApiResponse<RefundView> get(@AuthenticationPrincipal AuthenticatedUser member,
+        @PathVariable String number, @PathVariable long id) {
+        return ApiResponse.ok(refunds.get(member.memberId(), number, id));
+    }
+
+    @GetMapping("/v1/seller/refunds")
+    public ApiResponse<List<SellerRefundView>> listSeller(@AuthenticationPrincipal AuthenticatedUser seller,
+        @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(refunds.listSeller(seller.memberId(), page, size));
+    }
+
+    @GetMapping("/v1/seller/refunds/{id}")
+    public ApiResponse<SellerRefundView> getSeller(@AuthenticationPrincipal AuthenticatedUser seller,
+        @PathVariable long id) {
+        return ApiResponse.ok(refunds.getSeller(seller.memberId(), id));
+    }
+}
