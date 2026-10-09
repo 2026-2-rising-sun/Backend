@@ -41,6 +41,15 @@ public class PaymentAttempt extends BaseEntity {
     @Column(name = "scheduled_resolve_at")
     private Instant scheduledResolveAt;
 
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+    @Column(name = "execution_started_at")
+    private Instant executionStartedAt;
+    @Column(name = "lease_token", length = 36)
+    private String leaseToken;
+    @Column(name = "lease_until")
+    private Instant leaseUntil;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
