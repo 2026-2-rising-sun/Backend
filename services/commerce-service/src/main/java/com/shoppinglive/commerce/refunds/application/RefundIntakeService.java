@@ -216,7 +216,7 @@ public class RefundIntakeService {
         Set<Long> requestedOrderIds = jdbc.query("""
             SELECT t.order_id FROM refund_request r
             JOIN refund_target_order t ON t.refund_request_id=r.id
-            WHERE r.payment_group_id=?
+            WHERE r.payment_group_id=? AND r.status <> 'FAILED'
             """, (rs, row) -> rs.getLong(1), groupId).stream().collect(Collectors.toSet());
         return targets.stream().anyMatch(order -> requestedOrderIds.contains(order.getId()));
     }

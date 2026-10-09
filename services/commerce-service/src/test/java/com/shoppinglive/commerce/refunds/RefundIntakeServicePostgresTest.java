@@ -73,6 +73,19 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
     }
 
     @Test
+    void confirmedFailedRefundTargetCanBeRequestedAgainWithinRefundWindow() {
+        var group = createAndPay();
+        var failed = refunds.request(MEMBER_A, group.groupNumber(), "refund-failed-first", List.of(a.getId())).refund();
+        jdbc.update("UPDATE refund_request SET status='FAILED' WHERE id=?", failed.id());
+
+        var retry = refunds.request(MEMBER_A, group.groupNumber(), "refund-failed-retry", List.of(a.getId()));
+
+        assertThat(retry.created()).isTrue();
+        assertThat(retry.refund().targets()).hasSize(1);
+        assertThat(retry.refund().targets().getFirst().cartItemId()).isEqualTo(a.getId());
+    }
+
+    @Test
     void refundWindowIsStrictlyLessThan168Hours() {
         var group = createAndPay();
         Long groupId = groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId();
