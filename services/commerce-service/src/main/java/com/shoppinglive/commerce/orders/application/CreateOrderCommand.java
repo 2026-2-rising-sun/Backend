@@ -21,12 +21,19 @@ public record CreateOrderCommand(
     String memberId,
     Long expectedTotalAmount,
     Long sourceCartItemId,
-    Long sourceCartItemVersion
+    Long sourceCartItemVersion,
+    String couponId
 ) {
 
     public CreateOrderCommand(Long productId, Integer quantity, String buyerName, String buyerPhone,
         String memberId, Long expectedTotalAmount) {
-        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount, null, null);
+        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount, null, null, null);
+    }
+
+    public CreateOrderCommand(Long productId, Integer quantity, String buyerName, String buyerPhone,
+        String memberId, Long expectedTotalAmount, Long sourceCartItemId, Long sourceCartItemVersion) {
+        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount,
+            sourceCartItemId, sourceCartItemVersion, null);
     }
 
     /**
@@ -46,6 +53,8 @@ public record CreateOrderCommand(
         }
         require(expectedTotalAmount == null || expectedTotalAmount > 0,
             "확인 금액은 양수여야 합니다.");
+        require(couponId == null || (!couponId.isBlank() && couponId.length() <= 64),
+            "쿠폰 식별자는 1~64자여야 합니다.");
     }
 
     /**

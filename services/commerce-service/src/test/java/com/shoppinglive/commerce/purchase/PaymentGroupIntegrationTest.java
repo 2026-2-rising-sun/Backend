@@ -298,6 +298,83 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     }
 
     @Test
+    void singleOrderCouponIsReservedSnapshottedAndConsumedAfterPaymentSuccess() {
+        issueCoupon();
+        var created = singleCouponOrder("single-coupon-success");
+        var order = created.order();
+        assertThat(order.getTotalAmount()).isEqualTo(10000L);
+        assertThat(order.getDiscountAmount()).isEqualTo(5000L);
+        assertThat(order.getPayableAmount()).isEqualTo(5000L);
+        assertThat(order.getPaymentGroup().getCouponId()).isEqualTo(COUPON_ID);
+        assertThat(order.getPaymentGroup().getDiscountAmount()).isEqualTo(5000L);
+        assertThat(order.getPaymentGroup().getPayableAmount()).isEqualTo(5000L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+
+        scenarios.set(order.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_SUCCESS);
+        var attempt = singlePayments.startPayment(order.getOrderNumber(), MEMBER_A);
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(orders.findById(order.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        stock(salesA, 9, 0);
+    }
+
+    @Test
+    void singleOrderCouponReservationIsReleasedByCancellationExpiryAndDefinitiveFailure() {
+        issueCoupon();
+        var cancelled = singleCouponOrder("single-coupon-cancel").order();
+        singleOrders.cancelBeforePayment(cancelled.getOrderNumber(), MEMBER_A);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var expired = singleCouponOrder("single-coupon-expiry").order();
+        Long groupId = expired.getPaymentGroup().getId();
+        jdbc.update("UPDATE payment_group SET expires_at=? WHERE id=?",
+            Timestamp.from(Instant.now().minusSeconds(1)), groupId);
+        assertThat(service.expire(groupId)).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var failed = singleCouponOrder("single-coupon-failure").order();
+        scenarios.set(failed.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_FAIL);
+        var attempt = singlePayments.startPayment(failed.getOrderNumber(), MEMBER_A);
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        stock(salesA, 10, 0);
+    }
+
+    @Test
+    void singleOrderFullyDiscountedCouponCompletesWithoutGatewayAndConsumesCoupon() {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 10000L, COUPON_ID);
+        var created = singleCouponOrder("single-coupon-zero").order();
+        assertThat(created.getPayableAmount()).isZero();
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+
+        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(orders.findById(created.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
+        issueCoupon();
+        var created = singleCouponOrder("single-coupon-pending").order();
+        scenarios.set(created.getPaymentGroup().getGroupNumber(), PaymentScenario.DELAYED_SUCCESS);
+
+        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(service.get(MEMBER_A, created.getPaymentGroup().getGroupNumber()).status())
+            .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+    }
+
+    private com.shoppinglive.commerce.orders.application.OrderCreationResult singleCouponOrder(String key) {
+        return singleCreation.create(new CreateOrderCommand(1L, 1, "회원", "01012345678", MEMBER_A,
+            10000L, null, null, COUPON_ID), key);
+    }
+
+    @Test
     void couponReservationRollsBackWhenLaterStockReservationFails() {
         issueCoupon();
         doReturn(0).when(stocks).reserve(salesB, 1);

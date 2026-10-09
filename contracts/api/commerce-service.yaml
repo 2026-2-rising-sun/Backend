@@ -237,14 +237,14 @@ paths:
       tags: ["Orders"]
       summary: "회원 단건 주문 생성"
       operationId: "createOrder"
-      description: "서로 다른 회원은 같은 키를 독립 사용한다. 같은 회원의 키 재사용은 상품·수량·구매자 정보·expectedTotalAmount의 값과 존재 여부까지 비교한다. 단건도 주문 하나를 가진 결제 묶음으로 생성하고 groupNumber를 반환한다. 회원당 활성 묶음은 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 다른 새 주문은 409, 동일 입력 재전송은 허용한다. 새 주문 저장과 재고 예약은 원자적이며 결제 전 기한은 15분이다."
+      description: "couponId는 선택이며 지정 시 보유 쿠폰과 대상 상품을 검증해 할인액·실부담액을 저장하고 결제 묶음에서 예약한다. expectedTotalAmount는 할인 전 주문 총액이다. 서로 다른 회원은 같은 키를 독립 사용한다. 같은 회원의 키 재사용은 상품·수량·구매자 정보·expectedTotalAmount·couponId를 비교한다. 단건도 주문 하나를 가진 결제 묶음으로 생성하고 groupNumber를 반환한다. 회원당 활성 묶음은 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 다른 새 주문은 409, 동일 입력 재전송은 허용한다. 새 주문 저장·재고 예약·쿠폰 예약은 원자적이며 결제 전 기한은 15분이다."
       parameters: [{"$ref": "#/components/parameters/OptionalIdempotencyKey"}]
       requestBody:
         required: true
         content:
           application/json:
             schema: {"$ref": "#/components/schemas/CreateOrderRequest"}
-            example: {"productId": 1, "quantity": 2, "buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000}
+            example: {"productId": 1, "quantity": 2, "buyerName": "구매자", "buyerPhone": "010-1234-5678", "expectedTotalAmount": 30000, "couponId": "coupon-uuid"}
       x-required-roles: ["USER", "SELLER"]
       responses:
         "201":
@@ -1076,7 +1076,8 @@ components:
         buyerName: {"type": "string", "minLength": 1, "maxLength": 64}
         buyerPhone: {"type": "string", "pattern": "^[0-9-]{9,32}$", "writeOnly": true}
         expectedTotalAmount: {"type": ["integer", "null"], "format": "int64", "minimum": 1}
-      description: "소유자는 JWT sub이다. 비회원 조회 비밀번호는 지원하지 않는다. expectedTotalAmount는 직접 주문에서 선택이며 보내면 최신 금액과 일치해야 한다."
+        couponId: {"type": ["string", "null"], "maxLength": 64}
+      description: "소유자는 JWT sub이다. 비회원 조회 비밀번호는 지원하지 않는다. expectedTotalAmount는 직접 주문에서 선택이며 할인 전 금액을 보내면 최신 상품 합계와 일치해야 한다. couponId는 선택이며 같은 멱등키 재요청에서 쿠폰 ID가 달라지면 409다."
     CartOrderRequest:
       type: "object"
       required: ["buyerName", "buyerPhone", "expectedTotalAmount"]

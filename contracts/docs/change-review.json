@@ -383,6 +383,16 @@
           "change": "200 for completed zero-payable payment or completed replay; 202 while positive payment is processing"
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "24286aa811152182b32b440bcebb80aa42407def831908bafaad53b25acf4c90",
+      "headSnapshotSha256": "c39dc720091c5c5fcda0245a2183da64fda63ef555d2a5da1bd7c205e07809e9",
+      "reason": "Add optional couponId to single-order creation. Document that expectedTotalAmount remains the gross amount and coupon selection is included in idempotent request comparison; the change adds no operation or authorization change.",
+      "independentReview": {
+        "reviewer": "Bugbot subagent, independent from the implementation author",
+        "reviewedAt": "2026-10-09",
+        "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/193"
+      }
     }
   ]
 }
