@@ -138,7 +138,14 @@ public class RefundIntakeService {
             sellerIds.put(product.id(), product.sellerId());
         }
 
-        long requestId = insertRequest(group.getId(), memberId, idempotencyKey, fingerprint, amount, now);
+        Long requestId = insertRequest(group.getId(), memberId, idempotencyKey, fingerprint, amount, now);
+        if (requestId == null) {
+            ExistingRequest winner = findByKey(memberId, idempotencyKey);
+            if (winner != null && Objects.equals(winner.fingerprint(), fingerprint)) {
+                return new RequestResult(load(winner.id(), groupNumber), false);
+            }
+            throw new BusinessException(ErrorCode.CONFLICT, "같은 Idempotency-Key에 다른 환불 요청을 사용할 수 없습니다.");
+        }
         for (Order order : targets) {
             jdbc.update("""
                 INSERT INTO refund_target_order
@@ -190,13 +197,16 @@ public class RefundIntakeService {
         return loadSeller(requestId, sellerId);
     }
 
-    private long insertRequest(Long groupId, String member, String key, String fingerprint, long amount, Instant at) {
-        return jdbc.queryForObject("""
+    private Long insertRequest(Long groupId, String member, String key, String fingerprint, long amount, Instant at) {
+        List<Long> ids = jdbc.query("""
             INSERT INTO refund_request
                 (payment_group_id, member_id, idempotency_key, request_fingerprint, refund_amount, status, requested_at, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-            """, Long.class, groupId, member, key, fingerprint, amount, RefundStatus.PROCESSING.name(),
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT ON CONSTRAINT uk_refund_request_member_key DO NOTHING
+            RETURNING id
+            """, (rs, row) -> rs.getLong(1), groupId, member, key, fingerprint, amount, RefundStatus.PROCESSING.name(),
             Timestamp.from(at), Timestamp.from(at), Timestamp.from(at));
+        return ids.isEmpty() ? null : ids.getFirst();
     }
 
     private ExistingRequest findByKey(String member, String key) {
