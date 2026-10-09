@@ -53,6 +53,8 @@ public record CreateOrderCommand(
         }
         require(expectedTotalAmount == null || expectedTotalAmount > 0,
             "확인 금액은 양수여야 합니다.");
+        require(couponId == null || (!couponId.isBlank() && couponId.length() <= 64),
+            "쿠폰 식별자는 1~64자여야 합니다.");
     }
 
     /**

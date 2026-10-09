@@ -89,6 +89,9 @@ public class PaymentGroupService {
   }).toList();
   return new Quote(List.copyOf(priced),total,discount.couponId(),discount.discountAmount(),discount.payableAmount());
  }
+ public CouponPreviewService.Preview previewSingle(String member,String couponId,long productId,long totalAmount){
+  return couponPreview.preview(member,couponId,List.of(new CouponPreviewService.PricedItem("single",productId,totalAmount)));
+ }
  public Creation create(String member,List<Selection> selections,String buyer,String phone,long expected,String rawKey){
   return create(member,selections,buyer,phone,expected,null,rawKey);
  }
@@ -140,10 +143,16 @@ public class PaymentGroupService {
   });
  }
  public PaymentGroup bindSingle(Order order,String requestKey,Long sourceVersion){
+  return bindSingle(order,requestKey,sourceVersion,null,0L);
+ }
+ public PaymentGroup bindSingle(Order order,String requestKey,Long sourceVersion,String couponId,long discountAmount){
   String key="single:"+(requestKey==null?UUID.randomUUID():requestKey);
   // Order idempotency has its own key; avoid group-key collisions with cart requests.
   if(key.length()>64)key="single:"+fingerprint(key).substring(0,57);
-  PaymentGroup group=groups.saveAndFlush(new PaymentGroup("PG-"+UUID.randomUUID(),order.getMemberId(),key,fingerprint(order.getOrderNumber()),order.getTotalAmount(),order.getExpiresAt()));
+  couponReservations.reserve(order.getMemberId(),couponId);
+  PaymentGroup group=groups.saveAndFlush(new PaymentGroup("PG-"+UUID.randomUUID(),order.getMemberId(),key,
+   fingerprint(List.of(order.getOrderNumber(),couponId==null?"":couponId,discountAmount)),order.getTotalAmount(),
+   order.getExpiresAt(),discountAmount,couponId));
   order.attachGroup(group,sourceVersion);orders.saveAndFlush(order);return group;
  }
  public GroupResponse get(String member,String number){return tx.execute(t->response(owned(member,number)));}

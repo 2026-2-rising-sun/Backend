@@ -167,7 +167,7 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
     static Stream<Map<String, Object>> conflictingRequests() {
         return Stream.of(Map.of("productId", 999L), Map.of("quantity", 1),
             Map.of("buyerName", "다른 구매자"), Map.of("buyerPhone", "010-9999-0000"),
-            Map.of("expectedTotalAmount", 999L));
+            Map.of("expectedTotalAmount", 999L), Map.of("couponId", "different-coupon"));
     }
 
     @ParameterizedTest

@@ -240,6 +240,11 @@ public class OrderCreationService {
             long unitPrice = sales.getPrice();
             long totalAmount = OrderAmounts.total(unitPrice, command.quantity());
             command.verifyExpectedAmount(totalAmount);
+            var coupon = command.couponId() == null
+                ? new com.shoppinglive.commerce.coupons.application.CouponPreviewService.Preview(
+                    null, 0L, totalAmount, java.util.Map.of())
+                : paymentGroups.previewSingle(command.memberId(), command.couponId(),
+                    command.productId(), totalAmount);
 
             // 재고 배정보다 주문 INSERT 를 먼저 한다. Postgres 는 미커밋 중복 INSERT 에서
             // 뒤따르는 트랜잭션을 대기시키므로, 같은 멱등키의 동시 요청이 재고에 손대기 전에
@@ -256,7 +261,8 @@ public class OrderCreationService {
                 command.memberId(),
                 productName,
                 idempotencyKey,
-                Instant.now().plus(expiration), command.sourceCartItemId(), command.expectedTotalAmount());
+                Instant.now().plus(expiration), command.sourceCartItemId(), command.expectedTotalAmount(),
+                coupon.discountAmount());
             order.recordSourceCartVersion(command.sourceCartItemVersion());
             order = orderRepository.saveAndFlush(order);
 
@@ -270,7 +276,13 @@ public class OrderCreationService {
             }
 
             markSoldOutIfDepleted(sales);
-            paymentGroups.bindSingle(order, idempotencyKey, selected == null ? null : selected.getVersion());
+            if (coupon.couponId() == null) {
+                paymentGroups.bindSingle(order, idempotencyKey,
+                    selected == null ? null : selected.getVersion());
+            } else {
+                paymentGroups.bindSingle(order, idempotencyKey,
+                    selected == null ? null : selected.getVersion(), coupon.couponId(), coupon.discountAmount());
+            }
             return OrderCreationResult.created(order);
         });
     }
@@ -304,7 +316,9 @@ public class OrderCreationService {
             || !sameProduct || !Objects.equals(order.getQuantity(), command.quantity())
             || !Objects.equals(order.getBuyerName(), command.buyerName())
             || !Objects.equals(order.getBuyerPhone(), command.buyerPhone())
-            || !Objects.equals(order.getRequestedTotalAmount(), command.expectedTotalAmount())) {
+            || !Objects.equals(order.getRequestedTotalAmount(), command.expectedTotalAmount())
+            || !Objects.equals(order.getPaymentGroup() == null ? null : order.getPaymentGroup().getCouponId(),
+                command.couponId())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
         }
         return OrderCreationResult.replayed(order);

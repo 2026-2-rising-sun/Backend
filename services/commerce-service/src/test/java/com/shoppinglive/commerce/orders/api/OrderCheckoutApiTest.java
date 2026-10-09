@@ -2,6 +2,7 @@ package com.shoppinglive.commerce.orders.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -56,6 +58,15 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private com.shoppinglive.commerce.orders.infrastructure.OrderJpaRepository orders;
+
+    @Autowired
+    private com.shoppinglive.commerce.purchase.infrastructure.PaymentGroupRepository groups;
+
+    @Autowired
+    private com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository payments;
+
     private static final String COUPON_ID = "44444444-4444-4444-8444-444444444444";
 
     @BeforeEach
@@ -80,6 +91,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
 
     @AfterEach
     void tearDown() {
+        payments.deleteAll();
+        orders.deleteAll();
+        groups.deleteAll();
         jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON_ID);
         jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?", COUPON_ID);
         jdbc.update("DELETE FROM coupon_definition WHERE id=?", COUPON_ID);
@@ -98,6 +112,44 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
             .andExpect(jsonPath("$.payableAmount").value(25_000));
         assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class, COUPON_ID))
             .isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void 단건주문생성은_미리보기와_같은_할인을_저장하고_쿠폰을_예약한다() throws Exception {
+        String body = """
+            {"productId":%d,"quantity":2,"buyerName":"구매자","buyerPhone":"010-1234-5678",
+             "expectedTotalAmount":30000,"couponId":"%s"}
+            """.formatted(PRODUCT_ID, COUPON_ID);
+
+        mockMvc.perform(post("/v1/orders")
+                .header("Authorization", bearer(MEMBER_A))
+                .header(OrderCreationController.IDEMPOTENCY_KEY_HEADER, "single-coupon-order")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.totalAmount").value(30_000))
+            .andExpect(jsonPath("$.discountAmount").value(5_000))
+            .andExpect(jsonPath("$.payableAmount").value(25_000))
+            .andExpect(jsonPath("$.groupNumber").exists());
+
+        assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class, COUPON_ID))
+            .isEqualTo("RESERVED");
+        assertThat(jdbc.queryForObject("SELECT coupon_id FROM payment_group", String.class)).isEqualTo(COUPON_ID);
+        assertThat(jdbc.queryForObject("SELECT discount_amount FROM payment_group", Long.class)).isEqualTo(5_000L);
+        assertThat(jdbc.queryForObject("SELECT payable_amount FROM payment_group", Long.class)).isEqualTo(25_000L);
+
+        mockMvc.perform(post("/v1/orders")
+                .header("Authorization", bearer(MEMBER_A))
+                .header(OrderCreationController.IDEMPOTENCY_KEY_HEADER, "single-coupon-order")
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.discountAmount").value(5_000));
+        mockMvc.perform(post("/v1/orders")
+                .header("Authorization", bearer(MEMBER_A))
+                .header(OrderCreationController.IDEMPOTENCY_KEY_HEADER, "single-coupon-order")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.replace(",\"couponId\":\"" + COUPON_ID + "\"", "")))
+            .andExpect(status().isConflict());
+        assertThat(orders.count()).isEqualTo(1);
     }
 
     @Test
