@@ -13,7 +13,7 @@ async function prove() {
   const runtime = new Runtime({ output: path.join(root, 'build/refund-recovery-proof') });
   const originalStart = runtime.start.bind(runtime);
   runtime.start = (service, overrides = {}) => originalStart(service, service === 'commerce' ? {
-    ...overrides, COMMERCE_REFUNDS_API_ENABLED: 'true', COMMERCE_REFUNDS_EXECUTION_ENABLED: 'true',
+    ...overrides,
     SPRING_DATASOURCE_URL: runtime.databaseUrl('commerce').replace(/socketTimeout=\d+/, `socketTimeout=${socketTimeoutSeconds}`)
   } : overrides);
   let context;
@@ -29,12 +29,15 @@ async function prove() {
     context.result.deferred = ['Full coupon/refund policy and boundary flow remains V1 #164; actual production payment provider is excluded'];
     context.result.processCrashes = [];
     context.result.interruptionBoundary = { pauseSeconds, socketTimeoutSeconds };
+    context.result.refundActivation = 'application-defaults';
     context.save();
     await runtime.build(process.argv.includes('--use-prebuilt') || process.env.CI === 'true');
     context.result.jars = Object.fromEntries(Object.entries(runtime.jars).map(([service, file]) =>
       [service, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
     await runtime.setup();
     assert(runtime.environments.commerce.SPRING_DATASOURCE_URL.includes(`socketTimeout=${socketTimeoutSeconds}`));
+    assert(!Object.hasOwn(runtime.environments.commerce, 'COMMERCE_REFUNDS_API_ENABLED'));
+    assert(!Object.hasOwn(runtime.environments.commerce, 'COMMERCE_REFUNDS_EXECUTION_ENABLED'));
     await memberSeller(context);
     for (const phase of ['before-result', 'after-result', 'during-apply']) await provePhase(context, phase);
     context.check('three-actual-process-crashes', context.result.processCrashes.length, 3);

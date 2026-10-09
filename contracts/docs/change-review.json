@@ -539,6 +539,26 @@
         "reviewedAt": "2026-10-09",
         "evidence": "H2 PaymentScenario changes were independently reviewed by /root/bugbot_payment_gateway over 277af63 before local commit 1a438ab; R4B recovery changes were independently reviewed by /root/bugbot_refund_recovery over 05288bf, confirming snapshot 9ea41da2cd288525f0d1693594039927bafe29881783c76751c3bf38eb22a994 and no bugs. Final stacked PR review and CI after H2 are still required."
       }
+    },
+    {
+      "baseSnapshotSha256": "a53cebcadf27c7251769a543efd65691b0bb577891bc9a43da08c9446776cbe6",
+      "headSnapshotSha256": "03cc0eacffa4a8a978cbcb805ef031873bd23fe62c37c6ea5243964ce31394ed",
+      "reason": "R4B #176 adds owned recovery metadata and enables the refund API and automatic execution/recovery by default after a real three-boundary process crash proof. Explicit API disablement returns 404; execution disablement preserves requests for recovery after reactivation.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_refund_recovery, separate from implementer",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Read-only review against R4A 05288bf confirmed default activation, explicit disabling, fixture isolation, owned recovery projections and proof using application defaults; no bugs. Independently verified snapshot 03cc0eacffa4a8a978cbcb805ef031873bd23fe62c37c6ea5243964ce31394ed. H2 scenario alignment was previously reviewed by /root/bugbot_payment_gateway. Actual opt-in proof at 5a16f49 passed 284 checks and three SIGKILL boundaries; default activation proof remains separately required."
+      }
+    },
+    {
+      "baseSnapshotSha256": "d38b4e48c9d72ed51a076d32bac5e9154a683e247d706ae22e190a7799b5fe0e",
+      "headSnapshotSha256": "03cc0eacffa4a8a978cbcb805ef031873bd23fe62c37c6ea5243964ce31394ed",
+      "reason": "Combined unmerged H2 local/test scenarios and R4B owned refund recovery metadata/default activation over the merged H1 dev baseline. Individual delivery units were independently reviewed; final stacked PR CI/review remains required.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_refund_recovery, separate from implementer",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Read-only review against R4A 05288bf confirmed default activation, explicit disabling, fixture isolation, owned recovery projections and proof using application defaults; no bugs. Independently verified snapshot 03cc0eacffa4a8a978cbcb805ef031873bd23fe62c37c6ea5243964ce31394ed. H2 scenario alignment was previously reviewed by /root/bugbot_payment_gateway. Actual opt-in proof at 5a16f49 passed 284 checks and three SIGKILL boundaries; default activation proof remains separately required."
+      }
     }
   ]
 }

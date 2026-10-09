@@ -271,6 +271,7 @@ jobs:
           assert result['sha'] == os.environ['VERIFIED_SHA']
           assert result['passed'] and result['recoveryProofPassed'] and result['cleanupPassed']
           assert result['interruptionBoundary'] == {'pauseSeconds': 10, 'socketTimeoutSeconds': 60}
+          assert result['refundActivation'] == 'application-defaults'
           crashes = result['processCrashes']
           assert len(crashes) == 3
           assert {item['phase'] for item in crashes} == {'before-result', 'after-result', 'during-apply'}

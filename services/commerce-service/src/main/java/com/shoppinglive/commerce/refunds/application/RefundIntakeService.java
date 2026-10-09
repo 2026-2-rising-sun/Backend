@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Records a refund request and its immutable order targets; execution is added by later refund steps. */
+/** Records immutable refund targets and dispatches execution after commit when enabled. */
 @Service
 public class RefundIntakeService {
     private static final Duration REFUND_WINDOW = Duration.ofHours(168);
