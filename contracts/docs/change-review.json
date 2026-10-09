@@ -559,6 +559,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "Read-only review against R4A 05288bf confirmed default activation, explicit disabling, fixture isolation, owned recovery projections and proof using application defaults; no bugs. Independently verified snapshot 03cc0eacffa4a8a978cbcb805ef031873bd23fe62c37c6ea5243964ce31394ed. H2 scenario alignment was previously reviewed by /root/bugbot_payment_gateway. Actual opt-in proof at 5a16f49 passed 284 checks and three SIGKILL boundaries; default activation proof remains separately required."
       }
+    },
+    {
+      "baseSnapshotSha256": "7fd3d237215326e51971bb021d3b71bdda965dccfa709ccfc1c9a4921c5286f8",
+      "headSnapshotSha256": "0986a994176d2abb384da3b8ef6e23de2eefc73d16567183c1ac59c51aa329ca",
+      "reason": "After H2 alignment, refund recovery metadata and default activation preserve the approved payment recovery contract. Existing refund policy remains initial plus three retries then indefinite one-minute result-only lookup.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent /root/bugbot_refund_recovery",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Read-only review of R4B 7ae24e7537bc24e89a94d84d6e7a47bacdaac031 over de432e18 found no bugs; independently confirmed base7fd3d237/head0986a994 and Commerce49523aa2. Runtime proof was inspected, not rerun by the reviewer; final runtime and remote CI remain separate evidence."
+      }
     }
   ]
 }
