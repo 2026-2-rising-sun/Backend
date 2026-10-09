@@ -1309,10 +1309,13 @@ components:
         status:
           type: string
           enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
-          description: "PROCESSING은 처리 중, UNKNOWN은 승인 결과 미확정이다. UNKNOWN 동안 주문·재고·쿠폰 예약을 유지하며 같은 결제 시도의 결과를 확인한다. PENDING은 호환용 미사용 상태로 신규 결제는 PROCESSING으로 시작한다. TIMEOUT은 기존 데이터/API 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
+          description: "PROCESSING은 처리 중, UNKNOWN은 승인 결과 미확정이다. UNKNOWN 동안 주문 PAYMENT_CONFIRMING·재고·쿠폰 예약을 유지한다. 기존 결과를 먼저 조회하고, 없으면 동일 결제 시도 ID·키·금액으로 최초 실행 외 최대 3회 Full Jitter(0–1/0–2/0–4초) 재시도한다. 소진 후 UNKNOWN을 유지하며 1분마다 결과만 조회하고 자동 종료하지 않는다. 실행 횟수·작업 선점은 DB에 저장해 서버 재시작에도 한도를 보존한다. PENDING은 호환용 미사용 상태로 신규 결제는 PROCESSING으로 시작한다. TIMEOUT은 기존 데이터/API 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
-        scheduledResolveAt: {"type": ["string", "null"], "format": "date-time"}
+        scheduledResolveAt:
+          type: [string, 'null']
+          format: date-time
+          description: "미확정 결제의 다음 자동 처리 대상 시각이다. 최초에는 시나리오 지연 시각, 이후에는 재시도 또는 결과 조회 시각이며 완료 예정 시각을 보장하지 않는다. 작업 선점·서버 부하로 실제 처리는 늦어질 수 있다. 확정 결제에서도 마지막 예약 시각은 호환용으로 남는다."
       description: "현재 결제 게이트웨이는 Mock이다. scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
     PaymentScenario:
       type: "string"
