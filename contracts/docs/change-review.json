@@ -307,6 +307,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "PR #185 final HEAD e610142fa6f6bace2f17b25ee78b5f1f64748c92; independently reviewed full dev diff including discount snapshot migrations, models, response contract, and PostgreSQL fixture correction; no actionable defects."
       }
+    },
+    {
+      "baseSnapshotSha256": "44f7f725f93763a90cb2257b00c79fb798b20daafa167bbb94045136eda74997",
+      "headSnapshotSha256": "6005f78431543cffe0acde9f8ff5717bdaa287339a52c89251a6d56d68c03572",
+      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, and documented coupon policy boundaries.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_183_final2",
+        "reviewedAt": "2026-10-09",
+        "evidence": "PR #183 HEAD fe7fad5b80529e0cda93a19c3254ff6244ac5444; final Bugbot review covered member API/service, migration, authorization and OpenAPI; no actionable defects."
+      }
     }
   ]
 }
