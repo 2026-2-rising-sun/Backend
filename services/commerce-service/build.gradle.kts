@@ -46,7 +46,8 @@ tasks.register<Test>("postgresCommerceTest") {
             "SalesStatusConcurrencyTest", "PaymentFlowIntegrationTest", "PaymentSchedulingAfterCommitTest",
             "PaymentDelayReconcilerTest", "OrderExpirationSchedulerTest", "CartOrderIntegrationTest",
             "MemberCommerceApiTest", "MemberCommerceMigrationPostgresTest", "PaymentGroupIntegrationTest", "CouponManagementPostgresTest",
-            "CouponClaimPostgresTest", "CouponPreviewPostgresTest").forEach { includeTestsMatching("*.$it") }
+            "CouponClaimPostgresTest", "CouponPreviewPostgresTest", "CouponReservationPostgresTest")
+            .forEach { includeTestsMatching("*.$it") }
     }
     doFirst {
         require(!System.getenv("COMMERCE_TEST_POSTGRES_URL").isNullOrBlank()) {
