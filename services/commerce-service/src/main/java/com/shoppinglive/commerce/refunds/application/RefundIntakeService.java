@@ -33,8 +33,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Records a refund request and its immutable order targets; execution is added by later refund steps. */
 @Service
@@ -47,15 +50,19 @@ public class RefundIntakeService {
     private final ShoppingClient shopping;
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final RefundMockEngine mockRefundEngine;
+    private final boolean executionEnabled;
 
     @Autowired
     public RefundIntakeService(PaymentGroupRepository groups, OrderJpaRepository orders,
-        PaymentAttemptJpaRepository attempts, SalesJpaRepository sales, ShoppingClient shopping, JdbcTemplate jdbc) {
-        this(groups, orders, attempts, sales, shopping, jdbc, Clock.systemUTC());
+        PaymentAttemptJpaRepository attempts, SalesJpaRepository sales, ShoppingClient shopping, JdbcTemplate jdbc,
+        RefundMockEngine mockRefundEngine, @Value("${commerce.refunds.execution-enabled:false}") boolean executionEnabled) {
+        this(groups, orders, attempts, sales, shopping, jdbc, Clock.systemUTC(), mockRefundEngine, executionEnabled);
     }
 
     RefundIntakeService(PaymentGroupRepository groups, OrderJpaRepository orders,
-        PaymentAttemptJpaRepository attempts, SalesJpaRepository sales, ShoppingClient shopping, JdbcTemplate jdbc, Clock clock) {
+        PaymentAttemptJpaRepository attempts, SalesJpaRepository sales, ShoppingClient shopping, JdbcTemplate jdbc,
+        Clock clock, RefundMockEngine mockRefundEngine, boolean executionEnabled) {
         this.groups = groups;
         this.orders = orders;
         this.attempts = attempts;
@@ -63,6 +70,8 @@ public class RefundIntakeService {
         this.shopping = shopping;
         this.jdbc = jdbc;
         this.clock = clock;
+        this.mockRefundEngine = mockRefundEngine;
+        this.executionEnabled = executionEnabled;
     }
 
     @Transactional
@@ -89,6 +98,7 @@ public class RefundIntakeService {
             if (!Objects.equals(existing.fingerprint(), fingerprint)) {
                 throw new BusinessException(ErrorCode.CONFLICT, "같은 Idempotency-Key에 다른 환불 요청을 사용할 수 없습니다.");
             }
+            scheduleIfPending(existing.id(), existing.status());
             return new RequestResult(load(existing.id(), groupNumber), false);
         }
 
@@ -145,6 +155,7 @@ public class RefundIntakeService {
         if (requestId == null) {
             ExistingRequest winner = findByKey(memberId, idempotencyKey);
             if (winner != null && Objects.equals(winner.fingerprint(), fingerprint)) {
+                scheduleIfPending(winner.id(), winner.status());
                 return new RequestResult(load(winner.id(), groupNumber), false);
             }
             throw new BusinessException(ErrorCode.CONFLICT, "같은 Idempotency-Key에 다른 환불 요청을 사용할 수 없습니다.");
@@ -157,6 +168,7 @@ public class RefundIntakeService {
                 """, requestId, order.getId(), productIds.get(order.getSalesInfoId()),
                 sellerIds.get(productIds.get(order.getSalesInfoId())), order.getPayableAmount(), Timestamp.from(now));
         }
+        scheduleIfPending(requestId, RefundStatus.PROCESSING);
         return new RequestResult(load(requestId, groupNumber), true);
     }
 
@@ -222,9 +234,24 @@ public class RefundIntakeService {
     }
 
     private ExistingRequest findByKey(String member, String key) {
-        List<ExistingRequest> rows = jdbc.query("SELECT id,payment_group_id,request_fingerprint FROM refund_request WHERE member_id=? AND idempotency_key=?",
-            (rs, row) -> new ExistingRequest(rs.getLong(1), rs.getLong(2), rs.getString(3)), member, key);
+        List<ExistingRequest> rows = jdbc.query("SELECT id,payment_group_id,request_fingerprint,status FROM refund_request WHERE member_id=? AND idempotency_key=?",
+            (rs, row) -> new ExistingRequest(rs.getLong(1), rs.getLong(2), rs.getString(3),
+                RefundStatus.valueOf(rs.getString(4))), member, key);
         return rows.isEmpty() ? null : rows.getFirst();
+    }
+
+    private void scheduleIfPending(long requestId, RefundStatus status) {
+        if (!executionEnabled || (status != RefundStatus.PROCESSING && status != RefundStatus.UNKNOWN)) return;
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            mockRefundEngine.schedule(requestId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                mockRefundEngine.schedule(requestId);
+            }
+        });
     }
 
     private RefundView load(long id, String groupNumber) {
@@ -280,7 +307,7 @@ public class RefundIntakeService {
         }
     }
 
-    private record ExistingRequest(long id, long groupId, String fingerprint) { }
+    private record ExistingRequest(long id, long groupId, String fingerprint, RefundStatus status) { }
     private record RequestRow(long amount, RefundStatus status, Instant requestedAt, Instant resolvedAt) { }
     public record Target(Long cartItemId, long orderId, long productId, String productName, int quantity, long refundAmount) { }
     public record RefundView(long id, String paymentGroupNumber, long refundAmount, RefundStatus status,
