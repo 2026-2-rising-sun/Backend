@@ -4,3 +4,8 @@
 plugins {
     id("shoppinglive.library-conventions")
 }
+
+dependencies {
+    testImplementation(libs.jackson.databind)
+    testImplementation(libs.jackson.datatype.jsr310)
+}
