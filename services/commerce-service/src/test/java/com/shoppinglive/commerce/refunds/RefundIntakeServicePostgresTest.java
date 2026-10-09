@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commerce.orders.domain.OrderStatus;
 import com.shoppinglive.commerce.refunds.application.RefundIntakeService;
+import com.shoppinglive.commerce.shopping.domain.ProductSnapshot;
 import com.shoppinglive.common.core.BusinessException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -57,5 +58,17 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
         jdbc.update("UPDATE payment_attempt SET resolved_at = CURRENT_TIMESTAMP - INTERVAL '168 hours' WHERE id=?", paymentId);
         assertThatThrownBy(() -> refunds.request(MEMBER_A, group.groupNumber(), "refund-expired", List.of(a.getId())))
             .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void legacyProductWithoutSellerCanStillBeRefunded() {
+        var group = createAndPay();
+        shopping.register(new ProductSnapshot(81001L, "A", null, null));
+
+        var result = refunds.request(MEMBER_A, group.groupNumber(), "refund-legacy-owner", List.of(a.getId())).refund();
+
+        assertThat(result.refundAmount()).isEqualTo(20000L);
+        assertThat(jdbc.queryForObject("SELECT seller_id_snapshot FROM refund_target_order WHERE refund_request_id=?",
+            String.class, result.id())).isNull();
     }
 }

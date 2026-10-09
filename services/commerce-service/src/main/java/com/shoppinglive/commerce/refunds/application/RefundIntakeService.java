@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -132,8 +133,10 @@ public class RefundIntakeService {
         if (!productIds.keySet().containsAll(salesIds)) {
             throw new BusinessException(ErrorCode.CONFLICT, "주문 상품 스냅샷을 확인할 수 없습니다.");
         }
-        Map<Long, String> sellerIds = shopping.findProducts(productIds.values()).stream()
-            .collect(Collectors.toMap(ProductSnapshot::id, ProductSnapshot::sellerId, (left, right) -> left));
+        Map<Long, String> sellerIds = new HashMap<>();
+        for (ProductSnapshot product : shopping.findProducts(productIds.values())) {
+            sellerIds.put(product.id(), product.sellerId());
+        }
 
         long requestId = insertRequest(group.getId(), memberId, idempotencyKey, fingerprint, amount, now);
         for (Order order : targets) {
