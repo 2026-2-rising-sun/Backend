@@ -54,7 +54,7 @@ async function couponRefundFlow(ctx) {
   ctx.check('p3-group-replay-same-id', replay.groupNumber, group.groupNumber);
   const payment = await req('pay', 'POST', base + '/payments', { status: 202, headers: { 'X-Idempotency-Key': 'p3-pay' } });
   await ctx.poll('p3-paid', 'commerce', `${base}/payments/${id(payment.paymentId)}`, ctx.a, b => b.status === 'SUCCESS');
-  ctx.check('p3-coupon-used', await couponStatus('coupon-used'), 'USED');
+  ctx.check('p3-coupon-used', await couponStatus('coupon-used-read'), 'USED');
   const sold = before.map((s, i) => ({ available: s.available - (i === 0 ? 2 : 1), reserved: s.reserved }));
   ctx.check('p3-paid-stock', stock(), sold);
   ctx.check('p3-paid-cart-cleaned', r.sql('commerce', `SELECT count(*) FROM cart_item WHERE id IN (${items.map(i => id(i.id)).join(',')})`), '0');
