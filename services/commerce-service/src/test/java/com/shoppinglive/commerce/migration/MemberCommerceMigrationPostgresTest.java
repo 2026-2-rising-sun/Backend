@@ -130,6 +130,23 @@ class MemberCommerceMigrationPostgresTest {
             + "' AND table_name='payment_group'")).isZero();
     }
 
+    @Test
+    void discountSnapshotMigrationBackfillsGrossAndPayableAmountsForLegacyOrdersAndGroups() throws Exception {
+        migration("3").migrate();
+        sale();
+        memberOrder(1, "11111111-1111-4111-8111-111111111111", "snapshot-legacy");
+
+        migration(null).migrate();
+
+        assertThat(count("SELECT total_amount FROM orders WHERE id=1")).isEqualTo(1000);
+        assertThat(count("SELECT discount_amount FROM orders WHERE id=1")).isZero();
+        assertThat(count("SELECT payable_amount FROM orders WHERE id=1")).isEqualTo(1000);
+        assertThat(count("SELECT discount_amount FROM payment_group WHERE group_number='PG-LEGACY-1'")).isZero();
+        assertThat(count("SELECT payable_amount FROM payment_group WHERE group_number='PG-LEGACY-1'")).isEqualTo(1000);
+        assertThatThrownBy(() -> sql("UPDATE orders SET discount_amount=1001 WHERE id=1"))
+            .isInstanceOf(java.sql.SQLException.class);
+    }
+
     private void sale() throws Exception {
         sql("INSERT INTO sales_info (id,product_id,price,status,created_at,updated_at) VALUES (1,1,1000,'ON_SALE',now(),now())");
         sql("INSERT INTO sales_stock (sales_info_id,available,reserved,created_at,updated_at) VALUES (1,10,0,now(),now())");
