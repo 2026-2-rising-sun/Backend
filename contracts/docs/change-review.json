@@ -393,6 +393,43 @@
         "reviewedAt": "2026-10-09",
         "evidence": "https://github.com/2026-2-rising-sun/Backend/pull/193"
       }
+    },
+    {
+      "baseSnapshotSha256": "c39dc720091c5c5fcda0245a2183da64fda63ef555d2a5da1bd7c205e07809e9",
+      "headSnapshotSha256": "c55c2d8c3e75bbde8a6ab1ab0b7ddb3474dd2074b1e56aa959e5a53fd837b8c2",
+      "reason": "Add refund intake and query contracts. An omitted request body means the whole payment group; a provided body requires a non-empty cartItemIds list. Explicit null and an empty list are rejected. Existing PROCESSING, UNKNOWN, or SUCCESS targets cannot be requested again with another key; confirmed FAILED targets can be retried with a new key within the seven-day window.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent",
+        "reviewedAt": "2026-10-09",
+        "evidence": "PR #189 current HEAD 8ebc5dfd6f631465ba37c42d7a442b6af7a391eb re-reviewed with no remaining concrete findings."
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/refunds",
+          "change": "Add member refund intake with omitted-body whole-group semantics and non-empty cartItemIds selection"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/refunds",
+          "change": "List refund requests for a member-owned payment group"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}/refunds/{id}",
+          "change": "Read one member-owned refund request"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/seller/refunds",
+          "change": "List seller-owned refund requests"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/seller/refunds/{id}",
+          "change": "Read one seller-owned refund request"
+        }
+      ]
     }
   ]
 }
