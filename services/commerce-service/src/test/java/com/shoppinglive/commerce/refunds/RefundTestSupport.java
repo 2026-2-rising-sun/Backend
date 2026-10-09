@@ -83,6 +83,10 @@ abstract class RefundTestSupport extends CommerceSecurityTestSupport {
         return paymentGroups.get(MEMBER_A, created.groupNumber());
     }
 
+    protected void makeRefundDue(long requestId) {
+        jdbc.update("UPDATE refund_request SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?", requestId);
+    }
+
     protected PaymentGroupService.GroupResponse createAndPayWithCoupon() {
         var now = java.time.Instant.now();
         jdbc.update("""
