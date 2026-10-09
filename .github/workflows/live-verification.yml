@@ -257,12 +257,35 @@ jobs:
       - name: Require complete integration evidence
         if: always()
         run: python3 .github/scripts/check_integration_results.py
+      - name: Run refund process crash and restart proof
+        run: node scripts/integration/refund-recovery-proof.cjs --use-prebuilt
+      - name: Require all three refund crash boundaries
+        if: always()
+        env:
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads(Path('build/refund-recovery-proof/summary.json').read_text())
+          assert result['sha'] == os.environ['VERIFIED_SHA']
+          assert result['passed'] and result['recoveryProofPassed'] and result['cleanupPassed']
+          crashes = result['processCrashes']
+          assert len(crashes) == 3
+          assert {item['phase'] for item in crashes} == {'before-result', 'after-result', 'during-apply'}
+          for item in crashes:
+              assert item['crash']['signal'] == 'SIGKILL' and item['crash']['exited']
+              assert item['newProcess'] != item['crash']['processId']
+              assert item['providerResults'] == 1 and item['status'] == 'SUCCESS'
+          PY
       - name: Upload sanitized integration evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: integration-${{ github.sha }}
-          path: build/integration/
+          path: |
+            build/integration/
+            build/refund-recovery-proof/
           if-no-files-found: error
           retention-days: 7
 
