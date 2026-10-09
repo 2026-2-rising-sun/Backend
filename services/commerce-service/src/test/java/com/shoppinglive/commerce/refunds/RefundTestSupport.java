@@ -55,6 +55,7 @@ abstract class RefundTestSupport extends CommerceSecurityTestSupport {
     @AfterEach
     void cleanRefundFixtures() {
         if (jdbc == null) return;
+        jdbc.update("DELETE FROM mock_refund_result");
         jdbc.update("DELETE FROM refund_target_order");
         jdbc.update("DELETE FROM refund_request");
         jdbc.update("DELETE FROM mock_gateway_result");

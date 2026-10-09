@@ -34,6 +34,7 @@ server:
 commerce:
   refunds:
     api-enabled: false
+    execution-enabled: false
   order:
     # 결제 없이 방치된 주문의 자동 만료 유효시간. 팀 합의 시점에 최종 값 결정.
     expiration:
