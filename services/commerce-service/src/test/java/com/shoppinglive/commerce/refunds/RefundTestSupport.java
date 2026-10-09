@@ -25,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 abstract class RefundTestSupport extends CommerceSecurityTestSupport {
     protected static final String SELLER_B = "44444444-4444-4444-8444-444444444444";
+    protected static final String REFUND_COUPON = "55555555-5555-4555-8555-555555555555";
     @Autowired protected PaymentGroupService paymentGroups;
     @Autowired protected PaymentGroupRepository groups;
     @Autowired protected CartService cart;
@@ -62,6 +63,9 @@ abstract class RefundTestSupport extends CommerceSecurityTestSupport {
         if (attempts != null) attempts.deleteAll();
         if (orders != null) orders.deleteAll();
         if (groups != null) groups.deleteAll();
+        jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", REFUND_COUPON);
+        jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?", REFUND_COUPON);
+        jdbc.update("DELETE FROM coupon_definition WHERE id=?", REFUND_COUPON);
         if (cartItems != null) cartItems.deleteAll();
         if (stocks != null) stocks.deleteAll();
         if (sales != null) sales.deleteAll();
@@ -75,6 +79,31 @@ abstract class RefundTestSupport extends CommerceSecurityTestSupport {
                 new PaymentGroupService.Selection(b.getId(), b.getVersion())),
             "구매자", "01012345678", 25000L, "refund-order").group();
         var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-payment");
+        if (attempt.getStatus() != PaymentStatus.SUCCESS) paymentGroups.resolve(attempt.getId());
+        return paymentGroups.get(MEMBER_A, created.groupNumber());
+    }
+
+    protected PaymentGroupService.GroupResponse createAndPayWithCoupon() {
+        var now = java.time.Instant.now();
+        jdbc.update("""
+            INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,
+                starts_at,ends_at,expires_at,created_at)
+            VALUES (?,?,?,1000,1,1,?,?,?,?)
+            """, REFUND_COUPON, SELLER, "환불 테스트 쿠폰", java.sql.Timestamp.from(now.minusSeconds(60)),
+            java.sql.Timestamp.from(now.plusSeconds(3600)), java.sql.Timestamp.from(now.plusSeconds(7200)),
+            java.sql.Timestamp.from(now));
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", REFUND_COUPON, 81001L);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)", REFUND_COUPON, 81002L);
+        jdbc.update("""
+            INSERT INTO member_coupon(id,coupon_id,member_id,status,claimed_at)
+            VALUES (?,?,?,'AVAILABLE',?)
+            """, java.util.UUID.randomUUID().toString(), REFUND_COUPON, MEMBER_A,
+            java.sql.Timestamp.from(now));
+        var created = paymentGroups.create(MEMBER_A,
+            java.util.List.of(new PaymentGroupService.Selection(a.getId(), a.getVersion()),
+                new PaymentGroupService.Selection(b.getId(), b.getVersion())),
+            "구매자", "01012345678", 25000L, REFUND_COUPON, "refund-coupon-order").group();
+        var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-coupon-payment");
         if (attempt.getStatus() != PaymentStatus.SUCCESS) paymentGroups.resolve(attempt.getId());
         return paymentGroups.get(MEMBER_A, created.groupNumber());
     }

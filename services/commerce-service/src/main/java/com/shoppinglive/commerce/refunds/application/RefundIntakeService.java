@@ -104,7 +104,8 @@ public class RefundIntakeService {
 
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         if (group.getStatus() != OrderStatus.PAID || groupOrders.isEmpty()
-            || groupOrders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID)) {
+            || groupOrders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID
+                && order.getStatus() != OrderStatus.REFUNDED)) {
             throw new BusinessException(ErrorCode.CONFLICT, "결제 완료된 주문만 환불할 수 있습니다.");
         }
         PaymentAttempt attempt = group.getPaymentId() == null ? null : attempts.findById(group.getPaymentId()).orElse(null);
@@ -132,6 +133,9 @@ public class RefundIntakeService {
         }
         if (hasPreviouslyRequestedTargets(group.getId(), targets)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 환불 요청에 포함된 주문이 있습니다.");
+        }
+        if (targets.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "환불 가능한 주문 상태가 아닙니다.");
         }
 
         long amount = 0;
@@ -255,23 +259,25 @@ public class RefundIntakeService {
     }
 
     private RefundView load(long id, String groupNumber) {
-        RequestRow request = jdbc.query("SELECT refund_amount,status,requested_at,resolved_at FROM refund_request WHERE id=?",
-            rs -> rs.next() ? new RequestRow(rs.getLong(1), RefundStatus.valueOf(rs.getString(2)),
-                rs.getTimestamp(3).toInstant(), rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toInstant()) : null, id);
+        RequestRow request = jdbc.query("SELECT payment_group_id,refund_amount,status,requested_at,resolved_at FROM refund_request WHERE id=?",
+            rs -> rs.next() ? new RequestRow(rs.getLong(1), rs.getLong(2), RefundStatus.valueOf(rs.getString(3)),
+                rs.getTimestamp(4).toInstant(), rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant()) : null, id);
         if (request == null) throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
+        long cumulative = jdbc.queryForObject("SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=? AND status='SUCCESS'",
+            Long.class, request.groupId());
         List<Target> targets = jdbc.query("""
             SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
               FROM refund_target_order t JOIN orders o ON o.id=t.order_id
              WHERE t.refund_request_id=? ORDER BY t.order_id
             """, (rs, row) -> new Target((Long) rs.getObject(1), rs.getLong(2), rs.getLong(3),
                 rs.getString(4), rs.getInt(5), rs.getLong(6)), id);
-        return new RefundView(id, groupNumber, request.amount(), request.status(), request.requestedAt(), request.resolvedAt(), targets);
+        return new RefundView(id, groupNumber, request.amount(), cumulative, request.status(), request.requestedAt(), request.resolvedAt(), targets);
     }
 
     private SellerRefundView loadSeller(long id, String sellerId) {
-        RequestRow request = jdbc.query("SELECT refund_amount,status,requested_at,resolved_at FROM refund_request WHERE id=?",
-            rs -> rs.next() ? new RequestRow(rs.getLong(1), RefundStatus.valueOf(rs.getString(2)),
-                rs.getTimestamp(3).toInstant(), rs.getTimestamp(4) == null ? null : rs.getTimestamp(4).toInstant()) : null, id);
+        RequestRow request = jdbc.query("SELECT payment_group_id,refund_amount,status,requested_at,resolved_at FROM refund_request WHERE id=?",
+            rs -> rs.next() ? new RequestRow(rs.getLong(1), rs.getLong(2), RefundStatus.valueOf(rs.getString(3)),
+                rs.getTimestamp(4).toInstant(), rs.getTimestamp(5) == null ? null : rs.getTimestamp(5).toInstant()) : null, id);
         if (request == null) throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
         List<Target> targets = jdbc.query("""
             SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
@@ -285,7 +291,13 @@ public class RefundIntakeService {
         } catch (ArithmeticException overflow) {
             throw new BusinessException(ErrorCode.CONFLICT, "환불 금액 범위를 초과했습니다.");
         }
-        return new SellerRefundView(id, sellerAmount, request.status(), request.requestedAt(), request.resolvedAt(), targets);
+        Long cumulative = jdbc.queryForObject("""
+            SELECT COALESCE(SUM(t.refund_amount),0) FROM refund_request r
+            JOIN refund_target_order t ON t.refund_request_id=r.id
+            WHERE r.payment_group_id=? AND r.status='SUCCESS' AND t.seller_id_snapshot=?
+            """, Long.class, request.groupId(), sellerId);
+        return new SellerRefundView(id, sellerAmount, cumulative == null ? 0L : cumulative,
+            request.status(), request.requestedAt(), request.resolvedAt(), targets);
     }
 
     private static BusinessException invalid(String message) {
@@ -308,11 +320,11 @@ public class RefundIntakeService {
     }
 
     private record ExistingRequest(long id, long groupId, String fingerprint, RefundStatus status) { }
-    private record RequestRow(long amount, RefundStatus status, Instant requestedAt, Instant resolvedAt) { }
+    private record RequestRow(long groupId, long amount, RefundStatus status, Instant requestedAt, Instant resolvedAt) { }
     public record Target(Long cartItemId, long orderId, long productId, String productName, int quantity, long refundAmount) { }
-    public record RefundView(long id, String paymentGroupNumber, long refundAmount, RefundStatus status,
+    public record RefundView(long id, String paymentGroupNumber, long refundAmount, long cumulativeRefundAmount, RefundStatus status,
         Instant requestedAt, Instant resolvedAt, List<Target> targets) { }
     public record RequestResult(RefundView refund, boolean created) { }
-    public record SellerRefundView(long id, long refundAmount, RefundStatus status, Instant requestedAt,
+    public record SellerRefundView(long id, long refundAmount, long cumulativeRefundAmount, RefundStatus status, Instant requestedAt,
         Instant resolvedAt, List<Target> targets) { }
 }

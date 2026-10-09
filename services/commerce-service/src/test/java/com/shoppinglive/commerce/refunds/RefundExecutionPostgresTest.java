@@ -23,7 +23,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundExecutionService executions;
 
     @Test
-    void successIsAppliedOnceWithoutChangingOrderOrPaymentState() {
+    void successRefundsTargetOrderAndRestoresSoldStockOnce() {
         var group = createAndPay();
         var request = refunds.request(MEMBER_A, group.groupNumber(), "execute-success", List.of(a.getId())).refund();
 
@@ -31,14 +31,80 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(executions.execute(request.id())).isFalse();
 
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).cumulativeRefundAmount()).isEqualTo(20000L);
+        assertThat(refunds.getSeller(SELLER, request.id()).cumulativeRefundAmount()).isEqualTo(20000L);
+        assertThatThrownBy(() -> refunds.getSeller(SELLER_B, request.id()))
+            .isInstanceOf(BusinessException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
             request.id())).isEqualTo(1);
-        assertThat(orders.findByPaymentGroupIdOrderByIdAsc(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
-            .orElseThrow().getId())).extracting(order -> order.getStatus()).containsOnly(OrderStatus.PAID);
+        var groupId = groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId();
+        var groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(groupId);
+        assertThat(groupOrders).extracting(order -> order.getStatus())
+            .containsExactly(OrderStatus.REFUNDED, OrderStatus.PAID);
+        assertThat(stocks.findById(groupOrders.getFirst().getSalesInfoId()).orElseThrow().getAvailable()).isEqualTo(5);
+        assertThat(stocks.findById(groupOrders.getLast().getSalesInfoId()).orElseThrow().getAvailable()).isEqualTo(4);
         assertThat(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getStatus())
             .isEqualTo(OrderStatus.PAID);
         assertThat(attempts.findById(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
             .orElseThrow().getPaymentId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+    }
+
+    @Test
+    void paymentGroupIsRefundedOnlyAfterEveryOrderIsRefunded() {
+        var group = createAndPay();
+        var first = refunds.request(MEMBER_A, group.groupNumber(), "partial-a", List.of(a.getId())).refund();
+        assertThat(executions.execute(first.id())).isTrue();
+        assertThat(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getStatus())
+            .isEqualTo(OrderStatus.PAID);
+
+        var second = refunds.request(MEMBER_A, group.groupNumber(), "partial-b", List.of(b.getId())).refund();
+        assertThat(executions.execute(second.id())).isTrue();
+        assertThat(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getStatus())
+            .isEqualTo(OrderStatus.REFUNDED);
+        assertThat(orders.findByPaymentGroupIdOrderByIdAsc(
+            groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId()))
+            .extracting(order -> order.getStatus()).containsOnly(OrderStatus.REFUNDED);
+    }
+
+    @Test
+    void persistedMoneySuccessIsAppliedAfterDatabaseFailureWithoutExecutingAgain() {
+        var group = createAndPay();
+        var request = refunds.request(MEMBER_A, group.groupNumber(), "apply-retry", List.of(a.getId())).refund();
+        var target = orders.findByPaymentGroupIdOrderByIdAsc(
+            groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId()).getFirst();
+        jdbc.update("UPDATE sales_stock SET available=2147483647 WHERE sales_info_id=?", target.getSalesInfoId());
+
+        assertThatThrownBy(() -> executions.execute(request.id()))
+            .isInstanceOf(RuntimeException.class);
+        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.PROCESSING);
+        assertThat(orders.findById(target.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
+            request.id())).isEqualTo(1);
+
+        jdbc.update("UPDATE sales_stock SET available=3 WHERE sales_info_id=?", target.getSalesInfoId());
+        assertThat(executions.execute(request.id())).isTrue();
+        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(orders.findById(target.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(stocks.findById(target.getSalesInfoId()).orElseThrow().getAvailable()).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
+            request.id())).isEqualTo(1);
+    }
+
+    @Test
+    void successfulRefundDoesNotRestoreUsedCoupon() {
+        var group = createAndPayWithCoupon();
+        var request = refunds.request(MEMBER_A, group.groupNumber(), "used-coupon-refund", List.of(a.getId())).refund();
+        assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class,
+            REFUND_COUPON)).isEqualTo("USED");
+
+        assertThat(executions.execute(request.id())).isTrue();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=?", String.class,
+            REFUND_COUPON)).isEqualTo("USED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM member_coupon WHERE coupon_id=?", Integer.class,
+            REFUND_COUPON)).isEqualTo(1);
+        assertThat(groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getCouponId())
+            .isEqualTo(REFUND_COUPON);
     }
 
     @Test

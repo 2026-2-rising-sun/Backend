@@ -26,21 +26,25 @@ class RefundApiPostgresTest extends RefundTestSupport {
                 .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.refundAmount").value(25000))
+            .andExpect(jsonPath("$.data.cumulativeRefundAmount").value(0))
             .andExpect(jsonPath("$.data.targets.length()").value(2));
 
         mvc.perform(post("/v1/payment-groups/{number}/refunds", group.groupNumber())
                 .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.refundAmount").value(25000));
+            .andExpect(jsonPath("$.data.refundAmount").value(25000))
+            .andExpect(jsonPath("$.data.cumulativeRefundAmount").value(0));
 
         mvc.perform(get("/v1/payment-groups/{number}/refunds", group.groupNumber())
                 .header("Authorization", bearer(MEMBER_A)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].refundAmount").value(25000));
+            .andExpect(jsonPath("$.data[0].refundAmount").value(25000))
+            .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0));
 
         mvc.perform(get("/v1/seller/refunds").header("Authorization", adminBearer()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].refundAmount").value(20000))
+            .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0))
             .andExpect(jsonPath("$.data[0].targets.length()").value(1))
             .andExpect(jsonPath("$.data[0].targets[0].cartItemId").value(a.getId()))
             .andExpect(jsonPath("$.data[0].paymentGroupNumber").doesNotExist());
@@ -52,6 +56,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
         mvc.perform(get("/v1/seller/refunds").header("Authorization", sellerBToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data[0].refundAmount").value(5000))
+            .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0))
             .andExpect(jsonPath("$.data[0].targets.length()").value(1))
             .andExpect(jsonPath("$.data[0].targets[0].cartItemId").value(b.getId()));
     }
