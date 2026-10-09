@@ -11,6 +11,7 @@ import com.shoppinglive.commerce.payments.application.*;
 import com.shoppinglive.commerce.payments.domain.*;
 import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository;
 import com.shoppinglive.commerce.coupons.application.CouponPreviewService;
+import com.shoppinglive.commerce.coupons.application.CouponReservationService;
 import com.shoppinglive.commerce.purchase.domain.PaymentGroup;
 import com.shoppinglive.commerce.purchase.infrastructure.PaymentGroupRepository;
 import com.shoppinglive.commerce.sales.domain.*;
@@ -32,7 +33,7 @@ public class PaymentGroupService {
  public record Selection(Long itemId,Long version) {}
  public record Item(Long itemId,Long version,Long productId,String productName,Integer quantity,Long unitPrice,Long totalAmount,Long discountAmount,Long payableAmount) {}
  public record Quote(List<Item> items,Long totalAmount,String couponId,Long discountAmount,Long payableAmount) {}
- public record GroupResponse(String groupNumber,OrderStatus status,Long totalAmount,Long discountAmount,Long payableAmount,Instant expiresAt,List<OrderResponse> orders,Long paymentId) {}
+ public record GroupResponse(String groupNumber,OrderStatus status,Long totalAmount,Long discountAmount,Long payableAmount,String couponId,Instant expiresAt,List<OrderResponse> orders,Long paymentId) {}
  public record Creation(GroupResponse group,boolean created) {}
  private static final List<OrderStatus> ACTIVE=List.of(OrderStatus.PENDING_PAYMENT,OrderStatus.PAYMENT_CONFIRMING);
  private final PaymentGroupRepository groups;
@@ -49,6 +50,7 @@ public class PaymentGroupService {
  private final TransactionTemplate tx;
  private final JdbcTemplate jdbc;
  private final CouponPreviewService couponPreview;
+ private final CouponReservationService couponReservations;
  private final ObjectMapper mapper;
  private final OrderNumberGenerator numbers;
  @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
@@ -57,10 +59,12 @@ public class PaymentGroupService {
    SalesJpaRepository sales,SalesStockJpaRepository stock,PaymentAttemptJpaRepository payments,ShoppingClient shopping,
    PurchaseGuard guard,DurableMockGateway gateway,MockPaymentEngine engine,ObjectProvider<DevPaymentScenarioRegistry> scenarios,
    TransactionTemplate tx,JdbcTemplate jdbc,ObjectMapper mapper,OrderNumberGenerator numbers,CouponPreviewService couponPreview,
+   CouponReservationService couponReservations,
    @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration){
   this.groups=groups;this.orders=orders;this.cart=cart;this.sales=sales;this.stock=stock;this.payments=payments;
   this.shopping=shopping;this.guard=guard;this.gateway=gateway;this.engine=engine;this.scenarios=scenarios;
-  this.tx=tx;this.jdbc=jdbc;this.mapper=mapper;this.numbers=numbers;this.couponPreview=couponPreview;this.expiration=expiration;
+  this.tx=tx;this.jdbc=jdbc;this.mapper=mapper;this.numbers=numbers;this.couponPreview=couponPreview;
+  this.couponReservations=couponReservations;this.expiration=expiration;
  }
  public Quote preview(String member,List<Selection> selections){
   return preview(member,selections,null);
@@ -86,11 +90,15 @@ public class PaymentGroupService {
   return new Quote(List.copyOf(priced),total,discount.couponId(),discount.discountAmount(),discount.payableAmount());
  }
  public Creation create(String member,List<Selection> selections,String buyer,String phone,long expected,String rawKey){
+  return create(member,selections,buyer,phone,expected,null,rawKey);
+ }
+ public Creation create(String member,List<Selection> selections,String buyer,String phone,long expected,String couponId,String rawKey){
   validateKey(rawKey);String key="cart:"+fingerprint(rawKey).substring(0,59);List<Selection> selected=validateSelections(selections);
-  String fingerprint=fingerprint(List.of(selected,buyer,phone,expected));
+  String fingerprint=couponId==null?fingerprint(List.of(selected,buyer,phone,expected)):
+   fingerprint(List.of(selected,buyer,phone,expected,couponId));
   Optional<PaymentGroup> existing=groups.findByMemberIdAndRequestKey(member,key);
   if(existing.isPresent())return replay(existing.get(),fingerprint);
-  Quote quote=preview(member,selected);guard.ensure(member);
+  Quote quote=preview(member,selected,couponId);guard.ensure(member);
   return tx.execute(t->{
    guard.lock(member);
    Optional<PaymentGroup> replay=groups.findByMemberIdAndRequestKey(member,key);
@@ -117,10 +125,13 @@ public class PaymentGroupService {
     total=add(total,OrderAmounts.total(price,item.quantity()));currentSales.put(item.productId(),s);
    }
    if(total!=expected)throw conflict("주문 금액이 변경되었습니다. 다시 확인해 주세요.");
-   PaymentGroup group=groups.saveAndFlush(new PaymentGroup("PG-"+UUID.randomUUID(),member,key,fingerprint,total,Instant.now().plus(expiration)));
+   couponReservations.reserve(member,couponId);
+   PaymentGroup group=groups.saveAndFlush(new PaymentGroup("PG-"+UUID.randomUUID(),member,key,fingerprint,total,
+    Instant.now().plus(expiration),quote.discountAmount(),couponId));
    for(Item item:quote.items()){
     Sales s=currentSales.get(item.productId());
-    Order order=new Order(numbers.generate(),s.getId(),item.quantity(),item.unitPrice(),buyer,phone,member,item.productName(),null,group.getExpiresAt(),item.itemId(),expected);
+    Order order=new Order(numbers.generate(),s.getId(),item.quantity(),item.unitPrice(),buyer,phone,member,item.productName(),null,
+     group.getExpiresAt(),item.itemId(),expected,item.discountAmount());
     order.attachGroup(group,item.version());orders.saveAndFlush(order);
     if(stock.reserve(s.getId(),item.quantity())!=1)throw conflict("재고가 부족합니다.");
     if(stock.findById(s.getId()).orElseThrow().getAvailable()==0)sales.transitionStatus(s.getId(),"ON_SALE","SOLD_OUT");
@@ -215,7 +226,7 @@ public class PaymentGroupService {
  }
  private void restore(Order child){if(stock.restoreReserved(child.getSalesInfoId(),child.getQuantity())!=1)throw new IllegalStateException("reserved stock missing");sales.reopenIfStockAvailable(child.getSalesInfoId());}
  private PaymentGroup owned(String member,String number){return groups.findByGroupNumberAndMemberId(number,member).orElseThrow(()->error(ErrorCode.NOT_FOUND,"주문 묶음을 찾을 수 없습니다."));}
- private GroupResponse response(PaymentGroup g){return new GroupResponse(g.getGroupNumber(),g.getStatus(),g.getTotalAmount(),g.getDiscountAmount(),g.getPayableAmount(),g.getExpiresAt(),orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream().map(OrderResponse::from).toList(),g.getPaymentId());}
+ private GroupResponse response(PaymentGroup g){return new GroupResponse(g.getGroupNumber(),g.getStatus(),g.getTotalAmount(),g.getDiscountAmount(),g.getPayableAmount(),g.getCouponId(),g.getExpiresAt(),orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream().map(OrderResponse::from).toList(),g.getPaymentId());}
  private Creation replay(PaymentGroup g,String hash){if(!g.getFingerprint().equals(hash))throw conflict("다른 주문 요청에 사용된 멱등키입니다.");return new Creation(get(g.getMemberId(),g.getGroupNumber()),false);}
  private List<Selection> validateSelections(List<Selection> inputs){
   if(inputs==null || inputs.isEmpty() || inputs.size()>100)throw error(ErrorCode.INVALID_REQUEST,"상품을 1~100개 선택해 주세요.");
