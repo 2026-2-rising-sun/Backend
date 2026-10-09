@@ -310,12 +310,12 @@
     },
     {
       "baseSnapshotSha256": "44f7f725f93763a90cb2257b00c79fb798b20daafa167bbb94045136eda74997",
-      "headSnapshotSha256": "6005f78431543cffe0acde9f8ff5717bdaa287339a52c89251a6d56d68c03572",
-      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, and documented coupon policy boundaries.",
+      "headSnapshotSha256": "8667700d4ba37fba5219c85bb8969c7e3b1f3c1a7ab0e8af5253604b2fef92da",
+      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, documented policy boundaries, and preserve the existing AuthUnavailable response for seller coupon detail reads.",
       "independentReview": {
-        "reviewer": "Bugbot independent subagent /root/bugbot_183_final2",
+        "reviewer": "Bugbot independent subagent /root/bugbot_coupon_claim_final",
         "reviewedAt": "2026-10-09",
-        "evidence": "PR #183 HEAD fe7fad5b80529e0cda93a19c3254ff6244ac5444; final Bugbot review covered member API/service, migration, authorization and OpenAPI; no actionable defects."
+        "evidence": "PR #183 final review identified and corrected the seller coupon detail 503 response regression; final HEAD includes AuthUnavailable, member API/service, migration, authorization and OpenAPI review."
       }
     }
   ]
