@@ -684,7 +684,7 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/RefundViewEnvelope"}
-              example: {success: true, data: {id: 51, paymentGroupNumber: PG-EXAMPLE, refundAmount: 1900, cumulativeRefundAmount: 0, status: PROCESSING, requestedAt: '2026-10-09T00:00:00Z', resolvedAt: null, targets: [{cartItemId: 101, orderId: 301, productId: 1, productName: A, quantity: 2, refundAmount: 1900}]}, error: null}
+              example: {success: true, data: {id: 51, paymentGroupNumber: PG-EXAMPLE, refundAmount: 1900, cumulativeRefundAmount: 0, status: PROCESSING, requestedAt: '2026-10-09T00:00:00Z', resolvedAt: null, targets: [{cartItemId: 101, orderId: 301, productId: 1, productName: A, quantity: 2, refundAmount: 1900}], recovery: {retryCount: 0, retryExhausted: false, nextActionAt: '2026-10-09T00:00:00Z'}}, error: null}
         200:
           description: 동일 멱등 키·동일 입력 재요청, 기존 요청 반환
           content:
@@ -1052,9 +1052,17 @@ components:
         productName: {type: string}
         quantity: {type: integer, minimum: 1}
         refundAmount: {type: integer, format: int64, minimum: 0}
+    RefundRecovery:
+      type: [object, 'null']
+      description: PROCESSING/UNKNOWN의 영속 복구 정보. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤 새 금전 실행 없이 1분마다 기존 결과만 조회하며 자동 실패 종료하지 않는다. nextActionAt은 작업 선점 만료를 고려한 가장 이른 재탐색 시각이며 실행/결과 적용 완료를 보장하는 시각은 아니다. 내부 소유 토큰·멱등키는 반환하지 않는다.
+      required: [retryCount, retryExhausted, nextActionAt]
+      properties:
+        retryCount: {type: integer, minimum: 0, maximum: 3}
+        retryExhausted: {type: boolean}
+        nextActionAt: {type: string, format: date-time}
     RefundView:
       type: object
-      required: [id, paymentGroupNumber, refundAmount, cumulativeRefundAmount, status, requestedAt, resolvedAt, targets]
+      required: [id, paymentGroupNumber, refundAmount, cumulativeRefundAmount, status, requestedAt, resolvedAt, targets, recovery]
       properties:
         id: {type: integer, format: int64, minimum: 1}
         paymentGroupNumber: {type: string}
@@ -1064,9 +1072,10 @@ components:
         requestedAt: {type: string, format: date-time}
         resolvedAt: {type: [string, 'null'], format: date-time}
         targets: {type: array, items: {$ref: '#/components/schemas/RefundTarget'}}
+        recovery: {$ref: '#/components/schemas/RefundRecovery'}
     SellerRefundView:
       type: object
-      required: [id, refundAmount, cumulativeRefundAmount, status, requestedAt, resolvedAt, targets]
+      required: [id, refundAmount, cumulativeRefundAmount, status, requestedAt, resolvedAt, targets, recovery]
       properties:
         id: {type: integer, format: int64, minimum: 1}
         refundAmount: {type: integer, format: int64, minimum: 0, description: 해당 판매자 대상 주문만의 실부담액 합계}
@@ -1075,6 +1084,7 @@ components:
         requestedAt: {type: string, format: date-time}
         resolvedAt: {type: [string, 'null'], format: date-time}
         targets: {type: array, items: {$ref: '#/components/schemas/RefundTarget'}}
+        recovery: {$ref: '#/components/schemas/RefundRecovery'}
     RefundViewEnvelope:
       type: object
       required: [success, data, error]
