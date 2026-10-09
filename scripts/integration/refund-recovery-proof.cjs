@@ -6,12 +6,15 @@ const fs = require('node:fs');
 const { Runtime, root, command, delay } = require('./runtime.cjs');
 const { Context } = require('./context.cjs');
 const { memberSeller } = require('./member-seller.cjs');
+const pauseSeconds = 10;
+const socketTimeoutSeconds = 60;
 
 async function prove() {
   const runtime = new Runtime({ output: path.join(root, 'build/refund-recovery-proof') });
   const originalStart = runtime.start.bind(runtime);
   runtime.start = (service, overrides = {}) => originalStart(service, service === 'commerce' ? {
-    COMMERCE_REFUNDS_API_ENABLED: 'true', COMMERCE_REFUNDS_EXECUTION_ENABLED: 'true', ...overrides
+    ...overrides, COMMERCE_REFUNDS_API_ENABLED: 'true', COMMERCE_REFUNDS_EXECUTION_ENABLED: 'true',
+    SPRING_DATASOURCE_URL: runtime.databaseUrl('commerce').replace(/socketTimeout=\d+/, `socketTimeout=${socketTimeoutSeconds}`)
   } : overrides);
   let context;
   const interrupted = signal => {
@@ -25,11 +28,13 @@ async function prove() {
     context.result.scope = 'Refund recovery only: real HTTP/PostgreSQL and three actual Commerce process crashes; Mock monetary provider';
     context.result.deferred = ['Full coupon/refund policy and boundary flow remains V1 #164; actual production payment provider is excluded'];
     context.result.processCrashes = [];
+    context.result.interruptionBoundary = { pauseSeconds, socketTimeoutSeconds };
     context.save();
     await runtime.build(process.argv.includes('--use-prebuilt') || process.env.CI === 'true');
     context.result.jars = Object.fromEntries(Object.entries(runtime.jars).map(([service, file]) =>
       [service, crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
     await runtime.setup();
+    assert(runtime.environments.commerce.SPRING_DATASOURCE_URL.includes(`socketTimeout=${socketTimeoutSeconds}`));
     await memberSeller(context);
     for (const phase of ['before-result', 'after-result', 'during-apply']) await provePhase(context, phase);
     context.check('three-actual-process-crashes', context.result.processCrashes.length, 3);
@@ -78,15 +83,19 @@ async function provePhase(ctx, phase) {
   const guard = phase === 'before-result' ? '' : phase === 'after-result'
     ? "WHEN (NEW.status='REFUNDED' AND OLD.status='PAID')" : "WHEN (NEW.status='SUCCESS' AND OLD.status IN ('PROCESSING','UNKNOWN'))";
   // This database is owned by this proof run. The pause prevents crossing the chosen crash boundary.
-  r.sql('commerce', `CREATE FUNCTION r4b_pause() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(10); RETURN NEW; END $$;
+  r.sql('commerce', `CREATE FUNCTION r4b_pause() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(${pauseSeconds}); RETURN NEW; END $$;
     CREATE TRIGGER r4b_pause BEFORE ${event} ON ${table} FOR EACH ROW ${guard} EXECUTE FUNCTION r4b_pause();`);
   const refund = await req('refund', 'POST', `${base}/refunds`, { status: 201, headers: { 'Idempotency-Key': `proof-refund-${phase}` } });
   const id = number(refund.id);
   const sleeping = () => r.sql('commerce', "SELECT COUNT(*) FROM pg_stat_activity WHERE datname='commerce' AND wait_event='PgSleep' AND state='active'") === '1';
   await r.wait(sleeping, `${phase} database crash boundary`, 5000);
+  const observedAt = Date.now();
   const providerCount = () => Number(r.sql('commerce', `SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=${id}`));
   ctx.check(`refund-proof-${phase}-committed-provider-result-before-crash`, providerCount(), phase === 'before-result' ? 0 : 1);
+  assert(sleeping(), `${phase}: paused transaction must still be at the crash boundary`);
   const crash = await r.crash('commerce');
+  const observedToCrashMs = Date.now() - observedAt;
+  assert(observedToCrashMs < 5000, `${phase}: crash must precede the end of the database pause`);
   ctx.check(`refund-proof-${phase}-process-really-killed`, crash.signal, 'SIGKILL');
   // The paused PostgreSQL transaction sees the closed process socket after returning from pg_sleep;
   // DROP waits for that transaction to abort naturally. No forged provider outcome is inserted.
@@ -111,7 +120,7 @@ async function provePhase(ctx, phase) {
   ctx.check(`refund-proof-${phase}-same-request`, replay.id, id);
   ctx.check(`refund-proof-${phase}-replay-no-restock`, stock(), before);
   ctx.check(`refund-proof-${phase}-replay-no-new-provider-result`, providerCount(), 1);
-  contextEvidence(ctx, { phase, crash, newProcess, refundId: id, providerResults: providerCount(), status: completed.status });
+  contextEvidence(ctx, { phase, crash, observedToCrashMs, newProcess, refundId: id, providerResults: providerCount(), status: completed.status });
 }
 
 function contextEvidence(ctx, evidence) { ctx.result.processCrashes.push(evidence); ctx.save(); }

@@ -270,6 +270,7 @@ jobs:
           result = json.loads(Path('build/refund-recovery-proof/summary.json').read_text())
           assert result['sha'] == os.environ['VERIFIED_SHA']
           assert result['passed'] and result['recoveryProofPassed'] and result['cleanupPassed']
+          assert result['interruptionBoundary'] == {'pauseSeconds': 10, 'socketTimeoutSeconds': 60}
           crashes = result['processCrashes']
           assert len(crashes) == 3
           assert {item['phase'] for item in crashes} == {'before-result', 'after-result', 'during-apply'}
@@ -277,6 +278,7 @@ jobs:
               assert item['crash']['signal'] == 'SIGKILL' and item['crash']['exited']
               assert item['newProcess'] != item['crash']['processId']
               assert item['providerResults'] == 1 and item['status'] == 'SUCCESS'
+              assert 0 <= item['observedToCrashMs'] < 5000
           PY
       - name: Upload sanitized integration evidence
         if: always()
