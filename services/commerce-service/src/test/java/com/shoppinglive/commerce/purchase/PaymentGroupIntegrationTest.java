@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.purchase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -48,10 +49,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** No enclosing test transaction: gateway approval and the rollback boundary must really commit. */
 @SpringBootTest
+@AutoConfigureMockMvc
 class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
+    @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
     @Autowired PaymentGroupRepository groups;
     @Autowired CartService cart;
@@ -184,6 +193,88 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(couponStatus()).isEqualTo("USED");
+    }
+
+    @Test
+    void fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce() {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+
+        var quote = service.preview(MEMBER_A, selected(), COUPON_ID);
+        assertThat(quote.totalAmount()).isEqualTo(25000L);
+        assertThat(quote.discountAmount()).isEqualTo(25000L);
+        assertThat(quote.payableAmount()).isZero();
+
+        var created = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-order");
+        assertThat(created.group().payableAmount()).isZero();
+        assertThat(created.group().orders()).extracting(order -> order.payableAmount()).containsOnly(0L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+
+        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "zero-payment");
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        var completed = service.get(MEMBER_A, created.group().groupNumber());
+        assertThat(completed.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(completed.paymentId()).isEqualTo(attempt.getId());
+        assertThat(completed.orders()).extracting(order -> order.status()).containsOnly(OrderStatus.PAID);
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(cart.list(MEMBER_A)).extracting(CartItem::getId).containsExactly(unselected.getId());
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+        assertThat(service.start(MEMBER_A, created.group().groupNumber(), "zero-payment").getId()).isEqualTo(attempt.getId());
+        assertThat(payments.count()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentZeroPaymentStartsReturnOneCompletedAttempt() throws Exception {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+        var group = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-race-order").group();
+        var attempts = new ConcurrentLinkedQueue<Long>();
+        var failures = new ConcurrentLinkedQueue<Throwable>();
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            for (int i = 0; i < 2; i++) {
+                pool.submit(() -> {
+                    try {
+                        ready.countDown(); start.await();
+                        attempts.add(service.start(MEMBER_A, group.groupNumber(), "zero-race-payment").getId());
+                    } catch (Throwable failure) { failures.add(failure); }
+                    finally { done.countDown(); }
+                });
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(failures).isEmpty();
+        assertThat(attempts).hasSize(2);
+        assertThat(attempts.stream().distinct().count()).isEqualTo(1);
+        assertThat(payments.count()).isEqualTo(1);
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
+        assertThat(couponStatus()).isEqualTo("USED");
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void zeroPaymentHttpResponseSignalsCompletionWithOk() throws Exception {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+        var group = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-http-order").group();
+
+        mvc.perform(post("/v1/payment-groups/{number}/payments", group.groupNumber())
+                .header("Authorization", bearer(MEMBER_A))
+                .header("X-Idempotency-Key", "zero-http-payment")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("SUCCESS"));
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test

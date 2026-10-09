@@ -53,6 +53,15 @@ public class PaymentAttempt extends BaseEntity {
     public String getRequestKey(){return requestKey;}
     public void attachGroup(Long groupId,String key){paymentGroupId=groupId;requestKey=key;}
 
+    /** Completes a zero-payable attempt without creating a gateway authorization. */
+    public void completeWithoutCharge(Instant completedAt) {
+        if (status != PaymentStatus.PROCESSING || completedAt == null) {
+            throw new IllegalStateException("only a processing payment can complete without charge");
+        }
+        status = PaymentStatus.SUCCESS;
+        resolvedAt = completedAt;
+    }
+
     protected PaymentAttempt() {
         // JPA
     }

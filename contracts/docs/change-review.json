@@ -366,6 +366,23 @@
           "change": "nullable couponId response field"
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "b41615e297d570d9620be30908c6d3c44685062fc5ab8c5ef96540ed46715cea",
+      "headSnapshotSha256": "24286aa811152182b32b440bcebb80aa42407def831908bafaad53b25acf4c90",
+      "reason": "Commerce #174 documents terminal HTTP 200 for immediately completed zero-payable attempts and HTTP 202 for positive payments still processing. Zero payment does not invoke the gateway; order, coupon, stock and cart state complete in the same transaction.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent /root/bugbot_174",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Reviewed branch HEAD 9bdf74325d2a4a1a845b799c7124c4c7f1285ff4 against origin/dev; initial HTTP status mismatch was fixed, final review found no actionable issues."
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/payment-groups/{number}/payments",
+          "change": "200 for completed zero-payable payment or completed replay; 202 while positive payment is processing"
+        }
+      ]
     }
   ]
 }
