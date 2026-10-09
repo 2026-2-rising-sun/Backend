@@ -355,6 +355,20 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
+        issueCoupon();
+        var created = singleCouponOrder("single-coupon-pending").order();
+        scenarios.set(created.getPaymentGroup().getGroupNumber(), PaymentScenario.DELAYED_SUCCESS);
+
+        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(service.get(MEMBER_A, created.getPaymentGroup().getGroupNumber()).status())
+            .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+    }
+
     private com.shoppinglive.commerce.orders.application.OrderCreationResult singleCouponOrder(String key) {
         return singleCreation.create(new CreateOrderCommand(1L, 1, "회원", "01012345678", MEMBER_A,
             10000L, null, null, COUPON_ID), key);
