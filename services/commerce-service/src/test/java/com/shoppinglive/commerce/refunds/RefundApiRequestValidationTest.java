@@ -25,4 +25,21 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
                 .content("{\"cartItemId\":101,\"quantity\":1}"))
             .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void rejectsNullOrMissingCartIdsWhenARequestBodyIsPresent() throws Exception {
+        mvc.perform(post("/v1/payment-groups/{number}/refunds", "PG-unknown")
+                .header("Authorization", bearer(MEMBER_A))
+                .header("Idempotency-Key", "null-cart-ids")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cartItemIds\":null}"))
+            .andExpect(status().isBadRequest());
+
+        mvc.perform(post("/v1/payment-groups/{number}/refunds", "PG-unknown")
+                .header("Authorization", bearer(MEMBER_A))
+                .header("Idempotency-Key", "missing-cart-ids")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+    }
 }
