@@ -36,7 +36,7 @@ async function couponBoundaries(ctx) {
   await req('event-ended-new-claim', 'POST', `/v1/coupons/${held.id}/claims`, { token: ctx.b, status: 409 });
   const list = await req('held-list-read', 'GET', '/v1/me/coupons');
   ctx.check('p3-coupon-boundary-held-valid', list.find(c => c.couponId === held.id).status, 'AVAILABLE');
-  await req('held-preview', 'GET', `/v1/products/${ctx.products[0]}/order-preview?quantity=1&couponId=${held.id}`);
+  await req('held-preview', 'GET', `/v1/orders/checkout?productId=${ctx.products[0]}&quantity=1&couponId=${held.id}`);
   const before = stock(ctx);
   const bought = await purchase(ctx, req, 'p3-expiry-reservation', { couponId: held.id, beforePay: async () => {
     ctx.runtime.sql('commerce', `UPDATE coupon_definition SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id='${held.id}'`);
@@ -51,7 +51,7 @@ async function couponBoundaries(ctx) {
   ctx.runtime.sql('commerce', `UPDATE coupon_definition SET ends_at=clock_timestamp()-INTERVAL '20 seconds',expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id='${expired.id}'`);
   const expiredList = await req('expired-list-read', 'GET', '/v1/me/coupons');
   ctx.check('p3-coupon-boundary-expired-state', expiredList.find(c => c.couponId === expired.id).status, 'EXPIRED');
-  await req('expired-preview', 'GET', `/v1/products/${ctx.products[0]}/order-preview?quantity=1&couponId=${expired.id}`, { status: 409 });
+  await req('expired-preview', 'GET', `/v1/orders/checkout?productId=${ctx.products[0]}&quantity=1&couponId=${expired.id}`, { status: 409 });
   ctx.result.couponBoundariesPassed = true;
 }
 module.exports = { couponBoundaries };
