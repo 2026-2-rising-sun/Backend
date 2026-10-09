@@ -106,6 +106,26 @@ class CouponReservationPostgresTest {
         });
     }
 
+    @Test
+    void claimedCouponCanBeReservedAfterEventEndsButNotAfterCouponExpiry() {
+        verify(context -> {
+            Instant now = Instant.now();
+            context.jdbc().update("UPDATE coupon_definition SET ends_at=?,expires_at=? WHERE id=?",
+                Timestamp.from(now.minusSeconds(60)), Timestamp.from(now.plusSeconds(3600)), COUPON);
+
+            new TransactionTemplate(context.manager()).executeWithoutResult(status ->
+                context.reservations().reserve(MEMBER, COUPON));
+            assertThat(status(context.jdbc())).isEqualTo("RESERVED");
+
+            new TransactionTemplate(context.manager()).executeWithoutResult(status ->
+                context.reservations().release(MEMBER, COUPON));
+            context.jdbc().update("UPDATE coupon_definition SET expires_at=? WHERE id=?",
+                Timestamp.from(Instant.now().minusSeconds(1)), COUPON);
+            assertThatThrownBy(() -> new TransactionTemplate(context.manager()).executeWithoutResult(status ->
+                context.reservations().reserve(MEMBER, COUPON))).isInstanceOf(BusinessException.class);
+        });
+    }
+
     private static String status(JdbcTemplate jdbc) {
         return jdbc.queryForObject("SELECT status FROM member_coupon WHERE member_id=? AND coupon_id=?",
             String.class, MEMBER, COUPON);

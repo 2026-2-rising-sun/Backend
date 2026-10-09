@@ -21,8 +21,7 @@ public class CouponPreviewService {
     public record PricedItem(String key, long productId, long amount) { }
     public record Preview(String couponId, long discountAmount, long payableAmount,
             Map<String, Long> itemDiscounts) { }
-    private record Coupon(long fixedDiscount, String status, Instant startsAt, Instant endsAt,
-            Instant expiresAt) { }
+    private record Coupon(long fixedDiscount, String status, Instant startsAt, Instant expiresAt) { }
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -62,20 +61,19 @@ public class CouponPreviewService {
         }
 
         Coupon coupon = jdbc.query("""
-                SELECT c.fixed_discount,m.status,c.starts_at,c.ends_at,c.expires_at
+                SELECT c.fixed_discount,m.status,c.starts_at,c.expires_at
                 FROM member_coupon m JOIN coupon_definition c ON c.id=m.coupon_id
                 WHERE m.member_id=? AND m.coupon_id=?
                 """, result -> result.next()
                     ? new Coupon(result.getLong("fixed_discount"), result.getString("status"),
-                        result.getTimestamp("starts_at").toInstant(), result.getTimestamp("ends_at").toInstant(),
-                        result.getTimestamp("expires_at").toInstant())
+                        result.getTimestamp("starts_at").toInstant(), result.getTimestamp("expires_at").toInstant())
                     : null, memberId, couponId);
         if (coupon == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "보유 쿠폰을 찾을 수 없습니다.");
         }
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         if (!"AVAILABLE".equals(coupon.status()) || now.isBefore(coupon.startsAt())
-                || !now.isBefore(coupon.endsAt()) || !now.isBefore(coupon.expiresAt())) {
+                || !now.isBefore(coupon.expiresAt())) {
             throw conflict("사용할 수 없는 쿠폰입니다.");
         }
 

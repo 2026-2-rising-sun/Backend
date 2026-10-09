@@ -77,14 +77,23 @@ class CouponPreviewServiceTest {
                 .isInstanceOf(BusinessException.class);
         }
         jdbc.update("UPDATE member_coupon SET status='AVAILABLE' WHERE coupon_id=?", COUPON);
-        jdbc.update("UPDATE coupon_definition SET ends_at=? WHERE id=?", Timestamp.from(NOW), COUPON);
+        jdbc.update("UPDATE coupon_definition SET ends_at=?,expires_at=? WHERE id=?",
+            Timestamp.from(NOW), Timestamp.from(NOW), COUPON);
         assertThatThrownBy(() -> service.preview(MEMBER, COUPON,
             List.of(new CouponPreviewService.PricedItem("cart-1", 1, 1000))))
             .isInstanceOf(BusinessException.class);
-        jdbc.update("UPDATE coupon_definition SET expires_at=? WHERE id=?", Timestamp.from(NOW), COUPON);
-        assertThatThrownBy(() -> service.preview(MEMBER, COUPON,
-            List.of(new CouponPreviewService.PricedItem("cart-1", 1, 1000))))
-            .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void claimedCouponRemainsUsableAfterEventEndsUntilItsExpiry() {
+        jdbc.update("UPDATE coupon_definition SET ends_at=?,expires_at=? WHERE id=?",
+            Timestamp.from(NOW.minusSeconds(1)), Timestamp.from(NOW.plusSeconds(1)), COUPON);
+
+        var preview = service.preview(MEMBER, COUPON,
+            List.of(new CouponPreviewService.PricedItem("cart-1", 1, 1000)));
+
+        assertThat(preview.discountAmount()).isEqualTo(100);
+        assertThat(preview.payableAmount()).isEqualTo(900);
     }
 
     @Test
