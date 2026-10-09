@@ -147,6 +147,34 @@ class MemberCommerceMigrationPostgresTest {
             .isInstanceOf(java.sql.SQLException.class);
     }
 
+    @Test
+    void unknownPaymentMigrationPreservesLegacyStatusesAndPermitsUnconfirmedResult() throws Exception {
+        migration("11").migrate();
+        sale();
+        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "status-legacy");
+        String[] legacyStatuses = {"PENDING", "PROCESSING", "SUCCESS", "FAILED", "TIMEOUT"};
+        for (int i = 0; i < legacyStatuses.length; i++) {
+            sql("INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
+                + "VALUES(" + (i + 1) + ",1,'INSTANT_SUCCESS','" + legacyStatuses[i] + "',now(),now(),now())");
+        }
+        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET status='UNKNOWN' WHERE id=2"))
+            .isInstanceOf(java.sql.SQLException.class);
+
+        migration(null).migrate();
+
+        for (int i = 0; i < legacyStatuses.length; i++) {
+            assertThat(count("SELECT count(*) FROM payment_attempt WHERE id=" + (i + 1)
+                + " AND status='" + legacyStatuses[i] + "'")).isEqualTo(1);
+        }
+        sql("UPDATE payment_attempt SET status='UNKNOWN' WHERE id=2");
+        assertThat(count("SELECT count(*) FROM payment_attempt WHERE id=2 AND status='UNKNOWN' AND resolved_at IS NULL"))
+            .isEqualTo(1);
+        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET status='NOT_A_STATUS' WHERE id=2"))
+            .isInstanceOf(java.sql.SQLException.class);
+        assertThat(count("SELECT count(*) FROM orders WHERE status='PENDING_PAYMENT' AND payable_amount=1000"))
+            .isEqualTo(1);
+    }
+
     private void sale() throws Exception {
         sql("INSERT INTO sales_info (id,product_id,price,status,created_at,updated_at) VALUES (1,1,1000,'ON_SALE',now(),now())");
         sql("INSERT INTO sales_stock (sales_info_id,available,reserved,created_at,updated_at) VALUES (1,10,0,now(),now())");
