@@ -281,6 +281,24 @@ jobs:
               assert item['providerResults'] == 1 and item['status'] == 'SUCCESS'
               assert 0 <= item['observedToCrashMs'] < 5000
           PY
+      - name: Run coupon and selected/remaining refund flow
+        run: node scripts/integration/run-coupon-refund.cjs --use-prebuilt
+      - name: Require coupon refund flow evidence
+        if: always()
+        env:
+          VERIFIED_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads(Path('build/coupon-refund-proof/summary.json').read_text())
+          assert result['sha'] == os.environ['VERIFIED_SHA']
+          assert result['passed'] and result['couponRefundFlowPassed'] and result['cleanupPassed']
+          required = {'p3-discount-targets-only', 'p3-final-cumulative', 'p3-seller-amounts-masked',
+                      'p3-refund-coupon-used', 'p3-only-two-provider-results', 'p3-whole-stock-restored',
+                      'p3-omitted-body-whole-group'}
+          assert required <= {c['name'] for c in result['checks'] if c['passed']}
+          PY
       - name: Upload sanitized integration evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -289,6 +307,7 @@ jobs:
           path: |
             build/integration/
             build/refund-recovery-proof/
+            build/coupon-refund-proof/
           if-no-files-found: error
           retention-days: 7
 
