@@ -9,6 +9,7 @@ const { memberSeller } = require('./member-seller.cjs');
 const { couponRefundFlow } = require('./coupon-refund-flow.cjs');
 const { couponBoundaries } = require('./coupon-boundaries.cjs');
 const { refundBoundaries } = require('./refund-boundaries.cjs');
+const { refundRetryProof } = require('./refund-retry-proof.cjs');
 
 async function prove() {
   const runtime = new Runtime({ output: path.join(root, 'build/coupon-refund-proof') });
@@ -22,7 +23,7 @@ async function prove() {
     assert.equal(command('git', ['status', '--porcelain', '--untracked-files=normal']), '', 'Proof requires a clean checkout');
     context = new Context(runtime);
     context.result.scope = 'P3 coupon and selected/remaining refund: real HTTP/PostgreSQL; Mock monetary provider';
-    context.result.deferred = ['Refund exhaustion/restart scenario remains; payment automatic recovery policy H2 is unanswered; production provider is excluded'];
+    context.result.deferred = ['payment automatic recovery policy H2 is unanswered; production provider is excluded'];
     context.save();
     await runtime.build(process.argv.includes('--use-prebuilt') || process.env.CI === 'true');
     context.result.jars = Object.fromEntries(Object.entries(runtime.jars).map(([service, file]) =>
@@ -32,6 +33,7 @@ async function prove() {
     await couponRefundFlow(context);
     await couponBoundaries(context);
     await refundBoundaries(context);
+    await refundRetryProof(context);
   } catch (error) {
     if (context) context.result.error = runtime.sanitize(error.message);
     console.error(runtime.sanitize(error.stack || error.message));
@@ -41,7 +43,7 @@ async function prove() {
     catch (error) { if (context) context.result.error = runtime.sanitize(error.message); process.exitCode = 1; }
     if (context) {
       context.result.completedAt = new Date().toISOString(); context.save();
-      if (!context.result.passed || !context.result.couponRefundFlowPassed || !context.result.couponBoundariesPassed || !context.result.refundBoundariesPassed || !context.result.cleanupPassed) process.exitCode = 1;
+      if (!context.result.passed || !context.result.couponRefundFlowPassed || !context.result.couponBoundariesPassed || !context.result.refundBoundariesPassed || !context.result.refundRetryProofPassed || !context.result.cleanupPassed) process.exitCode = 1;
       console.log(`Coupon/refund flow: ${context.result.executed} checks; ${context.result.failed} failures`);
     }
     process.removeListener('SIGINT', interrupted); process.removeListener('SIGTERM', interrupted);

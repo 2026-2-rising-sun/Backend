@@ -293,13 +293,20 @@ jobs:
           from pathlib import Path
           result = json.loads(Path('build/coupon-refund-proof/summary.json').read_text())
           assert result['sha'] == os.environ['VERIFIED_SHA']
-          assert result['passed'] and result['couponRefundFlowPassed'] and result['couponBoundariesPassed'] and result['refundBoundariesPassed'] and result['cleanupPassed']
+          assert result['passed'] and result['couponRefundFlowPassed'] and result['couponBoundariesPassed'] and result['refundBoundariesPassed'] and result['refundRetryProofPassed'] and result['cleanupPassed']
           required = {'p3-discount-targets-only', 'p3-final-cumulative', 'p3-seller-amounts-masked',
                       'p3-refund-coupon-used', 'p3-only-two-provider-results', 'p3-whole-stock-restored',
                       'p3-omitted-body-whole-group', 'p3-coupon-boundary-last-one',
                       'p3-coupon-boundary-reserved-expiry-paid', 'p3-refund-boundary-overlap-race',
-                      'p3-refund-boundary-zero-no-refund-provider', 'p3-refund-boundary-zero-stock'}
+                      'p3-refund-boundary-zero-no-refund-provider', 'p3-refund-boundary-zero-stock',
+                      'p3-refund-retry-four-invocations', 'p3-refund-retry-natural-query-interval',
+                      'p3-refund-retry-no-new-execution', 'p3-refund-retry-late-single-result'}
           assert required <= {c['name'] for c in result['checks'] if c['passed']}
+          retry = result['refundRetryProof']
+          assert retry['oldProcess'] != retry['newProcess']
+          assert retry['status'] == 'UNKNOWN' and retry['retryCount'] == 3
+          assert retry['executionInvocations'] == 4 and retry['providerResults'] == 0
+          assert retry['finalDue'] - retry['originalDue'] >= 55000
           PY
       - name: Upload sanitized integration evidence
         if: always()
