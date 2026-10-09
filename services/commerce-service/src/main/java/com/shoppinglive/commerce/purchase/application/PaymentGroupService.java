@@ -10,6 +10,8 @@ import com.shoppinglive.commerce.payments.api.PaymentAttemptResponse;
 import com.shoppinglive.commerce.payments.application.*;
 import com.shoppinglive.commerce.payments.domain.*;
 import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaRepository;
+import com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore;
+import com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore.Lease;
 import com.shoppinglive.commerce.coupons.application.CouponPreviewService;
 import com.shoppinglive.commerce.coupons.application.CouponReservationService;
 import com.shoppinglive.commerce.purchase.domain.PaymentGroup;
@@ -44,7 +46,8 @@ public class PaymentGroupService {
  private final PaymentAttemptJpaRepository payments;
  private final ShoppingClient shopping;
  private final PurchaseGuard guard;
- private final DurableMockGateway gateway;
+ private final PaymentRecoveryStore recovery;
+ private final ObjectProvider<PaymentService> paymentService;
  private final MockPaymentEngine engine;
  private final ObjectProvider<DevPaymentScenarioRegistry> scenarios;
  private final TransactionTemplate tx;
@@ -57,12 +60,12 @@ public class PaymentGroupService {
  private final Duration expiration;
  public PaymentGroupService(PaymentGroupRepository groups,OrderJpaRepository orders,CartItemRepository cart,
    SalesJpaRepository sales,SalesStockJpaRepository stock,PaymentAttemptJpaRepository payments,ShoppingClient shopping,
-   PurchaseGuard guard,DurableMockGateway gateway,MockPaymentEngine engine,ObjectProvider<DevPaymentScenarioRegistry> scenarios,
+   PurchaseGuard guard,PaymentRecoveryStore recovery,ObjectProvider<PaymentService> paymentService,MockPaymentEngine engine,ObjectProvider<DevPaymentScenarioRegistry> scenarios,
    TransactionTemplate tx,JdbcTemplate jdbc,ObjectMapper mapper,OrderNumberGenerator numbers,CouponPreviewService couponPreview,
    CouponReservationService couponReservations,
    @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration){
   this.groups=groups;this.orders=orders;this.cart=cart;this.sales=sales;this.stock=stock;this.payments=payments;
-  this.shopping=shopping;this.guard=guard;this.gateway=gateway;this.engine=engine;this.scenarios=scenarios;
+  this.shopping=shopping;this.guard=guard;this.recovery=recovery;this.paymentService=paymentService;this.engine=engine;this.scenarios=scenarios;
   this.tx=tx;this.jdbc=jdbc;this.mapper=mapper;this.numbers=numbers;this.couponPreview=couponPreview;
   this.couponReservations=couponReservations;this.expiration=expiration;
  }
@@ -212,25 +215,20 @@ public class PaymentGroupService {
    close(g,OrderStatus.EXPIRED);return true;
   });
  }
- public boolean resolve(Long id){
-  PaymentAttempt attempt=payments.findById(id).orElseThrow();
+ public boolean resolve(Long id){return paymentService.getObject().resolvePayment(id);}
+ public boolean applyOutcome(Lease lease,PaymentStatus result){
+  if(!result.isConfirmedOutcome())throw new IllegalArgumentException("confirmed payment outcome required");
+  Long id=lease.id();PaymentAttempt attempt=payments.findById(id).orElseThrow();
   if(!attempt.getStatus().isUnconfirmed())return false;
-  // Commit approval independently before applying it to order/inventory state.
-  PaymentStatus result=gateway.authorize(id,attempt.getScenario());
   PaymentGroup found=groups.findById(attempt.getPaymentGroupId()).orElseThrow();guard.ensure(found.getMemberId());
   return tx.execute(t->{
    guard.lock(found.getMemberId());PaymentGroup g=lockedGroup(found.getId());
-   if(g.getStatus()!=OrderStatus.PAYMENT_CONFIRMING)return false;
-   if(!result.isConfirmedOutcome()){
-    payments.markUnknownIfProcessing(id);
-    return false;
-   }
+   if(g.getStatus()!=OrderStatus.PAYMENT_CONFIRMING || !recovery.owns(lease))return false;
    List<Order> children=orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
    // Cart before stock matches creation; all stock locks follow ascending sales id.
    for(Order child:children)if(child.getSourceCartItemId()!=null)cart.lockOwned(child.getSourceCartItemId(),g.getMemberId());
    for(Order child:children.stream().sorted(Comparator.comparing(Order::getSalesInfoId)).toList())guard.lockSales(child.getSalesInfoId());
    OrderStatus finalStatus=result==PaymentStatus.SUCCESS?OrderStatus.PAID:OrderStatus.FAILED;
-   if(payments.resolveIfUnconfirmed(id,result.name())!=1)throw new IllegalStateException("payment result inconsistent");
    if(result==PaymentStatus.SUCCESS)couponReservations.confirm(g.getMemberId(),g.getCouponId());
    else couponReservations.release(g.getMemberId(),g.getCouponId());
    for(Order child:children){
@@ -241,7 +239,9 @@ public class PaymentGroupService {
       jdbc.update("DELETE FROM cart_item WHERE id=? AND member_id=? AND version=?",child.getSourceCartItemId(),g.getMemberId(),child.getSourceCartItemVersion());
     }else restore(child);
    }
-   g.transition(finalStatus);groups.saveAndFlush(g);return true;
+   g.transition(finalStatus);groups.saveAndFlush(g);
+   if(!recovery.complete(lease,result.name()))throw new IllegalStateException("payment lease lost during result application");
+   return true;
   });
  }
  private PaymentGroup lockedGroup(Long id){PaymentGroup g=groups.lockById(id).orElseThrow();entityManager.refresh(g);return g;}

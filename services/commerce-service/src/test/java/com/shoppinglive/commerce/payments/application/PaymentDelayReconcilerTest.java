@@ -227,6 +227,7 @@ class PaymentDelayReconcilerTest extends com.shoppinglive.commerce.support.Comme
         assertThat(salesStockRepository.findById(healthySales).orElseThrow().getReserved()).isZero();
 
         jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesInfoId);
+        jdbc.update("UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",failed.getId());
         assertThat(recovery.reconcileOverdue()).isEqualTo(1);
         assertThat(recovery.reconcileOverdue()).isZero();
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus()).isEqualTo(OrderStatus.PAID);

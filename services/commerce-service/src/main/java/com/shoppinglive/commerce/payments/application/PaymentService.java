@@ -10,6 +10,10 @@ import com.shoppinglive.commerce.payments.infrastructure.PaymentAttemptJpaReposi
 import com.shoppinglive.commerce.sales.infrastructure.SalesStockJpaRepository;
 import com.shoppinglive.commerce.sales.application.SalesService;
 import java.time.Instant;
+import java.time.Duration;
+import com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore;
+import com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore.Lease;
+import com.shoppinglive.commerce.purchase.application.DurableMockGateway;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +35,9 @@ public class PaymentService {
     private final SalesService salesService;
     private final MockPaymentEngine mockPaymentEngine;
     private final ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider;
+    private final PaymentRecoveryStore recovery;
+    private final DurableMockGateway gateway;
+    private final PaymentRetryPolicy retryPolicy;
 
     public PaymentService(
         org.springframework.transaction.support.TransactionTemplate transaction,
@@ -41,7 +48,8 @@ public class PaymentService {
         SalesStockJpaRepository salesStockRepository,
         SalesService salesService,
         MockPaymentEngine mockPaymentEngine,
-        ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider) {
+        ObjectProvider<DevPaymentScenarioRegistry> devRegistryProvider,
+        PaymentRecoveryStore recovery, DurableMockGateway gateway, PaymentRetryPolicy retryPolicy) {
         this.groups = groups;
         this.transaction = transaction;
         this.orderService = orderService;
@@ -51,6 +59,9 @@ public class PaymentService {
         this.salesService = salesService;
         this.mockPaymentEngine = mockPaymentEngine;
         this.devRegistryProvider = devRegistryProvider;
+        this.recovery = recovery;
+        this.gateway = gateway;
+        this.retryPolicy = retryPolicy;
     }
 
     /**
@@ -134,26 +145,51 @@ public class PaymentService {
     public boolean resolvePayment(Long paymentAttemptId) {
         PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
         if (attempt == null || !attempt.getStatus().isUnconfirmed()) return false;
-        if (attempt.getPaymentGroupId() != null) return groups.resolve(paymentAttemptId);
-        return transaction.execute(status -> resolveLegacyPayment(paymentAttemptId));
+        var lease = recovery.claim(paymentAttemptId, Duration.ofMinutes(1));
+        return lease.isPresent() && resolveClaimed(lease.get());
     }
 
-    private boolean resolveLegacyPayment(Long paymentAttemptId) {
-        PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
-        if (attempt == null || !attempt.getStatus().isUnconfirmed()) {
-            return false;
+    public boolean resolveClaimed(Lease lease) {
+        int currentCount = lease.retryCount();
+        try {
+            PaymentStatus result = gateway.find(lease.id());
+            if (result == null) {
+                var invocation = recovery.beginInvocation(lease);
+                if (invocation.isEmpty()) {
+                    recovery.unknown(lease, PaymentRetryPolicy.RESULT_QUERY_DELAY);
+                    return false;
+                }
+                currentCount = invocation.get();
+                try {
+                    result = gateway.authorize(lease.id(), lease.scenario());
+                } catch (MockPaymentResultUnknownException unknown) {
+                    recovery.unknown(lease, retryPolicy.afterUnknown(currentCount));
+                    return false;
+                } catch (RuntimeException deliveryFailure) {
+                    recovery.unknown(lease, retryPolicy.afterUnknown(currentCount));
+                    throw deliveryFailure;
+                }
+            }
+            if (!result.isConfirmedOutcome()) {
+                recovery.unknown(lease, retryPolicy.afterUnknown(currentCount));
+                return false;
+            }
+            PaymentAttempt attempt = paymentAttemptRepository.findById(lease.id()).orElseThrow();
+            if (attempt.getPaymentGroupId() != null) return groups.applyOutcome(lease, result);
+            PaymentStatus confirmed = result;
+            return transaction.execute(status -> resolveLegacyPayment(lease, confirmed));
+        } catch (RuntimeException failure) {
+            // An independent authorization result survives local business rollback.
+            recovery.release(lease, currentCount == PaymentRetryPolicy.MAX_RETRIES
+                ? PaymentRetryPolicy.RESULT_QUERY_DELAY : Duration.ofSeconds(1));
+            throw failure;
         }
+    }
 
-        PaymentStatus outcome = attempt.getScenario().getOutcome();
-        if (!outcome.isConfirmedOutcome()) {
-            paymentAttemptRepository.markUnknownIfProcessing(paymentAttemptId);
-            return false;
-        }
-        int updated = paymentAttemptRepository
-            .resolveIfUnconfirmed(paymentAttemptId, outcome.name());
-        if (updated == 0) {
-            return false;
-        }
+    private boolean resolveLegacyPayment(Lease lease, PaymentStatus outcome) {
+        Long paymentAttemptId = lease.id();
+        PaymentAttempt attempt = paymentAttemptRepository.findById(paymentAttemptId).orElse(null);
+        if (attempt == null || !attempt.getStatus().isUnconfirmed() || !recovery.owns(lease)) return false;
 
         Order order = orderRepository.findById(attempt.getOrderId()).orElse(null);
         if (order == null) {
@@ -170,6 +206,9 @@ public class PaymentService {
                 throw new IllegalStateException("payment order transition failed: attemptId=" + paymentAttemptId);
             }
             salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+        }
+        if (!recovery.complete(lease, outcome.name())) {
+            throw new IllegalStateException("payment lease lost during result application");
         }
         return true;
     }

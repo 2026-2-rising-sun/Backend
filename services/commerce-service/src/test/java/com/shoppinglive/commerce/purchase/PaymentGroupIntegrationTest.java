@@ -516,6 +516,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
 
         // Later authoritative result is applied through the same attempt and real durable gateway.
         org.mockito.Mockito.doCallRealMethod().when(gateway).authorize(attempt.getId(), attempt.getScenario());
+        jdbc.update("UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",attempt.getId());
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(service.resolve(attempt.getId())).isFalse();
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus()).isEqualTo(finalScenario.getOutcome());
@@ -558,6 +559,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(items.count()).isEqualTo(3);
         stock(salesA, 8, 2);
         jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesB);
+        jdbc.update("UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",attempt.getId());
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(service.resolve(attempt.getId())).isFalse();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?", Integer.class, attempt.getId())).isEqualTo(1);

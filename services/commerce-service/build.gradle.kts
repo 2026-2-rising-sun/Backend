@@ -44,7 +44,7 @@ tasks.register<Test>("postgresCommerceTest") {
     filter {
         listOf("OrderCreationConcurrencyTest", "OrderCancellationConcurrencyTest", "SalesStockConcurrencyTest",
             "SalesStatusConcurrencyTest", "PaymentFlowIntegrationTest", "PaymentSchedulingAfterCommitTest",
-            "PaymentDelayReconcilerTest", "PaymentRecoveryStorePostgresTest", "DurableMockGatewayPostgresTest", "OrderExpirationSchedulerTest", "CartOrderIntegrationTest",
+            "PaymentDelayReconcilerTest", "PaymentRecoveryStorePostgresTest", "PaymentRecoveryPostgresTest", "DurableMockGatewayPostgresTest", "OrderExpirationSchedulerTest", "CartOrderIntegrationTest",
             "MemberCommerceApiTest", "MemberCommerceMigrationPostgresTest", "PaymentGroupIntegrationTest", "CouponManagementPostgresTest",
             "CouponClaimPostgresTest", "CouponPreviewPostgresTest", "CouponReservationPostgresTest",
             "RefundSchemaPostgresTest", "RefundIntakeServicePostgresTest", "DurableMockRefundGatewayPostgresTest",

@@ -52,6 +52,10 @@ class PaymentServiceTest {
 
     @Mock private org.springframework.transaction.support.TransactionTemplate transaction;
 
+    @Mock private com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore recovery;
+    @Mock private com.shoppinglive.commerce.purchase.application.DurableMockGateway gateway;
+    @Mock private PaymentRetryPolicy retryPolicy;
+
     @InjectMocks
     private PaymentService paymentService;
 
@@ -74,6 +78,15 @@ class PaymentServiceTest {
         PaymentAttempt attempt = new PaymentAttempt(1L, scenario, Instant.now());
         ReflectionTestUtils.setField(attempt, "id", 100L);
         ReflectionTestUtils.setField(attempt, "status", status);
+        if(status.isUnconfirmed()) {
+            var lease=new com.shoppinglive.commerce.payments.infrastructure.PaymentRecoveryStore.Lease(100L,scenario,0,null,"token",Instant.now().plusSeconds(60));
+            org.mockito.Mockito.lenient().when(recovery.claim(eq(100L),any())).thenReturn(Optional.of(lease));
+            org.mockito.Mockito.lenient().when(recovery.beginInvocation(lease)).thenReturn(Optional.of(0));
+            org.mockito.Mockito.lenient().when(recovery.owns(lease)).thenReturn(true);
+            org.mockito.Mockito.lenient().when(recovery.complete(eq(lease),any())).thenReturn(true);
+            org.mockito.Mockito.lenient().when(gateway.authorize(100L,scenario)).thenAnswer(inv->scenario.getOutcome());
+            org.mockito.Mockito.lenient().when(retryPolicy.afterUnknown(0)).thenReturn(java.time.Duration.ZERO);
+        }
         return attempt;
     }
 
@@ -118,7 +131,6 @@ class PaymentServiceTest {
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, initialStatus);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "SUCCESS")).willReturn(1);
         given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).willReturn(1);
         given(salesStockRepository.consumeReserved(order.getSalesInfoId(), 1)).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
@@ -136,7 +148,6 @@ class PaymentServiceTest {
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_FAIL, PaymentStatus.PROCESSING);
         Order order = sampleOrder();
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "FAILED")).willReturn(1);
         given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).willReturn(1);
         given(orderRepository.findById(1L)).willReturn(Optional.of(order));
 
@@ -163,7 +174,7 @@ class PaymentServiceTest {
         executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(paymentAttemptRepository.resolveIfUnconfirmed(100L, "SUCCESS")).willReturn(0);
+        given(recovery.owns(any())).willReturn(false);
 
         paymentService.resolvePayment(100L);
 
@@ -173,16 +184,15 @@ class PaymentServiceTest {
 
     @Test
     void unconfirmedLegacyOutcomeNeverFailsOrderOrReleasesStock() {
-        executeTransactionInline();
         PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
         PaymentScenario uncertain = org.mockito.Mockito.mock(PaymentScenario.class);
-        given(uncertain.getOutcome()).willReturn(PaymentStatus.TIMEOUT);
-        ReflectionTestUtils.setField(attempt, "scenario", uncertain);
+
+        given(gateway.authorize(100L, PaymentScenario.INSTANT_SUCCESS)).willReturn(PaymentStatus.TIMEOUT);
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
 
         assertThat(paymentService.resolvePayment(100L)).isFalse();
 
-        verify(paymentAttemptRepository).markUnknownIfProcessing(100L);
+        verify(recovery).unknown(any(), eq(java.time.Duration.ZERO));
         verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
         verify(orderRepository, never()).transitionStatus(any(), any(), any());
         verify(salesService, never()).restoreReserved(any(), any(Integer.class));
