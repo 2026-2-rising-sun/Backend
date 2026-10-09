@@ -499,6 +499,16 @@
           "change": "Clarify PaymentAttempt status semantics."
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "d38b4e48c9d72ed51a076d32bac5e9154a683e247d706ae22e190a7799b5fe0e",
+      "headSnapshotSha256": "a53cebcadf27c7251769a543efd65691b0bb577891bc9a43da08c9446776cbe6",
+      "reason": "H2 #154 aligns PaymentScenario with the three local/test fault scenarios in Java and V13: success or confirmed failure with first response loss, and temporary unavailability before a result exists. Public payment request fields, status meanings and route availability are unchanged. Automatic retry counts and query intervals remain a separate unresolved policy.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent /root/bugbot_payment_gateway",
+        "reviewedAt": "2026-10-09",
+        "evidence": "Independent read-only review of c79c39a and the PaymentScenario working-tree change against 277af63a3d7c65acdcdeb1fc0ac36a57610104b6 found no bugs. Verified seven enum values against Java/V13, result persistence versus first response loss, query-only behavior, local/test-only selection and unchanged public payment body restrictions."
+      }
     }
   ]
 }

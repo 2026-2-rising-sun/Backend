@@ -1316,7 +1316,8 @@ components:
       description: "현재 결제 게이트웨이는 Mock이다. scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
     PaymentScenario:
       type: "string"
-      enum: ["INSTANT_SUCCESS", "INSTANT_FAIL", "DELAYED_SUCCESS", "DELAYED_FAIL"]
+      enum: ["INSTANT_SUCCESS", "INSTANT_FAIL", "DELAYED_SUCCESS", "DELAYED_FAIL", "SUCCESS_RESPONSE_LOST", "FAILURE_RESPONSE_LOST", "UNAVAILABLE_BEFORE_RESULT"]
+      description: "Mock 결과 시나리오이며 일반 결제 요청에서 선택할 수 없다. local/test의 서버 시나리오 설정으로만 제어한다. SUCCESS_RESPONSE_LOST와 FAILURE_RESPONSE_LOST는 각각 승인 성공·확정 실패 결과를 저장한 뒤 최초 응답을 유실하고 같은 결제 시도 ID의 저장 결과는 보존한다. UNAVAILABLE_BEFORE_RESULT는 결과 저장 전 일시 장애로 승인·확정 실패 결과를 만들지 않는다. 결과 조회는 저장 결과만 확인하며 새 승인을 만들지 않는다. 자동 재실행 횟수·조회 주기는 별도 복구 정책이다."
     SetPaymentScenarioRequest:
       type: "object"
       required: ["scenario"]
