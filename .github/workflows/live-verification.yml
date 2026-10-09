@@ -293,10 +293,11 @@ jobs:
           from pathlib import Path
           result = json.loads(Path('build/coupon-refund-proof/summary.json').read_text())
           assert result['sha'] == os.environ['VERIFIED_SHA']
-          assert result['passed'] and result['couponRefundFlowPassed'] and result['cleanupPassed']
+          assert result['passed'] and result['couponRefundFlowPassed'] and result['couponBoundariesPassed'] and result['cleanupPassed']
           required = {'p3-discount-targets-only', 'p3-final-cumulative', 'p3-seller-amounts-masked',
                       'p3-refund-coupon-used', 'p3-only-two-provider-results', 'p3-whole-stock-restored',
-                      'p3-omitted-body-whole-group'}
+                      'p3-omitted-body-whole-group', 'p3-coupon-boundary-last-one',
+                      'p3-coupon-boundary-reserved-expiry-paid'}
           assert required <= {c['name'] for c in result['checks'] if c['passed']}
           PY
       - name: Upload sanitized integration evidence

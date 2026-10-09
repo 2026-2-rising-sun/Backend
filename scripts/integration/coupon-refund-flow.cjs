@@ -107,6 +107,7 @@ async function couponRefundFlow(ctx) {
   await ctx.poll('p3-all-refunded', 'commerce', `${allBase}/refunds/${id(all.id)}`, ctx.a, b => b.data.status === 'SUCCESS');
   ctx.check('p3-whole-omitted-state', (await req('all-final-group', 'GET', allBase)).status, 'REFUNDED');
   ctx.check('p3-whole-omitted-stock', stock(), before);
+  ctx.p3OtherProduct = other.productId;
   ctx.result.couponRefundFlowPassed = true;
 }
 module.exports = { couponRefundFlow };
