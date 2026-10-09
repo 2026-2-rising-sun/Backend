@@ -161,9 +161,24 @@ public class PaymentGroupService {
    List<Order> children=orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
    DevPaymentScenarioRegistry registry=scenarios.getIfAvailable();
    PaymentScenario scenario=registry==null?PaymentScenario.INSTANT_SUCCESS:registry.get(number).orElseGet(()->registry.get(children.getFirst().getOrderNumber()).orElse(PaymentScenario.INSTANT_SUCCESS));
-   PaymentAttempt attempt=new PaymentAttempt(children.getFirst().getId(),scenario,Instant.now());attempt.attachGroup(g.getId(),key);
+   Instant requestedAt=Instant.now();
+   PaymentAttempt attempt=new PaymentAttempt(children.getFirst().getId(),scenario,requestedAt);attempt.attachGroup(g.getId(),key);
+   if(g.getPayableAmount()==0)attempt.completeWithoutCharge(requestedAt);
    attempt=payments.saveAndFlush(attempt);g.transition(OrderStatus.PAYMENT_CONFIRMING);g.setPaymentId(attempt.getId());groups.saveAndFlush(g);
    for(Order child:children)if(orders.transitionStatus(child.getId(),"PENDING_PAYMENT","PAYMENT_CONFIRMING")!=1)throw new IllegalStateException("group order transition failed");
+   if(g.getPayableAmount()==0){
+    for(Order child:children)if(child.getSourceCartItemId()!=null)cart.lockOwned(child.getSourceCartItemId(),member);
+    for(Order child:children.stream().sorted(Comparator.comparing(Order::getSalesInfoId)).toList())guard.lockSales(child.getSalesInfoId());
+    couponReservations.confirm(member,g.getCouponId());
+    for(Order child:children){
+     if(orders.transitionStatus(child.getId(),"PAYMENT_CONFIRMING","PAID")!=1)throw new IllegalStateException("zero payment order transition failed");
+     if(stock.consumeReserved(child.getSalesInfoId(),child.getQuantity())!=1)throw new IllegalStateException("reserved stock missing");
+     if(child.getSourceCartItemId()!=null && child.getSourceCartItemVersion()!=null)
+      jdbc.update("DELETE FROM cart_item WHERE id=? AND member_id=? AND version=?",child.getSourceCartItemId(),member,child.getSourceCartItemVersion());
+    }
+    g.transition(OrderStatus.PAID);groups.saveAndFlush(g);
+    return attempt;
+   }
    Long id=attempt.getId();
    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization(){@Override public void afterCommit(){engine.schedule(id,scenario);}});
    return attempt;

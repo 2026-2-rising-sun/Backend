@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.purchase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -184,6 +185,36 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(couponStatus()).isEqualTo("USED");
+    }
+
+    @Test
+    void fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce() {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+
+        var quote = service.preview(MEMBER_A, selected(), COUPON_ID);
+        assertThat(quote.totalAmount()).isEqualTo(25000L);
+        assertThat(quote.discountAmount()).isEqualTo(25000L);
+        assertThat(quote.payableAmount()).isZero();
+
+        var created = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-order");
+        assertThat(created.group().payableAmount()).isZero();
+        assertThat(created.group().orders()).extracting(order -> order.payableAmount()).containsOnly(0L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+
+        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "zero-payment");
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        var completed = service.get(MEMBER_A, created.group().groupNumber());
+        assertThat(completed.status()).isEqualTo(OrderStatus.PAID);
+        assertThat(completed.paymentId()).isEqualTo(attempt.getId());
+        assertThat(completed.orders()).extracting(order -> order.status()).containsOnly(OrderStatus.PAID);
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(cart.list(MEMBER_A)).extracting(CartItem::getId).containsExactly(unselected.getId());
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+        assertThat(service.start(MEMBER_A, created.group().groupNumber(), "zero-payment").getId()).isEqualTo(attempt.getId());
+        assertThat(payments.count()).isEqualTo(1);
     }
 
     @Test
