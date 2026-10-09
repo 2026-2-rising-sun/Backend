@@ -307,6 +307,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "PR #185 final HEAD e610142fa6f6bace2f17b25ee78b5f1f64748c92; independently reviewed full dev diff including discount snapshot migrations, models, response contract, and PostgreSQL fixture correction; no actionable defects."
       }
+    },
+    {
+      "baseSnapshotSha256": "68c2fbdfe5efd5c7c9067be231e2bf571d5f7cf21026220a099bcc2257848400",
+      "headSnapshotSha256": "55314f4e46e49691c0559311d0668a7c35014e728210a747c1889706b10768ed",
+      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, preserve the existing AuthUnavailable seller detail read and ShoppingUnavailable seller edit responses, and retain the order amount snapshot fields already merged to dev.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_coupon_claim_final",
+        "reviewedAt": "2026-10-09",
+        "evidence": "PR #183 final review identified and corrected the seller coupon detail 503 response regression; final HEAD includes AuthUnavailable, member API/service, migration, authorization and OpenAPI review."
+      }
     }
   ]
 }

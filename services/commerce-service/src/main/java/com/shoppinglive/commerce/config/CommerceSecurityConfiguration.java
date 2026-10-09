@@ -46,6 +46,8 @@ public class CommerceSecurityConfiguration {
                     .requestMatchers("/v1/orders", "/v1/orders/**", "/v1/cart/items", "/v1/cart/items/**", "/v1/cart/checkout", "/v1/cart/orders", "/v1/payment-groups/**")
                     .hasAnyRole("USER", "SELLER")
                     .requestMatchers(HttpMethod.POST, "/v1/sales").hasRole("SELLER")
+                    .requestMatchers(HttpMethod.GET, "/v1/coupons", "/v1/me/coupons").hasAnyRole("USER","SELLER")
+                    .requestMatchers(HttpMethod.POST, "/v1/coupons/*/claims").hasAnyRole("USER","SELLER")
                     .requestMatchers(HttpMethod.POST, "/v1/seller/coupons").hasRole("SELLER")
                     .requestMatchers("/v1/seller/coupons", "/v1/seller/coupons/*").hasRole("SELLER")
                     .requestMatchers(HttpMethod.PATCH, "/v1/sales/*/price", "/v1/sales/*/stock", "/v1/sales/*/status").hasRole("SELLER")
