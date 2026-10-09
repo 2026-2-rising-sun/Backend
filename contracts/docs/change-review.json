@@ -297,6 +297,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "C1B HEAD 025f224f6dbeabc9e0d025ca42d0a32feb540afb; independently re-reviewed after mixed-version read fix; no defects, real PostgreSQL concurrent read/edit and version races verified."
       }
+    },
+    {
+      "baseSnapshotSha256": "44f7f725f93763a90cb2257b00c79fb798b20daafa167bbb94045136eda74997",
+      "headSnapshotSha256": "68c2fbdfe5efd5c7c9067be231e2bf571d5f7cf21026220a099bcc2257848400",
+      "reason": "Expose original order amount, fixed coupon discount and payable amount in order and payment-group responses while preserving legacy orders with zero discount.",
+      "independentReview": {
+        "reviewer": "Bugbot independent subagent /root/bugbot_185",
+        "reviewedAt": "2026-10-09",
+        "evidence": "PR #185 HEAD f242ef1897239c1a56ded4557f315d17e4c9141a; independently reviewed V7 backfill/constraints, response DTO and OpenAPI; no actionable defects."
+      }
     }
   ]
 }
