@@ -50,6 +50,9 @@ jobs:
             --allow-skipped-suite com.shoppinglive.commerce.coupons.CouponClaimPostgresTest=3 \
             --allow-skipped-suite com.shoppinglive.commerce.coupons.CouponPreviewPostgresTest=1 \
             --allow-skipped-suite com.shoppinglive.commerce.coupons.CouponReservationPostgresTest=3 \
+            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundSchemaPostgresTest=3 \
+            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundIntakeServicePostgresTest=7 \
+            --allow-skipped-suite com.shoppinglive.commerce.refunds.RefundApiPostgresTest=1 \
             --allow-skipped-suite com.shoppinglive.shopping.product.ProductSellerMigrationTest=1 \
             --output build/ci/unit-tests.json
       - name: Package integration application jars
@@ -104,8 +107,8 @@ jobs:
             database: commerce_test
             task: ':services:commerce-service:postgresCommerceTest'
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
-            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.CouponManagementPostgresTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=24 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=3'
+            suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.CouponManagementPostgresTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest *.RefundSchemaPostgresTest *.RefundIntakeServicePostgresTest *.RefundApiPostgresTest'
+            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=24 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=3 *.RefundSchemaPostgresTest=3 *.RefundIntakeServicePostgresTest=7 *.RefundApiPostgresTest=1'
           - service: live
             database: live_test
             # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.

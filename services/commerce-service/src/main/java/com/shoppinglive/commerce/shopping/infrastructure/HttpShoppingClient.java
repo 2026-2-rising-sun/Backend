@@ -7,6 +7,9 @@ import com.shoppinglive.common.core.ApiResponse;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
@@ -19,6 +22,8 @@ public class HttpShoppingClient implements ShoppingClient {
 
     public static final String RESILIENCE_INSTANCE = "shoppingProducts";
     private static final ParameterizedTypeReference<ApiResponse<ProductSnapshot>> RESPONSE_TYPE =
+        new ParameterizedTypeReference<>() { };
+    private static final ParameterizedTypeReference<ApiResponse<List<ProductSnapshot>>> LIST_RESPONSE_TYPE =
         new ParameterizedTypeReference<>() { };
 
     private final RestClient restClient;
@@ -41,6 +46,38 @@ public class HttpShoppingClient implements ShoppingClient {
             return Retry.decorateSupplier(retry, CircuitBreaker.decorateSupplier(circuitBreaker, call)).get();
         } catch (RuntimeException exception) {
             throw new ShoppingUnavailableException("shopping product lookup failed", exception);
+        }
+    }
+
+    @Override
+    public List<ProductSnapshot> findProducts(Collection<Long> productIds) {
+        if (productIds == null || productIds.isEmpty() || productIds.size() > 100
+            || productIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new IllegalArgumentException("productIds must contain 1..100 positive IDs");
+        }
+        List<Long> ids = productIds.stream().distinct().sorted().toList();
+        Supplier<List<ProductSnapshot>> call = () -> {
+            ApiResponse<List<ProductSnapshot>> response = restClient.get()
+                .uri(uri -> uri.path("/v1/internal/products").queryParam("ids", ids.stream()
+                    .map(String::valueOf).collect(Collectors.joining(","))).build())
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(LIST_RESPONSE_TYPE);
+            if (response == null || !response.success() || response.error() != null || response.data() == null) {
+                throw new IllegalStateException("invalid shopping batch response envelope");
+            }
+            for (ProductSnapshot product : response.data()) {
+                if (product == null || product.id() == null || !ids.contains(product.id()) || product.id() <= 0
+                    || !StringUtils.hasText(product.name())) {
+                    throw new IllegalStateException("invalid shopping product snapshot");
+                }
+            }
+            return response.data();
+        };
+        try {
+            return Retry.decorateSupplier(retry, CircuitBreaker.decorateSupplier(circuitBreaker, call)).get();
+        } catch (RuntimeException exception) {
+            throw new ShoppingUnavailableException("shopping batch product lookup failed", exception);
         }
     }
 

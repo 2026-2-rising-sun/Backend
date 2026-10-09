@@ -2,6 +2,8 @@ package com.shoppinglive.commerce.shopping.application;
 
 import com.shoppinglive.commerce.shopping.domain.ProductSnapshot;
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * shopping-service 의 상품 정보를 조회하기 위한 어댑터 계약.
@@ -26,6 +28,11 @@ public interface ShoppingClient {
      * @throws ShoppingUnavailableException 일시적 장애 (네트워크·5xx·timeout)
      */
     Optional<ProductSnapshot> findProduct(Long productId);
+
+    /** Resolves product ownership for a group of refund targets without one HTTP call per order. */
+    default List<ProductSnapshot> findProducts(Collection<Long> productIds) {
+        return productIds.stream().distinct().map(this::findProduct).flatMap(Optional::stream).toList();
+    }
 
     /**
      * 상품 존재 여부만 빠르게 확인한다. 기본 구현은 {@link #findProduct(Long)} 위임이며,

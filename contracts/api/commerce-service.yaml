@@ -660,6 +660,98 @@ paths:
         404: {"$ref":"#/components/responses/NotFound"}
         409: {"$ref":"#/components/responses/Conflict"}
         503: {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/payment-groups/{number}/refunds:
+    parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
+    post:
+      tags: [Payment Groups]
+      operationId: requestMyRefund
+      summary: 본인 결제 묶음 전체 또는 장바구니 항목 전체 수량 환불 접수
+      description: |-
+        안전한 환불 실행·재처리 경로가 준비될 때까지 commerce.refunds.api-enabled 기본값 false로 경로가 비활성화된다.
+        활성화 후 회원 본인 결제 묶음만 접수한다. 본문 생략은 결제 묶음 전체 환불, 본문을 보내면 비어 있지 않은 cartItemIds 배열이 필요하다. 값 지정은 해당 장바구니 항목 ID로 생성된 주문의 전체 수량을 뜻하며 빈 배열/null/빈 객체/알 수 없는 필드는 400으로 거절한다. 금액은 서버에 저장된 주문별 실부담액으로 계산하며 요청 금액/주문번호/부분 수량은 받지 않는다.
+        결제 완료 후 168시간 경계 직전까지 서버 접수해야 한다. 장바구니 행은 결제 뒤 삭제되므로 주문 source_cart_item_id를 검증한다.
+      x-required-roles: [USER, SELLER]
+      parameters: [{"$ref":"#/components/parameters/RequiredRefundIdempotencyKey"}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {"$ref":"#/components/schemas/RefundRequest"}
+            example: {cartItemIds: [101]}
+      responses:
+        201:
+          description: 환불 접수 및 대상·실부담액 스냅샷 저장
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/RefundViewEnvelope"}
+              example: {success: true, data: {id: 51, paymentGroupNumber: PG-EXAMPLE, refundAmount: 1900, status: PROCESSING, requestedAt: '2026-10-09T00:00:00Z', resolvedAt: null, targets: [{cartItemId: 101, orderId: 301, productId: 1, productName: A, quantity: 2, refundAmount: 1900}]}, error: null}
+        200:
+          description: 동일 멱등 키·동일 입력 재요청, 기존 요청 반환
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/RefundViewEnvelope"}
+        400: {"$ref":"#/components/responses/BadRequest"}
+        401: {"$ref":"#/components/responses/Unauthorized"}
+        403: {"$ref":"#/components/responses/Forbidden"}
+        404: {"$ref":"#/components/responses/NotFound"}
+        409: {"$ref":"#/components/responses/Conflict"}
+        503: {"$ref":"#/components/responses/AuthUnavailable"}
+    get:
+      tags: [Payment Groups]
+      operationId: listMyRefunds
+      summary: 본인 결제 묶음 환불 이력
+      x-required-roles: [USER, SELLER]
+      responses:
+        200:
+          description: 회원 본인 결제 묶음의 환불 요청 목록
+          content:
+            application/json:
+              schema: {type: object, required: [success, data, error], properties: {success: {const: true}, data: {type: array, items: {$ref: '#/components/schemas/RefundView'}}, error: {type: 'null'}}}
+        401: {"$ref":"#/components/responses/Unauthorized"}
+        404: {"$ref":"#/components/responses/NotFound"}
+        503: {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/payment-groups/{number}/refunds/{id}:
+    parameters: [{"$ref":"#/components/parameters/GroupNumber"},{"$ref":"#/components/parameters/RefundId"}]
+    get:
+      tags: [Payment Groups]
+      operationId: getMyRefund
+      summary: 본인 환불 요청 상세
+      x-required-roles: [USER, SELLER]
+      responses:
+        200: {description: 환불 요청과 전체 대상 상세, content: {application/json: {schema: {$ref: '#/components/schemas/RefundViewEnvelope'}}}}
+        401: {"$ref":"#/components/responses/Unauthorized"}
+        404: {"$ref":"#/components/responses/NotFound"}
+        503: {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/seller/refunds:
+    get:
+      tags: [Sales Admin]
+      operationId: listMySellerRefunds
+      summary: 본인 대상 주문의 환불 상태 목록
+      description: 혼합 판매자 요청에서 본인 대상 주문·실부담액만 반환한다. 결제 묶음 총액·다른 판매자 주문과 대상은 반환하지 않는다.
+      x-required-roles: [SELLER]
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        200: {description: 판매자 본인 대상 환불만 조회, content: {application/json: {schema: {type: object, required: [success, data, error], properties: {success: {const: true}, data: {type: array, items: {$ref: '#/components/schemas/SellerRefundView'}}, error: {type: 'null'}}}}}}
+        400: {"$ref":"#/components/responses/BadRequest"}
+        401: {"$ref":"#/components/responses/Unauthorized"}
+        403: {"$ref":"#/components/responses/Forbidden"}
+        503: {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/seller/refunds/{id}:
+    parameters: [{"$ref":"#/components/parameters/RefundId"}]
+    get:
+      tags: [Sales Admin]
+      operationId: getMySellerRefund
+      summary: 본인 대상 주문의 환불 상세
+      description: 요청의 판매자별 대상 금액과 주문만 반환하며 타 판매자 정보와 결제 묶음 총액은 숨긴다.
+      x-required-roles: [SELLER]
+      responses:
+        200: {description: 판매자 본인 환불 대상만 조회, content: {application/json: {schema: {$ref: '#/components/schemas/SellerRefundViewEnvelope'}}}}
+        401: {"$ref":"#/components/responses/Unauthorized"}
+        403: {"$ref":"#/components/responses/Forbidden"}
+        404: {"$ref":"#/components/responses/NotFound"}
+        503: {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/sales:
     get:
       tags: ["Internal Sales"]
@@ -863,12 +955,14 @@ components:
       in: "path"
       required: true
       schema: {"type":"integer","format":"int64","minimum":1}
+    RefundId: {name: id, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
     OrderNumber: {"name": "orderNumber", "in": "path", "required": true, "schema": {"type": "string"}}
     PaymentId: {"name": "paymentId", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
     ItemId: {"name": "itemId", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
     SalesId: {"name": "id", "in": "path", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}
     OptionalIdempotencyKey: {"name": "X-Idempotency-Key", "in": "header", "required": false, "schema": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "회원별 멱등키. 공백만 허용하지 않으며 동일 키의 입력 변경은 409."}
     RequiredIdempotencyKey: {"name": "X-Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1, "maxLength": 64}, "description": "회원별 요청 식별자. 동일 키·입력 재전송은 카트 변경·삭제 뒤에도 기존 결과로 연결한다. 다른 입력은 409이며 재전송 HTTP 상태는 각 API의 응답 정의를 따른다."}
+    RequiredRefundIdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 64}, description: 환불 요청 멱등 키. 회원별 같은 입력은 기존 요청을 반환하며 다른 결제 묶음/장바구니 ID 입력은 409.}
   responses:
     BadRequest:
       description: "요청 값·형식 또는 금액 범위 오류"
@@ -939,6 +1033,60 @@ components:
                   message: 인증 상태를 확인할 수 없습니다.
                   requestId: request-001
   schemas:
+    RefundStatus:
+      type: string
+      enum: [PROCESSING, UNKNOWN, SUCCESS, FAILED]
+    RefundRequest:
+      type: object
+      additionalProperties: false
+      required: [cartItemIds]
+      properties:
+        cartItemIds: {type: array, minItems: 1, maxItems: 100, uniqueItems: true, items: {type: integer, format: int64, minimum: 1}, description: 하나 이상의 장바구니 항목 ID. ID별 연결 주문의 전체 수량을 환불한다. 전체 묶음 환불은 요청 본문을 생략한다.}
+    RefundTarget:
+      type: object
+      required: [cartItemId, orderId, productId, productName, quantity, refundAmount]
+      properties:
+        cartItemId: {type: [integer, 'null'], format: int64, minimum: 1, description: 레거시 주문에 원본 cart item ID가 없으면 null}
+        orderId: {type: integer, format: int64, minimum: 1}
+        productId: {type: integer, format: int64, minimum: 1}
+        productName: {type: string}
+        quantity: {type: integer, minimum: 1}
+        refundAmount: {type: integer, format: int64, minimum: 0}
+    RefundView:
+      type: object
+      required: [id, paymentGroupNumber, refundAmount, status, requestedAt, resolvedAt, targets]
+      properties:
+        id: {type: integer, format: int64, minimum: 1}
+        paymentGroupNumber: {type: string}
+        refundAmount: {type: integer, format: int64, minimum: 0}
+        status: {$ref: '#/components/schemas/RefundStatus'}
+        requestedAt: {type: string, format: date-time}
+        resolvedAt: {type: [string, 'null'], format: date-time}
+        targets: {type: array, items: {$ref: '#/components/schemas/RefundTarget'}}
+    SellerRefundView:
+      type: object
+      required: [id, refundAmount, status, requestedAt, resolvedAt, targets]
+      properties:
+        id: {type: integer, format: int64, minimum: 1}
+        refundAmount: {type: integer, format: int64, minimum: 0, description: 해당 판매자 대상 주문만의 실부담액 합계}
+        status: {$ref: '#/components/schemas/RefundStatus'}
+        requestedAt: {type: string, format: date-time}
+        resolvedAt: {type: [string, 'null'], format: date-time}
+        targets: {type: array, items: {$ref: '#/components/schemas/RefundTarget'}}
+    RefundViewEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: '#/components/schemas/RefundView'}
+        error: {type: 'null'}
+    SellerRefundViewEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: '#/components/schemas/SellerRefundView'}
+        error: {type: 'null'}
     AvailableCoupon:
       type: object
       required: [id, name, fixedDiscount, remaining, endsAt, expiresAt]

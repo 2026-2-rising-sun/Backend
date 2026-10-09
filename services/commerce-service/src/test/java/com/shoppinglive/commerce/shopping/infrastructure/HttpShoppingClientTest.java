@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -138,6 +139,17 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(1);
         assertThat(circuitBreakers.circuitBreaker(HttpShoppingClient.RESILIENCE_INSTANCE)
             .getMetrics().getNumberOfFailedCalls()).isZero();
+    }
+
+    @Test
+    void batchLookupUsesOneInternalRequestAndValidatesEveryReturnedProduct() {
+        body = """
+            {"success":true,"data":[{"id":7,"name":"A","mainImageUrl":null,"sellerId":"seller-a"},{"id":8,"name":"B","mainImageUrl":null,"sellerId":"seller-b"}],"error":null}
+            """;
+        assertThat(client.findProducts(List.of(8L, 7L))).containsExactly(
+            new ProductSnapshot(7L, "A", null, "seller-a"), new ProductSnapshot(8L, "B", null, "seller-b"));
+        assertThat(requests).hasValue(1);
+        assertThat(path.get()).contains("GET /v1/internal/products?ids=7,8");
     }
 
     @ParameterizedTest
