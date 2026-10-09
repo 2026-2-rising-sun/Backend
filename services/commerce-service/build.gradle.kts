@@ -49,7 +49,7 @@ tasks.register<Test>("postgresCommerceTest") {
             "CouponClaimPostgresTest", "CouponPreviewPostgresTest", "CouponReservationPostgresTest",
             "RefundSchemaPostgresTest", "RefundIntakeServicePostgresTest", "DurableMockRefundGatewayPostgresTest",
             "RefundExecutionPostgresTest", "RefundExecutionConcurrencyPostgresTest", "RefundApiPostgresTest",
-            "RefundRecoveryStorePostgresTest")
+            "RefundRecoveryStorePostgresTest", "RefundRecoveryExecutionPostgresTest")
             .forEach { includeTestsMatching("*.$it") }
     }
     doFirst {

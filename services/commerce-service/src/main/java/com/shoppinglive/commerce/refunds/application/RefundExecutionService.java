@@ -2,133 +2,77 @@ package com.shoppinglive.commerce.refunds.application;
 
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.commerce.purchase.domain.PaymentGroup;
-import com.shoppinglive.commerce.purchase.infrastructure.PaymentGroupRepository;
-import com.shoppinglive.commerce.orders.domain.OrderStatus;
-import com.shoppinglive.commerce.sales.application.SalesService;
 import com.shoppinglive.commerce.refunds.domain.MockRefundOutcome;
 import com.shoppinglive.commerce.refunds.domain.MockRefundResult;
-import com.shoppinglive.commerce.refunds.domain.RefundStatus;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.util.List;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.shoppinglive.commerce.refunds.infrastructure.RefundRecoveryStore;
+import com.shoppinglive.commerce.refunds.infrastructure.RefundRecoveryStore.Lease;
+import java.time.Duration;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-/** Executes one persisted refund request against the idempotent Mock gateway. */
+/** Orchestrates short durable leases, external execution, and atomic result application. */
 @Service
 public class RefundExecutionService {
-    private final JdbcTemplate jdbc;
-    private final PaymentGroupRepository groups;
+    private static final Duration LEASE_DURATION = Duration.ofMinutes(1);
+    private final RefundRecoveryStore recovery;
     private final DurableMockRefundGateway gateway;
-    private final SalesService sales;
-    @PersistenceContext private EntityManager entityManager;
+    private final RefundOutcomeService outcomes;
+    private final RefundRetryPolicy retryPolicy;
 
-    public RefundExecutionService(JdbcTemplate jdbc, PaymentGroupRepository groups, DurableMockRefundGateway gateway,
-        SalesService sales) {
-        this.jdbc = jdbc;
-        this.groups = groups;
+    public RefundExecutionService(RefundRecoveryStore recovery, DurableMockRefundGateway gateway,
+                                  RefundOutcomeService outcomes, RefundRetryPolicy retryPolicy) {
+        this.recovery = recovery;
         this.gateway = gateway;
-        this.sales = sales;
+        this.outcomes = outcomes;
+        this.retryPolicy = retryPolicy;
     }
 
-    @Transactional
-    public boolean execute(long refundRequestId) {
-        return execute(refundRequestId, MockRefundScenario.SUCCESS);
+    public boolean execute(long requestId) {
+        return execute(requestId, MockRefundScenario.SUCCESS);
     }
 
-    @Transactional
-    public boolean execute(long refundRequestId, MockRefundScenario scenario) {
-        RefundExecutionRequest initial = findRequest(refundRequestId);
-        if (initial == null) throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
+    public boolean execute(long requestId, MockRefundScenario scenario) {
+        if (scenario == null) throw new IllegalArgumentException("scenario must be provided");
+        if (!recovery.exists(requestId)) throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
+        var lease = recovery.claim(requestId, LEASE_DURATION);
+        return lease.isPresent() && executeClaimed(lease.get(), scenario);
+    }
 
-        PaymentGroup group = groups.lockById(initial.paymentGroupId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
-        entityManager.refresh(group);
-
-        RefundExecutionRequest request = findRequest(refundRequestId);
-        if (request == null) throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
-        if (request.status() != RefundStatus.PROCESSING && request.status() != RefundStatus.UNKNOWN) return false;
-
-        if (!fitsPaymentAmount(group.getPayableAmount(), request)) {
-            throw new BusinessException(ErrorCode.CONFLICT, "결제 금액을 초과하는 환불 요청입니다.");
-        }
-
-        if (request.refundAmount() == 0) {
-            return applyOutcome(request.id(), MockRefundOutcome.SUCCESS, "0원 환불은 금전 실행 없이 처리합니다.");
-        }
-
+    public boolean executeClaimed(Lease lease, MockRefundScenario scenario) {
         try {
-            MockRefundResult result = gateway.execute(request.id(), request.refundAmount(), scenario);
-            return applyOutcome(request.id(), result.outcome(), "Mock 환불 결과: " + result.outcome());
-        } catch (MockRefundResultUnknownException unknown) {
-            jdbc.update("""
-                UPDATE refund_request
-                   SET status='UNKNOWN', result_detail=?, updated_at=CURRENT_TIMESTAMP
-                 WHERE id=? AND status='PROCESSING'
-                """, "Mock 환불 결과 확인이 필요합니다.", request.id());
-            return false;
-        }
-    }
+            if (!outcomes.prepare(lease)) return false;
+            if (lease.refundAmount() == 0) return outcomes.apply(lease, MockRefundOutcome.SUCCESS);
 
-    private boolean fitsPaymentAmount(long paymentAmount, RefundExecutionRequest current) {
-        Long previousAmount = jdbc.queryForObject("""
-            SELECT COALESCE(SUM(refund_amount), 0) FROM refund_request
-             WHERE payment_group_id=? AND id<>? AND status IN ('PROCESSING','UNKNOWN','SUCCESS')
-            """, Long.class, current.paymentGroupId(), current.id());
-        try {
-            return Math.addExact(previousAmount == null ? 0L : previousAmount, current.refundAmount()) <= paymentAmount;
-        } catch (ArithmeticException overflow) {
-            return false;
-        }
-    }
+            // Always check an earlier result before considering another execution.
+            MockRefundResult known = gateway.find(lease.requestId());
+            if (known != null) return apply(lease, known);
 
-    private boolean applyOutcome(long requestId, MockRefundOutcome outcome, String detail) {
-        if (outcome == MockRefundOutcome.SUCCESS) {
-            List<RefundTarget> targets = jdbc.query("""
-                SELECT t.order_id,o.sales_info_id,o.quantity
-                  FROM refund_target_order t JOIN orders o ON o.id=t.order_id
-                 WHERE t.refund_request_id=? ORDER BY o.sales_info_id,o.id
-                """, (rs, row) -> new RefundTarget(rs.getLong(1), rs.getLong(2), rs.getInt(3)), requestId);
-            for (RefundTarget target : targets) {
-                int transitioned = jdbc.update("""
-                    UPDATE orders SET status='REFUNDED',version=version+1,updated_at=CURRENT_TIMESTAMP
-                     WHERE id=? AND status='PAID'
-                    """, target.orderId());
-                if (transitioned != 1) {
-                    throw new BusinessException(ErrorCode.CONFLICT, "환불 대상 주문 상태가 변경되었습니다.");
-                }
-                sales.adjustAvailable(target.salesId(), target.quantity());
+            var invocation = recovery.beginInvocation(lease);
+            if (invocation.isEmpty()) {
+                recovery.unknown(lease, RefundRetryPolicy.RESULT_QUERY_DELAY);
+                return false;
             }
-            Long groupId = jdbc.queryForObject("SELECT payment_group_id FROM refund_request WHERE id=?", Long.class, requestId);
-            Long remaining = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM orders WHERE payment_group_id=? AND status<>'REFUNDED'
-                """, Long.class, groupId);
-            if (remaining != null && remaining == 0) {
-                PaymentGroup group = groups.lockById(groupId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
-                group.transition(OrderStatus.REFUNDED);
+            MockRefundResult result;
+            try {
+                result = gateway.execute(lease.requestId(), lease.refundAmount(), scenario);
+            } catch (MockRefundResultUnknownException unknown) {
+                recovery.unknown(lease, retryPolicy.afterUnknown(invocation.get()));
+                return false;
+            } catch (RuntimeException deliveryFailure) {
+                recovery.unknown(lease, retryPolicy.afterUnknown(invocation.get()));
+                throw deliveryFailure;
             }
+            return apply(lease, result);
+        } catch (RuntimeException failure) {
+            // The independent Mock result and invocation count survive local application rollback.
+            recovery.release(lease, Duration.ofSeconds(1));
+            throw failure;
         }
-        int updated = jdbc.update("""
-            UPDATE refund_request
-               SET status=?, resolved_at=CURRENT_TIMESTAMP, result_detail=?, updated_at=CURRENT_TIMESTAMP
-             WHERE id=? AND status IN ('PROCESSING','UNKNOWN')
-            """, outcome.name(), detail, requestId);
-        return updated == 1;
     }
 
-    private record RefundTarget(long orderId, long salesId, int quantity) { }
-
-    private RefundExecutionRequest findRequest(long requestId) {
-        List<RefundExecutionRequest> rows = jdbc.query("""
-            SELECT id,payment_group_id,refund_amount,status
-              FROM refund_request WHERE id=?
-            """, (rs, row) -> new RefundExecutionRequest(rs.getLong(1), rs.getLong(2), rs.getLong(3),
-                RefundStatus.valueOf(rs.getString(4))), requestId);
-        return rows.isEmpty() ? null : rows.getFirst();
+    private boolean apply(Lease lease, MockRefundResult result) {
+        if (result.refundRequestId() != lease.requestId() || result.refundAmount() != lease.refundAmount()) {
+            throw new IllegalStateException("Stored refund result differs from the original request");
+        }
+        return outcomes.apply(lease, result.outcome());
     }
-
-    private record RefundExecutionRequest(long id, long paymentGroupId, long refundAmount, RefundStatus status) { }
 }

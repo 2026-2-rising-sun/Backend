@@ -37,6 +37,39 @@ public class RefundRecoveryStore {
         return claim(" AND id=?", new Object[] {requestId}, 1, leaseDuration).stream().findFirst();
     }
 
+    public boolean exists(long requestId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM refund_request WHERE id=?)", Boolean.class, requestId));
+    }
+
+    /** Reserve an invocation durably before sending it, including a retry after interrupted PROCESSING. */
+    public Optional<Integer> beginInvocation(Lease lease) {
+        List<Integer> counts = independent.execute(transaction -> jdbc.query("""
+            UPDATE refund_request
+               SET retry_count=CASE WHEN execution_started_at IS NULL THEN 0 ELSE retry_count+1 END,
+                   status=CASE WHEN execution_started_at IS NULL THEN 'PROCESSING' ELSE 'UNKNOWN' END,
+                   execution_started_at=COALESCE(execution_started_at,clock_timestamp()),updated_at=clock_timestamp()
+             WHERE id=? AND lease_token=? AND lease_until > clock_timestamp()
+               AND status IN ('PROCESSING','UNKNOWN')
+               AND ((execution_started_at IS NULL AND status='PROCESSING')
+                    OR (execution_started_at IS NOT NULL AND retry_count<3))
+            RETURNING retry_count
+            """, (rs, row) -> rs.getInt(1), lease.requestId(), lease.token()));
+        return counts.stream().findFirst();
+    }
+
+    public boolean unknown(Lease lease, Duration delay) {
+        if (delay == null || delay.isNegative()) throw new IllegalArgumentException("delay must be nonnegative");
+        return independent.execute(transaction -> jdbc.update("""
+            UPDATE refund_request SET status='UNKNOWN',lease_token=NULL,lease_until=NULL,
+                   execution_started_at=COALESCE(execution_started_at,clock_timestamp()),
+                   next_action_at=clock_timestamp() + (? * INTERVAL '1 millisecond'),
+                   result_detail='Mock 환불 결과 확인이 필요합니다.',updated_at=clock_timestamp()
+             WHERE id=? AND lease_token=? AND lease_until > clock_timestamp()
+               AND status IN ('PROCESSING','UNKNOWN')
+            """, delay.toMillis(), lease.requestId(), lease.token()) == 1);
+    }
+
     private List<Lease> claim(String predicate, Object[] selection, int limit, Duration duration) {
         long millis = positiveMillis(duration);
         String token = UUID.randomUUID().toString();

@@ -82,6 +82,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
             request.id())).isEqualTo(1);
 
         jdbc.update("UPDATE sales_stock SET available=3 WHERE sales_info_id=?", target.getSalesInfoId());
+        makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
         assertThat(orders.findById(target.getId()).orElseThrow().getStatus()).isEqualTo(OrderStatus.REFUNDED);
@@ -130,6 +131,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
             request.id())).isZero();
 
+        makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
     }
@@ -144,6 +146,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
             request.id())).isEqualTo(1);
 
+        makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status()).isEqualTo(RefundStatus.SUCCESS);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?", Integer.class,
