@@ -4,6 +4,8 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.commerce.purchase.domain.PaymentGroup;
 import com.shoppinglive.commerce.purchase.infrastructure.PaymentGroupRepository;
+import com.shoppinglive.commerce.orders.domain.OrderStatus;
+import com.shoppinglive.commerce.sales.application.SalesService;
 import com.shoppinglive.commerce.refunds.domain.MockRefundOutcome;
 import com.shoppinglive.commerce.refunds.domain.MockRefundResult;
 import com.shoppinglive.commerce.refunds.domain.RefundStatus;
@@ -20,12 +22,15 @@ public class RefundExecutionService {
     private final JdbcTemplate jdbc;
     private final PaymentGroupRepository groups;
     private final DurableMockRefundGateway gateway;
+    private final SalesService sales;
     @PersistenceContext private EntityManager entityManager;
 
-    public RefundExecutionService(JdbcTemplate jdbc, PaymentGroupRepository groups, DurableMockRefundGateway gateway) {
+    public RefundExecutionService(JdbcTemplate jdbc, PaymentGroupRepository groups, DurableMockRefundGateway gateway,
+        SalesService sales) {
         this.jdbc = jdbc;
         this.groups = groups;
         this.gateway = gateway;
+        this.sales = sales;
     }
 
     @Transactional
@@ -80,6 +85,32 @@ public class RefundExecutionService {
     }
 
     private boolean applyOutcome(long requestId, MockRefundOutcome outcome, String detail) {
+        if (outcome == MockRefundOutcome.SUCCESS) {
+            List<RefundTarget> targets = jdbc.query("""
+                SELECT t.order_id,o.sales_info_id,o.quantity
+                  FROM refund_target_order t JOIN orders o ON o.id=t.order_id
+                 WHERE t.refund_request_id=? ORDER BY o.sales_info_id,o.id
+                """, (rs, row) -> new RefundTarget(rs.getLong(1), rs.getLong(2), rs.getInt(3)), requestId);
+            for (RefundTarget target : targets) {
+                int transitioned = jdbc.update("""
+                    UPDATE orders SET status='REFUNDED',version=version+1,updated_at=CURRENT_TIMESTAMP
+                     WHERE id=? AND status='PAID'
+                    """, target.orderId());
+                if (transitioned != 1) {
+                    throw new BusinessException(ErrorCode.CONFLICT, "환불 대상 주문 상태가 변경되었습니다.");
+                }
+                sales.adjustAvailable(target.salesId(), target.quantity());
+            }
+            Long groupId = jdbc.queryForObject("SELECT payment_group_id FROM refund_request WHERE id=?", Long.class, requestId);
+            Long remaining = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM orders WHERE payment_group_id=? AND status<>'REFUNDED'
+                """, Long.class, groupId);
+            if (remaining != null && remaining == 0) {
+                PaymentGroup group = groups.lockById(groupId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
+                group.transition(OrderStatus.REFUNDED);
+            }
+        }
         int updated = jdbc.update("""
             UPDATE refund_request
                SET status=?, resolved_at=CURRENT_TIMESTAMP, result_detail=?, updated_at=CURRENT_TIMESTAMP
@@ -87,6 +118,8 @@ public class RefundExecutionService {
             """, outcome.name(), detail, requestId);
         return updated == 1;
     }
+
+    private record RefundTarget(long orderId, long salesId, int quantity) { }
 
     private RefundExecutionRequest findRequest(long requestId) {
         List<RefundExecutionRequest> rows = jdbc.query("""

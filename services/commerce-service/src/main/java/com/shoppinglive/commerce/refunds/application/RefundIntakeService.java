@@ -104,7 +104,8 @@ public class RefundIntakeService {
 
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         if (group.getStatus() != OrderStatus.PAID || groupOrders.isEmpty()
-            || groupOrders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID)) {
+            || groupOrders.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID
+                && order.getStatus() != OrderStatus.REFUNDED)) {
             throw new BusinessException(ErrorCode.CONFLICT, "결제 완료된 주문만 환불할 수 있습니다.");
         }
         PaymentAttempt attempt = group.getPaymentId() == null ? null : attempts.findById(group.getPaymentId()).orElse(null);
@@ -132,6 +133,9 @@ public class RefundIntakeService {
         }
         if (hasPreviouslyRequestedTargets(group.getId(), targets)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 환불 요청에 포함된 주문이 있습니다.");
+        }
+        if (targets.stream().anyMatch(order -> order.getStatus() != OrderStatus.PAID)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "환불 가능한 주문 상태가 아닙니다.");
         }
 
         long amount = 0;

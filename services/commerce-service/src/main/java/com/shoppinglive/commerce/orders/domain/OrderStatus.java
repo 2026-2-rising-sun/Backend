@@ -15,13 +15,15 @@ public enum OrderStatus {
     /** 결제 전 사용자 취소. 확보 재고 반환됨. */
     CANCELLED,
     /** 미결제 만료. 확보 재고 반환됨. (주문 5 채택 시) */
-    EXPIRED;
+    EXPIRED,
+    /** 결제 성공 주문의 환불 완료. 판매 완료 재고를 복구했다. */
+    REFUNDED;
 
     /**
      * 결제 흐름의 최종 확정 상태인가.
-     * PAID · FAILED · CANCELLED · EXPIRED 는 더 이상 상태 변경 없음.
+     * PAID · FAILED · CANCELLED · EXPIRED · REFUNDED 는 더 이상 상태 변경 없음.
      */
     public boolean isTerminal() {
-        return this == PAID || this == FAILED || this == CANCELLED || this == EXPIRED;
+        return this == PAID || this == FAILED || this == CANCELLED || this == EXPIRED || this == REFUNDED;
     }
 }
