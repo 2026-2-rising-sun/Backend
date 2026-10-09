@@ -175,6 +175,30 @@ class MemberCommerceMigrationPostgresTest {
             .isEqualTo(1);
     }
 
+    @Test
+    void recoveryScenariosMigrationPreservesExistingAttemptsAndAllowsTransportFailureFixtures() throws Exception {
+        migration("12").migrate();
+        sale();
+        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "recovery-scenario-legacy");
+        sql("INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
+            + "VALUES(1,1,'DELAYED_SUCCESS','PROCESSING',now(),now(),now())");
+        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET scenario='SUCCESS_RESPONSE_LOST' WHERE id=1"))
+            .isInstanceOf(java.sql.SQLException.class);
+
+        migration(null).migrate();
+
+        assertThat(count("SELECT count(*) FROM payment_attempt WHERE id=1 AND scenario='DELAYED_SUCCESS' AND status='PROCESSING'"))
+            .isEqualTo(1);
+        String[] newScenarios = {"SUCCESS_RESPONSE_LOST", "FAILURE_RESPONSE_LOST", "UNAVAILABLE_BEFORE_RESULT"};
+        for (int i = 0; i < newScenarios.length; i++) {
+            sql("INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
+                + "VALUES(" + (i + 2) + ",1,'" + newScenarios[i] + "','PROCESSING',now(),now(),now())");
+        }
+        assertThat(count("SELECT count(*) FROM payment_attempt")).isEqualTo(4);
+        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET scenario='INVALID_SCENARIO' WHERE id=1"))
+            .isInstanceOf(java.sql.SQLException.class);
+    }
+
     private void sale() throws Exception {
         sql("INSERT INTO sales_info (id,product_id,price,status,created_at,updated_at) VALUES (1,1,1000,'ON_SALE',now(),now())");
         sql("INSERT INTO sales_stock (sales_info_id,available,reserved,created_at,updated_at) VALUES (1,10,0,now(),now())");
