@@ -339,6 +339,33 @@
           "change": "optional couponId and per-item/group discount/payable response fields"
         }
       ]
+    },
+    {
+      "baseSnapshotSha256": "cfd1b3daa5e986e8da63ccd49856f45b3041fce16274335848a2def65305dd28",
+      "headSnapshotSha256": "b41615e297d570d9620be30908c6d3c44685062fc5ab8c5ef96540ed46715cea",
+      "reason": "Commerce #173 adds an optional couponId to cart-order creation and a nullable couponId to payment-group responses. The expected total remains the pre-discount gross amount; the idempotency fingerprint includes couponId. Coupon reservation is atomic with orders and stock, then confirmed on payment success or released on definitive failure, cancellation, or expiry. Existing request fields and authorization are unchanged; null couponId examples cover legacy/no-coupon groups.",
+      "independentReview": {
+        "reviewer": "Bugbot independent review subagent /root/bugbot_coupon_reservation_final",
+        "reviewedAt": "2026-10-09",
+        "evidence": "PR #187 branch review at 557aab3277ed2aacba211e3196d9955adf4adc5e found no actionable correctness or regression issue; it verified couponId idempotency, reservation transaction boundaries, payment lifecycle and expiry behavior. The later 390f199 commit only adds null couponId to existing response examples; contract lint/examples pass."
+      },
+      "changedOperations": [
+        {
+          "method": "POST",
+          "path": "/v1/cart/orders",
+          "change": "optional couponId request field; reserve coupon and snapshot group/order discounts"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/active",
+          "change": "nullable couponId response field"
+        },
+        {
+          "method": "GET",
+          "path": "/v1/payment-groups/{number}",
+          "change": "nullable couponId response field"
+        }
+      ]
     }
   ]
 }

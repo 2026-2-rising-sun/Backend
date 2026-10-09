@@ -73,6 +73,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     private CartItem a;
     private CartItem b;
     private CartItem unselected;
+    private static final String COUPON_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
     @BeforeEach
     void seed() {
@@ -94,9 +95,19 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         if (groups != null) groups.findAll().forEach(group -> scenarios.clear(group.getGroupNumber()));
         jdbc.update("DELETE FROM mock_gateway_result");
         payments.deleteAll(); orders.deleteAll(); groups.deleteAll(); items.deleteAll();
+        ensureCouponTables();
+        jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_definition WHERE id=?", COUPON_ID);
         stocks.deleteAll(); sales.deleteAll();
         jdbc.update("DELETE FROM member_purchase_guard");
         shopping.clear();
+    }
+
+    private void ensureCouponTables() {
+        jdbc.execute("CREATE TABLE IF NOT EXISTS coupon_definition (id VARCHAR(36) PRIMARY KEY, seller_id VARCHAR(36) NOT NULL, name VARCHAR(100) NOT NULL, fixed_discount BIGINT NOT NULL, issuance_limit INTEGER NOT NULL, issued_count INTEGER NOT NULL, starts_at TIMESTAMP WITH TIME ZONE NOT NULL, ends_at TIMESTAMP WITH TIME ZONE NOT NULL, expires_at TIMESTAMP WITH TIME ZONE NOT NULL, version BIGINT NOT NULL, created_at TIMESTAMP WITH TIME ZONE NOT NULL)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS coupon_target (coupon_id VARCHAR(36) NOT NULL, product_id BIGINT NOT NULL, PRIMARY KEY(coupon_id, product_id))");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS member_coupon (id VARCHAR(36) PRIMARY KEY, coupon_id VARCHAR(36) NOT NULL, member_id VARCHAR(36) NOT NULL, status VARCHAR(16) NOT NULL, claimed_at TIMESTAMP WITH TIME ZONE NOT NULL, UNIQUE(coupon_id, member_id))");
     }
 
     private List<Selection> selected() {
@@ -111,6 +122,22 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         var current = stocks.findById(id).orElseThrow();
         assertThat(current.getAvailable()).isEqualTo(available);
         assertThat(current.getReserved()).isEqualTo(reserved);
+    }
+
+    private void issueCoupon() {
+        Instant now = Instant.now();
+        jdbc.update("""
+            INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,starts_at,ends_at,expires_at,version,created_at)
+            VALUES(?,?,?, ?,10,1,?,?,?,0,?)
+            """, COUPON_ID, MEMBER_B, "5천원 할인", 5000L, Timestamp.from(now.minusSeconds(60)),
+            Timestamp.from(now.plusSeconds(3600)), Timestamp.from(now.plusSeconds(7200)), Timestamp.from(now));
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,1)", COUPON_ID);
+        jdbc.update("INSERT INTO member_coupon(id,coupon_id,member_id,status,claimed_at) VALUES(?,?,?,'AVAILABLE',?)",
+            "dddddddd-dddd-4ddd-8ddd-dddddddddddd", COUPON_ID, MEMBER_A, Timestamp.from(now.minusSeconds(30)));
+    }
+
+    private String couponStatus() {
+        return jdbc.queryForObject("SELECT status FROM member_coupon WHERE coupon_id=? AND member_id=?", String.class, COUPON_ID, MEMBER_A);
     }
 
     private void untouched() {
@@ -135,6 +162,58 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(service.active(MEMBER_B)).isEmpty();
         assertThat(items.count()).isEqualTo(3);
         stock(salesA, 8, 2); stock(salesB, 9, 1);
+    }
+
+    @Test
+    void couponIsReservedWithDiscountSnapshotsAndIdempotentReplay() {
+        issueCoupon();
+        var quote = service.preview(MEMBER_A, selected(), COUPON_ID);
+        assertThat(quote.discountAmount()).isEqualTo(5000);
+        assertThat(quote.payableAmount()).isEqualTo(20000);
+        assertThat(quote.items()).extracting(PaymentGroupService.Item::discountAmount).containsExactly(5000L, 0L);
+
+        var created = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-order");
+        assertThat(created.group().couponId()).isEqualTo(COUPON_ID);
+        assertThat(created.group().discountAmount()).isEqualTo(5000);
+        assertThat(created.group().payableAmount()).isEqualTo(20000);
+        assertThat(orders.findAll()).extracting(order -> order.getDiscountAmount()).containsExactlyInAnyOrder(5000L, 0L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-order").created()).isFalse();
+        Timestamp elapsed = Timestamp.from(Instant.now().minusSeconds(1));
+        jdbc.update("UPDATE coupon_definition SET ends_at=?, expires_at=? WHERE id=?", elapsed, elapsed, COUPON_ID);
+        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("USED");
+    }
+
+    @Test
+    void couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure() {
+        issueCoupon();
+        var cancelled = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-cancel").group();
+        service.cancel(MEMBER_A, cancelled.groupNumber());
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var expired = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-expiry").group();
+        Long groupId = groups.findByGroupNumberAndMemberId(expired.groupNumber(), MEMBER_A).orElseThrow().getId();
+        jdbc.update("UPDATE payment_group SET expires_at=? WHERE id=?", Timestamp.from(Instant.now().minusSeconds(1)), groupId);
+        assertThat(service.expire(groupId)).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var failedGroup = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-failure").group();
+        scenarios.set(failedGroup.groupNumber(), PaymentScenario.INSTANT_FAIL);
+        var attempt = service.start(MEMBER_A, failedGroup.groupNumber(), "coupon-failure-payment");
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void couponReservationRollsBackWhenLaterStockReservationFails() {
+        issueCoupon();
+        doReturn(0).when(stocks).reserve(salesB, 1);
+        assertThatThrownBy(() -> service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-stock-race"))
+            .isInstanceOf(BusinessException.class);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        untouched();
     }
 
     @Test

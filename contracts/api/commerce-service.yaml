@@ -526,7 +526,7 @@ paths:
       tags: ["Cart"]
       summary: "상품별 주문과 결제 묶음 생성"
       operationId: "createMyCartGroup"
-      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때 원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 미결제 기한은 15분이며 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다."
+      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때 원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 미결제 기한은 15분이며 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다."
       x-required-roles: ["USER","SELLER"]
       parameters: [{"$ref":"#/components/parameters/RequiredIdempotencyKey"}]
       requestBody:
@@ -541,13 +541,13 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         201:
           description: "새 묶음과 상품별 주문 생성"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         400: {"$ref":"#/components/responses/BadRequest"}
         401: {"$ref":"#/components/responses/Unauthorized"}
         403: {"$ref":"#/components/responses/Forbidden"}
@@ -567,7 +567,7 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         204: {"description":"활성 묶음 없음, 본문 없음"}
         401: {"$ref":"#/components/responses/Unauthorized"}
         403: {"$ref":"#/components/responses/Forbidden"}
@@ -586,7 +586,7 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         401: {"$ref":"#/components/responses/Unauthorized"}
         403: {"$ref":"#/components/responses/Forbidden"}
         404: {"$ref":"#/components/responses/NotFound"}
@@ -1024,6 +1024,7 @@ components:
         buyerName: {"type":"string","minLength":1,"maxLength":64}
         buyerPhone: {"type":"string","pattern":"^[0-9-]{9,32}$","writeOnly":true}
         expectedTotalAmount: {"type":"integer","format":"int64","minimum":1}
+        couponId: {"type":["string","null"],"maxLength":64}
     CartCheckoutItem:
       type: "object"
       required: ["itemId","version","productId","productName","quantity","unitPrice","totalAmount","discountAmount","payableAmount"]
@@ -1048,13 +1049,14 @@ components:
         payableAmount: {"type":"integer","format":"int64","minimum":0}
     PaymentGroup:
       type: "object"
-      required: ["groupNumber","status","totalAmount","discountAmount","payableAmount","expiresAt","orders","paymentId"]
+      required: ["groupNumber","status","totalAmount","discountAmount","payableAmount","couponId","expiresAt","orders","paymentId"]
       properties:
         groupNumber: {"type":"string"}
         status: {"type":"string","enum":["PENDING_PAYMENT","PAYMENT_CONFIRMING","PAID","FAILED","CANCELLED","EXPIRED"]}
         totalAmount: {"type":"integer","format":"int64","minimum":1}
         discountAmount: {"type":"integer","format":"int64","minimum":0}
         payableAmount: {"type":"integer","format":"int64","minimum":0}
+        couponId: {"type":["string","null"],"maxLength":64}
         expiresAt: {"type":"string","format":"date-time"}
         orders: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/Order"}}
         paymentId: {"type":["integer","null"],"format":"int64","minimum":1}
