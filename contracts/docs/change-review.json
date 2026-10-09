@@ -309,9 +309,9 @@
       }
     },
     {
-      "baseSnapshotSha256": "44f7f725f93763a90cb2257b00c79fb798b20daafa167bbb94045136eda74997",
-      "headSnapshotSha256": "8667700d4ba37fba5219c85bb8969c7e3b1f3c1a7ab0e8af5253604b2fef92da",
-      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, documented policy boundaries, and preserve the existing AuthUnavailable response for seller coupon detail reads.",
+      "baseSnapshotSha256": "68c2fbdfe5efd5c7c9067be231e2bf571d5f7cf21026220a099bcc2257848400",
+      "headSnapshotSha256": "55314f4e46e49691c0559311d0668a7c35014e728210a747c1889706b10768ed",
+      "reason": "Add member coupon availability, claim and owned-coupon operations with member-scoped access, idempotent claim replay, preserve the existing AuthUnavailable seller detail read and ShoppingUnavailable seller edit responses, and retain the order amount snapshot fields already merged to dev.",
       "independentReview": {
         "reviewer": "Bugbot independent subagent /root/bugbot_coupon_claim_final",
         "reviewedAt": "2026-10-09",
