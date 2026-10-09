@@ -11,18 +11,21 @@ function stock(ctx) {
   return JSON.parse(ctx.runtime.sql('commerce', `SELECT json_build_object('available',available,'reserved',reserved) FROM sales_stock WHERE sales_info_id=${positiveId(ctx.sales[0])}`));
 }
 async function purchase(ctx, req, name, options = {}) {
-  const quantity = options.quantity ?? 1;
-  const item = await req(name + '-cart', 'POST', '/v1/cart/items', { status: 201, body: { productId: positiveId(ctx.products[0]), quantity } });
+  const selections = options.selections ?? [{ productId: positiveId(ctx.products[0]), quantity: options.quantity ?? 1 }];
+  const items = [];
+  for (let i = 0; i < selections.length; i++) items.push(await req(name + '-cart-' + i, 'POST', '/v1/cart/items', { status: 201,
+    body: { productId: positiveId(selections[i].productId), quantity: positiveId(selections[i].quantity) } }));
+  const item = items[0];
   const group = await req(name + '-group', 'POST', '/v1/cart/orders', { status: 201, headers: { 'X-Idempotency-Key': name + '-group' },
-    body: { items: [{ itemId: positiveId(item.id), version: item.version }], buyerName: 'P3 fixture', buyerPhone: '01012345678',
-      expectedTotalAmount: 10000 * quantity, ...(options.couponId ? { couponId: couponId(options.couponId) } : {}) } });
+    body: { items: items.map(i => ({ itemId: positiveId(i.id), version: i.version })), buyerName: 'P3 fixture', buyerPhone: '01012345678',
+      expectedTotalAmount: 10000 * selections.reduce((sum, s) => sum + s.quantity, 0), ...(options.couponId ? { couponId: couponId(options.couponId) } : {}) } });
   assert(/^[A-Za-z0-9-]{1,64}$/.test(group.groupNumber));
   const base = '/v1/payment-groups/' + group.groupNumber;
   if (options.beforePay) await options.beforePay();
   const payment = await req(name + '-pay', 'POST', base + '/payments', { status: group.payableAmount === 0 ? 200 : 202,
     headers: { 'X-Idempotency-Key': name + '-pay' } });
   await ctx.poll(name + '-paid', 'commerce', `${base}/payments/${positiveId(payment.paymentId)}`, ctx.a, b => b.status === 'SUCCESS');
-  return { item, group, base, payment };
+  return { item, items, group, base, payment };
 }
 async function refund(ctx, req, name, bought, options = {}) {
   const requested = await req(name + '-request', 'POST', bought.base + '/refunds', { status: 201,
