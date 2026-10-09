@@ -90,7 +90,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
         var group = createAndPay();
         Long groupId = groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId();
         Long paymentId = groups.findById(groupId).orElseThrow().getPaymentId();
-        jdbc.update("UPDATE payment_attempt SET resolved_at = CURRENT_TIMESTAMP - INTERVAL '168 hours' WHERE id=?", paymentId);
+        jdbc.update("UPDATE payment_attempt SET resolved_at = CURRENT_TIMESTAMP - INTERVAL '168 hours 1 second' WHERE id=?", paymentId);
         assertThatThrownBy(() -> refunds.request(MEMBER_A, group.groupNumber(), "refund-expired", List.of(a.getId())))
             .isInstanceOf(BusinessException.class);
     }
