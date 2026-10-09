@@ -21,12 +21,19 @@ public record CreateOrderCommand(
     String memberId,
     Long expectedTotalAmount,
     Long sourceCartItemId,
-    Long sourceCartItemVersion
+    Long sourceCartItemVersion,
+    String couponId
 ) {
 
     public CreateOrderCommand(Long productId, Integer quantity, String buyerName, String buyerPhone,
         String memberId, Long expectedTotalAmount) {
-        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount, null, null);
+        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount, null, null, null);
+    }
+
+    public CreateOrderCommand(Long productId, Integer quantity, String buyerName, String buyerPhone,
+        String memberId, Long expectedTotalAmount, Long sourceCartItemId, Long sourceCartItemVersion) {
+        this(productId, quantity, buyerName, buyerPhone, memberId, expectedTotalAmount,
+            sourceCartItemId, sourceCartItemVersion, null);
     }
 
     /**

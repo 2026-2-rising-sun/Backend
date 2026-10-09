@@ -14,6 +14,7 @@ public record CreateOrderRequest(
     @NotBlank @Pattern(
         regexp = "^[0-9-]{9,32}$",
         message = "연락처는 숫자와 하이픈만 사용할 수 있습니다.") String buyerPhone,
-    @Positive Long expectedTotalAmount
+    @Positive Long expectedTotalAmount,
+    @Size(max = 64) String couponId
 ) {
 }

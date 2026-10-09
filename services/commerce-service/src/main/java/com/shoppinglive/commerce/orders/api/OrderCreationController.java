@@ -55,7 +55,10 @@ public class OrderCreationController {
                 request.buyerName(),
                 request.buyerPhone(),
                 member.memberId(),
-                request.expectedTotalAmount()),
+                request.expectedTotalAmount(),
+                null,
+                null,
+                request.couponId()),
             idempotencyKey);
 
         return ResponseEntity
