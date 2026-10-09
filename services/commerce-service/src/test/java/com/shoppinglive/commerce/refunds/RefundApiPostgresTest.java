@@ -11,7 +11,6 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "commerce.refunds.api-enabled=true")
@@ -24,15 +23,13 @@ class RefundApiPostgresTest extends RefundTestSupport {
     void memberAndSellersSeeOnlyTheirOwnRefundProjection() throws Exception {
         var group = createAndPay();
         mvc.perform(post("/v1/payment-groups/{number}/refunds", group.groupNumber())
-                .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"cartItemIds\":[]}"))
+                .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.data.refundAmount").value(25000))
             .andExpect(jsonPath("$.data.targets.length()").value(2));
 
         mvc.perform(post("/v1/payment-groups/{number}/refunds", group.groupNumber())
-                .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"cartItemIds\":[]}"))
+                .header("Authorization", bearer(MEMBER_A)).header("Idempotency-Key", "refund-http-all"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.refundAmount").value(25000));
 

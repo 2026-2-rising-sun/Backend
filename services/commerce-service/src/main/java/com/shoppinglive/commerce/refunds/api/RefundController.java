@@ -45,7 +45,7 @@ public class RefundController {
     public record RefundRequest(
         @JsonProperty(value = "cartItemIds", required = true)
         @JsonSetter(nulls = Nulls.FAIL)
-        @Size(max = 100) List<@Positive Long> cartItemIds) {
+        @Size(min = 1, max = 100) List<@Positive Long> cartItemIds) {
         @JsonAnySetter
         public void rejectUnknownField(String name, Object value) {
             throw new IllegalArgumentException("지원하지 않는 환불 요청 필드: " + name);
@@ -67,6 +67,7 @@ public class RefundController {
         if (!body.isObject()) throw invalidRefundBody();
         try {
             RefundRequest request = mapper.treeToValue(body, RefundRequest.class);
+            if (request.cartItemIds() == null || request.cartItemIds().isEmpty()) throw invalidRefundBody();
             return request.cartItemIds();
         } catch (JsonProcessingException | IllegalArgumentException exception) {
             throw invalidRefundBody();
@@ -74,7 +75,7 @@ public class RefundController {
     }
 
     private static BusinessException invalidRefundBody() {
-        return new BusinessException(ErrorCode.INVALID_REQUEST, "환불 요청 본문은 cartItemIds 배열을 포함하는 객체여야 합니다.");
+        return new BusinessException(ErrorCode.INVALID_REQUEST, "환불 요청 본문에는 비어 있지 않은 cartItemIds 배열이 필요합니다.");
     }
 
     @GetMapping("/v1/payment-groups/{number}/refunds")

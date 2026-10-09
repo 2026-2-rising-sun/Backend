@@ -44,6 +44,16 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
     }
 
     @Test
+    void rejectsEmptyCartIdsInsteadOfTreatingThemAsWholeGroupRefund() throws Exception {
+        mvc.perform(post("/v1/payment-groups/{number}/refunds", "PG-unknown")
+                .header("Authorization", bearer(MEMBER_A))
+                .header("Idempotency-Key", "empty-cart-ids")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"cartItemIds\":[]}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void rejectsJsonNullWithoutTreatingItAsAnOmittedBody() throws Exception {
         mvc.perform(post("/v1/payment-groups/{number}/refunds", "PG-unknown")
                 .header("Authorization", bearer(MEMBER_A))
