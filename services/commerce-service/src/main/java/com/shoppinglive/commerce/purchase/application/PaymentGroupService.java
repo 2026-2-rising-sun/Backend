@@ -203,6 +203,8 @@ public class PaymentGroupService {
    for(Order child:children.stream().sorted(Comparator.comparing(Order::getSalesInfoId)).toList())guard.lockSales(child.getSalesInfoId());
    OrderStatus finalStatus=result==PaymentStatus.SUCCESS?OrderStatus.PAID:OrderStatus.FAILED;
    if(payments.resolveIfProcessing(id,result.name())!=1)throw new IllegalStateException("payment result inconsistent");
+   if(result==PaymentStatus.SUCCESS)couponReservations.confirm(g.getMemberId(),g.getCouponId());
+   else couponReservations.release(g.getMemberId(),g.getCouponId());
    for(Order child:children){
     if(orders.transitionStatus(child.getId(),"PAYMENT_CONFIRMING",finalStatus.name())!=1)throw new IllegalStateException("group order inconsistent");
     if(result==PaymentStatus.SUCCESS){
@@ -222,6 +224,7 @@ public class PaymentGroupService {
    int changed=terminal==OrderStatus.CANCELLED?orders.cancelOrder(child.getId()):jdbc.update("UPDATE orders SET status='EXPIRED',cancelled_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='PENDING_PAYMENT'",child.getId());
    if(changed!=1)throw new IllegalStateException("group close inconsistent");restore(child);
   }
+  couponReservations.release(g.getMemberId(),g.getCouponId());
   g.transition(terminal);groups.saveAndFlush(g);
  }
  private void restore(Order child){if(stock.restoreReserved(child.getSalesInfoId(),child.getQuantity())!=1)throw new IllegalStateException("reserved stock missing");sales.reopenIfStockAvailable(child.getSalesInfoId());}

@@ -105,7 +105,7 @@ jobs:
             task: ':services:commerce-service:postgresCommerceTest'
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
             suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.CouponManagementPostgresTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=14 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=2'
+            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=17 *.CouponManagementPostgresTest=2 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=2'
           - service: live
             database: live_test
             # live 는 실제 Redis 검사도 이 job 에서 함께 돌린다.

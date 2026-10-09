@@ -179,7 +179,31 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(orders.findAll()).extracting(order -> order.getDiscountAmount()).containsExactlyInAnyOrder(5000L, 0L);
         assertThat(couponStatus()).isEqualTo("RESERVED");
         assertThat(service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-order").created()).isFalse();
+        Timestamp elapsed = Timestamp.from(Instant.now().minusSeconds(1));
+        jdbc.update("UPDATE coupon_definition SET ends_at=?, expires_at=? WHERE id=?", elapsed, elapsed, COUPON_ID);
+        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("USED");
+    }
 
+    @Test
+    void couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure() {
+        issueCoupon();
+        var cancelled = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-cancel").group();
+        service.cancel(MEMBER_A, cancelled.groupNumber());
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var expired = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-expiry").group();
+        Long groupId = groups.findByGroupNumberAndMemberId(expired.groupNumber(), MEMBER_A).orElseThrow().getId();
+        jdbc.update("UPDATE payment_group SET expires_at=? WHERE id=?", Timestamp.from(Instant.now().minusSeconds(1)), groupId);
+        assertThat(service.expire(groupId)).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var failedGroup = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-failure").group();
+        scenarios.set(failedGroup.groupNumber(), PaymentScenario.INSTANT_FAIL);
+        var attempt = service.start(MEMBER_A, failedGroup.groupNumber(), "coupon-failure-payment");
+        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test

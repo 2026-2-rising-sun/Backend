@@ -30,7 +30,7 @@ jobs:
             task: :services:commerce-service:postgresCommerceTest
             report: services/commerce-service/build/test-results/postgresCommerceTest/TEST-*.xml
             suites: '*.OrderCreationConcurrencyTest *.OrderCancellationConcurrencyTest *.SalesStockConcurrencyTest *.SalesStatusConcurrencyTest *.PaymentFlowIntegrationTest *.PaymentSchedulingAfterCommitTest *.PaymentDelayReconcilerTest *.OrderExpirationSchedulerTest *.CartOrderIntegrationTest *.MemberCommerceApiTest *.MemberCommerceMigrationPostgresTest *.PaymentGroupIntegrationTest *.CouponClaimPostgresTest *.CouponPreviewPostgresTest *.CouponReservationPostgresTest'
-            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=16 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=2'
+            minimums: '*.MemberCommerceMigrationPostgresTest=6 *.PaymentGroupIntegrationTest=17 *.CouponClaimPostgresTest=3 *.CouponPreviewPostgresTest=1 *.CouponReservationPostgresTest=2'
           - service: live
             database: live_test
             task: :services:live-service:test --tests *PostgresMigrationTest --tests *PostgresLikeTest
