@@ -120,6 +120,9 @@ public class RefundIntakeService {
                 throw new BusinessException(ErrorCode.CONFLICT, "장바구니 항목과 주문의 연결이 모호합니다.");
             }
         }
+        if (hasPreviouslyRequestedTargets(group.getId(), targets)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 환불 요청에 포함된 주문이 있습니다.");
+        }
 
         long amount = 0;
         try {
@@ -207,6 +210,15 @@ public class RefundIntakeService {
             """, (rs, row) -> rs.getLong(1), groupId, member, key, fingerprint, amount, RefundStatus.PROCESSING.name(),
             Timestamp.from(at), Timestamp.from(at), Timestamp.from(at));
         return ids.isEmpty() ? null : ids.getFirst();
+    }
+
+    private boolean hasPreviouslyRequestedTargets(Long groupId, List<Order> targets) {
+        Set<Long> requestedOrderIds = jdbc.query("""
+            SELECT t.order_id FROM refund_request r
+            JOIN refund_target_order t ON t.refund_request_id=r.id
+            WHERE r.payment_group_id=?
+            """, (rs, row) -> rs.getLong(1), groupId).stream().collect(Collectors.toSet());
+        return targets.stream().anyMatch(order -> requestedOrderIds.contains(order.getId()));
     }
 
     private ExistingRequest findByKey(String member, String key) {

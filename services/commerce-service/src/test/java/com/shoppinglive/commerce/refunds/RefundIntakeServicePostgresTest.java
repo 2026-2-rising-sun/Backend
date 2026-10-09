@@ -62,6 +62,17 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
     }
 
     @Test
+    void overlappingTargetsAreRejectedAcrossDifferentIdempotencyKeys() {
+        var group = createAndPay();
+        refunds.request(MEMBER_A, group.groupNumber(), "refund-whole-first", List.of());
+
+        assertThatThrownBy(() -> refunds.request(MEMBER_A, group.groupNumber(), "refund-partial-after-whole", List.of(a.getId())))
+            .isInstanceOf(BusinessException.class)
+            .extracting(exception -> ((BusinessException) exception).errorCode())
+            .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+    }
+
+    @Test
     void refundWindowIsStrictlyLessThan168Hours() {
         var group = createAndPay();
         Long groupId = groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A).orElseThrow().getId();
