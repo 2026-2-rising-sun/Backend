@@ -65,13 +65,13 @@ class MemberCouponHttpTest extends CommerceSecurityTestSupport {
     }
 
     @Test
-    void availableListAndClaimRequireMemberRole() throws Exception {
+    void availableListAndClaimRequireAuthenticatedUserOrSeller() throws Exception {
         mvc.perform(get("/v1/coupons").header("Authorization",bearer(MEMBER_A)))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].id").value(coupon));
         mvc.perform(get("/v1/coupons"))
             .andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/coupons").header("Authorization","Bearer " + TOKENS.token(MEMBER_A,Set.of("SELLER"))))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk());
         mvc.perform(post("/v1/coupons/{id}/claims",coupon).header("Authorization",bearer(MEMBER_A)))
             .andExpect(status().isCreated());
     }
