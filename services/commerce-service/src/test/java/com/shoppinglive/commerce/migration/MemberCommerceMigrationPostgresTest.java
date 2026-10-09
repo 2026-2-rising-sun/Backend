@@ -50,9 +50,9 @@ class MemberCommerceMigrationPostgresTest {
     void newDatabaseRequiresMemberAndScopesIdempotency() throws Exception {
         migration(null).migrate();
         sale();
-        memberOrder(1, "11111111-1111-4111-8111-111111111111", "key");
-        memberOrder(2, "22222222-2222-4222-8222-222222222222", "key");
-        assertThatThrownBy(() -> memberOrder(3, "11111111-1111-4111-8111-111111111111", "key"))
+        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "key");
+        memberOrderWithDiscountSnapshot(2, "22222222-2222-4222-8222-222222222222", "key");
+        assertThatThrownBy(() -> memberOrderWithDiscountSnapshot(3, "11111111-1111-4111-8111-111111111111", "key"))
             .isInstanceOf(java.sql.SQLException.class).hasMessageContaining("uk_orders_member_idempotency");
         assertThatThrownBy(() -> sql("UPDATE orders SET member_id = NULL WHERE id = 1"))
             .isInstanceOf(java.sql.SQLException.class).hasMessageContaining("null");
@@ -162,6 +162,13 @@ class MemberCommerceMigrationPostgresTest {
         sql("INSERT INTO orders (id,order_number,sales_info_id,quantity,unit_price,total_amount,status,buyer_name,buyer_phone,"
             + "member_id,idempotency_key,product_name_snapshot,created_at,updated_at) VALUES (" + id + ",'member-" + id
             + "',1,1,1000,1000,'PENDING_PAYMENT','buyer','01012345678','" + memberId + "','" + key + "','product',now(),now())");
+    }
+
+    private void memberOrderWithDiscountSnapshot(int id, String memberId, String key) throws Exception {
+        sql("INSERT INTO orders (id,order_number,sales_info_id,quantity,unit_price,total_amount,discount_amount,payable_amount,"
+            + "status,buyer_name,buyer_phone,member_id,idempotency_key,product_name_snapshot,created_at,updated_at) VALUES ("
+            + id + ",'member-" + id + "',1,1,1000,1000,0,1000,'PENDING_PAYMENT','buyer','01012345678','"
+            + memberId + "','" + key + "','product',now(),now())");
     }
 
     private void sql(String query) throws Exception {
