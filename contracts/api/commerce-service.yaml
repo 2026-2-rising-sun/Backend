@@ -597,7 +597,7 @@ paths:
       tags: ["Payment Groups"]
       summary: "통합 결제 시작"
       operationId: "startMyGroupPayment"
-      description: "묶음 총액으로 Mock gateway 승인 한 번을 요청한다. 같은 X-Idempotency-Key 재전송은 기존 결제 시도를 반환한다. 이미 시작된 결제에 다른 키를 보내면 409. 결제 전 만료시각을 검사하며 기한이 지난 묶음은 시작할 수 없다. 승인 결과 불명/응답 유실은 확인 중으로 유지하고 조회·재확인으로 복구한다. Mock 승인 결과는 주문 반영 트랜잭션과 별도로 보관하여 승인 뒤 반영 실패에도 같은 시도를 재확인한다. 실제 외부 PG 승인을 보장하는 구현은 아니다."
+      description: "양수 결제 금액은 Mock gateway 승인을 한 번 요청한다. 결제 금액이 0원이면 금전 승인을 요청하지 않고 주문·재고·쿠폰을 동기 확정하며 응답 시 결제 시도와 묶음 상태가 SUCCESS/PAID다. 같은 X-Idempotency-Key 재전송은 기존 결제 시도를 반환한다. 이미 시작된 결제에 다른 키를 보내면 409. 결제 전 만료시각을 검사하며 기한이 지난 묶음은 시작할 수 없다. 양수 승인 결과 불명/응답 유실은 확인 중으로 유지하고 조회·재확인으로 복구한다. Mock 승인 결과는 주문 반영 트랜잭션과 별도로 보관하여 승인 뒤 반영 실패에도 같은 시도를 재확인한다. 실제 외부 PG 승인을 보장하는 구현은 아니다."
       x-required-roles: ["USER","SELLER"]
       parameters: [{"$ref":"#/components/parameters/RequiredIdempotencyKey"}]
       requestBody:
@@ -612,7 +612,9 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentAttempt"}
-              example: {"paymentId":1,"orderId":1,"scenario":"INSTANT_SUCCESS","status":"PROCESSING","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":null,"scheduledResolveAt":"2026-10-08T00:00:00Z"}
+              examples:
+                positiveAmount: {"value":{"paymentId":1,"orderId":1,"scenario":"INSTANT_SUCCESS","status":"PROCESSING","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":null,"scheduledResolveAt":"2026-10-08T00:00:00Z"}}
+                zeroAmount: {"value":{"paymentId":2,"orderId":2,"scenario":"INSTANT_SUCCESS","status":"SUCCESS","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":"2026-10-08T00:00:00Z","scheduledResolveAt":"2026-10-08T00:00:00Z"}}
         400: {"$ref":"#/components/responses/BadRequest"}
         401: {"$ref":"#/components/responses/Unauthorized"}
         403: {"$ref":"#/components/responses/Forbidden"}
@@ -1060,7 +1062,7 @@ components:
         expiresAt: {"type":"string","format":"date-time"}
         orders: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/Order"}}
         paymentId: {"type":["integer","null"],"format":"int64","minimum":1}
-      description: "totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. 만료는 미결제에만 적용되며 확인 중에는 임의 취소·재고 반환을 하지 않는다."
+      description: "totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 만료는 미결제에만 적용되며 확인 중에는 임의 취소·재고 반환을 하지 않는다."
     CreateOrderRequest:
       type: "object"
       required: ["productId", "quantity", "buyerName", "buyerPhone"]

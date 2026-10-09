@@ -218,6 +218,41 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     }
 
     @Test
+    void concurrentZeroPaymentStartsReturnOneCompletedAttempt() throws Exception {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+        var group = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-race-order").group();
+        var attempts = new ConcurrentLinkedQueue<Long>();
+        var failures = new ConcurrentLinkedQueue<Throwable>();
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        var done = new CountDownLatch(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            for (int i = 0; i < 2; i++) {
+                pool.submit(() -> {
+                    try {
+                        ready.countDown(); start.await();
+                        attempts.add(service.start(MEMBER_A, group.groupNumber(), "zero-race-payment").getId());
+                    } catch (Throwable failure) { failures.add(failure); }
+                    finally { done.countDown(); }
+                });
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(failures).isEmpty();
+        assertThat(attempts).hasSize(2);
+        assertThat(attempts.stream().distinct().count()).isEqualTo(1);
+        assertThat(payments.count()).isEqualTo(1);
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
+        assertThat(couponStatus()).isEqualTo("USED");
+        stock(salesA, 8, 0); stock(salesB, 9, 0);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure() {
         issueCoupon();
         var cancelled = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "coupon-cancel").group();
