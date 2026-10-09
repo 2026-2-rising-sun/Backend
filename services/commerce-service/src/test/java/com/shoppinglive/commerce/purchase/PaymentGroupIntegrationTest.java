@@ -49,10 +49,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** No enclosing test transaction: gateway approval and the rollback boundary must really commit. */
 @SpringBootTest
+@AutoConfigureMockMvc
 class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
+    @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
     @Autowired PaymentGroupRepository groups;
     @Autowired CartService cart;
@@ -249,6 +257,23 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
         assertThat(couponStatus()).isEqualTo("USED");
         stock(salesA, 8, 0); stock(salesB, 9, 0);
+        verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void zeroPaymentHttpResponseSignalsCompletionWithOk() throws Exception {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+        var group = service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-http-order").group();
+
+        mvc.perform(post("/v1/payment-groups/{number}/payments", group.groupNumber())
+                .header("Authorization", bearer(MEMBER_A))
+                .header("X-Idempotency-Key", "zero-http-payment")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("SUCCESS"));
+        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
         verify(engine, never()).schedule(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
