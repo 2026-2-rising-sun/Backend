@@ -114,7 +114,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
+        '503': { $ref: '#/components/responses/ShoppingUnavailable' }
     patch:
       tags: [Sales Admin]
       operationId: updateSellerCoupon
