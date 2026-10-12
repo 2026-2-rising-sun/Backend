@@ -71,7 +71,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
     @Test
     void publicReadsAndMinimalProbesRemainAnonymous() throws Exception {
         for (String path : List.of("/v1/products", "/v1/products/" + productId,
-            "/v1/products/" + productId + "/purchase-check?quantity=1",
+            "/v1/products/" + productId + "/purchase-check?quantity=1", "/v1/products/" + productId + "/coupons",
             "/v1/product-images/" + imageId, "/actuator/health/readiness", "/actuator/health/liveness")) {
             mvc.perform(get(path)).andExpect(status().isOk());
         }

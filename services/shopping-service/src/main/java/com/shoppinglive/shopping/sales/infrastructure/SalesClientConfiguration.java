@@ -27,18 +27,9 @@ public class SalesClientConfiguration {
     private static final String SOURCE_HTTP = "http";
     private static final String SOURCE_REPLICA = "replica";
 
-    // HTTP 빈은 두 모드 모두 만든다. backfill 이 구체 타입으로 주입받고, 설정 검사도 여기서 해야 기동이 실패한다.
+    // Commerce 주소·서비스 토큰·timeout 은 판매정보와 상품 쿠폰이 함께 쓴다. 설정 검사도 여기서 기동을 막는다.
     @Bean
-    HttpSalesInfoClient httpSalesInfoClient(
-        RestClient.Builder restClientBuilder,
-        SalesClientProperties properties,
-        CircuitBreakerRegistry circuitBreakerRegistry,
-        RetryRegistry retryRegistry,
-        @Value("${shopping.sales.source:" + SOURCE_HTTP + "}") String source) {
-        // 조건 빈은 모르는 값을 조용히 무시해 http 로 떨어지므로, 허용 값 밖이면 여기서 기동을 막는다.
-        if (!SOURCE_HTTP.equals(source) && !SOURCE_REPLICA.equals(source)) {
-            throw new IllegalStateException("shopping.sales.source must be http or replica: " + source);
-        }
+    RestClient commerceRestClient(RestClient.Builder restClientBuilder, SalesClientProperties properties) {
         if (!StringUtils.hasText(properties.baseUrl())) {
             throw new IllegalStateException("shopping.sales-client.base-url is required");
         }
@@ -49,13 +40,26 @@ public class SalesClientConfiguration {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(properties.connectTimeout());
         requestFactory.setReadTimeout(properties.readTimeout());
-        RestClient restClient = restClientBuilder.clone()
+        return restClientBuilder.clone()
             .baseUrl(properties.baseUrl())
             .defaultHeader("X-Service-Token", properties.serviceToken())
             .requestFactory(requestFactory)
             .build();
+    }
+
+    // HTTP 빈은 두 모드 모두 만든다. backfill 이 구체 타입으로 주입받고, source 검사도 여기서 해야 기동이 실패한다.
+    @Bean
+    HttpSalesInfoClient httpSalesInfoClient(
+        RestClient commerceRestClient,
+        CircuitBreakerRegistry circuitBreakerRegistry,
+        RetryRegistry retryRegistry,
+        @Value("${shopping.sales.source:" + SOURCE_HTTP + "}") String source) {
+        // 조건 빈은 모르는 값을 조용히 무시해 http 로 떨어지므로, 허용 값 밖이면 여기서 기동을 막는다.
+        if (!SOURCE_HTTP.equals(source) && !SOURCE_REPLICA.equals(source)) {
+            throw new IllegalStateException("shopping.sales.source must be http or replica: " + source);
+        }
         return new HttpSalesInfoClient(
-            restClient,
+            commerceRestClient,
             circuitBreakerRegistry.circuitBreaker(HttpSalesInfoClient.RESILIENCE_INSTANCE),
             retryRegistry.retry(HttpSalesInfoClient.RESILIENCE_INSTANCE));
     }

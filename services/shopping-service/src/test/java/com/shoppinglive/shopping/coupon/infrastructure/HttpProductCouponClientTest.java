@@ -1,0 +1,58 @@
+package com.shoppinglive.shopping.coupon.infrastructure;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+import com.shoppinglive.shopping.coupon.application.ProductCoupon;
+import com.shoppinglive.shopping.coupon.application.ProductCouponUnavailableException;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+
+class HttpProductCouponClientTest {
+
+    private static final String BASE_URL = "http://commerce.test";
+    private static final String COUPON_URL = BASE_URL + "/v1/service/coupons?productId=7";
+    private static final String BODY = """
+        {"success":true,"data":[{"id":"33333333-3333-4333-8333-333333333334","name":"가을 니트 5천원 할인",
+        "fixedDiscount":5000,"soldOut":false,"endsAt":"2026-10-15T11:00:00Z","expiresAt":"2026-11-15T00:00:00Z"}],
+        "error":null}
+        """;
+
+    private final RestClient.Builder builder = RestClient.builder().baseUrl(BASE_URL);
+    private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    private final HttpProductCouponClient client = new HttpProductCouponClient(builder.build());
+
+    @Test
+    void parsesProposedEnvelopeIntoCouponsForTheRequestedProduct() {
+        // given
+        server.expect(requestTo(COUPON_URL)).andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(BODY, MediaType.APPLICATION_JSON));
+
+        // when
+        List<ProductCoupon> coupons = client.findByProductId(7L);
+
+        // then
+        assertThat(coupons).containsExactly(new ProductCoupon("33333333-3333-4333-8333-333333333334",
+            "가을 니트 5천원 할인", 5_000L, false,
+            Instant.parse("2026-10-15T11:00:00Z"), Instant.parse("2026-11-15T00:00:00Z")));
+        server.verify();
+    }
+
+    @Test
+    void commerceServerErrorIsReportedAsUnavailable() {
+        // given
+        server.expect(requestTo(COUPON_URL)).andRespond(withServerError());
+
+        // when / then
+        assertThatThrownBy(() -> client.findByProductId(7L)).isInstanceOf(ProductCouponUnavailableException.class);
+    }
+}
