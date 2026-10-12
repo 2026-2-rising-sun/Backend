@@ -32,4 +32,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             where p.createdAt <= :createdAt and (p.createdAt < :createdAt or p.id < :id)
             order by p.createdAt desc, p.id desc""")
     List<Product> findLatestBefore(@Param("createdAt") Instant createdAt, @Param("id") Long id, Limit limit);
+
+    /** id 오름차순 키셋 구간. 판매정보 backfill 이 상품 전체를 엔티티 로딩 없이 훑을 때 쓴다. */
+    @Query("select p.id from Product p where p.id > :id order by p.id asc")
+    List<Long> findIdsAfter(@Param("id") Long id, Limit limit);
 }
