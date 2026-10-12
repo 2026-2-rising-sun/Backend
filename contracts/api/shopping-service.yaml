@@ -230,6 +230,25 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/SalesUnavailable' }
+  /v1/products/{productId}/coupons:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      security: []
+      tags: [Public Product]
+      summary: 상품에 적용 가능한 쿠폰 목록
+      operationId: listProductCoupons
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '200':
+          description: 표시용 목록이라 몇 초 지연될 수 있다. 회원과 무관하게 같은 결과이며, 없는 상품 id·쿠폰 없음·Commerce 조회 불가이면 빈 목록을 돌려준다. 할인 금액 계산과 회원별 수령 여부는 포함하지 않는다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductCouponListEnvelope' }
+              examples:
+                normal: { value: { success: true, data: [{ id: '33333333-3333-4333-8333-333333333334', name: 가을 니트 5천원 할인, fixedDiscount: 5000, soldOut: false, endsAt: '2026-10-15T11:00:00Z', expiresAt: '2026-11-15T00:00:00Z' }], error: null } }
+                empty: { value: { success: true, data: [], error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /v1/admin/product-images:
     post:
       x-required-roles: [SELLER]
@@ -538,6 +557,16 @@ components:
         reason: { type: ['string', 'null'], enum: [SOLD_OUT, EXCEEDS_STOCK, null] }
         maxQuantity: { type: integer }
         unitPrice: { type: integer, format: int64 }
+    ProductCoupon:
+      type: object
+      required: [id, name, fixedDiscount, soldOut, endsAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        fixedDiscount: { type: integer, format: int64, minimum: 0 }
+        soldOut: { type: boolean }
+        endsAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
     ImageUpload:
       type: object
       required: [imageId, url, contentType, sizeBytes, width, height]
@@ -625,6 +654,10 @@ components:
       type: object
       required: [success, data, error]
       properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/PurchaseCheck' }, error: { type: 'null' } }
+    ProductCouponListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { type: array, items: { $ref: '#/components/schemas/ProductCoupon' } }, error: { type: 'null' } }
     ImageUploadEnvelope:
       type: object
       required: [success, data, error]
