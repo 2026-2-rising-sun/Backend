@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":libs:common-persistence"))
     implementation(project(":libs:common-resilience"))
     implementation(project(":contracts:events"))
+    implementation(project(":libs:common-kafka"))
 
     // 버전은 spring-boot-dependencies BOM 이 관리한다. 공용 버전 카탈로그는 다른 서비스와 공유하므로
     // shopping 작업 범위에서 건드리지 않고 이 서비스 안에서만 선언한다.
@@ -19,5 +20,8 @@ dependencies {
     runtimeOnly(libs.postgresql)
 
     testRuntimeOnly(libs.h2)
+    // 버전은 BOM 이 관리한다. 임베디드 broker 로 이벤트 수신 경로를 검증한다.
+    testImplementation("org.springframework.kafka:spring-kafka-test")
+    testImplementation("org.awaitility:awaitility")
     testImplementation(testFixtures(project(":libs:common-security")))
 }
