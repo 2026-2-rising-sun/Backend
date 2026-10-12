@@ -37,6 +37,12 @@ jobs:
             report: services/live-service/build/test-results/test/TEST-*.xml
             suites: '*.PostgresMigrationTest *.PostgresLikeTest'
             minimums: '*.PostgresMigrationTest=9 *.PostgresLikeTest=5'
+          - service: shopping
+            database: shopping_test
+            task: :services:shopping-service:test --tests *ProductSellerMigrationTest --tests *ProductSalesRepositoryTest
+            report: services/shopping-service/build/test-results/test/TEST-*.xml
+            suites: '*.ProductSellerMigrationTest *.ProductSalesRepositoryTest'
+            minimums: '*.ProductSellerMigrationTest=2 *.ProductSalesRepositoryTest=18'
     services:
       postgres:
         image: postgres:16
@@ -59,6 +65,9 @@ jobs:
       COMMERCE_TEST_POSTGRES_PASSWORD: test
       LIVE_PG_TEST: '1'
       LIVE_PG_PORT: '55432'
+      SHOPPING_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/${{ matrix.database }}
+      SHOPPING_TEST_POSTGRES_USER: postgres
+      SHOPPING_TEST_POSTGRES_PASSWORD: test
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
