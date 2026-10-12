@@ -112,6 +112,43 @@ class ProductCouponServiceTest {
         verify(client, times(1)).findByProductId(2L);
     }
 
+    @Test
+    void expiredEntryIsRefreshedOnceWhileOtherCallersGetThePreviousValueWithoutWaiting() throws Exception {
+        // given: 이전 값이 캐시되어 있고 TTL 이 지났다. 갱신 조회는 응답 전까지 막혀 있다.
+        List<ProductCoupon> previous = List.of(coupon("old"));
+        List<ProductCoupon> refreshed = List.of(coupon("new"));
+        CountDownLatch loaderEntered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(client.findByProductId(PRODUCT_ID)).thenReturn(previous).thenAnswer(invocation -> {
+            loaderEntered.countDown();
+            release.await();
+            return refreshed;
+        });
+        assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+        nanos.addAndGet(Duration.ofSeconds(3).toNanos());
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            // when: 한 요청이 갱신을 맡아 멈춰 있는 동안 다른 요청이 들어온다
+            Future<List<ProductCoupon>> refresher = pool.submit(() -> service.findByProductId(PRODUCT_ID));
+            assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<List<ProductCoupon>> other = pool.submit(() -> service.findByProductId(PRODUCT_ID));
+
+            // then: 다른 요청은 갱신이 끝나기 전에 이전 값을 받고, 상위 조회는 한 번뿐이다
+            assertThat(other.get(1, TimeUnit.SECONDS)).isEqualTo(previous);
+            assertThat(refresher.isDone()).isFalse();
+            verify(client, times(2)).findByProductId(PRODUCT_ID);
+
+            // when: 갱신이 끝나면 새 값이 보인다
+            release.countDown();
+            assertThat(refresher.get(5, TimeUnit.SECONDS)).isEqualTo(refreshed);
+            assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(refreshed);
+            verify(client, times(2)).findByProductId(PRODUCT_ID);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
     private static ProductCoupon coupon(final String id) {
         return new ProductCoupon(id, "가을 니트 5천원 할인", 5_000L, false,
             Instant.parse("2026-10-15T11:00:00Z"), Instant.parse("2026-11-15T00:00:00Z"));

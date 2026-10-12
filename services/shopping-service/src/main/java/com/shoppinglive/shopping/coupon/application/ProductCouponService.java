@@ -14,7 +14,8 @@ import org.slf4j.LoggerFactory;
  * 상품별 쿠폰 목록을 짧게 캐시한다. 캐시는 Pod 마다 따로 있다 (분산 캐시 아님).
  *
  * <p>같은 상품의 동시 미스는 조회를 한 번만 하고 나머지는 그 결과를 기다린다. 실패는 빈 목록으로 캐시해
- * Commerce 장애 중 요청이 업스트림으로 몰리지 않게 한다.
+ * Commerce 장애 중 요청이 업스트림으로 몰리지 않게 한다. 만료된 항목을 갱신하는 동안에는 이전 값을 바로 돌려주고,
+ * 이전 값이 없는 첫 조회만 결과를 기다린다(stale-while-refresh): 느린 Commerce 가 요청 스레드를 붙잡지 않게 한다.
  */
 public class ProductCouponService {
 
@@ -46,9 +47,11 @@ public class ProductCouponService {
         }
         // 조회 자체는 compute 밖에서 한다. 안에서 원격 호출을 하면 같은 bin 의 다른 상품 요청이 함께 막힌다.
         final Entry entry = entries.compute(productId,
-            (id, current) -> current != null && current.isFresh(now) ? current : new Entry());
+            (id, current) -> current != null && current.isFresh(now) ? current : new Entry(current));
         if (entry.claimLoad()) {
             load(productId, entry);
+        } else if (entry.previous != null && !entry.result.isDone()) {
+            return entry.previous;
         }
         return entry.result.join();
     }
@@ -79,7 +82,14 @@ public class ProductCouponService {
 
         private final AtomicBoolean loading = new AtomicBoolean();
         private final CompletableFuture<List<ProductCoupon>> result = new CompletableFuture<>();
+        // 교체된 항목의 마지막 완료 값(실패였다면 빈 목록). 첫 조회라 없으면 null.
+        private final List<ProductCoupon> previous;
         private volatile long expiresAtNanos;
+
+        /** @param replaced 만료되어 교체되는 항목. 교체가 아니면 null. 교체 대상은 항상 완료된 항목이다. */
+        Entry(final Entry replaced) {
+            this.previous = replaced == null ? null : replaced.result.join();
+        }
 
         boolean claimLoad() {
             return loading.compareAndSet(false, true);
