@@ -50,6 +50,17 @@ class HttpProductCouponClientTest {
     }
 
     @Test
+    @DisplayName("Commerce 가 음수 정액 할인을 주면 ProductCouponUnavailableException 으로 알린다")
+    void negativeFixedDiscountIsReportedAsUnavailable() {
+        // given
+        server.expect(requestTo(COUPON_URL)).andRespond(withSuccess(BODY.replace("\"fixedDiscount\":5000",
+            "\"fixedDiscount\":-1"), MediaType.APPLICATION_JSON));
+
+        // when / then
+        assertThatThrownBy(() -> client.findByProductId(7L)).isInstanceOf(ProductCouponUnavailableException.class);
+    }
+
+    @Test
     @DisplayName("Commerce 가 서버 오류를 응답하면 ProductCouponUnavailableException 으로 알린다")
     void commerceServerErrorIsReportedAsUnavailable() {
         // given

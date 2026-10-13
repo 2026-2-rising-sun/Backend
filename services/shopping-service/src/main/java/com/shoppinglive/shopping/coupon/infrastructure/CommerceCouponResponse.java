@@ -12,6 +12,7 @@ record CommerceCouponResponse(String id, String name, Long fixedDiscount, Boolea
         Instant expiresAt) {
 
     ProductCoupon toCoupon() {
+        if (fixedDiscount != null && fixedDiscount < 0) throw new IllegalStateException("fixedDiscount is negative");
         return new ProductCoupon(Objects.requireNonNull(id), Objects.requireNonNull(name),
             Objects.requireNonNull(fixedDiscount), Objects.requireNonNull(soldOut),
             Objects.requireNonNull(endsAt), Objects.requireNonNull(expiresAt));
