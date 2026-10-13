@@ -11,9 +11,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 판매정보 이벤트 한 건을 Shopping 자체 모델로 해석하고 검증한다.
  *
- * <p>공유 DTO({@code SalesInfoEvent})를 쓰지 않는 이유: 모르는 enum 값이나 schemaVersion 에서 생성자가 던져
- * 메시지 전체가 읽히지 않는다. 여기서는 필드를 직접 읽고, 모르는 {@code status} 만 PRIVATE 으로 바꾼다.
- * {@code eventType} 은 네 종류를 구분하지 않으므로 읽지 않는다.
+ * <p>공유 DTO({@code SalesInfoEvent})를 쓰지 않는 이유: 모르는 enum 값 하나에도 생성자가 던져 메시지 전체가
+ * 읽히지 않는다. 여기서는 필드를 직접 읽어 값마다 다르게 처리한다.
+ * <ul>
+ *   <li>{@code eventType} 은 읽지 않는다. payload 가 변경분이 아니라 상품의 현재 판매정보 전체라서,
+ *       어떤 종류의 이벤트든 같은 방식으로 저장한다. 새 종류가 추가돼도 영향이 없다.</li>
+ *   <li>모르는 {@code status} 는 PRIVATE 으로 바꿔 저장한다. 가격·재고 등 나머지 값은 그대로 반영한다.</li>
+ *   <li>지원하지 않는 {@code schemaVersion} 은 거부한다. 필드의 의미가 달라졌을 수 있어 일부만 읽어 저장하지 않는다.</li>
+ * </ul>
+ * 거부는 {@link InvalidMessageException} 으로 알리고, listener 가 그 메시지를 건너뛴다.
  */
 @Slf4j
 record SalesInfoEventMessage(long productId, long salesId, long snapshotVersion, long price,
@@ -63,7 +69,8 @@ record SalesInfoEventMessage(long productId, long salesId, long snapshotVersion,
         return root;
     }
 
-    // 모르는 값은 PRIVATE 으로 저장한다. 판매 중 상태가 옛 값으로 남으면 구매 화면이 계속 열리기 때문이다.
+    // 모르는 값은 PRIVATE 으로 저장한다. 메시지를 버리면 판매 중이던 옛 상태가 남아 구매 화면이 계속 열린다.
+    // 무엇인지 모르는 상태의 상품은 파는 것보다 숨기는 쪽이 안전하다.
     private static SalesStatus toSalesStatus(String raw, long productId, long snapshotVersion) {
         for (SalesStatus status : SalesStatus.values()) {
             if (status.name().equals(raw)) {
