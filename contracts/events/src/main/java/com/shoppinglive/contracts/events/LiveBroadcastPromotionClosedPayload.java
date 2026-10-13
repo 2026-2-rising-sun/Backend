@@ -10,6 +10,9 @@ import java.util.Objects;
  * <p>{@code reason} 값은 {@code SELLER_CLOSED} · {@code EXPIRED} · {@code BROADCAST_ENDED} ·
  * {@code CANCELED} 중 하나다. 소비자는 모르는 reason 을 받아도 역직렬화에 실패하지 않는다.
  *
+ * <p>소비자 dedup 규칙은 {@link LiveBroadcastPromotionOpenedPayload} 와 같다 — 봉투의
+ * {@code eventId} 로 거른다.
+ *
  * @param openedAt 열렸던 시각. READY 에서 바로 닫힌 경우(열림 발행 없음)엔 null 이지만, 그 경우에는
  *                 이 이벤트 자체가 발행되지 않는다. 안전을 위해 null 허용으로 둔다
  */
