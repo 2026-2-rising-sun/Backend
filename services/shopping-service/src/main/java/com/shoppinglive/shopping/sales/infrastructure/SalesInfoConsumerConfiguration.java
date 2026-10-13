@@ -13,6 +13,7 @@ import org.springframework.util.backoff.FixedBackOff;
  *
  * <p>기본 error handler 는 10회 뒤 포기하고 넘어가므로, DB 가 그보다 오래 죽으면 이벤트가 유실된다.
  * 그래서 실패 레코드는 offset 을 넘기지 않고 간격을 두고 무한히 다시 받는다.
+ * 재시도하는 동안 같은 partition 의 뒤 이벤트는 처리되지 않는다.
  */
 @Configuration(proxyBeanMethods = false)
 class SalesInfoConsumerConfiguration {

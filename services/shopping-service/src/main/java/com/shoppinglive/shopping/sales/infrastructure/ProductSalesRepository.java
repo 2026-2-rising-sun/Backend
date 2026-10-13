@@ -16,8 +16,14 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * {@code product_sales} read replica 저장소. 이벤트 경로와 backfill 경로가 같은 version 규칙을 따른다.
- * transaction 안에서 호출하면 안 된다. PostgreSQL 은 키 충돌 뒤 같은 transaction 의 후속 문장을 모두 거부한다.
+ * Commerce 판매정보의 조회용 사본({@code product_sales})을 읽고 쓴다. 상품 하나에 행 하나다.
+ *
+ * <p>쓰는 경로는 둘이다. 이벤트는 {@link #apply}, 초기 적재(backfill)는 {@link #insertIfAbsent} 를 쓴다.
+ * 이벤트는 중복되거나 순서가 바뀌어 올 수 있어, 저장된 값보다 큰 {@code snapshotVersion} 만 반영해야
+ * 옛 이벤트가 새 값을 덮지 않는다. 이벤트의 version 은 1 이상이므로 backfill 이 넣은 version 0 행은 첫 이벤트에 덮인다.
+ *
+ * <p>transaction 안에서 호출하면 안 된다. 동시 최초 INSERT 의 키 충돌을 잡은 뒤 UPDATE 로 이어 가는데,
+ * PostgreSQL 은 오류가 난 transaction 의 후속 문장을 모두 거부한다.
  */
 @Repository
 @RequiredArgsConstructor
@@ -40,7 +46,7 @@ public class ProductSalesRepository {
 
     /**
      * 이벤트 경로. 없으면 INSERT, 있으면 version 이 더 클 때만 UPDATE 한다.
-     * 중복·역순 이벤트는 0건 갱신으로 끝나며 예외를 던지지 않는다.
+     * 중복(같은 version)·역순(더 작은 version) 이벤트는 0건 갱신으로 끝나며 예외를 던지지 않는다.
      *
      * @return 행이 바뀌었으면 {@code true}
      */
@@ -49,7 +55,8 @@ public class ProductSalesRepository {
         try {
             inserted = insertIfMissing(info, version);
         } catch (DuplicateKeyException e) {
-            // 같은 신규 상품을 다른 쓰기가 동시에 먼저 INSERT 했다. version 비교로 넘어간다.
+            // NOT EXISTS 는 다른 쓰기의 미커밋 행을 보지 못한다. 같은 신규 상품을 동시에 INSERT 하면 한쪽은
+            // PK 충돌이 난다. 먼저 들어간 행과 version 을 비교해야 하므로 UPDATE 로 넘어간다.
             inserted = 0;
         }
         return inserted == 1 || updateIfNewer(info, version) == 1;
@@ -57,6 +64,8 @@ public class ProductSalesRepository {
 
     /**
      * backfill 경로. version 0 으로 없는 행만 INSERT 하고, 이미 있으면 건드리지 않는다.
+     * 적재 원본(Commerce HTTP 조회)에는 version 이 없어 이벤트 값과 어느 쪽이 새로운지 비교할 수 없다.
+     * 그래서 이미 있는 행은 이벤트가 넣은 더 새로운 값으로 보고 남긴다.
      *
      * @return 새로 저장했으면 {@code true}
      */
@@ -64,6 +73,7 @@ public class ProductSalesRepository {
         try {
             return insertIfMissing(info, BACKFILL_VERSION) == 1;
         } catch (DuplicateKeyException e) {
+            // 다른 쓰기가 동시에 먼저 넣었다. 이미 있는 행과 같게 취급한다.
             return false;
         }
     }

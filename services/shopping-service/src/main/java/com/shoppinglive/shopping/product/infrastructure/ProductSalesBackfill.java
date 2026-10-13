@@ -17,6 +17,15 @@ import org.springframework.stereotype.Component;
 /**
  * consume 이 시작되기 전부터 있던 판매정보를 Commerce HTTP 조회로 replica 에 version 0 행으로 채운다.
  *
+ * <p>{@code shopping.sales.backfill.enabled=true} 로 기동했을 때만, 애플리케이션 시작 시 한 번 실행한다.
+ * 설정이 없으면 이 빈 자체가 만들어지지 않는다. 여러 번 실행해도 없는 행만 채운다.
+ *
+ * <p>상품 id 를 {@value #CHUNK_SIZE} 개씩 나눠 읽는다. 상품 전체를 한 번에 메모리에 올리지 않고,
+ * Commerce 조회 한 번이 받는 id 수(100)에도 맞춘다. Commerce 에 판매정보가 없는 상품은 행을 만들지 않는다.
+ *
+ * <p>Commerce 조회가 실패하면 그 묶음에서 멈춘다. 앞 묶음까지 저장한 행은 그대로 남고, 실패한 묶음과 그 뒤 상품은
+ * 적재되지 않는다. 나머지는 다시 기동해 채운다.
+ *
  * <p>구체 타입 {@link HttpSalesInfoClient} 로 주입해 항상 Commerce 를 읽게 한다. replica 를 읽는 SalesInfoClient 가
  * 추가돼도 타입이 달라 주입이 모호해지지 않고, backfill 이 replica 를 원본 삼아 자기 빈을 채우는 일도 없다.
  */
