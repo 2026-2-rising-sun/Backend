@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.sales.infrastructure;
 
 import java.time.Duration;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,10 @@ class SalesInfoConsumerConfiguration {
     @Bean
     DefaultErrorHandler salesInfoErrorHandler(
         @Value("${shopping.sales.consumer.retry-interval:1s}") Duration retryInterval) {
-        return new DefaultErrorHandler(new FixedBackOff(retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS));
+        DefaultErrorHandler handler = new DefaultErrorHandler(
+            new FixedBackOff(retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS));
+        // 기본 fatal 목록(ClassCastException 등)을 끈다. 해석·검증 실패는 listener 안에서 건너뛴다.
+        handler.setClassifications(Map.of(), true);
+        return handler;
     }
 }

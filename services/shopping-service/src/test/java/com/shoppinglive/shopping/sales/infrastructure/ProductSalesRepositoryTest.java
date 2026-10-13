@@ -127,13 +127,13 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
-    @DisplayName("같은 상품의 첫 저장이 여러 스레드에서 동시에 들어와도 가장 높은 version 의 값이 남는다")
+    @DisplayName("같은 상품의 첫 저장이 backfill 과 이벤트 스레드에서 동시에 들어와도 가장 높은 version 의 값이 남는다")
     @MethodSource("databases")
     void concurrentFirstInsertKeepsHighestVersion(Db db) throws Exception {
         Fixture fixture = open(db);
         int threads = 8;
         CountDownLatch start = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        ExecutorService pool = Executors.newFixedThreadPool(threads + 1);
         try {
             List<Future<Boolean>> results = new ArrayList<>();
             for (long version = 1; version <= threads; version++) {
@@ -143,6 +143,10 @@ class ProductSalesRepositoryTest {
                     return fixture.repository().apply(sales(PRODUCT, v * 100), v);
                 }));
             }
+            results.add(pool.submit(() -> {
+                start.await();
+                return fixture.repository().insertIfAbsent(sales(PRODUCT, 50));
+            }));
             start.countDown();
             for (Future<Boolean> result : results) {
                 result.get(30, TimeUnit.SECONDS);

@@ -5,7 +5,6 @@ import com.shoppinglive.shopping.sales.application.SalesInfoUnavailableException
 import com.shoppinglive.shopping.sales.domain.SalesInfo;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.dao.DataAccessException;
 
 /**
@@ -24,13 +23,10 @@ public class ReplicaSalesInfoClient implements SalesInfoClient {
 
     @Override
     public Map<Long, SalesInfo> findByProductIds(Collection<Long> productIds) {
-        Set<Long> ids = ProductIds.distinct(productIds);
-        // 빈 입력은 DB 를 건드리지 않는다 (계약: 원격·DB 호출 없이 빈 Map).
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
+        // null 거부만 여기서 한다. 중복 제거와 빈 입력(DB 미접근)은 repository 가 한다.
+        ProductIds.distinct(productIds);
         try {
-            return replica.findByProductIds(ids);
+            return replica.findByProductIds(productIds);
         } catch (DataAccessException e) {
             throw new SalesInfoUnavailableException("sales replica read failed", e);
         }
