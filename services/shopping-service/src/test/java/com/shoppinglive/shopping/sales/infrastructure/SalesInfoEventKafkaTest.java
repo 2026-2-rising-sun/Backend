@@ -44,6 +44,8 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
     private static final int FAILURES_BEFORE_RECOVERY = 11;
     private static final long FIRST_PRODUCT = 501L;
     private static final long SECOND_PRODUCT = 502L;
+    private static final long THIRD_PRODUCT = 503L;
+    private static final int CLASS_CAST_FAILURES = 3;
 
     @Autowired
     EmbeddedKafkaBroker broker;
@@ -69,6 +71,25 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
             assertThat(repository.findByProductIds(List.of(FIRST_PRODUCT, SECOND_PRODUCT))).hasSize(2));
+    }
+
+    @Test
+    @DisplayName("ClassCastException 이 여러 번 나도 이벤트를 건너뛰지 않고, 복구 뒤 그 이벤트가 반영된다")
+    void eventIsAppliedAfterClassCastFailures() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (calls.incrementAndGet() <= CLASS_CAST_FAILURES) {
+                throw new ClassCastException("unexpected type");
+            }
+            return invocation.callRealMethod();
+        }).when(repository).apply(any(), anyLong());
+
+        try (KafkaProducer<String, String> producer = new KafkaProducer<>(producerProperties())) {
+            send(producer, event(THIRD_PRODUCT));
+        }
+
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+            assertThat(repository.findByProductIds(List.of(THIRD_PRODUCT))).hasSize(1));
     }
 
     private Map<String, Object> producerProperties() {
