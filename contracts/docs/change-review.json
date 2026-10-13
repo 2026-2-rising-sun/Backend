@@ -569,6 +569,16 @@
         "reviewedAt": "2026-10-09",
         "evidence": "Read-only review of R4B 7ae24e7537bc24e89a94d84d6e7a47bacdaac031 over de432e18 found no bugs; independently confirmed base7fd3d237/head0986a994 and Commerce49523aa2. Runtime proof was inspected, not rerun by the reviewer; final runtime and remote CI remain separate evidence."
       }
+    },
+    {
+      "baseSnapshotSha256": "0986a994176d2abb384da3b8ef6e23de2eefc73d16567183c1ac59c51aa329ca",
+      "headSnapshotSha256": "8bfdda7888bcee5c38c5e724f5e016dbd8afeb25be9db74fd29e280da6e9674d",
+      "reason": "PR #213 adds the Shopping public display-only product coupon GET endpoint and ProductCoupon/ProductCouponListEnvelope schemas. The local public API contract was independently reviewed against its implementation; invalid upstream UUIDs and nonpositive product IDs were corrected to match the existing schema constraints. This structural acknowledgment does not resolve the separately proposed Commerce upstream API or business-policy agreement.",
+      "independentReview": {
+        "reviewer": "Independent Bugbot subagent /root/bugbot, separate from implementer",
+        "reviewedAt": "2026-10-13",
+        "evidence": "Read-only review against base 822656d633a6e65cc5de46aedadb64cdcfdd27e8 and PR head 0e272e97aa4d68b9e5a1ce5fe498194664eeec13 plus working-tree fixes in CommerceCouponResponse, PublicProductCouponController and regression tests. Verified public GET access, positive int64 productId validation with 400 INVALID_REQUEST before Commerce invocation, success/data/error envelope, required fields, strict canonical UUID validation, nonnegative fixedDiscount, Instant timestamps and cached empty-list failure fallback. The initial UUID and productId-range findings were resolved; no remaining actionable findings in the reviewed contract scope. Independently recomputed the exact base/head structural hashes above using base-diff.cjs. Regression sources cover malformed and shortened UUIDs plus 0/-1 product IDs; the reviewer did not execute tests. Commerce upstream route/authentication/visibility-policy agreement and real integration remain proposed/unverified. This is not GitHub approval or merge authorization."
+      }
     }
   ]
 }

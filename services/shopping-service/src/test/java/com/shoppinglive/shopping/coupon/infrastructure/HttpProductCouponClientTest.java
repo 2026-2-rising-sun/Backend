@@ -13,6 +13,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -58,6 +60,16 @@ class HttpProductCouponClientTest {
 
         // when / then
         assertThatThrownBy(() -> client.findByProductId(7L)).isInstanceOf(ProductCouponUnavailableException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"not-a-uuid", "1-1-1-1-1"})
+    @DisplayName("UUID 계약을 위반한 쿠폰 ID는 조회 실패로 처리한다")
+    void invalidCouponIdIsReportedAsUnavailable(String invalidId) {
+        server.expect(requestTo(COUPON_URL)).andRespond(withSuccess(
+            BODY.replace("33333333-3333-4333-8333-333333333334", invalidId), MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.findByProductId(7L)).isInstanceOf(ProductCouponUnavailableException.class);
+        server.verify();
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.product;
 
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -14,6 +15,8 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +31,16 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
 
     @Autowired MockMvc mvc;
     @MockitoBean ProductCouponClient commerce;
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, -1})
+    @DisplayName("0 또는 음수 상품 ID는 Commerce 호출 없이 400 INVALID_REQUEST를 반환한다")
+    void nonPositiveProductIdIsRejected(long productId) throws Exception {
+        mvc.perform(get("/v1/products/{productId}/coupons", productId))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        verifyNoInteractions(commerce);
+    }
 
     @Test
     @DisplayName("인증 없이 상품 쿠폰 목록을 조회하면 200 과 쿠폰 항목이 응답된다")

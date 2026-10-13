@@ -1,6 +1,8 @@
 package com.shoppinglive.shopping.product.api;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.coupon.application.ProductCouponService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +28,9 @@ public class PublicProductCouponController {
 
     @GetMapping("/coupons")
     public ApiResponse<List<PublicProductCouponItem>> listCoupons(@PathVariable Long productId) {
+        if (productId < 1) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 1 이상이어야 합니다.");
+        }
         return ApiResponse.ok(couponService.findByProductId(productId).stream()
             .map(PublicProductCouponItem::from)
             .toList());
