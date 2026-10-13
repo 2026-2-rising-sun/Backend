@@ -17,9 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,7 +32,7 @@ class ProductSalesRepositoryTest {
         }
     }
 
-    record Fixture(ProductSalesRepository repository, TransactionTemplate outer) {
+    record Fixture(ProductSalesRepository repository) {
     }
 
     static Stream<Db> databases() {
@@ -157,28 +155,11 @@ class ProductSalesRepositoryTest {
         assertThat(stored(fixture)).containsEntry(PRODUCT, sales(PRODUCT, threads * 100L));
     }
 
-    @ParameterizedTest
-    @DisplayName("바깥 트랜잭션이 롤백 전용으로 표시되어도 apply 로 저장한 판매정보는 남는다")
-    @MethodSource("databases")
-    void applyInsideOuterTransactionCommitsIndependently(Db db) {
-        Fixture fixture = open(db);
-
-        fixture.outer().executeWithoutResult(status -> {
-            fixture.repository().apply(sales(PRODUCT, 100), 1);
-            status.setRollbackOnly();
-        });
-
-        assertThat(stored(fixture)).containsEntry(PRODUCT, sales(PRODUCT, 100));
-    }
-
     private static Fixture open(Db db) {
         DataSource dataSource = new DriverManagerDataSource(db.url(), db.user(), db.password());
         Flyway.configure().dataSource(dataSource).load().migrate();
         new NamedParameterJdbcTemplate(dataSource).getJdbcOperations().update("DELETE FROM product_sales");
-        DataSourceTransactionManager transactions = new DataSourceTransactionManager(dataSource);
-        return new Fixture(
-            new ProductSalesRepository(new NamedParameterJdbcTemplate(dataSource), transactions),
-            new TransactionTemplate(transactions));
+        return new Fixture(new ProductSalesRepository(new NamedParameterJdbcTemplate(dataSource)));
     }
 
     private static Map<Long, SalesInfo> stored(Fixture fixture) {
