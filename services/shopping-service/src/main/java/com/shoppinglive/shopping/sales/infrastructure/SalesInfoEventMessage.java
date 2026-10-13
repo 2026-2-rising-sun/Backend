@@ -6,8 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.contracts.events.SalesInfoEventContract;
 import com.shoppinglive.shopping.sales.domain.SalesInfo;
 import com.shoppinglive.shopping.sales.domain.SalesStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 판매정보 이벤트 한 건을 Shopping 자체 모델로 해석하고 검증한다.
@@ -16,10 +15,10 @@ import org.slf4j.LoggerFactory;
  * 메시지 전체가 읽히지 않는다. 여기서는 필드를 직접 읽고, 모르는 {@code status} 만 PRIVATE 으로 바꾼다.
  * {@code eventType} 은 네 종류를 구분하지 않으므로 읽지 않는다.
  */
+@Slf4j
 record SalesInfoEventMessage(long productId, long salesId, long snapshotVersion, long price,
                              SalesStatus status, int available) {
 
-    private static final Logger log = LoggerFactory.getLogger(SalesInfoEventMessage.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String CURRENCY = "KRW";
 

@@ -36,7 +36,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(properties = {
     "shopping.sales.backfill.enabled=true",
-    "spring.datasource.url=jdbc:h2:mem:product_sales_backfill;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"})
+    "spring.datasource.url=jdbc:h2:mem:product_sales_backfill;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;"
+        + "DATABASE_TO_LOWER=TRUE"})
 class ProductSalesBackfillTest extends ShoppingSecuritySupport {
 
     private static final int CHUNK = 100;

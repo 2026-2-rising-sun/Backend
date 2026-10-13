@@ -6,8 +6,8 @@ import com.shoppinglive.shopping.sales.infrastructure.HttpSalesInfoClient;
 import com.shoppinglive.shopping.sales.infrastructure.ProductSalesRepository;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,23 +20,17 @@ import org.springframework.stereotype.Component;
  * <p>구체 타입 {@link HttpSalesInfoClient} 로 주입해 항상 Commerce 를 읽게 한다. replica 를 읽는 SalesInfoClient 가
  * 추가돼도 타입이 달라 주입이 모호해지지 않고, backfill 이 replica 를 원본 삼아 자기 빈을 채우는 일도 없다.
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "shopping.sales.backfill", name = "enabled", havingValue = "true")
 public class ProductSalesBackfill implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(ProductSalesBackfill.class);
     private static final int CHUNK_SIZE = 100;
 
     private final ProductRepository products;
     private final HttpSalesInfoClient commerceClient;
     private final ProductSalesRepository replica;
-
-    public ProductSalesBackfill(
-        ProductRepository products, HttpSalesInfoClient commerceClient, ProductSalesRepository replica) {
-        this.products = products;
-        this.commerceClient = commerceClient;
-        this.replica = replica;
-    }
 
     @Override
     public void run(ApplicationArguments args) {
