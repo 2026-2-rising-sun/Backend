@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -48,6 +49,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("사본에 없는 상품의 첫 판매정보는 저장되어 그대로 조회된다")
     @MethodSource("databases")
     void newProductIsStored(Db db) {
         Fixture fixture = open(db);
@@ -57,6 +59,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("더 큰 version 의 이벤트가 오면 저장된 판매정보를 덮어쓴다")
     @MethodSource("databases")
     void largerVersionOverwrites(Db db) {
         Fixture fixture = open(db);
@@ -67,6 +70,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("같은 version 의 이벤트가 다시 오면 저장된 값이 바뀌지 않는다")
     @MethodSource("databases")
     void sameVersionIsIgnored(Db db) {
         Fixture fixture = open(db);
@@ -77,6 +81,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("더 작은 version 의 이벤트는 저장된 판매정보를 바꾸지 않는다")
     @MethodSource("databases")
     void olderVersionIsIgnored(Db db) {
         Fixture fixture = open(db);
@@ -87,6 +92,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("이벤트로 저장된 행이 있으면 backfill 적재는 그 값을 덮어쓰지 않는다")
     @MethodSource("databases")
     void backfillDoesNotOverwriteEventRow(Db db) {
         Fixture fixture = open(db);
@@ -97,6 +103,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("backfill 로 먼저 들어간 행은 이벤트가 오면 이벤트 값으로 바뀐다")
     @MethodSource("databases")
     void eventOverwritesBackfillRow(Db db) {
         Fixture fixture = open(db);
@@ -107,6 +114,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("조회 대상 중 사본에 행이 있는 상품만 반환하고, 빈 목록 조회는 빈 결과를 돌려준다")
     @MethodSource("databases")
     void findReturnsOnlyExistingRows(Db db) {
         Fixture fixture = open(db);
@@ -119,6 +127,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("같은 상품의 첫 저장이 여러 스레드에서 동시에 들어와도 가장 높은 version 의 값이 남는다")
     @MethodSource("databases")
     void concurrentFirstInsertKeepsHighestVersion(Db db) throws Exception {
         Fixture fixture = open(db);
@@ -145,6 +154,7 @@ class ProductSalesRepositoryTest {
     }
 
     @ParameterizedTest
+    @DisplayName("바깥 트랜잭션이 롤백 전용으로 표시되어도 apply 로 저장한 판매정보는 남는다")
     @MethodSource("databases")
     void applyInsideOuterTransactionCommitsIndependently(Db db) {
         Fixture fixture = open(db);
