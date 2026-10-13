@@ -1322,10 +1322,9 @@ components:
         attributes:
           { $ref: '#/components/schemas/PromotionAttributes' }
         durationSeconds:
-          type: integer
+          type: ['integer', 'null']
           minimum: 10
           maximum: 3600
-          nullable: true
           description: 자동 만료 시간. 비우면 수동 close 때까지 열려 있다.
     Promotion:
       type: object
@@ -1337,13 +1336,14 @@ components:
         title: { type: string }
         attributes: { $ref: '#/components/schemas/PromotionAttributes' }
         status: { $ref: '#/components/schemas/PromotionStatus' }
-        durationSeconds: { type: integer, nullable: true }
-        openedAt: { type: string, format: date-time, nullable: true }
-        closesAt: { type: string, format: date-time, nullable: true }
-        closedAt: { type: string, format: date-time, nullable: true }
+        durationSeconds: { type: ['integer', 'null'] }
+        openedAt: { type: ['string', 'null'], format: date-time }
+        closesAt: { type: ['string', 'null'], format: date-time }
+        closedAt: { type: ['string', 'null'], format: date-time }
         closeReason:
-          allOf: [ { $ref: '#/components/schemas/PromotionCloseReason' } ]
-          nullable: true
+          oneOf:
+            - { $ref: '#/components/schemas/PromotionCloseReason' }
+            - { type: 'null' }
         version: { type: integer, format: int64 }
     PublicPromotion:
       type: object
@@ -1356,7 +1356,7 @@ components:
         title: { type: string }
         attributes: { $ref: '#/components/schemas/PromotionAttributes' }
         openedAt: { type: string, format: date-time }
-        closesAt: { type: string, format: date-time, nullable: true }
+        closesAt: { type: ['string', 'null'], format: date-time }
     PromotionStreamEvent:
       type: object
       description: SSE `promotion.opened` 와 `promotion.closed` 가 공유하는 data 모양.
@@ -1366,12 +1366,13 @@ components:
         type: { type: string }
         title: { type: string }
         status: { $ref: '#/components/schemas/PromotionStatus' }
-        openedAt: { type: string, format: date-time, nullable: true }
-        closesAt: { type: string, format: date-time, nullable: true }
-        closedAt: { type: string, format: date-time, nullable: true }
+        openedAt: { type: ['string', 'null'], format: date-time }
+        closesAt: { type: ['string', 'null'], format: date-time }
+        closedAt: { type: ['string', 'null'], format: date-time }
         closeReason:
-          allOf: [ { $ref: '#/components/schemas/PromotionCloseReason' } ]
-          nullable: true
+          oneOf:
+            - { $ref: '#/components/schemas/PromotionCloseReason' }
+            - { type: 'null' }
     PromotionEnvelope:
       type: object
       required: [success, data, error]
