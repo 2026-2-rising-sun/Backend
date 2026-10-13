@@ -37,6 +37,10 @@ public class Sales extends BaseEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    // Event revision is advanced by the transaction snapshot collector, including stock changes.
+    @Column(name = "snapshot_version", nullable = false, updatable = false)
+    private long snapshotVersion = 1;
+
     protected Sales() {
         // JPA 전용
     }

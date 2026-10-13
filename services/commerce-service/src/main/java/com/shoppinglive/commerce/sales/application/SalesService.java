@@ -13,23 +13,25 @@ import org.springframework.transaction.annotation.Transactional;
  * 판매 도메인 유스케이스 서비스.
  *
  * <p>가격 변경(판매 2)·재고 조정(판매 3)·상태 전이(판매 4) 등을 담당한다. 각 유스케이스는
- * 자체 트랜잭션을 갖고, 동시성은 DB 계층에서 낙관적 락(가격) 또는 조건부 UPDATE
- * (재고·상태) 로 보장한다.
+ * 자체 트랜잭션을 갖고, 변경 전에 재고·판매정보 행을 같은 순서로 잠근다.
+ * 낙관적 락(가격)과 조건부 UPDATE(재고·상태)는 유지하며, 이벤트 버전과 스냅샷도 함께 확정한다.
  */
 @Service
 public class SalesService {
 
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
+    private final SalesInfoEventTracker events;
 
     public SalesService(
-        SalesJpaRepository salesRepository, SalesStockJpaRepository salesStockRepository) {
+        SalesJpaRepository salesRepository, SalesStockJpaRepository salesStockRepository, SalesInfoEventTracker events) {
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
+        this.events = events;
     }
 
     /**
-     * 판매정보의 가격을 변경한다. `@Version` 낙관적 락으로 lost update 방어.
+     * 판매정보의 가격을 변경한다. 공통 행 잠금과 `@Version`으로 lost update를 방어한다.
      *
      * @throws SalesNotFoundException 판매정보가 없을 때
      * @throws IllegalArgumentException 가격이 유효하지 않을 때
@@ -37,6 +39,7 @@ public class SalesService {
      */
     @Transactional
     public Sales changePrice(Long salesId, Long newPrice) {
+        events.watch(salesId);
         Sales sales = salesRepository.findById(salesId)
             .orElseThrow(() -> new SalesNotFoundException("sales not found: id=" + salesId));
         sales.changePrice(newPrice);
@@ -53,6 +56,7 @@ public class SalesService {
      */
     @Transactional
     public SalesStock adjustAvailable(Long salesId, int delta) {
+        events.watch(salesId);
         int updated = salesStockRepository.adjustAvailable(salesId, delta);
         if (updated == 0) {
             if (!salesStockRepository.existsById(salesId)) {
@@ -70,6 +74,7 @@ public class SalesService {
     /** 취소·만료·결제 실패의 재고 복구와 품절 해제를 같은 트랜잭션으로 처리한다. */
     @Transactional
     public void restoreReserved(Long salesId, int quantity) {
+        events.watch(salesId);
         if (salesStockRepository.restoreReserved(salesId, quantity) != 1) {
             throw new IllegalStateException("stock reserved insufficient for restore: salesId=" + salesId);
         }
@@ -114,6 +119,8 @@ public class SalesService {
             throw new IllegalStateTransitionException(
                 "target status is not admin-changeable: " + requestedTarget);
         }
+
+        events.watch(salesId);
 
         Sales sales = salesRepository.findById(salesId)
             .orElseThrow(() -> new SalesNotFoundException("sales not found: id=" + salesId));

@@ -42,7 +42,7 @@ tasks.register<Test>("postgresCommerceTest") {
     systemProperty("spring.profiles.active", "test,postgres-test")
     systemProperty("commerce.tests.schema", postgresTestSchema)
     filter {
-        listOf("OrderCreationConcurrencyTest", "OrderCancellationConcurrencyTest", "SalesStockConcurrencyTest",
+        listOf("SalesInfoEventIntegrationTest", "OrderCreationConcurrencyTest", "OrderCancellationConcurrencyTest", "SalesStockConcurrencyTest",
             "SalesStatusConcurrencyTest", "PaymentFlowIntegrationTest", "PaymentSchedulingAfterCommitTest",
             "PaymentDelayReconcilerTest", "PaymentRecoveryStorePostgresTest", "PaymentRecoveryPostgresTest", "DurableMockGatewayPostgresTest", "OrderExpirationSchedulerTest", "CartOrderIntegrationTest",
             "MemberCommerceApiTest", "MemberCommerceMigrationPostgresTest", "PaymentGroupIntegrationTest", "CouponManagementPostgresTest",
@@ -59,4 +59,21 @@ tasks.register<Test>("postgresCommerceTest") {
     }
     finalizedBy(cleanupPostgresCommerceTest)
     shouldRunAfter(tasks.named("test"))
+}
+
+tasks.register<Test>("salesEventsKafkaTest") {
+    group = "verification"
+    description = "Verify sales event publication against real Kafka and isolated PostgreSQL"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    systemProperty("spring.profiles.active", "test,postgres-test")
+    systemProperty("commerce.tests.schema", postgresTestSchema)
+    filter { includeTestsMatching("*.SalesInfoEventKafkaTest") }
+    doFirst {
+        require(!System.getenv("COMMERCE_TEST_POSTGRES_URL").isNullOrBlank()) { "COMMERCE_TEST_POSTGRES_URL is required" }
+        require(!System.getenv("COMMERCE_TEST_KAFKA_SERVERS").isNullOrBlank()) { "COMMERCE_TEST_KAFKA_SERVERS is required" }
+    }
+    finalizedBy(cleanupPostgresCommerceTest)
+    shouldRunAfter(tasks.named("postgresCommerceTest"))
 }

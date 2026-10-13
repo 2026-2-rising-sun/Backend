@@ -5,11 +5,14 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.*;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.shoppinglive.commerce.sales.application.SalesInfoEventTracker;
 @Service
 public class PurchaseGuard {
  private final JdbcTemplate jdbc;
  private final TransactionTemplate independent;
- public PurchaseGuard(JdbcTemplate jdbc,PlatformTransactionManager manager){
+ private final SalesInfoEventTracker events;
+ public PurchaseGuard(JdbcTemplate jdbc,PlatformTransactionManager manager,SalesInfoEventTracker events){
+  this.events=events;
   this.jdbc=jdbc;independent=new TransactionTemplate(manager);
   independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
  }
@@ -25,8 +28,6 @@ public class PurchaseGuard {
   if(active!=null && active>0)throw new BusinessException(ErrorCode.CONFLICT,"진행 중인 주문이 있습니다. 기존 주문을 결제하거나 취소해 주세요.");
  }
  public void lockSales(long id){
-  // All stock mutation paths take stock before sales, consistently.
-  jdbc.queryForObject("SELECT sales_info_id FROM sales_stock WHERE sales_info_id=? FOR UPDATE",Long.class,id);
-  jdbc.queryForObject("SELECT id FROM sales_info WHERE id=? FOR UPDATE",Long.class,id);
+  events.watch(id);
  }
 }

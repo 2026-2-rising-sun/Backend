@@ -54,10 +54,13 @@ class SalesRegistrationServiceTest {
 
     private SalesRegistrationService salesRegistrationService;
 
+    @Mock
+    private SalesInfoEventTracker events;
+
     @BeforeEach
     void setUp() {
         salesRegistrationService = new SalesRegistrationService(
-            salesRepository, salesStockRepository, shoppingClient, transactionTemplate);
+            salesRepository, salesStockRepository, shoppingClient, transactionTemplate, events);
     }
 
     /**

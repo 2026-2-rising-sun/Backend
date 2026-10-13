@@ -25,6 +25,9 @@ class SalesServiceTest {
     @Mock
     private SalesStockJpaRepository salesStockRepository;
 
+    @Mock
+    private SalesInfoEventTracker events;
+
     @InjectMocks
     private SalesService salesService;
 

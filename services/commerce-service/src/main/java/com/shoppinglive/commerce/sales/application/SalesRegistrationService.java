@@ -37,16 +37,18 @@ public class SalesRegistrationService {
     private final SalesStockJpaRepository salesStockRepository;
     private final ShoppingClient shoppingClient;
     private final TransactionTemplate transactionTemplate;
+    private final SalesInfoEventTracker events;
 
     public SalesRegistrationService(
         SalesJpaRepository salesRepository,
         SalesStockJpaRepository salesStockRepository,
         ShoppingClient shoppingClient,
-        TransactionTemplate transactionTemplate) {
+        TransactionTemplate transactionTemplate, SalesInfoEventTracker events) {
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
         this.shoppingClient = shoppingClient;
         this.transactionTemplate = transactionTemplate;
+        this.events = events;
     }
 
     /**
@@ -99,6 +101,7 @@ public class SalesRegistrationService {
                 Sales saved = salesRepository
                     .saveAndFlush(new Sales(productId, price, SalesStatus.READY));
                 salesStockRepository.save(new SalesStock(saved.getId(), initialStock, 0));
+                events.registered(saved.getId());
                 return saved;
             });
         } catch (DataIntegrityViolationException e) {
