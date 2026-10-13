@@ -27,8 +27,9 @@ public class OutboxConfiguration {
 
     @Bean
     public EventOutbox eventOutbox(final OutboxMessageRepository repository,
-                                   final ObjectMapper objectMapper) {
-        return new EventOutbox(repository, objectMapper);
+                                   final ObjectMapper objectMapper,
+                                   final org.springframework.context.ApplicationEventPublisher applicationEvents) {
+        return new EventOutbox(repository, objectMapper, applicationEvents);
     }
 
     /**

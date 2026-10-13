@@ -57,6 +57,34 @@ class OutboxRelayTest {
     }
 
     @Test
+    void afterCommitListenerDrainsSynchronously() {
+        when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))
+                .thenReturn(List.of(message(1L, "e-1", "LiveBroadcastStarted")));
+        when(kafka.send(any(ProducerRecord.class))).thenReturn(sent());
+
+        relay.onOutboxCommitted(OutboxCommittedEvent.INSTANCE);
+
+        verify(kafka).send(any(ProducerRecord.class));
+        verify(repository).markPublished(eq(1L), any(Instant.class));
+    }
+
+    @Test
+    void reentrantCallDuringSendDoesNotDoubleSend() {
+        // 중복 전송을 피하기 위해, fast-path drain 중 다시 relay() 가 호출되면 즉시 0 을 돌려줘야 한다.
+        when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))
+                .thenReturn(List.of(message(1L, "e-1", "LiveBroadcastStarted")));
+        when(kafka.send(any(ProducerRecord.class)))
+                .thenAnswer(invocation -> {
+                    // kafka.send 가 호출되는 그 순간 relay 가 또 돌면 안 된다.
+                    assertEquals(0, relay.relay());
+                    return sent();
+                });
+
+        assertEquals(1, relay.relay());
+        verify(kafka, org.mockito.Mockito.times(1)).send(any(ProducerRecord.class));
+    }
+
+    @Test
     void stopsAtTheFirstFailureSoLaterEventsDoNotOvertakeIt() {
         when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))
                 .thenReturn(List.of(message(1L, "e-1", "LiveBroadcastStarted"),
