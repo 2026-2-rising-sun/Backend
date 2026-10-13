@@ -1,0 +1,61 @@
+package com.shoppinglive.notification.security;
+
+import com.shoppinglive.common.security.test.JwtTestTokens;
+import com.shoppinglive.common.security.test.StubAccessSessionVerifier;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+/** 실제 토큰 검증기와 필터를 그대로 쓴다. 인증을 가짜로 끼워넣거나 필터를 끄지 않는다. */
+@Import(NotificationSecuritySupport.SessionTestConfiguration.class)
+public abstract class NotificationSecuritySupport {
+
+    @Autowired
+    protected StubAccessSessionVerifier accessSessions;
+
+    @BeforeEach
+    void resetAccessSessionFixture() {
+        accessSessions.reset();
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class SessionTestConfiguration {
+        @Bean
+        StubAccessSessionVerifier accessSessionVerifier() {
+            return new StubAccessSessionVerifier();
+        }
+    }
+
+    protected static final JwtTestTokens TOKENS = new JwtTestTokens();
+    private static final String KEY_FILE = publicKeys();
+
+    @DynamicPropertySource
+    static void securityProperties(DynamicPropertyRegistry properties) {
+        properties.add("shoppinglive.security.jwt.issuer", () -> JwtTestTokens.ISSUER);
+        properties.add("shoppinglive.security.jwt.audience", () -> JwtTestTokens.AUDIENCE);
+        properties.add("shoppinglive.security.jwt.public-key-set-location", () -> KEY_FILE);
+    }
+
+    /** 알림함을 쓰는 일반 회원. */
+    protected static String userBearer() {
+        return "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER"));
+    }
+
+    private static String publicKeys() {
+        try {
+            var file = Files.createTempFile("notification-test-public-", ".jwks");
+            Files.writeString(file, TOKENS.publicJwkSet().toString());
+            file.toFile().deleteOnExit();
+            return file.toUri().toString();
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+}
