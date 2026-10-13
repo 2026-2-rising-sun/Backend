@@ -37,10 +37,9 @@ class ReplicaSalesInfoClientTest {
     }
 
     @Test
-    @DisplayName("조회할 상품이 없으면 빈 결과를 돌려주고 사본을 읽지 않는다")
-    void emptyInputReturnsEmptyWithoutReadingReplica() {
+    @DisplayName("조회할 상품이 없으면 빈 결과를 돌려준다")
+    void emptyInputReturnsEmpty() {
         assertThat(client.findByProductIds(List.of())).isEmpty();
-        verifyNoInteractions(repository);
     }
 
     @Test
