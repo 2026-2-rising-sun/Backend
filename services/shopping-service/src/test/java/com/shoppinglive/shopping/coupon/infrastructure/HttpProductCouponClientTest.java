@@ -11,6 +11,7 @@ import com.shoppinglive.shopping.coupon.application.ProductCoupon;
 import com.shoppinglive.shopping.coupon.application.ProductCouponUnavailableException;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -32,6 +33,7 @@ class HttpProductCouponClientTest {
     private final HttpProductCouponClient client = new HttpProductCouponClient(builder.build());
 
     @Test
+    @DisplayName("Commerce 응답 envelope 의 data 를 쿠폰 목록으로 바꾸고, 요청한 productId 로 조회한다")
     void parsesProposedEnvelopeIntoCouponsForTheRequestedProduct() {
         // given
         server.expect(requestTo(COUPON_URL)).andExpect(method(HttpMethod.GET))
@@ -48,6 +50,7 @@ class HttpProductCouponClientTest {
     }
 
     @Test
+    @DisplayName("Commerce 가 서버 오류를 응답하면 ProductCouponUnavailableException 으로 알린다")
     void commerceServerErrorIsReportedAsUnavailable() {
         // given
         server.expect(requestTo(COUPON_URL)).andRespond(withServerError());

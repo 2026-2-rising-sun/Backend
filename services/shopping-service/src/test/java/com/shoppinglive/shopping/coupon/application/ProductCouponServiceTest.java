@@ -16,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class ProductCouponServiceTest {
@@ -28,6 +29,7 @@ class ProductCouponServiceTest {
         client, Duration.ofSeconds(3), Duration.ofSeconds(1), nanos::get);
 
     @Test
+    @DisplayName("캐시된 쿠폰은 TTL 이 지나기 전까지 Commerce 를 다시 부르지 않고, TTL 이 지나면 다시 조회한다")
     void freshEntryIsServedWithoutUpstreamCallUntilCacheTtlExpires() {
         // given
         List<ProductCoupon> coupons = List.of(coupon("c1"));
@@ -50,6 +52,7 @@ class ProductCouponServiceTest {
     }
 
     @Test
+    @DisplayName("같은 상품에 대한 동시 캐시 미스는 Commerce 조회를 한 번만 하고 모든 요청이 그 결과를 받는다")
     void concurrentMissesForOneProductCallUpstreamOnce() throws Exception {
         // given: 업스트림 응답을 짧게 붙잡아 나머지 요청이 같은 조회를 기다리는 상황을 만든다
         CountDownLatch release = new CountDownLatch(1);
@@ -80,6 +83,7 @@ class ProductCouponServiceTest {
     }
 
     @Test
+    @DisplayName("Commerce 조회 실패는 빈 목록으로 캐시되어 실패 TTL 동안 다시 부르지 않고, 지나면 복구된 쿠폰을 보여준다")
     void upstreamFailureIsCachedAsEmptyUntilFailureTtlThenRecovers() {
         // given
         List<ProductCoupon> recovered = List.of(coupon("c1"));
@@ -100,6 +104,7 @@ class ProductCouponServiceTest {
     }
 
     @Test
+    @DisplayName("상품마다 캐시 항목이 따로 있어 한 상품의 쿠폰이 다른 상품 조회에 섞이지 않는다")
     void differentProductsDoNotShareEntries() {
         // given
         when(client.findByProductId(1L)).thenReturn(List.of(coupon("a")));
@@ -113,6 +118,7 @@ class ProductCouponServiceTest {
     }
 
     @Test
+    @DisplayName("TTL 이 지난 캐시는 갱신 조회가 도는 동안 다른 요청에 이전 값을 기다리게 하지 않고, 갱신 조회는 한 번만 일어난다")
     void expiredEntryIsRefreshedOnceWhileOtherCallersGetThePreviousValueWithoutWaiting() throws Exception {
         // given: 이전 값이 캐시되어 있고 TTL 이 지났다. 갱신 조회는 응답 전까지 막혀 있다.
         List<ProductCoupon> previous = List.of(coupon("old"));

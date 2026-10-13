@@ -12,6 +12,7 @@ import com.shoppinglive.shopping.coupon.application.ProductCouponUnavailableExce
 import com.shoppinglive.shopping.security.ShoppingSecuritySupport;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,6 +30,7 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
     @MockitoBean ProductCouponClient commerce;
 
     @Test
+    @DisplayName("인증 없이 상품 쿠폰 목록을 조회하면 200 과 쿠폰 항목이 응답된다")
     void anonymousReadReturnsCouponItems() throws Exception {
         // given
         ProductCoupon coupon = new ProductCoupon("33333333-3333-4333-8333-333333333334", "가을 니트 5천원 할인",
@@ -45,6 +47,7 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("Commerce 를 쓸 수 없으면 500 대신 200 과 빈 쿠폰 목록을 응답한다")
     void unavailableCommerceAnswersEmptyListInsteadOfServerError() throws Exception {
         // given
         when(commerce.findByProductId(9102L)).thenThrow(new ProductCouponUnavailableException("commerce down"));
@@ -57,6 +60,7 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("상품 id 가 숫자가 아니면 인증 없이도 다른 상품 API 와 같은 INVALID_REQUEST 400 을 응답한다")
     void malformedIdIsAnAnonymousInputErrorLikeSiblings() throws Exception {
         mvc.perform(get("/v1/products/abc/coupons"))
             .andExpect(status().isBadRequest())
@@ -64,6 +68,7 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("쿠폰 경로에 GET 이 아닌 메서드를 인증 없이 요청하면 401 로 거부된다")
     void otherMethodsOnCouponPathAreRejectedAnonymously() throws Exception {
         mvc.perform(post("/v1/products/9103/coupons")).andExpect(status().isUnauthorized());
     }
