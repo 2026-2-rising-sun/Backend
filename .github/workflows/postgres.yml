@@ -42,7 +42,7 @@ jobs:
             task: :services:shopping-service:test --tests *ProductSellerMigrationTest --tests *ProductSalesRepositoryTest
             report: services/shopping-service/build/test-results/test/TEST-*.xml
             suites: '*.ProductSellerMigrationTest *.ProductSalesRepositoryTest'
-            minimums: '*.ProductSellerMigrationTest=2 *.ProductSalesRepositoryTest=18'
+            minimums: '*.ProductSellerMigrationTest=2 *.ProductSalesRepositoryTest=16'
     services:
       postgres:
         image: postgres:16

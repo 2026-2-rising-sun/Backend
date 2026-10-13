@@ -13,15 +13,10 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * {@code product_sales} read replica 저장소. 이벤트 경로와 backfill 경로가 같은 version 규칙을 따른다.
- *
- * <p>쓰기는 호출자의 transaction 을 떼고 autocommit 으로 실행한다. PostgreSQL 은 키 충돌 뒤 같은
- * transaction 의 모든 문장을 거부하므로, 충돌 뒤 UPDATE 로 복구하려면 바깥 transaction 과 분리해야 한다.
+ * transaction 안에서 호출하면 안 된다. PostgreSQL 은 키 충돌 뒤 같은 transaction 의 후속 문장을 모두 거부한다.
  */
 @Repository
 public class ProductSalesRepository {
@@ -40,12 +35,9 @@ public class ProductSalesRepository {
     private static final long BACKFILL_VERSION = 0L;
 
     private final NamedParameterJdbcTemplate jdbc;
-    private final TransactionTemplate standalone;
 
-    public ProductSalesRepository(NamedParameterJdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+    public ProductSalesRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.standalone = new TransactionTemplate(transactionManager);
-        this.standalone.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
     }
 
     /**
@@ -55,7 +47,14 @@ public class ProductSalesRepository {
      * @return 행이 바뀌었으면 {@code true}
      */
     public boolean apply(SalesInfo info, long version) {
-        return standalone.execute(status -> applyNow(info, version));
+        int inserted;
+        try {
+            inserted = insertIfMissing(info, version);
+        } catch (DuplicateKeyException e) {
+            // 같은 신규 상품을 다른 쓰기가 동시에 먼저 INSERT 했다. version 비교로 넘어간다.
+            inserted = 0;
+        }
+        return inserted == 1 || updateIfNewer(info, version) == 1;
     }
 
     /**
@@ -64,13 +63,11 @@ public class ProductSalesRepository {
      * @return 새로 저장했으면 {@code true}
      */
     public boolean insertIfAbsent(SalesInfo info) {
-        return standalone.execute(status -> {
-            try {
-                return insertIfMissing(info, BACKFILL_VERSION) == 1;
-            } catch (DuplicateKeyException e) {
-                return false;
-            }
-        });
+        try {
+            return insertIfMissing(info, BACKFILL_VERSION) == 1;
+        } catch (DuplicateKeyException e) {
+            return false;
+        }
     }
 
     /** 상품 id 목록에 해당하는 판매정보만 돌려준다. 저장되지 않은 상품은 결과에서 빠진다. */
@@ -80,22 +77,12 @@ public class ProductSalesRepository {
             return Map.of();
         }
         List<SalesInfo> rows = jdbc.query(
-            "SELECT product_id, sales_id, price, status, available FROM product_sales WHERE product_id IN (:productIds)",
+            "SELECT product_id, sales_id, price, status, available FROM product_sales "
+                + "WHERE product_id IN (:productIds)",
             Map.of("productIds", ids),
             (rs, rowNum) -> new SalesInfo(rs.getLong("product_id"), rs.getLong("sales_id"), rs.getLong("price"),
                 SalesStatus.valueOf(rs.getString("status")), rs.getInt("available")));
         return rows.stream().collect(Collectors.toMap(SalesInfo::productId, Function.identity()));
-    }
-
-    private boolean applyNow(SalesInfo info, long version) {
-        int inserted;
-        try {
-            inserted = insertIfMissing(info, version);
-        } catch (DuplicateKeyException e) {
-            // 같은 신규 상품을 다른 쓰기가 동시에 먼저 INSERT 했다. version 비교로 넘어간다.
-            inserted = 0;
-        }
-        return inserted == 1 || updateIfNewer(info, version) == 1;
     }
 
     private int insertIfMissing(SalesInfo info, long version) {
