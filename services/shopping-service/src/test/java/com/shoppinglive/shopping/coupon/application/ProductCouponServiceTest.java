@@ -155,6 +155,41 @@ class ProductCouponServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("캐시가 가득 차 정리할 때 조회 중인 항목은 남겨, 같은 상품의 동시 요청이 Commerce 를 다시 부르지 않는다")
+    void pruneKeepsInFlightEntrySoSecondRequestDoesNotReload() throws Exception {
+        // given: 완료된 항목으로 상한 직전까지 채우고, 마지막 상품 A 의 조회는 응답을 붙잡아 둔다
+        long held = ProductCouponService.MAX_ENTRIES;
+        CountDownLatch loaderEntered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(client.findByProductId(held)).thenAnswer(invocation -> {
+            loaderEntered.countDown();
+            release.await();
+            return List.of(coupon("held"));
+        });
+        for (long id = 1; id < held; id++) {
+            service.findByProductId(id);
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<List<ProductCoupon>> first = pool.submit(() -> service.findByProductId(held));
+            assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // when: 다른 상품 조회가 상한에서 정리를 일으키고, 조회 중이던 상품 A 를 다시 요청한다
+            service.findByProductId(held + 1);
+            Future<List<ProductCoupon>> second = pool.submit(() -> service.findByProductId(held));
+            release.countDown();
+
+            // then
+            assertThat(first.get(5, TimeUnit.SECONDS)).extracting(ProductCoupon::id).containsExactly("held");
+            assertThat(second.get(5, TimeUnit.SECONDS)).extracting(ProductCoupon::id).containsExactly("held");
+            verify(client, times(1)).findByProductId(held);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
     private static ProductCoupon coupon(final String id) {
         return new ProductCoupon(id, "가을 니트 5천원 할인", 5_000L, false,
             Instant.parse("2026-10-15T11:00:00Z"), Instant.parse("2026-11-15T00:00:00Z"));

@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ProductCouponService {
 
-    // shortcut: 항목 1만 개 초과 시 만료분을 지우고 그래도 차면 전부 비운다(비운 뒤엔 같은 상품을 한 번 더 조회).
+    // shortcut: 항목 1만 개 초과 시 만료분을 지우고 그래도 차면 완료된 항목을 지운다(조회 중인 항목은 남긴다).
     //   상품 수나 메모리가 측정으로 문제가 되면 Caffeine(maximumSize, expireAfterWrite)으로 바꾼다.
     static final int MAX_ENTRIES = 10_000;
 
@@ -73,8 +73,9 @@ public class ProductCouponService {
 
     private void prune(final long now) {
         entries.values().removeIf(entry -> entry.isExpired(now));
+        // 조회 중인 항목은 남긴다. 지우면 같은 상품의 동시 요청이 Commerce 를 다시 부른다.
         if (entries.size() >= MAX_ENTRIES) {
-            entries.clear();
+            entries.values().removeIf(entry -> entry.result.isDone());
         }
     }
 
