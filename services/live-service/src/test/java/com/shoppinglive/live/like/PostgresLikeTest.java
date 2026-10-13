@@ -29,7 +29,9 @@ class PostgresLikeTest extends LiveSecuritySupport {
         final String name = UUID.randomUUID().toString();
         final long id = broadcasts.register(name, new BroadcastInput(name, Instant.now(),
             "arn:aws:ivs:channel/" + name, "https://example.com/" + name)).getId();
-        jdbc.update("UPDATE broadcast SET status = 'LIVE' WHERE id = ?", id);
+        // 운영 전이와 맞추기 위해 started_at 도 함께 세팅한다. end() 가 Kafka payload 를 만들면서
+        // non-null startedAt 을 요구하기 때문.
+        jdbc.update("UPDATE broadcast SET status = 'LIVE', started_at = CURRENT_TIMESTAMP WHERE id = ?", id);
         return id;
     }
 
