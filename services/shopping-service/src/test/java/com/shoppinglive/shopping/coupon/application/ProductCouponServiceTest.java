@@ -27,10 +27,11 @@ class ProductCouponServiceTest {
 
     private final AtomicLong nanos = new AtomicLong(1_000_000_000L);
     private final ProductCouponClient client = mock(ProductCouponClient.class);
-    private final ProductCouponService service = new ProductCouponService(client, TTL, nanos::get);
+    // 로드를 호출 스레드에서 바로 실행한다. 반환 시점에 적재와 쓰기 시각 기록이 끝나 있어 시간 경계를 결정적으로 검증한다.
+    private final ProductCouponService service = new ProductCouponService(client, TTL, nanos::get, Runnable::run);
 
     @Test
-    @DisplayName("캐시된 쿠폰은 TTL 이 지나기 전까지 Commerce 를 다시 부르지 않고, TTL 이 지나면 이전 값을 주면서 다시 조회한다")
+    @DisplayName("캐시된 쿠폰은 TTL 이 지나기 전까지 Commerce 를 다시 부르지 않고, TTL 이 지나면 다시 조회한다")
     void freshEntryIsServedWithoutUpstreamCallUntilCacheTtlExpires() {
         // given
         List<ProductCoupon> coupons = List.of(coupon("c1"));
@@ -44,12 +45,12 @@ class ProductCouponServiceTest {
         // then
         verify(client, times(1)).findByProductId(PRODUCT_ID);
 
-        // when: TTL 을 넘기면 갱신 조회가 백그라운드에서 한 번 일어난다
+        // when: TTL 을 넘기면 갱신 조회가 한 번 일어난다
         nanos.addAndGet(Duration.ofMillis(2).toNanos());
         assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(coupons);
 
         // then
-        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> verify(client, times(2)).findByProductId(PRODUCT_ID));
+        verify(client, times(2)).findByProductId(PRODUCT_ID);
     }
 
     @Test
@@ -64,11 +65,12 @@ class ProductCouponServiceTest {
             release.await();
             return coupons;
         });
-        ExecutorService pool = Executors.newFixedThreadPool(8);
-        try {
+        try (ExecutorService loaders = Executors.newVirtualThreadPerTaskExecutor();
+             ExecutorService callers = Executors.newFixedThreadPool(8)) {
+            ProductCouponService concurrent = new ProductCouponService(client, TTL, nanos::get, loaders);
             List<Future<List<ProductCoupon>>> results = new ArrayList<>();
             for (int i = 0; i < 8; i++) {
-                results.add(pool.submit(() -> service.findByProductId(PRODUCT_ID)));
+                results.add(callers.submit(() -> concurrent.findByProductId(PRODUCT_ID)));
             }
 
             // when
@@ -82,7 +84,6 @@ class ProductCouponServiceTest {
             verify(client, times(1)).findByProductId(PRODUCT_ID);
         } finally {
             release.countDown();
-            pool.shutdownNow();
         }
     }
 
@@ -103,9 +104,7 @@ class ProductCouponServiceTest {
 
         // when / then: TTL 이 지나면 갱신 조회가 복구된 값을 가져온다
         nanos.addAndGet(Duration.ofMillis(2).toNanos());
-        service.findByProductId(PRODUCT_ID);
-        await().atMost(Duration.ofSeconds(5))
-            .untilAsserted(() -> assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(recovered));
+        assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(recovered);
         verify(client, times(2)).findByProductId(PRODUCT_ID);
     }
 
@@ -136,19 +135,21 @@ class ProductCouponServiceTest {
             release.await();
             return refreshed;
         });
-        assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(previous);
-        nanos.addAndGet(Duration.ofSeconds(3).plusMillis(1).toNanos());
-        try {
+        try (ExecutorService loaders = Executors.newVirtualThreadPerTaskExecutor()) {
+            ProductCouponService concurrent = new ProductCouponService(client, TTL, nanos::get, loaders);
+            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+            nanos.addAndGet(Duration.ofSeconds(3).plusMillis(1).toNanos());
+
             // when / then: 갱신 조회가 시작되어 멈춰 있어도 요청은 기다리지 않고 이전 값을 받는다
-            assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
             assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
             verify(client, times(2)).findByProductId(PRODUCT_ID);
 
             // when: 갱신이 끝나면 새 값이 보인다
             release.countDown();
             await().atMost(Duration.ofSeconds(5))
-                .untilAsserted(() -> assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(refreshed));
+                .untilAsserted(() -> assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(refreshed));
             verify(client, times(2)).findByProductId(PRODUCT_ID);
         } finally {
             release.countDown();
