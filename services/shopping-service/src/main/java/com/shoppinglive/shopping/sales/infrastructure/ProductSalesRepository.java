@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Repository;
  * transaction 안에서 호출하면 안 된다. PostgreSQL 은 키 충돌 뒤 같은 transaction 의 후속 문장을 모두 거부한다.
  */
 @Repository
+@RequiredArgsConstructor
 public class ProductSalesRepository {
 
     private static final String INSERT_IF_MISSING = """
@@ -35,10 +37,6 @@ public class ProductSalesRepository {
     private static final long BACKFILL_VERSION = 0L;
 
     private final NamedParameterJdbcTemplate jdbc;
-
-    public ProductSalesRepository(NamedParameterJdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-    }
 
     /**
      * 이벤트 경로. 없으면 INSERT, 있으면 version 이 더 클 때만 UPDATE 한다.
