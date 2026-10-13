@@ -15,6 +15,8 @@ import org.springframework.web.client.RestClient;
 /**
  * 판매정보 어댑터 설정. {@code shopping.sales.source} 가 {@code http}(기본)면 Commerce HTTP 구현,
  * {@code replica} 면 {@code product_sales} 사본 구현이 {@code SalesInfoClient} 로 주입된다.
+ * 조회 서비스는 {@code SalesInfoClient} 만 의존하므로 설정을 바꿔도 서비스 코드는 그대로다.
+ * 그 밖의 값은 기동을 실패시킨다.
  *
  * <p>HTTP 구현체를 {@code @Component} 로 두지 않은 이유: timeout(request factory) 조립을 호출 로직과 분리해,
  * 테스트가 {@code MockRestServiceServer} 에 묶인 RestClient 를 그대로 넣을 수 있게 하려는 것이다
