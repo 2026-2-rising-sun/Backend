@@ -13,6 +13,7 @@ import com.shoppinglive.shopping.sales.domain.SalesStatus;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 
@@ -22,6 +23,7 @@ class ReplicaSalesInfoClientTest {
     private final ReplicaSalesInfoClient client = new ReplicaSalesInfoClient(repository);
 
     @Test
+    @DisplayName("사본에 행이 있는 상품만 결과에 담고, 행이 없는 상품은 결과에서 빠진다")
     void mapsStoredRowsAndLeavesProductsWithoutRowsOut() {
         // given: 1번 상품만 사본에 있다
         SalesInfo stored = new SalesInfo(1L, 10L, 1_000L, SalesStatus.ON_SALE, 3);
@@ -35,12 +37,14 @@ class ReplicaSalesInfoClientTest {
     }
 
     @Test
+    @DisplayName("조회할 상품이 없으면 빈 결과를 돌려주고 사본을 읽지 않는다")
     void emptyInputReturnsEmptyWithoutReadingReplica() {
         assertThat(client.findByProductIds(List.of())).isEmpty();
         verifyNoInteractions(repository);
     }
 
     @Test
+    @DisplayName("상품 id 목록이 null 이거나 null 원소를 포함하면 사본을 읽기 전에 거부한다")
     void nullInputIsRejectedBeforeReadingReplica() {
         assertThatThrownBy(() -> client.findByProductIds(null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> client.findByProductIds(Arrays.asList(1L, null)))
@@ -49,6 +53,7 @@ class ReplicaSalesInfoClientTest {
     }
 
     @Test
+    @DisplayName("사본 DB 조회가 실패하면 판매정보 사용 불가 예외로 바꿔 전달한다")
     void replicaReadFailureBecomesSalesInfoUnavailable() {
         when(repository.findByProductIds(anyCollection()))
             .thenThrow(new DataAccessResourceFailureException("replica down"));
