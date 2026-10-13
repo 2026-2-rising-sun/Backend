@@ -32,6 +32,10 @@ live:
     mode: stub
   ivs:
     mode: stub
+  promotion:
+    expiry:
+      # 테스트는 메서드를 직접 호출해 결정론으로 검증하므로 스케줄러는 끈다.
+      enabled: false
 
 management:
   endpoints:

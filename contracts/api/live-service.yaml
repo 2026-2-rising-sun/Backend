@@ -686,6 +686,8 @@ paths:
         | `stream.ready` | `StreamReadyEvent` | 연결 직후 한 번 |
         | `chat.created` | `ChatMessage` (`id:` 는 messageId) | 채팅 저장 후 |
         | `likes.updated` | `LikeTotal` | 커밋 version이 바뀌면 약 1초 간격 |
+        | `promotion.opened` | `PromotionStreamEvent` | 방송 중 이벤트가 열렸을 때 |
+        | `promotion.closed` | `PromotionStreamEvent` | 방송 중 이벤트가 닫혔을 때(판매자·만료) |
         | `broadcast.ended` | `BroadcastEndedEvent` | 방송 종료 시. 이후 서버가 연결을 닫는다 |
 
         클라이언트 규칙:
@@ -726,6 +728,133 @@ paths:
         '409': { $ref: '#/components/responses/BroadcastNotLive' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
 
+  /v1/admin/broadcasts/{id}/promotions:
+    parameters:
+      - $ref: '#/components/parameters/BroadcastId'
+    post:
+      x-required-roles: [SELLER]
+      summary: 방송 중 이벤트(프로모션) 생성
+      description: |
+        READY 상태로 저장한다. 라이브는 `attributes` 를 해석하지 않고 그대로 저장·전달한다.
+        같은 `Idempotency-Key` 재요청은 fingerprint(type·title·attributes·durationSeconds)가 같으면
+        같은 리소스를 돌려주고, 다르면 409 다. 종료된 방송에는 만들 수 없다.
+      operationId: createPromotion
+      tags: [Admin Promotion]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromotionInput' }
+            example:
+              type: COUPON_DROP
+              title: 방송 한정 3,000원 할인
+              attributes: { couponPolicyId: 7, claimLimit: 500 }
+              durationSeconds: 300
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '201':
+          description: 생성됨(같은 키·동일 입력은 같은 id)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromotionEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 같은 Idempotency-Key 에 다른 요청 본문이거나 방송이 종료 상태
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+    get:
+      x-required-roles: [SELLER]
+      summary: 방송의 프로모션 전체 목록
+      description: 상태 무관으로 그 방송에 속한 모든 프로모션을 id 오름차순으로 돌려준다.
+      operationId: listPromotions
+      tags: [Admin Promotion]
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '200':
+          description: 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromotionListEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+
+  /v1/admin/broadcasts/{id}/promotions/{promotionId}/open:
+    parameters:
+      - $ref: '#/components/parameters/BroadcastId'
+      - $ref: '#/components/parameters/PromotionId'
+    post:
+      x-required-roles: [SELLER]
+      summary: 프로모션 열기
+      description: |
+        READY → OPEN 전이. LIVE 방송에서만 성공한다(그 외는 409). 이미 OPEN 이면 같은 응답을
+        돌려주고 멱등으로 성공한다. 닫혀 있던 프로모션을 다시 열면 409 다.
+      operationId: openPromotion
+      tags: [Admin Promotion]
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '200':
+          description: 열림(멱등 응답 포함)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromotionEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 방송이 LIVE 가 아니거나 프로모션이 CLOSED
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+
+  /v1/admin/broadcasts/{id}/promotions/{promotionId}/close:
+    parameters:
+      - $ref: '#/components/parameters/BroadcastId'
+      - $ref: '#/components/parameters/PromotionId'
+    post:
+      x-required-roles: [SELLER]
+      summary: 프로모션 닫기
+      description: |
+        READY · OPEN → CLOSED 전이. 이미 CLOSED 면 같은 응답으로 멱등 성공. READY 에서 호출하면
+        reason 이 CANCELED 로 저장된다.
+      operationId: closePromotion
+      tags: [Admin Promotion]
+      responses:
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '200':
+          description: 닫힘(멱등 응답 포함)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PromotionEnvelope' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/AuthUnavailable' }
+
+  /v1/broadcasts/{id}/promotions:
+    parameters:
+      - $ref: '#/components/parameters/BroadcastId'
+    get:
+      security: []
+      summary: 공개 — 지금 열린 방송 중 이벤트 목록
+      description: |
+        비회원도 호출할 수 있다. 현재 OPEN 인 프로모션만 노출한다.
+      operationId: listPublicPromotions
+      tags: [Public Promotion]
+      responses:
+        '200':
+          description: 열린 프로모션 목록
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicPromotionListEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
 components:
   securitySchemes:
     BearerAuth:
@@ -736,6 +865,11 @@ components:
   parameters:
     BroadcastId:
       name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PromotionId:
+      name: promotionId
       in: path
       required: true
       schema: { type: integer, format: int64 }
@@ -1159,4 +1293,107 @@ components:
       properties:
         success: { type: boolean, const: true }
         data: { $ref: '#/components/schemas/LikeTotal' }
+        error: { type: 'null' }
+
+    PromotionStatus:
+      type: string
+      enum: [READY, OPEN, CLOSED]
+    PromotionCloseReason:
+      type: string
+      enum: [SELLER_CLOSED, EXPIRED, BROADCAST_ENDED, CANCELED]
+    PromotionAttributes:
+      type: object
+      description: |
+        종류별 자유 JSON. 라이브는 해석하지 않고 저장·전달한다. 쿠폰 드롭 예:
+        `{"couponPolicyId": 7, "claimLimit": 500}`. 직렬화 결과가 4KB 를 넘지 않아야 한다.
+      additionalProperties: true
+    PromotionInput:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]{1,63}$'
+          description: 대문자 영숫자·언더스코어로 시작하는 2~64자 상수 이름(예 COUPON_DROP).
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        attributes:
+          { $ref: '#/components/schemas/PromotionAttributes' }
+        durationSeconds:
+          type: integer
+          minimum: 10
+          maximum: 3600
+          nullable: true
+          description: 자동 만료 시간. 비우면 수동 close 때까지 열려 있다.
+    Promotion:
+      type: object
+      required: [id, broadcastId, type, title, attributes, status, version]
+      properties:
+        id: { type: integer, format: int64 }
+        broadcastId: { type: integer, format: int64 }
+        type: { type: string }
+        title: { type: string }
+        attributes: { $ref: '#/components/schemas/PromotionAttributes' }
+        status: { $ref: '#/components/schemas/PromotionStatus' }
+        durationSeconds: { type: integer, nullable: true }
+        openedAt: { type: string, format: date-time, nullable: true }
+        closesAt: { type: string, format: date-time, nullable: true }
+        closedAt: { type: string, format: date-time, nullable: true }
+        closeReason:
+          allOf: [ { $ref: '#/components/schemas/PromotionCloseReason' } ]
+          nullable: true
+        version: { type: integer, format: int64 }
+    PublicPromotion:
+      type: object
+      description: 시청자에게 노출하는 열린 프로모션 요약.
+      required: [id, broadcastId, type, title, attributes, openedAt]
+      properties:
+        id: { type: integer, format: int64 }
+        broadcastId: { type: integer, format: int64 }
+        type: { type: string }
+        title: { type: string }
+        attributes: { $ref: '#/components/schemas/PromotionAttributes' }
+        openedAt: { type: string, format: date-time }
+        closesAt: { type: string, format: date-time, nullable: true }
+    PromotionStreamEvent:
+      type: object
+      description: SSE `promotion.opened` 와 `promotion.closed` 가 공유하는 data 모양.
+      required: [promotionId, type, title, status]
+      properties:
+        promotionId: { type: integer, format: int64 }
+        type: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/PromotionStatus' }
+        openedAt: { type: string, format: date-time, nullable: true }
+        closesAt: { type: string, format: date-time, nullable: true }
+        closedAt: { type: string, format: date-time, nullable: true }
+        closeReason:
+          allOf: [ { $ref: '#/components/schemas/PromotionCloseReason' } ]
+          nullable: true
+    PromotionEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/Promotion' }
+        error: { type: 'null' }
+    PromotionListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Promotion' }
+        error: { type: 'null' }
+    PublicPromotionListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/PublicPromotion' }
         error: { type: 'null' }

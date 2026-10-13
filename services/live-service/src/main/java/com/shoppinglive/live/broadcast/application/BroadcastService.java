@@ -8,6 +8,7 @@ import com.shoppinglive.live.broadcast.api.BroadcastResponse;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import com.shoppinglive.live.broadcast.domain.BroadcastStatus;
 import com.shoppinglive.live.broadcast.infrastructure.BroadcastRepository;
+import com.shoppinglive.live.promotion.application.PromotionService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -28,13 +29,16 @@ public class BroadcastService {
 
     private final BroadcastRepository repository;
     private final BroadcastEventPublisher events;
+    private final PromotionService promotions;
     private final TransactionTemplate transaction;
 
     public BroadcastService(final BroadcastRepository repository,
                             final BroadcastEventPublisher events,
+                            final PromotionService promotions,
                             final PlatformTransactionManager manager) {
         this.repository = repository;
         this.events = events;
+        this.promotions = promotions;
         this.transaction = new TransactionTemplate(manager);
     }
 
@@ -128,7 +132,9 @@ public class BroadcastService {
         // SSE 종료 신호(BroadcastEndNotifier)와 달리 다른 서비스로 가는 이벤트는 유실되면 안 되므로
         // 같은 트랜잭션의 outbox 에 남긴다. 반복 종료는 전이가 없어 기록하지 않는다.
         if (transitioned) {
-            events.ended(broadcast);
+            final java.util.List<Long> closedPromotionIds =
+                promotions.closeAllForEndedBroadcast(id, broadcast.getEndedAt());
+            events.ended(broadcast, closedPromotionIds);
         }
         return broadcast;
     }

@@ -39,10 +39,10 @@ public class BroadcastEventPublisher {
                 productIds));
     }
 
-    public void ended(final Broadcast broadcast) {
+    public void ended(final Broadcast broadcast, final List<Long> closedPromotionIds) {
         publish(LiveBroadcastEventType.LiveBroadcastEnded, broadcast, broadcast.getEndedAt(),
             new LiveBroadcastEndedPayload(broadcast.getId(), broadcast.getVersion(),
-                broadcast.getStartedAt(), broadcast.getEndedAt()));
+                broadcast.getStartedAt(), broadcast.getEndedAt(), closedPromotionIds));
     }
 
     private void publish(final LiveBroadcastEventType type, final Broadcast broadcast,
