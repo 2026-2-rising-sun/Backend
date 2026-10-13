@@ -25,6 +25,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,6 +52,7 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
     ProductSalesRepository repository;
 
     @Test
+    @DisplayName("DB 장애가 10회를 넘게 나도 이벤트를 건너뛰지 않고, 복구 뒤 그 이벤트와 다음 이벤트가 모두 반영된다")
     void eventIsAppliedAfterMoreThanTenDbFailuresAndNextEventFollows() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         doAnswer(invocation -> {

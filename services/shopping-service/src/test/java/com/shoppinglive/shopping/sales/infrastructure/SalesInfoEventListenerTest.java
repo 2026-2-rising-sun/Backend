@@ -26,6 +26,7 @@ import javax.sql.DataSource;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -61,6 +62,7 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("계약에 맞는 판매정보 이벤트는 사본 행으로 저장된다")
     void validContractEventIsStoredInReplica() throws Exception {
         listener.consume(record(json(event(2, SalesInfoStatus.ON_SALE, 27000))));
 
@@ -68,6 +70,7 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("같은 snapshotVersion 이나 더 오래된 snapshotVersion 의 이벤트가 와도 저장된 행은 바뀌지 않는다")
     void duplicateAndOlderSnapshotVersionLeaveRowUnchanged() throws Exception {
         listener.consume(record(json(event(2, SalesInfoStatus.ON_SALE, 27000))));
 
@@ -78,6 +81,7 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("계약에 없는 status 값을 받으면 판매 상태는 PRIVATE 으로 저장된다")
     void unknownStatusIsStoredAsPrivate() throws Exception {
         String raw = json(event(2, SalesInfoStatus.ON_SALE, 27000)).replace("\"ON_SALE\"", "\"SCHEDULED\"");
 
@@ -87,6 +91,7 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("계약에 없는 eventType 이어도 판매정보는 저장된다")
     void unknownEventTypeIsStillStored() throws Exception {
         String raw = json(event(2, SalesInfoStatus.ON_SALE, 27000)).replace("\"PriceChanged\"", "\"FutureChanged\"");
 
@@ -96,6 +101,7 @@ class SalesInfoEventListenerTest {
     }
 
     @ParameterizedTest(name = "{0} is skipped and the next valid event is applied")
+    @DisplayName("잘못된 메시지는 예외 없이 건너뛰고 다음 정상 이벤트는 반영된다")
     @MethodSource("invalidMessages")
     void invalidMessageIsSkippedAndNextValidEventIsApplied(String name, String raw) throws Exception {
         assertThatCode(() -> listener.consume(record(raw))).doesNotThrowAnyException();
@@ -107,6 +113,7 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("사본 저장 중 DB 장애가 나면 예외를 삼키지 않고 호출자에게 전달한다")
     void repositoryFailureIsNotSwallowed() throws Exception {
         ProductSalesRepository failing = mock(ProductSalesRepository.class);
         when(failing.apply(any(), anyLong())).thenThrow(new DataAccessResourceFailureException("db down"));

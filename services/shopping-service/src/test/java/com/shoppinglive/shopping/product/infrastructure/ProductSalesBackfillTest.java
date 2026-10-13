@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +64,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("backfill 은 판매정보가 있는 상품만 version 0 행으로 넣고, 판매정보가 없는 상품은 건너뛴다")
     void backfillInsertsVersionZeroRowsAndSkipsProductsWithoutSales() {
         List<Long> ids = createProducts(2);
         long withSales = ids.get(0);
@@ -75,6 +77,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("backfill 을 두 번 실행해도 두 번째 실행은 새 행을 넣지 않는다")
     void secondRunInsertsNothing() {
         createProducts(PRODUCTS);
 
@@ -83,6 +86,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("이벤트로 이미 저장된 행이 있으면 backfill 은 그 행을 바꾸지 않는다")
     void backfillDoesNotOverwriteRowFromEvent() {
         long id = createProducts(1).getFirst();
         replica.apply(sales(id, 999), 1);
@@ -92,6 +96,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("상품 250개가 100개씩 세 번 조회되어 빠짐없이 사본에 적재된다")
     void everyProductAcrossChunksIsCovered() {
         List<Long> ids = createProducts(PRODUCTS);
 
@@ -103,6 +108,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("두 번째 chunk 에서 Commerce 가 응답하지 않으면 예외 없이 멈추고 앞 chunk 까지만 적재된다")
     void unavailableCommerceOnLaterChunkStopsWithoutThrowing() {
         List<Long> ids = createProducts(PRODUCTS);
         AtomicInteger calls = new AtomicInteger();
@@ -119,6 +125,7 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("backfill 설정 속성이 없으면 ProductSalesBackfill 빈이 생성되지 않는다")
     void backfillBeanIsAbsentWhenPropertyIsUnset() {
         new ApplicationContextRunner()
             .withUserConfiguration(ProductSalesBackfill.class)
