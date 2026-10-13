@@ -38,6 +38,18 @@ class ShoppingServiceApplicationTests extends ShoppingSecuritySupport {
     }
 
     @Test
+    @DisplayName("shopping.sales.source 가 http 나 replica 가 아니면 기동이 실패한다")
+    void unknownSalesSourcePreventsStartup() {
+        salesContext().withPropertyValues(
+            "shopping.sales-client.base-url=http://localhost:8083",
+            "shopping.sales-client.service-token=test-shopping-commerce-credential-00000001",
+            "shopping.sales.source=replcia")
+            .run(context -> assertThat(context.getStartupFailure())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasStackTraceContaining("shopping.sales.source must be http or replica"));
+    }
+
+    @Test
     @DisplayName("제거된 stub 설정이 남아 있어도 판매정보 조회는 HTTP만 사용한다")
     void legacyModeCannotEnableStub() {
         salesContext().withPropertyValues(
