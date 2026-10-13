@@ -31,13 +31,19 @@ public class OutboxConfiguration {
         return new EventOutbox(repository, objectMapper);
     }
 
-    /** outbox 행은 이미 JSON 문자열이라 값도 문자열 그대로 보낸다. */
+    /**
+     * outbox 행은 이미 JSON 문자열이라 값도 문자열 그대로 보낸다.
+     * {@code max.block.ms} 를 {@link OutboxProperties#sendTimeout()} 로 맞춰, 브로커 메타데이터를
+     * 못 받는 상황에서도 {@code send()} 호출이 producer 기본 60 초가 아닌 설정값에서 풀리게 한다.
+     */
     @Bean
     public KafkaTemplate<String, String> outboxKafkaTemplate(
-            final ProducerFactory<String, String> producerFactory) {
+            final ProducerFactory<String, String> producerFactory,
+            final OutboxProperties properties) {
         return new KafkaTemplate<>(producerFactory, Map.of(
             ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class));
+            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+            ProducerConfig.MAX_BLOCK_MS_CONFIG, properties.sendTimeout().toMillis()));
     }
 
     @Bean
