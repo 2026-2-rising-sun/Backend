@@ -67,8 +67,24 @@ class LiveBroadcastEventContractTest {
         assertEquals("live.broadcast.v1", LiveBroadcastEventContract.TOPIC_NAME);
         assertEquals("broadcastId", LiveBroadcastEventContract.MESSAGE_KEY_FIELD);
         assertEquals("42", LiveBroadcastEventContract.messageKey(42));
-        assertEquals(List.of("LiveBroadcastStarted", "LiveBroadcastEnded"),
+        assertEquals(List.of("LiveBroadcastScheduled", "LiveBroadcastStarted", "LiveBroadcastEnded"),
                 Arrays.stream(LiveBroadcastEventType.values()).map(Enum::name).toList());
+    }
+
+    @Test
+    void scheduledEventCarriesWhatNotificationNeedsToComputeTheReminderTime() throws Exception {
+        EventEnvelope<LiveBroadcastScheduledPayload> event = EventEnvelope.create(
+                "LiveBroadcastScheduled", 1, "live-service", "42",
+                Instant.parse("2026-10-20T09:00:00Z"),
+                new LiveBroadcastScheduledPayload(42, 0, "가을 신상 라이브",
+                        Instant.parse("2026-10-25T12:00:00Z")));
+
+        JsonNode json = mapper.readTree(mapper.writeValueAsBytes(event));
+
+        assertEquals("LiveBroadcastScheduled", json.get("eventType").asText());
+        assertEquals("가을 신상 라이브", json.at("/payload/title").asText());
+        assertEquals("2026-10-25T12:00:00Z", json.at("/payload/scheduledAt").asText());
+        assertEquals(0, json.at("/payload/broadcastVersion").asLong());
     }
 
     @Test
@@ -89,5 +105,7 @@ class LiveBroadcastEventContractTest {
         assertThrows(IllegalArgumentException.class, () -> new LiveBroadcastEndedPayload(0, 3, now, now));
         assertThrows(NullPointerException.class,
                 () -> new LiveBroadcastStartedPayload(42, 2, "t", now, now, null));
+        assertThrows(NullPointerException.class,
+                () -> new LiveBroadcastScheduledPayload(42, 0, "t", null));
     }
 }

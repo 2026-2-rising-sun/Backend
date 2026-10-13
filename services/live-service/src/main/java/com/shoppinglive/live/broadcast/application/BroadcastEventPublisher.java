@@ -5,6 +5,7 @@ import com.shoppinglive.contracts.events.EventEnvelope;
 import com.shoppinglive.contracts.events.LiveBroadcastEndedPayload;
 import com.shoppinglive.contracts.events.LiveBroadcastEventContract;
 import com.shoppinglive.contracts.events.LiveBroadcastEventType;
+import com.shoppinglive.contracts.events.LiveBroadcastScheduledPayload;
 import com.shoppinglive.contracts.events.LiveBroadcastStartedPayload;
 import com.shoppinglive.live.broadcast.domain.Broadcast;
 import java.time.Instant;
@@ -22,6 +23,13 @@ public class BroadcastEventPublisher {
 
     public BroadcastEventPublisher(final EventOutbox outbox) {
         this.outbox = outbox;
+    }
+
+    /** 등록·일정 변경 때 부른다. 알림 서비스가 시작 임박 알림 시각을 계산하는 근거다. */
+    public void scheduled(final Broadcast broadcast) {
+        publish(LiveBroadcastEventType.LiveBroadcastScheduled, broadcast, Instant.now(),
+            new LiveBroadcastScheduledPayload(broadcast.getId(), broadcast.getVersion(),
+                broadcast.getTitle(), broadcast.getScheduledAt()));
     }
 
     public void started(final Broadcast broadcast, final List<Long> productIds) {

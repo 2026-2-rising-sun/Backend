@@ -5,6 +5,7 @@ package com.shoppinglive.contracts.events;
  * 토픽을 새로 만들지 않고 여기에 이름과 payload 만 추가한다.
  */
 public enum LiveBroadcastEventType {
+    LiveBroadcastScheduled,
     LiveBroadcastStarted,
     LiveBroadcastEnded
 }

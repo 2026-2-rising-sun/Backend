@@ -45,10 +45,15 @@ public class BroadcastService {
             return replay(existing, fingerprint);
         }
         try {
-            return transaction.execute(status -> repository.saveAndFlush(
-                new Broadcast(key, fingerprint, input.title(), input.scheduledAt(),
-                    input.channelArn(), input.playbackUrl())
-            ));
+            // 등록 이벤트는 같은 트랜잭션의 outbox 에 남긴다. 같은 키 동시 등록에서 진 쪽은
+            // 롤백되므로 이벤트도 남지 않고, 위 재조회 경로(멱등 재응답)는 이벤트를 내지 않는다.
+            return transaction.execute(status -> {
+                final Broadcast saved = repository.saveAndFlush(
+                    new Broadcast(key, fingerprint, input.title(), input.scheduledAt(),
+                        input.channelArn(), input.playbackUrl()));
+                events.scheduled(saved);
+                return saved;
+            });
         } catch (DataIntegrityViolationException exception) {
             return repository.findByRequestKey(key)
                 .map(found -> replay(found, fingerprint))
@@ -63,12 +68,20 @@ public class BroadcastService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST,
                 "channelArn과 playbackUrl은 함께 변경해야 합니다.");
         }
+        final String titleBefore = broadcast.getTitle();
+        final java.time.Instant scheduledAtBefore = broadcast.getScheduledAt();
         broadcast.edit(version,
             patched("title", input.title(), broadcast.getTitle()),
             patched("scheduledAt", input.scheduledAt(), broadcast.getScheduledAt()),
             patched("channelArn", input.channelArn(), broadcast.getChannelArn()),
             patched("playbackUrl", input.playbackUrl(), broadcast.getPlaybackUrl()));
         repository.flush();
+        // 알림 서비스가 "시작 임박" 시각을 다시 계산할 수 있게, 알림에 쓰는 제목·예정 시각이 바뀔 때만 낸다.
+        // 송출 정보(채널·playback URL)만 바뀐 경우에는 알림 상태가 바뀌지 않으므로 내지 않는다.
+        if (!titleBefore.equals(broadcast.getTitle())
+            || !scheduledAtBefore.equals(broadcast.getScheduledAt())) {
+            events.scheduled(broadcast);
+        }
         return broadcast;
     }
 
