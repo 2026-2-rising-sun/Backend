@@ -33,7 +33,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 class SalesInfoEventListenerTest {
@@ -57,7 +56,7 @@ class SalesInfoEventListenerTest {
         Flyway.configure().dataSource(dataSource).load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         jdbc.getJdbcOperations().update("DELETE FROM product_sales");
-        repository = new ProductSalesRepository(jdbc, new DataSourceTransactionManager(dataSource));
+        repository = new ProductSalesRepository(jdbc);
         listener = new SalesInfoEventListener(repository);
     }
 
