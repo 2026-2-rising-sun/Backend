@@ -37,7 +37,8 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @SpringBootTest(properties = {
     "shopping.sales.source=replica",
-    "spring.datasource.url=jdbc:h2:mem:product_replica_sales_http;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"})
+    "spring.datasource.url=jdbc:h2:mem:product_replica_sales_http;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;"
+        + "DATABASE_TO_LOWER=TRUE"})
 @AutoConfigureMockMvc
 @DisplayName("replica 모드의 상품 판매정보 조회")
 class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
