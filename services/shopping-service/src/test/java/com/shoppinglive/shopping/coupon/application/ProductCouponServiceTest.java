@@ -12,11 +12,13 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -69,21 +71,24 @@ class ProductCouponServiceTest {
              ExecutorService callers = Executors.newFixedThreadPool(8)) {
             ProductCouponService concurrent = new ProductCouponService(client, TTL, nanos::get, loaders);
             List<Future<List<ProductCoupon>>> results = new ArrayList<>();
-            for (int i = 0; i < 8; i++) {
-                results.add(callers.submit(() -> concurrent.findByProductId(PRODUCT_ID)));
-            }
+            try {
+                for (int i = 0; i < 8; i++) {
+                    results.add(callers.submit(() -> concurrent.findByProductId(PRODUCT_ID)));
+                }
 
-            // when
-            assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
-            release.countDown();
+                // when
+                assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
+                release.countDown();
 
-            // then
-            for (Future<List<ProductCoupon>> result : results) {
-                assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(coupons);
+                // then
+                for (Future<List<ProductCoupon>> result : results) {
+                    assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(coupons);
+                }
+                verify(client, times(1)).findByProductId(PRODUCT_ID);
+            } finally {
+                // 실패해도 로드를 풀어야 executor 를 닫을 때 막히지 않는다
+                release.countDown();
             }
-            verify(client, times(1)).findByProductId(PRODUCT_ID);
-        } finally {
-            release.countDown();
         }
     }
 
@@ -135,24 +140,31 @@ class ProductCouponServiceTest {
             release.await();
             return refreshed;
         });
+        // 첫 적재는 호출 스레드에서 끝내고(쓰기 시각 기록 완료), 시계를 옮긴 뒤의 갱신만 비동기로 돈다
+        AtomicReference<Executor> active = new AtomicReference<>(Runnable::run);
         try (ExecutorService loaders = Executors.newVirtualThreadPerTaskExecutor()) {
-            ProductCouponService concurrent = new ProductCouponService(client, TTL, nanos::get, loaders);
-            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
-            nanos.addAndGet(Duration.ofSeconds(3).plusMillis(1).toNanos());
+            ProductCouponService concurrent = new ProductCouponService(client, TTL, nanos::get,
+                task -> active.get().execute(task));
+            try {
+                assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+                nanos.addAndGet(Duration.ofSeconds(3).plusMillis(1).toNanos());
+                active.set(loaders);
 
-            // when / then: 갱신 조회가 시작되어 멈춰 있어도 요청은 기다리지 않고 이전 값을 받는다
-            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
-            assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
-            verify(client, times(2)).findByProductId(PRODUCT_ID);
+                // when / then: 갱신 조회가 시작되어 멈춰 있어도 요청은 기다리지 않고 이전 값을 받는다
+                assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+                assertThat(loaderEntered.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+                verify(client, times(2)).findByProductId(PRODUCT_ID);
 
-            // when: 갱신이 끝나면 새 값이 보인다
-            release.countDown();
-            await().atMost(Duration.ofSeconds(5))
-                .untilAsserted(() -> assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(refreshed));
-            verify(client, times(2)).findByProductId(PRODUCT_ID);
-        } finally {
-            release.countDown();
+                // when: 갱신이 끝나면 새 값이 보인다
+                release.countDown();
+                await().atMost(Duration.ofSeconds(5))
+                    .untilAsserted(() -> assertThat(concurrent.findByProductId(PRODUCT_ID)).isEqualTo(refreshed));
+                verify(client, times(2)).findByProductId(PRODUCT_ID);
+            } finally {
+                // 실패해도 로드를 풀어야 executor 를 닫을 때 막히지 않는다
+                release.countDown();
+            }
         }
     }
 
