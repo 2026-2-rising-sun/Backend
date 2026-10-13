@@ -17,7 +17,9 @@ record CommerceCouponResponse(String id, String name, Long fixedDiscount, Boolea
         if (!UUID.fromString(couponId).toString().equalsIgnoreCase(couponId)) {
             throw new IllegalStateException("coupon id must be a canonical UUID");
         }
-        if (fixedDiscount != null && fixedDiscount < 0) throw new IllegalStateException("fixedDiscount is negative");
+        if (fixedDiscount != null && fixedDiscount < 0) {
+            throw new IllegalStateException("fixedDiscount is negative");
+        }
         return new ProductCoupon(couponId, Objects.requireNonNull(name),
             Objects.requireNonNull(fixedDiscount), Objects.requireNonNull(soldOut),
             Objects.requireNonNull(endsAt), Objects.requireNonNull(expiresAt));

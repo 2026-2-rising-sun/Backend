@@ -5,6 +5,7 @@ import com.shoppinglive.shopping.coupon.application.ProductCoupon;
 import com.shoppinglive.shopping.coupon.application.ProductCouponClient;
 import com.shoppinglive.shopping.coupon.application.ProductCouponUnavailableException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -12,9 +13,10 @@ import org.springframework.web.client.RestClient;
 /**
  * Commerce 상품별 쿠폰 조회 구현체. 회원 정보를 보내지 않고 service token 으로 호출한다.
  *
- * <p>재시도와 서킷은 두지 않는다. 실패 결과를 빈 목록으로 짧게 캐시하므로 장애 중에도 상품당 호출은 실패 TTL 마다
+ * <p>재시도와 서킷은 두지 않는다. 실패 결과를 빈 목록으로 짧게 캐시하므로 장애 중에도 상품당 호출은 캐시 TTL 마다
  * 한 번으로 제한되고, 재시도는 그 부하를 곱하기만 한다. 어떤 실패든 {@link ProductCouponUnavailableException} 하나로 알린다.
  */
+@RequiredArgsConstructor
 public class HttpProductCouponClient implements ProductCouponClient {
 
     // 제안 계약(미합의): Commerce 가 합의하기 전까지 이 경로와 응답 형태는 바뀔 수 있다. 바뀌면 이 클래스만 고친다.
@@ -24,15 +26,11 @@ public class HttpProductCouponClient implements ProductCouponClient {
         new ParameterizedTypeReference<>() {
         };
 
+    /** baseUrl·service token·timeout 이 설정된 Commerce 클라이언트 */
     private final RestClient restClient;
 
-    /** @param restClient baseUrl·service token·timeout 이 설정된 Commerce 클라이언트 */
-    public HttpProductCouponClient(RestClient restClient) {
-        this.restClient = restClient;
-    }
-
     @Override
-    public List<ProductCoupon> findByProductId(final long productId) {
+    public List<ProductCoupon> findByProductId(long productId) {
         try {
             ApiResponse<List<CommerceCouponResponse>> body = restClient.get()
                 .uri(uri -> uri.path(PATH).queryParam("productId", productId).build())

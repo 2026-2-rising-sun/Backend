@@ -5,6 +5,7 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.coupon.application.ProductCouponService;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,13 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/v1/products/{productId}")
+@RequiredArgsConstructor
 public class PublicProductCouponController {
 
     private final ProductCouponService couponService;
-
-    public PublicProductCouponController(ProductCouponService couponService) {
-        this.couponService = couponService;
-    }
 
     @GetMapping("/coupons")
     public ApiResponse<List<PublicProductCouponItem>> listCoupons(@PathVariable Long productId) {

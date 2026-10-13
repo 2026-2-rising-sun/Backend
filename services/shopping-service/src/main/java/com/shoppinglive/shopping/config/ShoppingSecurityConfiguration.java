@@ -43,8 +43,8 @@ public class ShoppingSecurityConfiguration {
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                     .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
-                        "/v1/products", "/v1/products/", "/v1/products/{id}", "/v1/products/{id}/purchase-check", "/v1/products/{id}/coupons",
-                        "/v1/product-images/", "/v1/product-images/{id}").permitAll()
+                        "/v1/products", "/v1/products/", "/v1/products/{id}", "/v1/products/{id}/purchase-check",
+                        "/v1/products/{id}/coupons", "/v1/product-images/", "/v1/product-images/{id}").permitAll()
                     .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/", "/v1/admin/products/{id}", "/v1/seller/products").hasRole("SELLER")
                     .requestMatchers(HttpMethod.POST, "/v1/admin/products", "/v1/admin/product-images").hasRole("SELLER")
                     .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("SELLER");
