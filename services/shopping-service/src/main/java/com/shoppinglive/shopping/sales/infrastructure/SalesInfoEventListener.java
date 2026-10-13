@@ -1,9 +1,9 @@
 package com.shoppinglive.shopping.sales.infrastructure;
 
 import com.shoppinglive.contracts.events.SalesInfoEventContract;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -12,18 +12,14 @@ import org.springframework.stereotype.Component;
  *
  * <p>해석·검증 실패만 건너뛴다. 그 밖의 예외(DB 오류 등)는 밖으로 던져 error handler 가 같은 offset 을 재시도하게 한다.
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class SalesInfoEventListener {
 
     static final String SKIP_MARKER = "SALES_EVENT_SKIPPED";
 
-    private static final Logger log = LoggerFactory.getLogger(SalesInfoEventListener.class);
-
     private final ProductSalesRepository repository;
-
-    public SalesInfoEventListener(ProductSalesRepository repository) {
-        this.repository = repository;
-    }
 
     @KafkaListener(topics = SalesInfoEventContract.TOPIC_NAME)
     public void consume(ConsumerRecord<String, String> record) {

@@ -5,6 +5,7 @@ import com.shoppinglive.shopping.sales.application.SalesInfoUnavailableException
 import com.shoppinglive.shopping.sales.domain.SalesInfo;
 import java.util.Collection;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
 
 /**
@@ -13,13 +14,10 @@ import org.springframework.dao.DataAccessException;
  * <p>DB 읽기 실패는 Commerce 장애와 같은 {@link SalesInfoUnavailableException} 으로 바꾼다. 그래야 상위의 503 과
  * 관리 화면 UNKNOWN 처리가 두 모드에서 같게 동작한다.
  */
+@RequiredArgsConstructor
 public class ReplicaSalesInfoClient implements SalesInfoClient {
 
     private final ProductSalesRepository replica;
-
-    public ReplicaSalesInfoClient(ProductSalesRepository replica) {
-        this.replica = replica;
-    }
 
     @Override
     public Map<Long, SalesInfo> findByProductIds(Collection<Long> productIds) {
