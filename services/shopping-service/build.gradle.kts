@@ -19,6 +19,9 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly(libs.postgresql)
 
+    // 버전은 BOM 이 관리한다. 상품 쿠폰 목록의 Pod 로컬 캐시에 쓴다.
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     testRuntimeOnly(libs.h2)
     // 버전은 BOM 이 관리한다. 임베디드 broker 로 이벤트 수신 경로를 검증한다.
     testImplementation("org.springframework.kafka:spring-kafka-test")

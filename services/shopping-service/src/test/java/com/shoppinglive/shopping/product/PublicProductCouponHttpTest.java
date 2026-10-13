@@ -63,7 +63,8 @@ class PublicProductCouponHttpTest extends ShoppingSecuritySupport {
     @DisplayName("Commerce 를 쓸 수 없으면 500 대신 200 과 빈 쿠폰 목록을 응답한다")
     void unavailableCommerceAnswersEmptyListInsteadOfServerError() throws Exception {
         // given
-        when(commerce.findByProductId(9102L)).thenThrow(new ProductCouponUnavailableException("commerce down"));
+        when(commerce.findByProductId(9102L))
+            .thenThrow(new ProductCouponUnavailableException("commerce down", new IllegalStateException("timeout")));
 
         // when / then
         mvc.perform(get("/v1/products/9102/coupons"))

@@ -20,7 +20,6 @@ public class ProductCouponConfiguration {
     @Bean
     ProductCouponService productCouponService(ProductCouponClient productCouponClient,
             ProductCouponProperties properties) {
-        return new ProductCouponService(productCouponClient, properties.cacheTtl(), properties.failureTtl(),
-            System::nanoTime);
+        return new ProductCouponService(productCouponClient, properties.cacheTtl(), System::nanoTime);
     }
 }
