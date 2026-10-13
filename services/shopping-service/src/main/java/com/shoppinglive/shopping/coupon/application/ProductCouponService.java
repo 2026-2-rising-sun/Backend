@@ -19,14 +19,17 @@ import lombok.extern.slf4j.Slf4j;
 public class ProductCouponService {
 
     private static final int MAX_ENTRIES = 10_000;
+    private static final Duration MAX_STALE = Duration.ofMinutes(1);
 
     private final AsyncLoadingCache<Long, List<ProductCoupon>> cache;
 
     public ProductCouponService(ProductCouponClient client, Duration cacheTtl, LongSupplier nanoTime) {
+        // 갱신이 없던 항목은 MAX_STALE 뒤 동기 조회해, 한동안 안 본 상품이 오래된 쿠폰을 주지 않게 한다.
         // Caffeine 은 로드를 map compute 안에서 제출하므로 실행은 비동기여야 한다. 가상 스레드라 공용 풀과 상한을 공유하지 않는다.
         this.cache = Caffeine.newBuilder()
             .maximumSize(MAX_ENTRIES)
             .refreshAfterWrite(cacheTtl)
+            .expireAfterWrite(MAX_STALE)
             .ticker(nanoTime::getAsLong)
             .executor(Executors.newVirtualThreadPerTaskExecutor())
             .buildAsync(productId -> load(client, productId));

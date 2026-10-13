@@ -155,6 +155,23 @@ class ProductCouponServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("오래 조회되지 않은 상품은 1분이 지난 뒤 첫 요청에서 이전 값 대신 새 값을 받는다")
+    void entryUnusedBeyondMaxStaleIsReloadedBeforeServing() {
+        // given
+        List<ProductCoupon> previous = List.of(coupon("old"));
+        List<ProductCoupon> latest = List.of(coupon("new"));
+        when(client.findByProductId(PRODUCT_ID)).thenReturn(previous).thenReturn(latest);
+        assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(previous);
+
+        // when
+        nanos.addAndGet(Duration.ofMinutes(1).plusMillis(1).toNanos());
+
+        // then
+        assertThat(service.findByProductId(PRODUCT_ID)).isEqualTo(latest);
+        verify(client, times(2)).findByProductId(PRODUCT_ID);
+    }
+
     private static ProductCoupon coupon(String id) {
         return new ProductCoupon(id, "가을 니트 5천원 할인", 5_000L, false,
             Instant.parse("2026-10-15T11:00:00Z"), Instant.parse("2026-11-15T00:00:00Z"));
