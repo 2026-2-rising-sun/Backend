@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":libs:common-persistence"))
     implementation(project(":libs:common-resilience"))
     implementation(project(":libs:common-kafka"))
+    implementation(project(":libs:common-outbox"))
     implementation(project(":contracts:events"))
 
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

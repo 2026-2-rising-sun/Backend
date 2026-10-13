@@ -27,11 +27,14 @@ public class BroadcastService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final BroadcastRepository repository;
+    private final BroadcastEventPublisher events;
     private final TransactionTemplate transaction;
 
     public BroadcastService(final BroadcastRepository repository,
+                            final BroadcastEventPublisher events,
                             final PlatformTransactionManager manager) {
         this.repository = repository;
+        this.events = events;
         this.transaction = new TransactionTemplate(manager);
     }
 
@@ -100,14 +103,20 @@ public class BroadcastService {
         return found.map(BroadcastResponse::from);
     }
 
-    /** 종료는 짧은 트랜잭션의 원자적 상태 전이다. 외부 호출을 하지 않는다. */
+    /** 종료는 짧은 트랜잭션의 원자적 상태 전이다. 외부 호출을 하지 않고 이벤트는 outbox 에 기록한다. */
     @Transactional
     public Broadcast end(final long id) {
         final Broadcast broadcast = repository.findForLikeUpdate(id)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         // DB timestamp 컬럼은 마이크로초 정밀도라, 저장 전에 맞춰 잘라낸다(#65 start()와 동일 이유).
-        broadcast.end(java.time.Instant.now().truncatedTo(ChronoUnit.MICROS));
+        final boolean transitioned =
+            broadcast.end(java.time.Instant.now().truncatedTo(ChronoUnit.MICROS));
         repository.flush();
+        // SSE 종료 신호(BroadcastEndNotifier)와 달리 다른 서비스로 가는 이벤트는 유실되면 안 되므로
+        // 같은 트랜잭션의 outbox 에 남긴다. 반복 종료는 전이가 없어 기록하지 않는다.
+        if (transitioned) {
+            events.ended(broadcast);
+        }
         return broadcast;
     }
 

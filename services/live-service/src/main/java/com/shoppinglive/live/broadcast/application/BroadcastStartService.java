@@ -15,6 +15,8 @@ import com.shoppinglive.live.integration.ivs.IvsReadinessClient;
 import com.shoppinglive.live.integration.ivs.IvsUnavailableException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -32,17 +34,20 @@ public class BroadcastStartService {
     private final BroadcastProductRepository links;
     private final IvsReadinessClient ivs;
     private final SalesClient salesClient;
+    private final BroadcastEventPublisher events;
     private final TransactionTemplate transaction;
 
     public BroadcastStartService(final BroadcastRepository broadcasts,
                                  final BroadcastProductRepository links,
                                  final IvsReadinessClient ivs,
                                  final SalesClient salesClient,
+                                 final BroadcastEventPublisher events,
                                  final PlatformTransactionManager transactionManager) {
         this.broadcasts = broadcasts;
         this.links = links;
         this.ivs = ivs;
         this.salesClient = salesClient;
+        this.events = events;
         this.transaction = new TransactionTemplate(transactionManager);
     }
 
@@ -61,17 +66,21 @@ public class BroadcastStartService {
         }
 
         requireIvsReady(broadcast);
-        requireBroadcastableProduct(broadcastId);
+        final List<Long> broadcastableProductIds = requireBroadcastableProduct(broadcastId);
 
         return transaction.execute(ignored -> {
             final Broadcast fresh = read(broadcastId);
-            fresh.start(expectedVersion, Instant.now());
+            final boolean transitioned = fresh.start(expectedVersion, Instant.now());
             try {
                 broadcasts.flush();
             } catch (DataIntegrityViolationException e) {
                 // V3 partial unique index: 같은 채널로 이미 다른 방송이 LIVE 다.
                 throw new BusinessException(ErrorCode.CONFLICT,
                     "같은 채널로 이미 진행 중인 방송이 있습니다.");
+            }
+            // 동시 시작에서 진 쪽은 transitioned=false 라 이벤트가 한 번만 기록된다.
+            if (transitioned) {
+                events.started(fresh, broadcastableProductIds);
             }
             return fresh;
         });
@@ -97,8 +106,11 @@ public class BroadcastStartService {
         }
     }
 
-    /** ON_SALE 또는 SOLD_OUT 상품이 최소 1개. available 은 보지 않는다. */
-    private void requireBroadcastableProduct(final long broadcastId) {
+    /**
+     * ON_SALE 또는 SOLD_OUT 상품이 최소 1개. available 은 보지 않는다.
+     * 시작 이벤트에 싣도록 공개 가능한 상품 id 를 노출 순서대로 돌려준다.
+     */
+    private List<Long> requireBroadcastableProduct(final long broadcastId) {
         final List<BroadcastProduct> connected =
             links.findByBroadcastIdOrderByPositionAsc(broadcastId);
         if (connected.isEmpty()) {
@@ -112,10 +124,18 @@ public class BroadcastStartService {
             throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE,
                 "판매 정보를 조회할 수 없습니다.");
         }
-        if (sales.stream().noneMatch(snapshot -> snapshot.status().broadcastable())) {
+        final Set<Long> broadcastable = sales.stream()
+            .filter(snapshot -> snapshot.status().broadcastable())
+            .map(SalesSnapshot::productId)
+            .collect(Collectors.toSet());
+        if (broadcastable.isEmpty()) {
             throw new BusinessException(ErrorCode.CONFLICT,
                 "판매중 또는 품절인 연결 상품이 최소 1개 필요합니다.");
         }
+        return connected.stream()
+            .map(BroadcastProduct::getProductId)
+            .filter(broadcastable::contains)
+            .toList();
     }
 
     private Broadcast read(final long broadcastId) {

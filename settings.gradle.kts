@@ -30,6 +30,7 @@ include(
     "libs:common-security",
     "libs:common-persistence",
     "libs:common-kafka",
+    "libs:common-outbox",
     "libs:common-resilience",
 )
 

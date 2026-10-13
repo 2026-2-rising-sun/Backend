@@ -73,12 +73,14 @@ public class Broadcast extends BaseEntity {
     /**
      * PREPARING → LIVE. 이미 LIVE 면 최초 startedAt 을 보존하며 성공하고,
      * ENDED 재시작은 409 다. 외부 준비 확인은 호출자가 이 트랜잭션 밖에서 마친다.
+     *
+     * @return 이번 호출로 실제 전이가 일어났으면 true. 이벤트는 true 일 때만 낸다
      */
-    public void start(final long expectedVersion, final Instant now) {
+    public boolean start(final long expectedVersion, final Instant now) {
         // 멱등 판정이 version 검사보다 먼저다. 시작 성공이 version 을 올리므로,
         // 응답이 유실된 클라이언트가 원래 발급받은 expectedVersion 으로 재시도해도 성공해야 한다.
         if (status == BroadcastStatus.LIVE) {
-            return;
+            return false;
         }
         if (status == BroadcastStatus.ENDED) {
             throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송은 다시 시작할 수 없습니다.");
@@ -89,21 +91,25 @@ public class Broadcast extends BaseEntity {
         this.status = BroadcastStatus.LIVE;
         // DB timestamp의 마이크로초 정밀도와 맞춰 최초 응답과 재조회 응답을 동일하게 유지한다.
         this.startedAt = now.truncatedTo(ChronoUnit.MICROS);
+        return true;
     }
 
     /**
      * LIVE → ENDED. 반복 종료는 최초 endedAt 을 보존하며 성공하고, 준비 상태 종료는 409 다.
      * 종료는 주문·결제·재고·송출에 관여하지 않는다.
+     *
+     * @return 이번 호출로 실제 전이가 일어났으면 true. 이벤트는 true 일 때만 낸다
      */
-    public void end(final Instant now) {
+    public boolean end(final Instant now) {
         if (status == BroadcastStatus.PREPARING) {
             throw new BusinessException(ErrorCode.CONFLICT, "준비 상태의 방송은 종료할 수 없습니다.");
         }
         if (status == BroadcastStatus.ENDED) {
-            return;
+            return false;
         }
         this.status = BroadcastStatus.ENDED;
         this.endedAt = now.truncatedTo(ChronoUnit.MICROS);
+        return true;
     }
 
     public String getFingerprint() {

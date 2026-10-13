@@ -21,6 +21,12 @@ spring:
     redis:
       port: 1
 
+# 기본 테스트에는 Kafka 가 없다. outbox 기록은 검증하되 릴레이는 돌리지 않는다.
+shoppinglive:
+  outbox:
+    relay:
+      enabled: false
+
 live:
   products:
     mode: stub
