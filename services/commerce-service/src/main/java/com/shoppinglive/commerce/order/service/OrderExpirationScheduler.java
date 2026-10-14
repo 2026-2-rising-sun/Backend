@@ -1,0 +1,73 @@
+package com.shoppinglive.commerce.order.service;
+
+import com.shoppinglive.commerce.order.entity.Order;
+import com.shoppinglive.commerce.order.entity.OrderStatus;
+import com.shoppinglive.commerce.order.repository.OrderJpaRepository;
+import com.shoppinglive.commerce.sales.service.SalesService;
+import java.time.Instant;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Limit;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * 미결제 주문을 만료하고 예약 재고를 복구한다.
+ *
+ * <p>{@code commerce.order.expiration.duration} 이 지난 결제 전 주문을 자동 만료 처리한다. 60 초마다 실행. 초기 지연 60 초
+ * (테스트 컨텍스트에서 자동 실행되어 데이터 간섭 방지).
+ *
+ * <p>처리 단위: 한 번에 최대 {@link #BATCH_SIZE} 건. 대량 밀림 시에도 트랜잭션이 지나치게 길어지지 않도록 제한.
+ */
+@Component
+public class OrderExpirationScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderExpirationScheduler.class);
+    private static final int BATCH_SIZE = 100;
+
+    private final OrderJpaRepository orderRepository;
+    private final SalesService salesService;
+
+    public OrderExpirationScheduler(OrderJpaRepository orderRepository, SalesService salesService) {
+        this.orderRepository = orderRepository;
+        this.salesService = salesService;
+    }
+
+    @Transactional
+    @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")
+    public void runScheduled() {
+        int processed = processExpiredOrders();
+        if (processed > 0) {
+            log.info("expired {} pending orders", processed);
+        }
+    }
+
+    /**
+     * 만료 대상을 조회해 EXPIRED 전이 · 재고 복구 처리한다. 테스트에서 직접 호출 가능하도록 public.
+     *
+     * @return 실제로 만료 처리된 주문 수
+     */
+    @Transactional
+    public int processExpiredOrders() {
+        List<Order> candidates =
+                orderRepository.findByPaymentGroupIsNullAndStatusAndExpiresAtBefore(
+                        OrderStatus.PENDING_PAYMENT, Instant.now(), Limit.of(BATCH_SIZE));
+
+        int expired = 0;
+        for (Order order : candidates) {
+            if (order.getPaymentGroup() != null) {
+                continue;
+            }
+            int updated = orderRepository.expireOrder(order.getId());
+            if (updated == 1) {
+                salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+                expired++;
+            }
+            // updated == 0 이면 이미 다른 흐름에서 상태 전이 (결제 시작·수동 취소 등). 무해.
+        }
+
+        return expired;
+    }
+}

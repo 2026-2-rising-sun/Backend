@@ -1,0 +1,214 @@
+openapi: 3.1.0
+info:
+  title: Notification API
+  version: 1.0.0
+  description: 회원 본인의 인앱 알림함 조회와 읽음 처리. 이벤트 구독 및 알림 생성은 별도 기능이다.
+servers:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+security:
+- BearerAuth: []
+paths:
+  /v1/notifications:
+    get:
+      summary: 내 알림 목록
+      operationId: listNotifications
+      description: USER·SELLER 본인의 알림만 occurredAt 내림차순, 같은 시각은 id 내림차순으로 반환한다. 조회는
+        읽음 상태를 바꾸지 않는다. cursor가 없거나 공백이면 첫 구간이다. nextCursor는 해석하지 않고 다음 요청에 전달한다.
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListEnvelope'
+        '400':
+          description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+          content: &id001
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
+  /v1/notifications/unread-count:
+    get:
+      summary: 내 안 읽은 알림 개수
+      operationId: getUnreadNotificationCount
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCountEnvelope'
+        '400':
+          description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+          content: *id001
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
+  /v1/notifications/{notificationId}/read:
+    post:
+      summary: 내 알림 읽음 처리
+      operationId: markNotificationRead
+      description: 서버 시각으로 최초 읽음만 기록한다. 반복·동시 요청도 최초 성공한 쓰기의 시각을 유지한다. 다른 회원의 알림과
+        없는 ID는 모두 404. notificationId 숫자 형식 오류는 400이며 존재하지 않는 0·음수 ID는 404이다.
+      parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: 읽음 처리 완료. 반복 호출도 최초 읽음 시각을 유지한다. 본문 없음.
+        '404':
+          description: 없는 알림과 다른 회원의 알림은 모두 NOT_FOUND
+          content: *id001
+        '400':
+          description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+          content: *id001
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
+components:
+  securitySchemes:
+    BearerAuth:
+      $ref: ./common.yaml#/components/securitySchemes/BearerAuth
+  schemas:
+    Notification:
+      type: object
+      required:
+      - id
+      - title
+      - body
+      - occurredAt
+      - readAt
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        title:
+          type: string
+          maxLength: 100
+        body:
+          type: string
+          maxLength: 500
+        occurredAt:
+          type: string
+          format: date-time
+        readAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    NotificationPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      - hasNext
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        hasNext:
+          type: boolean
+    NotificationListEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/NotificationPage'
+        error:
+          type: 'null'
+    UnreadCountEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+          - unreadCount
+          properties:
+            unreadCount:
+              type: integer
+              format: int64
+              minimum: 0
+        error:
+          type: 'null'
+    ErrorEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: 'null'
+        error:
+          $ref: ./common.yaml#/components/schemas/ApiError

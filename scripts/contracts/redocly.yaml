@@ -1,5 +1,0 @@
-extends: [spec]
-rules:
-  operation-operationId: error
-  operation-operationId-unique: error
-  security-defined: error
