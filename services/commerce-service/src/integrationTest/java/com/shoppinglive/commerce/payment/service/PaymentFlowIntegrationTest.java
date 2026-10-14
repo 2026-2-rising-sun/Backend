@@ -1,0 +1,189 @@
+package com.shoppinglive.commerce.payment.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import com.shoppinglive.commerce.order.entity.Order;
+import com.shoppinglive.commerce.order.entity.OrderStatus;
+import com.shoppinglive.commerce.order.repository.OrderJpaRepository;
+import com.shoppinglive.commerce.payment.dto.DevPaymentScenarioRegistry;
+import com.shoppinglive.commerce.payment.entity.PaymentAttempt;
+import com.shoppinglive.commerce.payment.entity.PaymentScenario;
+import com.shoppinglive.commerce.payment.entity.PaymentStatus;
+import com.shoppinglive.commerce.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commerce.sales.entity.Sales;
+import com.shoppinglive.commerce.sales.entity.SalesStatus;
+import com.shoppinglive.commerce.sales.entity.SalesStock;
+import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
+import java.time.Duration;
+import java.time.Instant;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+/**
+ * 결제 시작 → Mock 엔진 → 결과 확정 → DB · 재고 반영까지 e2e.
+ *
+ * <p>Awaitility 로 async 완료를 폴링. INSTANT · DELAYED · dev 레지스트리 지정 케이스.
+ *
+ * <p><b>대기 시간이 10 초인 이유:</b> 원래 2 초였는데 CI 에서 첫 비동기 결제가 2.2 초 걸려 빌드가 깨졌다. 스레드풀 생성·JIT 워밍업·첫 DB 쓰기가
+ * 한꺼번에 몰리는 클래스의 첫 테스트라 느린 러너에서는 2 초를 넘길 수 있다. Awaitility 는 조건이 충족되면 즉시 빠져나오므로 상한을 늘려도 정상 경로는 그대로
+ * 빠르다 — 느릴 때 더 기다려줄 뿐이다.
+ */
+@SpringBootTest
+class PaymentFlowIntegrationTest
+        extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
+
+    @Autowired private PaymentService paymentService;
+
+    @Autowired private DevPaymentScenarioRegistry devRegistry;
+
+    @Autowired private OrderJpaRepository orderRepository;
+
+    @Autowired private PaymentAttemptJpaRepository paymentAttemptRepository;
+
+    @Autowired private SalesJpaRepository salesRepository;
+
+    @Autowired private SalesStockJpaRepository salesStockRepository;
+
+    private String orderNumber;
+    private Long salesInfoId;
+
+    @BeforeEach
+    void setUp() {
+        paymentAttemptRepository.deleteAll();
+        orderRepository.deleteAll();
+        salesStockRepository.deleteAll();
+        salesRepository.deleteAll();
+
+        Sales sales = salesRepository.save(new Sales(500L, 10_000L, SalesStatus.ON_SALE));
+        salesInfoId = sales.getId();
+        salesStockRepository.save(new SalesStock(salesInfoId, 4, 1));
+
+        orderNumber = "OD-FLOW-1";
+        Order order =
+                new Order(
+                        orderNumber,
+                        salesInfoId,
+                        1,
+                        10_000L,
+                        "홍길동",
+                        "010-1234-5678",
+                        "11111111-1111-4111-8111-111111111111",
+                        "테스트",
+                        null,
+                        Instant.now().plusSeconds(900));
+        orderRepository.save(order);
+    }
+
+    @AfterEach
+    void tearDown() {
+        paymentAttemptRepository.deleteAll();
+        orderRepository.deleteAll();
+        salesStockRepository.deleteAll();
+        salesRepository.deleteAll();
+        devRegistry.clear(orderNumber);
+    }
+
+    @Test
+    void INSTANT_SUCCESS_결제_시작_후_짧게_기다리면_PAID_로_확정_재고_소진() {
+        startPaymentWithScenario(
+                orderNumber,
+                "11111111-1111-4111-8111-111111111111",
+                PaymentScenario.INSTANT_SUCCESS);
+
+        await().atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ofMillis(50))
+                .untilAsserted(
+                        () -> {
+                            Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
+                            assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+                            SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
+                            // consumeReserved: reserved 1 → 0, available 4 그대로 (소진)
+                            assertThat(s.getReserved()).isZero();
+                            assertThat(s.getAvailable()).isEqualTo(4);
+                        });
+    }
+
+    @Test
+    void INSTANT_FAIL_이면_FAILED_확정_재고_복구() {
+        startPaymentWithScenario(
+                orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_FAIL);
+
+        await().atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ofMillis(50))
+                .untilAsserted(
+                        () -> {
+                            Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
+                            assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
+                            SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
+                            // restoreReserved: 예약 재고 1 → 0, 가용 재고 4 → 5
+                            assertThat(s.getReserved()).isZero();
+                            assertThat(s.getAvailable()).isEqualTo(5);
+                        });
+    }
+
+    @Test
+    void DELAYED_SUCCESS_는_짧게_기다린_후에_PAID_로_확정() {
+        PaymentAttempt attempt =
+                startPaymentWithScenario(
+                        orderNumber,
+                        "11111111-1111-4111-8111-111111111111",
+                        PaymentScenario.DELAYED_SUCCESS);
+
+        // 시작 직후: 아직 PAYMENT_CONFIRMING, attempt.status = PROCESSING
+        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+
+        await().atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ofMillis(100))
+                .untilAsserted(
+                        () -> {
+                            Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
+                            assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+                        });
+    }
+
+    @Test
+    void dev_registry_사전지정_시나리오_body_scenario_없어도_적용() {
+        devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
+
+        startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", null);
+
+        await().atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ofMillis(50))
+                .untilAsserted(
+                        () -> {
+                            Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
+                            assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
+                        });
+    }
+
+    @Test
+    void 테스트용_registry를_변경한_경우_변경값을_사용() {
+        devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
+
+        startPaymentWithScenario(
+                orderNumber,
+                "11111111-1111-4111-8111-111111111111",
+                PaymentScenario.INSTANT_SUCCESS);
+
+        await().atMost(Duration.ofSeconds(10))
+                .pollDelay(Duration.ofMillis(50))
+                .untilAsserted(
+                        () -> {
+                            Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
+                            assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+                        });
+    }
+
+    private com.shoppinglive.commerce.payment.entity.PaymentAttempt startPaymentWithScenario(
+            String number, String memberId, PaymentScenario scenario) {
+        if (scenario != null) {
+            devRegistry.set(number, scenario);
+        }
+        return paymentService.startPayment(number, memberId);
+    }
+}
