@@ -22,46 +22,101 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 public class ShoppingSecurityConfiguration {
     @Bean
     @Order(1)
-    SecurityFilterChain internalProducts(HttpSecurity http, ServiceCallerTokenValidator callers,
-                                         JsonSecurityErrorHandler errors) throws Exception {
-        return stateless(http, errors).securityMatcher("/v1/internal/**")
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.GET, "/v1/internal/products", "/v1/internal/products/", "/v1/internal/products/{id}")
-                .hasAnyAuthority("SERVICE_commerce", "SERVICE_live")
-                .anyRequest().denyAll())
-            .addFilterBefore(new ServiceTokenAuthenticationFilter(callers, errors), AnonymousAuthenticationFilter.class)
-            .build();
+    SecurityFilterChain internalProducts(
+            HttpSecurity http, ServiceCallerTokenValidator callers, JsonSecurityErrorHandler errors)
+            throws Exception {
+        return stateless(http, errors)
+                .securityMatcher("/v1/internal/**")
+                .authorizeHttpRequests(
+                        auth ->
+                                auth.requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/internal/products",
+                                                "/v1/internal/products/",
+                                                "/v1/internal/products/{id}")
+                                        .hasAnyAuthority("SERVICE_commerce", "SERVICE_live")
+                                        .anyRequest()
+                                        .denyAll())
+                .addFilterBefore(
+                        new ServiceTokenAuthenticationFilter(callers, errors),
+                        AnonymousAuthenticationFilter.class)
+                .build();
     }
 
     @Bean
     @Order(2)
-    SecurityFilterChain products(HttpSecurity http, MemberJwtAuthenticationConverter converter,
-                                 JsonSecurityErrorHandler errors, Environment environment) throws Exception {
-        boolean devEnabled = environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
-            && environment.getProperty("shopping.dev-api.enabled", Boolean.class, false);
-        return stateless(http, errors).cors(Customizer.withDefaults())
-            .authorizeHttpRequests(auth -> {
-                auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                    .requestMatchers(HttpMethod.GET, "/actuator/health/readiness", "/actuator/health/liveness",
-                        "/v1/products", "/v1/products/", "/v1/products/{id}", "/v1/products/{id}/purchase-check",
-                        "/v1/product-images/", "/v1/product-images/{id}").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/v1/admin/products", "/v1/admin/products/", "/v1/admin/products/{id}", "/v1/seller/products").hasRole("SELLER")
-                    .requestMatchers(HttpMethod.POST, "/v1/admin/products", "/v1/admin/product-images").hasRole("SELLER")
-                    .requestMatchers(HttpMethod.PATCH, "/v1/admin/products/", "/v1/admin/products/{id}").hasRole("SELLER");
-                if (devEnabled) auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images").hasRole("SELLER");
-                auth.anyRequest().denyAll();
-            })
-            .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
-                .authenticationEntryPoint(errors).accessDeniedHandler(errors)
-                .withObjectPostProcessor(errors.bearerFailureHandler()))
-            .build();
+    SecurityFilterChain products(
+            HttpSecurity http,
+            MemberJwtAuthenticationConverter converter,
+            JsonSecurityErrorHandler errors,
+            Environment environment)
+            throws Exception {
+        boolean devEnabled =
+                environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
+                        && environment.getProperty(
+                                "shopping.dev-api.enabled", Boolean.class, false);
+        return stateless(http, errors)
+                .cors(Customizer.withDefaults())
+                .authorizeHttpRequests(
+                        auth -> {
+                            auth.dispatcherTypeMatchers(DispatcherType.ERROR)
+                                    .permitAll()
+                                    .requestMatchers(
+                                            HttpMethod.GET,
+                                            "/actuator/health/readiness",
+                                            "/actuator/health/liveness",
+                                            "/v1/products",
+                                            "/v1/products/",
+                                            "/v1/products/{id}",
+                                            "/v1/products/{id}/purchase-check",
+                                            "/v1/product-images/",
+                                            "/v1/product-images/{id}")
+                                    .permitAll()
+                                    .requestMatchers(
+                                            HttpMethod.GET,
+                                            "/v1/admin/products",
+                                            "/v1/admin/products/",
+                                            "/v1/admin/products/{id}",
+                                            "/v1/seller/products")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(
+                                            HttpMethod.POST,
+                                            "/v1/admin/products",
+                                            "/v1/admin/product-images")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(
+                                            HttpMethod.PATCH,
+                                            "/v1/admin/products/",
+                                            "/v1/admin/products/{id}")
+                                    .hasRole("SELLER");
+                            if (devEnabled) {
+                                auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images")
+                                        .hasRole("SELLER");
+                            }
+                            auth.anyRequest().denyAll();
+                        })
+                .oauth2ResourceServer(
+                        oauth ->
+                                oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
+                                        .authenticationEntryPoint(errors)
+                                        .accessDeniedHandler(errors)
+                                        .withObjectPostProcessor(errors.bearerFailureHandler()))
+                .build();
     }
 
-    private HttpSecurity stateless(HttpSecurity http, JsonSecurityErrorHandler errors) throws Exception {
-        // Only explicit Bearer/service headers are accepted; this service never authenticates cookies.
-        return http.csrf(AbstractHttpConfigurer::disable).logout(AbstractHttpConfigurer::disable)
-            .requestCache(AbstractHttpConfigurer::disable)
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(errors).accessDeniedHandler(errors));
+    private HttpSecurity stateless(HttpSecurity http, JsonSecurityErrorHandler errors)
+            throws Exception {
+        // Only explicit Bearer/service headers are accepted; this service never authenticates
+        // cookies.
+        return http.csrf(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .requestCache(AbstractHttpConfigurer::disable)
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(
+                        exceptions ->
+                                exceptions
+                                        .authenticationEntryPoint(errors)
+                                        .accessDeniedHandler(errors));
     }
 }

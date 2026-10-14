@@ -1,0 +1,71 @@
+package com.shoppinglive.commerce.order.controller;
+
+import com.shoppinglive.commerce.coupon.service.CouponPreviewService;
+import com.shoppinglive.commerce.order.dto.OrderCheckoutResponse;
+import com.shoppinglive.commerce.order.service.OrderCheckoutService;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import com.shoppinglive.common.web.QuantityParser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import java.util.List;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 주문서 확인 API (주문 1).
+ *
+ * <p>경로를 {@code /v1/orders/checkout} 으로 두어 주문 조회({@code /v1/orders/{orderNumber}})와 같은 묶음에 둔다. 리터럴
+ * 경로가 경로 변수보다 먼저 매칭되므로 충돌하지 않지만, 회귀를 막으려고 라우팅 테스트를 함께 둔다.
+ */
+@RestController
+@RequestMapping("/v1/orders/checkout")
+public class OrderCheckoutController {
+
+    private final OrderCheckoutService orderCheckoutService;
+    private final CouponPreviewService couponPreview;
+
+    public OrderCheckoutController(
+            OrderCheckoutService orderCheckoutService, CouponPreviewService couponPreview) {
+        this.orderCheckoutService = orderCheckoutService;
+        this.couponPreview = couponPreview;
+    }
+
+    /**
+     * 주문서에 표시할 상품명·단가·수량·총액과 주문 가능 여부를 돌려준다.
+     *
+     * <p>이 호출은 재고를 잡지 않는다. 최종 확정은 주문 생성(주문 2)에서 다시 한다.
+     *
+     * <p>수량을 문자열로 받아 직접 해석하는 이유: {@code int} 로 선언하면 {@code abc} 같은 값이 {@code
+     * MethodArgumentTypeMismatchException} 이 되고, 이 예외는 공통 예외 핸들러의 {@code Exception} 처리로 떨어져 400 이
+     * 아니라 500 이 된다.
+     */
+    @Operation(
+            summary = "주문 가능 여부와 최신 금액 확인",
+            description =
+                    "재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400.")
+    @SecurityRequirement(name = "BearerAuth")
+    @GetMapping
+    public OrderCheckoutResponse checkout(
+            @AuthenticationPrincipal AuthenticatedUser member,
+            @RequestParam(name = "productId", required = false) Long productId,
+            @RequestParam(name = "quantity", required = false) String quantity,
+            @RequestParam(name = "couponId", required = false) String couponId) {
+        var checkout = orderCheckoutService.preview(productId, QuantityParser.parse(quantity));
+        if (couponId != null && !checkout.orderable()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "쿠폰 대상 상품을 주문할 수 없습니다.");
+        }
+        var discount =
+                couponPreview.preview(
+                        member.memberId(),
+                        couponId,
+                        List.of(
+                                new CouponPreviewService.PricedItem(
+                                        "single", productId, checkout.totalAmount())));
+        return OrderCheckoutResponse.from(checkout, discount);
+    }
+}
