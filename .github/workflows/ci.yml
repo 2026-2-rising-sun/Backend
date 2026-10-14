@@ -46,8 +46,11 @@ jobs:
           python -m pip install --requirement .github/scripts/api/requirements.txt
           python -m unittest discover -s .github/scripts/api -p 'test_*.py'
           python .github/scripts/api/check_structure.py
+          python .github/scripts/api/check_events.py
       - name: Build and run tests
         run: ./gradlew build --no-daemon --max-workers=2
+      - name: Check serialized event samples
+        run: python .github/scripts/api/check_events.py --samples
       - uses: actions/upload-artifact@v4
         if: always()
         with:
