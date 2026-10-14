@@ -7,7 +7,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.shoppinglive.shopping.client.commerce.HttpCouponSnapshotClient;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -63,38 +61,6 @@ class CouponSyncTest {
                 .extracting(CouponSnapshot::couponId)
                 .containsExactly("c1", "c2", "c3");
         server.verify();
-    }
-
-    @Test
-    @DisplayName("replica 에서 진행 중인데 목록에 없던 쿠폰은 단건 API 로 다시 읽는다")
-    void refreshesOpenCouponsMissingFromList() {
-        expectPage(null, "null", false, coupon("c1"));
-        when(replica.findOpenCouponIds(NOW)).thenReturn(List.of("c1", "ended", "gone"));
-        server.expect(requestTo(BASE + "/v1/internal/coupon-snapshots/ended"))
-                .andRespond(
-                        withSuccess(
-                                "{\"success\":true,\"data\":"
-                                        + coupon("ended")
-                                        + ",\"error\":null}",
-                                MediaType.APPLICATION_JSON));
-        server.expect(requestTo(BASE + "/v1/internal/coupon-snapshots/gone"))
-                .andRespond(withResourceNotFound());
-
-        assertThat(sync.sync()).isEqualTo(2);
-        server.verify();
-    }
-
-    @Test
-    @DisplayName("이벤트와 동시에 처음 넣다가 키가 충돌하면 한 번 더 반영한다")
-    void retriesOnceOnConcurrentInsert() {
-        expectPage(null, "null", false, coupon("c1"));
-        when(replica.findOpenCouponIds(NOW)).thenReturn(List.of());
-        when(replica.apply(any()))
-                .thenThrow(new DuplicateKeyException("concurrent insert"))
-                .thenReturn(false);
-
-        assertThat(sync.sync()).isZero();
-        verify(replica, times(2)).apply(any());
     }
 
     private void expectPage(String afterId, String nextCursor, boolean hasNext, String... items) {

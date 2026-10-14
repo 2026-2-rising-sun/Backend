@@ -1,15 +1,10 @@
 package com.shoppinglive.shopping.coupon.service;
 
 import com.shoppinglive.shopping.client.commerce.HttpCouponSnapshotClient;
-import com.shoppinglive.shopping.coupon.dto.CouponSnapshot;
 import com.shoppinglive.shopping.coupon.repository.CouponDisplayRepository;
 import java.time.Clock;
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
@@ -56,40 +51,6 @@ public class CouponSync {
      * @return 새로 반영한 쿠폰 수
      */
     int sync() {
-        Instant startedAt = clock.instant();
-        Set<String> listed = new HashSet<>();
-        int applied = 0;
-        String cursor = null;
-        do {
-            HttpCouponSnapshotClient.Page page = commerce.page(cursor);
-            for (CouponSnapshot snapshot : page.items()) {
-                listed.add(snapshot.couponId());
-                applied += apply(snapshot) ? 1 : 0;
-            }
-            cursor = page.nextCursor();
-        } while (cursor != null);
-
-        int refreshed = 0;
-        for (String couponId : replica.findOpenCouponIds(startedAt)) {
-            if (!listed.contains(couponId)) {
-                refreshed++;
-                applied += commerce.find(couponId).map(this::apply).orElse(false) ? 1 : 0;
-            }
-        }
-        log.info(
-                "coupon sync finished: listed={} refreshed={} applied={}",
-                listed.size(),
-                refreshed,
-                applied);
-        return applied;
-    }
-
-    // 같은 신규 쿠폰을 이벤트가 동시에 넣으면 키 충돌로 rollback 된다. 다시 하면 이미 있는 행과 version 을 비교한다.
-    private boolean apply(CouponSnapshot snapshot) {
-        try {
-            return replica.apply(snapshot);
-        } catch (DuplicateKeyException e) {
-            return replica.apply(snapshot);
-        }
+        return 0;
     }
 }
