@@ -1,0 +1,235 @@
+asyncapi: 3.1.0
+info:
+  title: Live 방송 이벤트 계약
+  version: 1.0.0
+  description: 방송 일정·시작·종료를 상태 변경과 같은 트랜잭션의 Outbox에 기록하는 계약. 중복 전달이 가능하며 다중 릴레이의 전역
+    순서를 보장하지 않는다.
+defaultContentType: application/json
+channels:
+  broadcast:
+    address: live.broadcast.v1
+    description: Kafka key와 aggregateId는 payload.broadcastId의 10진 문자열이다. eventId로
+      중복을 식별하고 방송 상태 스냅샷은 broadcastVersion으로 최신 여부를 판단한다. 모르는 eventType은 무시한다.
+    messages:
+      LiveBroadcastScheduled:
+        $ref: '#/components/messages/LiveBroadcastScheduled'
+      LiveBroadcastStarted:
+        $ref: '#/components/messages/LiveBroadcastStarted'
+      LiveBroadcastEnded:
+        $ref: '#/components/messages/LiveBroadcastEnded'
+operations:
+  publishBroadcast:
+    action: send
+    channel:
+      $ref: '#/channels/broadcast'
+    messages:
+    - $ref: '#/channels/broadcast/messages/LiveBroadcastScheduled'
+    - $ref: '#/channels/broadcast/messages/LiveBroadcastStarted'
+    - $ref: '#/channels/broadcast/messages/LiveBroadcastEnded'
+components:
+  schemas:
+    EventEnvelope:
+      type: object
+      description: '도메인 payload와 독립적인 공통 봉투. 필수값은 null일 수 없다.
+
+        eventType·source·aggregateId는 공백만으로 구성될 수 없다.
+
+        '
+      required:
+      - eventId
+      - eventType
+      - schemaVersion
+      - source
+      - aggregateId
+      - occurredAt
+      - payload
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+          description: 표준 UUID 문자열. 동일 이벤트를 식별하며 순서를 나타내지 않는다.
+        eventType:
+          type: string
+          minLength: 1
+          pattern: \S
+          description: 이벤트 종류를 식별하는 이름
+        schemaVersion:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+          description: 이벤트 데이터 형식의 버전
+        source:
+          type: string
+          minLength: 1
+          pattern: \S
+          description: 발행 서비스 이름
+        aggregateId:
+          type: string
+          minLength: 1
+          pattern: \S
+          description: 이벤트 대상의 식별자. 판매정보 이벤트에서는 판매 ID의 10진수 문자열이다.
+        occurredAt:
+          type: string
+          format: date-time
+          description: ISO 8601 형식의 이벤트 발생 시각
+        payload:
+          not:
+            type: 'null'
+          description: 이벤트별 업무 데이터. 판매정보 계약에서 전체 스냅샷으로 구체화한다.
+    LiveBroadcastScheduledPayload:
+      type: object
+      required:
+      - broadcastId
+      - broadcastVersion
+      - title
+      - scheduledAt
+      properties:
+        broadcastId: &id001
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        broadcastVersion: &id002
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+        title:
+          type: string
+        scheduledAt: &id003
+          type: string
+          format: date-time
+    LiveBroadcastStartedPayload:
+      type: object
+      required:
+      - broadcastId
+      - broadcastVersion
+      - title
+      - scheduledAt
+      - startedAt
+      - productIds
+      properties:
+        broadcastId: *id001
+        broadcastVersion: *id002
+        title:
+          type: string
+        scheduledAt: *id003
+        startedAt: *id003
+        productIds:
+          type: array
+          items: *id001
+    LiveBroadcastEndedPayload:
+      type: object
+      required:
+      - broadcastId
+      - broadcastVersion
+      - startedAt
+      - endedAt
+      properties:
+        broadcastId: *id001
+        broadcastVersion: *id002
+        startedAt: *id003
+        endedAt: *id003
+  messages:
+    LiveBroadcastScheduled:
+      name: LiveBroadcastScheduled
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: LiveBroadcastScheduled
+            schemaVersion:
+              const: 1
+            source:
+              const: live-service
+            aggregateId:
+              type: string
+              pattern: ^[1-9][0-9]*$
+            payload:
+              $ref: '#/components/schemas/LiveBroadcastScheduledPayload'
+      examples:
+      - name: LiveBroadcastScheduled예시
+        payload:
+          eventId: c3d2e1f0-1a2b-4c3d-9e8f-7a6b5c4d3e21
+          eventType: LiveBroadcastScheduled
+          schemaVersion: 1
+          source: live-service
+          aggregateId: '42'
+          occurredAt: '2026-10-25T12:01:05.482913Z'
+          payload:
+            broadcastId: 42
+            broadcastVersion: 0
+            title: 가을 신상 라이브
+            scheduledAt: '2026-10-25T12:00:00Z'
+    LiveBroadcastStarted:
+      name: LiveBroadcastStarted
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: LiveBroadcastStarted
+            schemaVersion:
+              const: 1
+            source:
+              const: live-service
+            aggregateId:
+              type: string
+              pattern: ^[1-9][0-9]*$
+            payload:
+              $ref: '#/components/schemas/LiveBroadcastStartedPayload'
+      examples:
+      - name: LiveBroadcastStarted예시
+        payload:
+          eventId: c3d2e1f0-1a2b-4c3d-9e8f-7a6b5c4d3e21
+          eventType: LiveBroadcastStarted
+          schemaVersion: 1
+          source: live-service
+          aggregateId: '42'
+          occurredAt: '2026-10-25T12:01:05.482913Z'
+          payload:
+            broadcastId: 42
+            broadcastVersion: 2
+            title: 가을 신상 라이브
+            scheduledAt: '2026-10-25T12:00:00Z'
+            startedAt: '2026-10-25T12:01:05.482913Z'
+            productIds:
+            - 101
+            - 102
+    LiveBroadcastEnded:
+      name: LiveBroadcastEnded
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: LiveBroadcastEnded
+            schemaVersion:
+              const: 1
+            source:
+              const: live-service
+            aggregateId:
+              type: string
+              pattern: ^[1-9][0-9]*$
+            payload:
+              $ref: '#/components/schemas/LiveBroadcastEndedPayload'
+      examples:
+      - name: LiveBroadcastEnded예시
+        payload:
+          eventId: c3d2e1f0-1a2b-4c3d-9e8f-7a6b5c4d3e21
+          eventType: LiveBroadcastEnded
+          schemaVersion: 1
+          source: live-service
+          aggregateId: '42'
+          occurredAt: '2026-10-25T12:01:05.482913Z'
+          payload:
+            broadcastId: 42
+            broadcastVersion: 3
+            startedAt: '2026-10-25T12:01:05.482913Z'
+            endedAt: '2026-10-25T13:00:00Z'

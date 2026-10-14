@@ -7,8 +7,8 @@ spring:
   task:
     scheduling:
       pool:
-        # heartbeat·구독 재시도·좋아요 전달이 서로를 기다리지 않게 한다.
-        size: 4
+        # heartbeat·구독 재시도·좋아요 전달·outbox 릴레이가 서로를 기다리지 않게 한다.
+        size: 5
   data:
     redis:
       # Redis 는 실시간 전달에만 쓴다. 장애 시 요청이 오래 붙잡히지 않도록 짧게 끊는다.
@@ -69,6 +69,8 @@ spring:
   config:
     activate:
       on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
   datasource:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/live
     username: ${POSTGRES_USER:shoppinglive}
@@ -111,6 +113,8 @@ spring:
   config:
     activate:
       on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
   datasource:
     url: jdbc:postgresql://postgres:5432/live
     username: ${POSTGRES_USER:shoppinglive}
