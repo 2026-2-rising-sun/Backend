@@ -16,6 +16,13 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  kafka:
+    consumer:
+      group-id: shopping-service
+    listener:
+      # 테스트 classpath 에 kafka 가 있어도 broker 에 붙지 않도록 listener 컨테이너를 기동하지 않는다.
+      # 임베디드 broker 테스트는 이 값을 true 로 다시 켠다.
+      auto-startup: false
   servlet:
     multipart:
       max-file-size: 6MB
