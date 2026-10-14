@@ -26,6 +26,7 @@ springdoc:
     enabled: ${API_DOCS_ENABLED:false}
   swagger-ui:
     enabled: ${API_DOCS_ENABLED:false}
+    path: /swagger
 
 server:
   port: 8085

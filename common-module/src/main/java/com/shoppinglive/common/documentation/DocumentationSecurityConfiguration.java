@@ -14,7 +14,7 @@ public class DocumentationSecurityConfiguration {
     @Bean
     @Order(0)
     SecurityFilterChain documentationSecurity(HttpSecurity http) throws Exception {
-        return http.securityMatcher("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+        return http.securityMatcher("/v3/api-docs/**", "/swagger-ui/**", "/swagger")
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .build();
     }
