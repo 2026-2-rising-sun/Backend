@@ -230,6 +230,30 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/SalesUnavailable' }
+  /v1/products/{productId}/coupons:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      security: []
+      tags: [Public Product]
+      summary: 상품에 적용 가능한 쿠폰
+      operationId: listProductCoupons
+      description: >-
+        Commerce 쿠폰 이벤트로 채운 replica를 읽는다. 요청마다 Commerce를 호출하지 않는다.
+        startsAt <= 지금 < endsAt인 쿠폰만 endsAt 오름차순으로 준다. 소진된 쿠폰도 soldOut=true로 준다.
+        회원별 보유·사용 여부는 주지 않는다. 받기와 최종 적용 판정은 Commerce가 한다.
+        쿠폰이 없거나 모르는 상품이면 빈 목록이다. 쿠폰 적용 예상가는 클라이언트가 판매가 - fixedDiscount(0 미만은 0)로 계산한다.
+        표시정보는 Commerce보다 늦을 수 있다. 보통 이벤트 전달 시간만큼 늦고, 이벤트를 놓치면 다음 주기 동기화(기본 10분)에 맞춰진다.
+        이 API가 실패해도 상품 상세 API에는 영향이 없다. 화면은 쿠폰 영역만 숨기고 상품은 그대로 보여 준다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductCouponListEnvelope' }
+              examples:
+                normal: { value: { success: true, data: [ { couponId: coupon-opaque-id, name: 상품 할인 쿠폰, fixedDiscount: 1000, startsAt: '2026-10-15T09:00:00Z', endsAt: '2026-10-16T09:00:00Z', expiresAt: '2026-10-17T09:00:00Z', soldOut: false } ], error: null } }
+        '400': { $ref: '#/components/responses/BadRequest' }
   /v1/admin/product-images:
     post:
       x-required-roles: [SELLER]
@@ -609,6 +633,21 @@ components:
         available: { type: integer, minimum: 0 }
         purchasable: { type: boolean }
         maxQuantity: { type: integer, minimum: 0 }
+    ProductCoupon:
+      type: object
+      required: [couponId, name, fixedDiscount, startsAt, endsAt, expiresAt, soldOut]
+      properties:
+        couponId: { type: string, maxLength: 36, description: Commerce 쿠폰 ID. UUID로 한정하지 않는 opaque 문자열 }
+        name: { type: string, maxLength: 100 }
+        fixedDiscount: { type: integer, format: int64, minimum: 1, description: 정액 할인 금액(원) }
+        startsAt: { type: string, format: date-time, description: 발급 시작, 포함 경계 }
+        endsAt: { type: string, format: date-time, description: 발급 종료, 제외 경계 }
+        expiresAt: { type: string, format: date-time, description: 발급받은 쿠폰의 사용 만료 }
+        soldOut: { type: boolean, description: 발급 수량 소진 여부 }
+    ProductCouponListEnvelope:
+      type: object
+      required: [success, data, error]
+      properties: { success: { type: boolean, const: true }, data: { type: array, items: { $ref: '#/components/schemas/ProductCoupon' } }, error: { type: 'null' } }
     PurchaseCheck:
       type: object
       required: [productId, quantity, orderable, reason, maxQuantity, unitPrice]

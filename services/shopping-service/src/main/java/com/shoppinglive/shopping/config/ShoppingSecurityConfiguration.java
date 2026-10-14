@@ -69,6 +69,7 @@ public class ShoppingSecurityConfiguration {
                                             "/v1/products/",
                                             "/v1/products/{id}",
                                             "/v1/products/{id}/purchase-check",
+                                            "/v1/products/{id}/coupons",
                                             "/v1/product-images/",
                                             "/v1/product-images/{id}")
                                     .permitAll()
