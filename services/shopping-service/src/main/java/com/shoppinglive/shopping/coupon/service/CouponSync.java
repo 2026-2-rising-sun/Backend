@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.coupon.service;
 
 import com.shoppinglive.shopping.client.commerce.HttpCouponSnapshotClient;
+import com.shoppinglive.shopping.coupon.dto.CouponSnapshot;
 import com.shoppinglive.shopping.coupon.repository.CouponDisplayRepository;
 import java.time.Clock;
 import org.slf4j.Logger;
@@ -51,6 +52,15 @@ public class CouponSync {
      * @return 새로 반영한 쿠폰 수
      */
     int sync() {
-        return 0;
+        int applied = 0;
+        String cursor = null;
+        do {
+            HttpCouponSnapshotClient.Page page = commerce.page(cursor);
+            for (CouponSnapshot snapshot : page.items()) {
+                applied += replica.apply(snapshot) ? 1 : 0;
+            }
+            cursor = page.nextCursor();
+        } while (cursor != null);
+        return applied;
     }
 }
