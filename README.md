@@ -32,6 +32,8 @@ node scripts/local/auth-env.cjs create --access-ttl PT15M --refresh-ttl P30D --o
 ./gradlew :services:commerce-service:bootRun --args='--spring.profiles.active=local'
 ```
 
+Notification 인증을 연결하려면 생성 파일에 `NOTIFICATION_MEMBER_SERVICE_TOKEN`이 있어야 합니다. 이전 생성 파일을 사용하는 경우 새 디렉터리에 인증 정보를 생성하고 모든 서비스가 같은 새 파일을 사용하도록 실행 설정을 갱신합니다. 기존 인증 파일은 생성 도구가 덮어쓰지 않습니다.
+
 각 서비스에 필요한 DB·Redis와 외부 서비스 주소를 준비한 뒤 실행합니다. 인증 정보 생성 명령만으로 전체 실행 환경이 준비되는 것은 아닙니다. 기본 Application 실행은 프로필을 지정하지 않으면 local을 선택하며, 명시적으로 지정한 설정이 로컬 생성 파일보다 우선합니다.
 
 Member·Shopping·Commerce·Live의 local 프로필은 `/swagger-ui.html`과 `/v3/api-docs`를 제공합니다. 다른 환경에서는 `API_DOCS_ENABLED=true`로 활성화합니다. 현재 API 문서는 컨트롤러·DTO에서 Springdoc이 생성합니다.
