@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -81,6 +82,19 @@ class CouponSyncTest {
 
         assertThat(sync.sync()).isEqualTo(2);
         server.verify();
+    }
+
+    @Test
+    @DisplayName("이벤트와 동시에 처음 넣다가 키가 충돌하면 한 번 더 반영한다")
+    void retriesOnceOnConcurrentInsert() {
+        expectPage(null, "null", false, coupon("c1"));
+        when(replica.findOpenCouponIds(NOW)).thenReturn(List.of());
+        when(replica.apply(any()))
+                .thenThrow(new DuplicateKeyException("concurrent insert"))
+                .thenReturn(false);
+
+        assertThat(sync.sync()).isZero();
+        verify(replica, times(2)).apply(any());
     }
 
     private void expectPage(String afterId, String nextCursor, boolean hasNext, String... items) {
