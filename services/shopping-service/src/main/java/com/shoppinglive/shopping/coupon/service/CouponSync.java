@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
@@ -63,7 +64,7 @@ public class CouponSync {
             HttpCouponSnapshotClient.Page page = commerce.page(cursor);
             for (CouponSnapshot snapshot : page.items()) {
                 listed.add(snapshot.couponId());
-                applied += replica.apply(snapshot) ? 1 : 0;
+                applied += apply(snapshot) ? 1 : 0;
             }
             cursor = page.nextCursor();
         } while (cursor != null);
@@ -72,7 +73,7 @@ public class CouponSync {
         for (String couponId : replica.findOpenCouponIds(startedAt)) {
             if (!listed.contains(couponId)) {
                 refreshed++;
-                applied += commerce.find(couponId).map(replica::apply).orElse(false) ? 1 : 0;
+                applied += commerce.find(couponId).map(this::apply).orElse(false) ? 1 : 0;
             }
         }
         log.info(
@@ -81,5 +82,14 @@ public class CouponSync {
                 refreshed,
                 applied);
         return applied;
+    }
+
+    // 같은 신규 쿠폰을 이벤트가 동시에 넣으면 키 충돌로 rollback 된다. 다시 하면 이미 있는 행과 version 을 비교한다.
+    private boolean apply(CouponSnapshot snapshot) {
+        try {
+            return replica.apply(snapshot);
+        } catch (DuplicateKeyException e) {
+            return replica.apply(snapshot);
+        }
     }
 }
