@@ -10,6 +10,17 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 @Configuration(proxyBeanMethods = false)
 class SalesInfoProducerConfiguration {
     @Bean
+    org.springframework.kafka.core.KafkaTemplate<
+                    String, com.shoppinglive.common.events.EventEnvelope<SalesInfoSnapshot>>
+            salesInfoKafkaTemplate(
+                    org.springframework.kafka.core.ProducerFactory<
+                                    String,
+                                    com.shoppinglive.common.events.EventEnvelope<SalesInfoSnapshot>>
+                            factory) {
+        return new org.springframework.kafka.core.KafkaTemplate<>(factory);
+    }
+
+    @Bean
     DefaultKafkaProducerFactoryCustomizer salesEventSerializer(ObjectMapper mapper) {
         return factory -> {
             factory.updateConfigs(
