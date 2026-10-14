@@ -41,7 +41,7 @@ test('local keys match; missing/invalid TTL and credential overwrites fail', () 
     const tokens = Object.entries(env)
       .filter(([key]) => key.endsWith('_SERVICE_TOKEN'))
       .map(([, value]) => value);
-    assert.equal(new Set(tokens).size, 7);
+    assert.equal(new Set(tokens).size, 8);
     assert.equal(env.MEMBER_SESSION_BASE_URL, 'http://localhost:8081');
     assert.equal(run(args).status, 1);
     assert.equal(fs.readFileSync(envPath, 'utf8'), saved);
@@ -91,6 +91,14 @@ test('local keys match; missing/invalid TTL and credential overwrites fail', () 
       },
     );
     assert.equal(member.status, 0, member.stderr);
+    const notification = run(['exec','notification','--env',envPath,'--',process.execPath,'-e', `
+      const a=require('node:assert/strict');
+      a.ok(process.env.NOTIFICATION_MEMBER_SERVICE_TOKEN);
+      a.ok(process.env.MEMBER_SESSION_BASE_URL);
+      a.ok(process.env.MEMBER_JWT_PUBLIC_KEY_SET_LOCATION);
+      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','SHOPPING_MEMBER_SERVICE_TOKEN','COMMERCE_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
+    `]);
+    assert.equal(notification.status, 0, notification.stderr);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

@@ -238,7 +238,7 @@ paths:
       operationId: checkMemberSession
       security:
         - ServiceToken: []
-      description: Shopping/Commerce/Live caller만 허용한다. memberId와 sessionId가 일치하고 회원·세션이 유효하면 active=true. 미지·불일치·보안 폐기·탈퇴는 false. 일반 로그아웃은 기존 access를 즉시 차단하지 않는다. 이 응답은 캐시하지 않는다.
+      description: Shopping/Commerce/Live/Notification caller만 허용한다. memberId와 sessionId가 일치하고 회원·세션이 유효하면 active=true. 미지·불일치·보안 폐기·탈퇴는 false. 일반 로그아웃은 기존 access를 즉시 차단하지 않는다. 이 응답은 캐시하지 않는다.
       requestBody:
         required: true
         content:
