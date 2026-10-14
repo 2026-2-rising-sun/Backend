@@ -89,3 +89,5 @@ tasks.register<Test>("postgresCommerceTest") {
 }
 
 tasks.named<Jar>("jar") { enabled = false }
+
+tasks.named<Test>("test") { outputs.dir(layout.buildDirectory.dir("contract-samples")) }
