@@ -1,0 +1,62 @@
+package com.shoppinglive.commerce.order.dto;
+
+import com.shoppinglive.commerce.coupon.service.CouponPreviewService;
+import com.shoppinglive.commerce.order.entity.OrderCheckout;
+import com.shoppinglive.commerce.sales.entity.SalesStatus;
+
+/**
+ * 주문서 확인 응답 (주문 1).
+ *
+ * <p>{@code orderable = false} 면 {@code reason} 이 채워진다. 화면은 이 값으로 "품절" · "재고 부족" · "판매 중단" 을 구분해
+ * 안내한다.
+ */
+public record OrderCheckoutResponse(
+        Long productId,
+        Long salesId,
+        String productName,
+        long unitPrice,
+        int quantity,
+        long totalAmount,
+        int available,
+        SalesStatus salesStatus,
+        boolean orderable,
+        OrderCheckout.Reason reason,
+        String couponId,
+        long discountAmount,
+        long payableAmount) {
+
+    public static OrderCheckoutResponse from(OrderCheckout checkout) {
+        return new OrderCheckoutResponse(
+                checkout.productId(),
+                checkout.salesId(),
+                checkout.productName(),
+                checkout.unitPrice(),
+                checkout.quantity(),
+                checkout.totalAmount(),
+                checkout.available(),
+                checkout.salesStatus(),
+                checkout.orderable(),
+                checkout.reason(),
+                null,
+                0,
+                checkout.totalAmount());
+    }
+
+    public static OrderCheckoutResponse from(
+            OrderCheckout checkout, CouponPreviewService.Preview preview) {
+        return new OrderCheckoutResponse(
+                checkout.productId(),
+                checkout.salesId(),
+                checkout.productName(),
+                checkout.unitPrice(),
+                checkout.quantity(),
+                checkout.totalAmount(),
+                checkout.available(),
+                checkout.salesStatus(),
+                checkout.orderable(),
+                checkout.reason(),
+                preview.couponId(),
+                preview.discountAmount(),
+                preview.payableAmount());
+    }
+}

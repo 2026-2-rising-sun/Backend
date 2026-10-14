@@ -2,16 +2,16 @@ package com.shoppinglive.commerce.support;
 
 import com.shoppinglive.common.security.test.JwtTestTokens;
 import com.shoppinglive.common.security.test.StubAccessSessionVerifier;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -21,26 +21,37 @@ public abstract class CommerceSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
 
     @BeforeEach
-    void resetAccessSessionFixture() { accessSessions.reset(); }
+    void resetAccessSessionFixture() {
+        accessSessions.reset();
+    }
 
-    @Autowired(required = false) private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    @Autowired(required = false)
+    private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
 
     @AfterEach
     void removeOrphanPurchaseFixtures() {
         // Subclass cleanup removes orders/payments first. Group keys are durable in production,
         // so deleting only orders otherwise leaks active/replay state between repeated tests.
-        if (fixtureJdbc != null && shouldCleanPurchaseFixtures()) fixtureJdbc.update("""
+        if (fixtureJdbc != null && shouldCleanPurchaseFixtures()) {
+            fixtureJdbc.update(
+                    """
             DELETE FROM payment_group g WHERE NOT EXISTS
                 (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
             AND NOT EXISTS (SELECT 1 FROM payment_attempt p WHERE p.payment_group_id = g.id)
             """);
+        }
     }
 
-    protected boolean shouldCleanPurchaseFixtures() { return true; }
+    protected boolean shouldCleanPurchaseFixtures() {
+        return true;
+    }
 
     @TestConfiguration(proxyBeanMethods = false)
     static class SessionTestConfiguration {
-        @Bean StubAccessSessionVerifier accessSessionVerifier() { return new StubAccessSessionVerifier(); }
+        @Bean
+        StubAccessSessionVerifier accessSessionVerifier() {
+            return new StubAccessSessionVerifier();
+        }
     }
 
     protected static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
@@ -57,18 +68,27 @@ public abstract class CommerceSecurityTestSupport {
             Files.writeString(file, TOKENS.publicJwkSet().toString());
             file.toFile().deleteOnExit();
             return file;
-        } catch (IOException exception) { throw new ExceptionInInitializerError(exception); }
+        } catch (IOException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
     }
 
     @DynamicPropertySource
     static void securityProperties(DynamicPropertyRegistry properties) {
         properties.add("shoppinglive.security.jwt.issuer", () -> JwtTestTokens.ISSUER);
         properties.add("shoppinglive.security.jwt.audience", () -> JwtTestTokens.AUDIENCE);
-        properties.add("shoppinglive.security.jwt.public-key-set-location", () -> KEY_SET.toUri().toString());
+        properties.add(
+                "shoppinglive.security.jwt.public-key-set-location",
+                () -> KEY_SET.toUri().toString());
         properties.add("shoppinglive.security.service-tokens.shopping", () -> SHOPPING_TOKEN);
         properties.add("shoppinglive.security.service-tokens.live", () -> LIVE_TOKEN);
     }
 
-    protected static String bearer(String memberId) { return "Bearer " + TOKENS.token(memberId, Set.of("USER")); }
-    protected static String adminBearer() { return "Bearer " + TOKENS.token(SELLER, Set.of("USER", "SELLER")); }
+    protected static String bearer(String memberId) {
+        return "Bearer " + TOKENS.token(memberId, Set.of("USER"));
+    }
+
+    protected static String adminBearer() {
+        return "Bearer " + TOKENS.token(SELLER, Set.of("USER", "SELLER"));
+    }
 }

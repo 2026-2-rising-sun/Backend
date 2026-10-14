@@ -1,6 +1,6 @@
 package com.shoppinglive.member.operations;
 
-import com.shoppinglive.member.members.api.SignupRequest;
+import com.shoppinglive.member.members.dto.SignupRequest;
 import jakarta.validation.Validation;
 import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
@@ -26,24 +26,31 @@ public final class SellerBootstrapCommand {
         String username = required(environment, "MEMBER_BOOTSTRAP_DB_USER");
         String databasePassword = required(environment, "MEMBER_BOOTSTRAP_DB_PASSWORD");
         if (!url.startsWith("jdbc:postgresql:") || !schema.matches("[a-z_][a-z0-9_]{0,62}")) {
-            throw new IllegalArgumentException("Seller bootstrap requires an explicit PostgreSQL URL and schema");
+            throw new IllegalArgumentException(
+                    "Seller bootstrap requires an explicit PostgreSQL URL and schema");
         }
-        SignupRequest request = new SignupRequest(required(environment, "MEMBER_BOOTSTRAP_SELLER_EMAIL"),
-            required(environment, "MEMBER_BOOTSTRAP_SELLER_PASSWORD"),
-            required(environment, "MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME"));
+        SignupRequest request =
+                new SignupRequest(
+                        required(environment, "MEMBER_BOOTSTRAP_SELLER_EMAIL"),
+                        required(environment, "MEMBER_BOOTSTRAP_SELLER_PASSWORD"),
+                        required(environment, "MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME"));
         try (var validation = Validation.buildDefaultValidatorFactory()) {
             if (!validation.getValidator().validate(request).isEmpty()
-                || request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-                throw new IllegalArgumentException("Invalid seller email, display name or password");
+                    || request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+                throw new IllegalArgumentException(
+                        "Invalid seller email, display name or password");
             }
         }
-        String email = com.shoppinglive.member.members.domain.Member.normalizeEmail(request.email());
+        String email =
+                com.shoppinglive.member.members.entity.Member.normalizeEmail(request.email());
         String hash = new BCryptPasswordEncoder(12).encode(request.password());
         UUID id = UUID.randomUUID();
         // DB migration을 자동 실행하지 않는다. 운영자가 지정한 이미 준비된 schema에 신규 SELLER만 넣는다.
         try (var connection = DriverManager.getConnection(url, username, databasePassword)) {
             connection.setSchema(schema);
-            try (var statement = connection.prepareStatement("""
+            try (var statement =
+                    connection.prepareStatement(
+                            """
                 INSERT INTO members(id,email,password_hash,display_name,role,created_at,updated_at,version)
                 VALUES (?,?,?,?,'SELLER',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
                 """)) {
@@ -56,13 +63,16 @@ public final class SellerBootstrapCommand {
             return id;
         } catch (SQLException exception) {
             // URL/SQL 오류가 자격증명을 포함할 수 있어 원문 예외와 환경 값을 출력하지 않는다.
-            throw new IllegalStateException("Seller bootstrap failed; verify database access, migration and duplicate email");
+            throw new IllegalStateException(
+                    "Seller bootstrap failed; verify database access, migration and duplicate email");
         }
     }
 
     private String required(Map<String, String> environment, String key) {
         String value = environment.get(key);
-        if (value == null || value.isBlank()) throw new IllegalArgumentException("Missing required environment: " + key);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Missing required environment: " + key);
+        }
         return value;
     }
 }

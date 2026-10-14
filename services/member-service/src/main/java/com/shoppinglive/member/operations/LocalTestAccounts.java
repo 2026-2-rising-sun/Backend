@@ -32,20 +32,34 @@ public class LocalTestAccounts implements ApplicationRunner {
     }
 
     private void create(String login, String role, String displayName) {
-        UUID id = UUID.nameUUIDFromBytes(("shoppinglive-local-" + login).getBytes(StandardCharsets.UTF_8));
+        UUID id =
+                UUID.nameUUIDFromBytes(
+                        ("shoppinglive-local-" + login).getBytes(StandardCharsets.UTF_8));
         String email = login + "@local.test";
-        var existing = jdbc.queryForList("SELECT id, password_hash, role, withdrawn_at FROM members WHERE email = ?", email);
+        var existing =
+                jdbc.queryForList(
+                        "SELECT id, password_hash, role, withdrawn_at FROM members WHERE email = ?",
+                        email);
         if (!existing.isEmpty()) {
             var member = existing.getFirst();
-            if (!id.toString().equals(member.get("id").toString()) || !role.equals(member.get("role"))
-                || member.get("withdrawn_at") != null || !passwords.matches(login, member.get("password_hash").toString())) {
-                throw new IllegalStateException("Local test account collision; disable fixtures or use a disposable local database");
+            if (!id.toString().equals(member.get("id").toString())
+                    || !role.equals(member.get("role"))
+                    || member.get("withdrawn_at") != null
+                    || !passwords.matches(login, member.get("password_hash").toString())) {
+                throw new IllegalStateException(
+                        "Local test account collision; disable fixtures or use a disposable local database");
             }
             return;
         }
-        jdbc.update("""
+        jdbc.update(
+                """
             INSERT INTO members(id,email,password_hash,display_name,role,created_at,updated_at,version)
             VALUES (?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
-            """, id, email, passwords.encode(login), displayName, role);
+            """,
+                id,
+                email,
+                passwords.encode(login),
+                displayName,
+                role);
     }
 }
