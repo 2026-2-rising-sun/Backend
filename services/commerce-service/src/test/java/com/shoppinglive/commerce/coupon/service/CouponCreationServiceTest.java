@@ -21,7 +21,14 @@ class CouponCreationServiceTest {
         var jdbc = mock(JdbcTemplate.class);
         var shopping = mock(ShoppingClient.class);
         var manager = mock(PlatformTransactionManager.class);
-        var service = new CouponCreationService(jdbc, shopping, manager);
+        var service =
+                new CouponCreationService(
+                        jdbc,
+                        shopping,
+                        manager,
+                        org.mockito.Mockito.mock(
+                                com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher
+                                        .class));
         Instant start = Instant.parse("2026-10-09T00:00:00Z"), end = start.plusSeconds(60);
         when(shopping.findProduct(1L))
                 .thenReturn(Optional.of(new ProductSnapshot(1L, "상품", null, "other")));

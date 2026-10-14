@@ -53,3 +53,19 @@ python3 -m venv .venv-api
 직접 선언한 Spring MVC 매핑을 읽습니다. 마지막 `/`, 조건부·개발용 매핑도 포함하며, 지원하지 않는 상속·매핑 표현식은 성공으로 넘기지 않고 실패합니다. 테스트는 `python -m unittest discover -s .github/scripts/api`로 실행합니다.
 
 이벤트 계약 원본은 `contracts/events`의 AsyncAPI YAML입니다. `.github/scripts/api/check_events.py`는 참조·스키마·예시를 검사하고, `--samples`로 서비스 테스트가 생성한 실제 직렬화 표본을 검사합니다. 이는 실제 Kafka 전달이나 소비자 DB 반영을 검증하지 않습니다.
+
+### 쿠폰 표시정보 생산자 검증
+
+Commerce는 쿠폰 생성·설정 변경·발급 수량 소진을 `commerce.coupon-info.v1`에 전체 스냅샷으로 전달한다. 계약 원본은 [`contracts/events/commerce-coupon-info.yaml`](contracts/events/commerce-coupon-info.yaml)이며, 초기 적재·주기적 복구 API는 [`contracts/api/commerce-service.yaml`](contracts/api/commerce-service.yaml)의 `/v1/internal/coupon-snapshots` 목록·단건 경로다. Shopping 서비스 토큰만 허용한다. 일반 상품 조회는 Shopping의 이벤트 사본을 사용하도록 구현할 예정이며 수신 작업은 [#229](https://github.com/2026-2-rising-sun/Backend/issues/229)에서 관리한다.
+
+쿠폰별 `snapshotVersion`은 이벤트와 API에 동일하게 적용한다. 목록은 미래·진행 쿠폰과 소진 쿠폰을 포함하며 페이지 전체의 단일 시점 일관성을 보장하지 않는다. 소비를 먼저 시작하고 전체 페이지를 주기적으로 순회한다. 이미 저장한 쿠폰은 단건 조회로 종료·기간 변경·대상 변경 누락도 복구해야 한다. 발급 시작 포함·종료 제외의 시간 경계는 소비자가 현재 시각으로 판단한다.
+
+기본 `:services:commerce-service:build`는 H2에서 업무·API·Outbox 원자성을 검사한다. 실제 PostgreSQL은 다음 환경으로 실행하며, 실행마다 격리 스키마를 만들고 종료 시 제거한다.
+
+```bash
+COMMERCE_TEST_POSTGRES_URL=jdbc:postgresql://localhost:55432/commerce_test \
+COMMERCE_TEST_POSTGRES_USER=postgres COMMERCE_TEST_POSTGRES_PASSWORD=test \
+./gradlew :services:commerce-service:postgresCommerceTest --tests '*CouponSyncIntegrationTest'
+```
+
+실제 Kafka를 함께 확인하려면 위 PostgreSQL 환경에 `COMMERCE_TEST_KAFKA_SERVERS=localhost:29092`를 더하고 `--tests '*CouponSyncKafkaTest'`를 실행한다. 이 테스트는 실제 Outbox 행을 production 릴레이·template으로 전송하고 판매 이벤트 template과 직렬화가 섞이지 않는지 확인한다. 별도 서비스 전체 E2E를 보장하지 않는다. 브로커 없이 돌리는 테스트에서는 `shoppinglive.outbox.relay.enabled=false`로 주기적 발행을 끈다.

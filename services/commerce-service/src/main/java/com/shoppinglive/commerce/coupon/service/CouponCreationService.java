@@ -2,6 +2,8 @@ package com.shoppinglive.commerce.coupon.service;
 
 import com.shoppinglive.commerce.client.shopping.ShoppingClient;
 import com.shoppinglive.commerce.coupon.entity.CouponDefinition;
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher;
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher.Type;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.Timestamp;
@@ -16,12 +18,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class CouponCreationService {
+    private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
     private final ShoppingClient shopping;
     private final TransactionTemplate transaction;
 
     public CouponCreationService(
-            JdbcTemplate jdbc, ShoppingClient shopping, PlatformTransactionManager manager) {
+            JdbcTemplate jdbc,
+            ShoppingClient shopping,
+            PlatformTransactionManager manager,
+            CouponDisplayEventPublisher events) {
+        this.events = events;
         this.jdbc = jdbc;
         this.shopping = shopping;
         this.transaction = new TransactionTemplate(manager);
@@ -76,6 +83,7 @@ public class CouponCreationService {
                                 id,
                                 productId);
                     }
+                    events.publish(Type.CouponCreated, id);
                     return new CouponDefinition(
                             id,
                             sellerId,

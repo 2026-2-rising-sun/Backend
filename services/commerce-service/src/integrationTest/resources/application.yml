@@ -48,3 +48,8 @@ management:
           include: readinessState,db
       probes:
         enabled: true
+
+shoppinglive:
+  outbox:
+    relay:
+      enabled: false

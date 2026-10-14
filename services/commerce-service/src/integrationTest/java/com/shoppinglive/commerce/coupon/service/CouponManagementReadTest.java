@@ -19,7 +19,10 @@ import org.springframework.test.context.jdbc.Sql;
         properties =
                 "spring.datasource.url=jdbc:h2:mem:coupon_management_read;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
 @Sql(
-        scripts = "/db/migration/V5__coupon_definitions.sql",
+        scripts = {
+            "/db/migration/V5__coupon_definitions.sql",
+            "/db/migration/V17__coupon_display_snapshot_version.sql"
+        },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class CouponManagementReadTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
