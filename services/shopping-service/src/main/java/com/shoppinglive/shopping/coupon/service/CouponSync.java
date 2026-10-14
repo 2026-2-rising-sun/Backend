@@ -4,6 +4,9 @@ import com.shoppinglive.shopping.client.commerce.HttpCouponSnapshotClient;
 import com.shoppinglive.shopping.coupon.dto.CouponSnapshot;
 import com.shoppinglive.shopping.coupon.repository.CouponDisplayRepository;
 import java.time.Clock;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -52,15 +55,31 @@ public class CouponSync {
      * @return 새로 반영한 쿠폰 수
      */
     int sync() {
+        Instant startedAt = clock.instant();
+        Set<String> listed = new HashSet<>();
         int applied = 0;
         String cursor = null;
         do {
             HttpCouponSnapshotClient.Page page = commerce.page(cursor);
             for (CouponSnapshot snapshot : page.items()) {
+                listed.add(snapshot.couponId());
                 applied += replica.apply(snapshot) ? 1 : 0;
             }
             cursor = page.nextCursor();
         } while (cursor != null);
+
+        int refreshed = 0;
+        for (String couponId : replica.findOpenCouponIds(startedAt)) {
+            if (!listed.contains(couponId)) {
+                refreshed++;
+                applied += commerce.find(couponId).map(replica::apply).orElse(false) ? 1 : 0;
+            }
+        }
+        log.info(
+                "coupon sync finished: listed={} refreshed={} applied={}",
+                listed.size(),
+                refreshed,
+                applied);
         return applied;
     }
 }
