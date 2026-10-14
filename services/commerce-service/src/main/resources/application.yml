@@ -1,6 +1,15 @@
 spring:
   application:
     name: commerce-service
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 1000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
   jpa:
@@ -95,6 +104,8 @@ spring:
   config:
     activate:
       on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
   datasource:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/commerce
     username: ${POSTGRES_USER:shoppinglive}
@@ -120,6 +131,8 @@ spring:
   config:
     activate:
       on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
   datasource:
     url: jdbc:postgresql://postgres:5432/commerce
     username: ${POSTGRES_USER:shoppinglive}

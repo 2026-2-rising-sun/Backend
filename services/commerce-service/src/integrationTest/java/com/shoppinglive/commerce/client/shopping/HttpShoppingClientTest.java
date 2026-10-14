@@ -270,7 +270,11 @@ class HttpShoppingClientTest {
         SalesStockJpaRepository stock = mock(SalesStockJpaRepository.class);
         SalesRegistrationService registration =
                 new SalesRegistrationService(
-                        mock(SalesJpaRepository.class), stock, client, transaction);
+                        mock(SalesJpaRepository.class),
+                        stock,
+                        client,
+                        transaction,
+                        mock(com.shoppinglive.commerce.sales.event.SalesInfoEventTracker.class));
         SalesController controller =
                 new SalesController(
                         mock(SalesService.class), registration, mock(SalesLookupService.class));

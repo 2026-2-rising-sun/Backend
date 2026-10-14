@@ -6,6 +6,9 @@ spring:
     password: ${COMMERCE_TEST_POSTGRES_PASSWORD:postgres}
     hikari:
       schema: ${commerce.tests.schema}
+      # Several cached Spring contexts share the test database's connection limit.
+      maximum-pool-size: 4
+      minimum-idle: 0
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,3 +20,8 @@ spring:
     schemas: ${commerce.tests.schema}
     default-schema: ${commerce.tests.schema}
     create-schemas: true
+
+commerce:
+  sales:
+    events:
+      enabled: false
