@@ -21,13 +21,6 @@ shoppinglive:
       audience: shoppinglive-api
       public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
 
-springdoc:
-  api-docs:
-    enabled: ${API_DOCS_ENABLED:false}
-  swagger-ui:
-    enabled: ${API_DOCS_ENABLED:false}
-    path: /swagger
-
 server:
   port: 8085
 
@@ -56,11 +49,6 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/notification
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-springdoc:
-  api-docs:
-    enabled: true
-  swagger-ui:
-    enabled: true
 
 shoppinglive:
   security:

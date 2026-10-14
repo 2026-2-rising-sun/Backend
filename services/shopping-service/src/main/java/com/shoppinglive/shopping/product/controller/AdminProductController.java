@@ -11,8 +11,6 @@ import com.shoppinglive.shopping.product.entity.Product;
 import com.shoppinglive.shopping.product.service.ProductRegistrationService;
 import com.shoppinglive.shopping.product.service.ProductUpdateService;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,8 +52,6 @@ public class AdminProductController {
      * 상품 기본정보 등록. 같은 {@code X-Idempotency-Key} 로 다시 보내면 새 상품을 만들지 않고 처음 등록된 상품을 같은 201 응답으로 돌려준다
      * (재전송한 클라이언트가 첫 응답과 구분할 필요가 없도록). 재요청 본문은 보지 않는다.
      */
-    @Operation(summary = "상품 기본정보 등록")
-    @SecurityRequirement(name = "BearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> register(
             @AuthenticationPrincipal AuthenticatedUser seller,
@@ -81,8 +77,6 @@ public class AdminProductController {
     }
 
     /** 기본정보 부분 수정·대표 이미지 교체. 응답의 version 을 다음 수정 요청에 그대로 보내야 한다. */
-    @Operation(summary = "상품 기본정보 부분 수정")
-    @SecurityRequirement(name = "BearerAuth")
     @PatchMapping("/{productId}")
     public ApiResponse<ProductResponse> update(
             @AuthenticationPrincipal AuthenticatedUser seller,
