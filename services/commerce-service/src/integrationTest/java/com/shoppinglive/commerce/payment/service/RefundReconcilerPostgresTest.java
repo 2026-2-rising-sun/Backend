@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
             "commerce.refunds.execution-enabled=true",
             "commerce.refunds.recovery.initial-delay=PT24H"
         })
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class RefundReconcilerPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;

@@ -23,7 +23,11 @@ JDK 21 / Gradle 기반 라이브 커머스 백엔드입니다.
 
 `build`는 단위·통합 테스트와 Java·KTS 포맷 검사를 포함합니다. 단위 테스트는 `src/test`, 통합 테스트는 `src/integrationTest`에 있습니다. 외부 PostgreSQL·Redis가 필요한 테스트는 환경을 지정하지 않으면 건너뛸 수 있습니다. 기본 빌드 성공을 실제 DB·전체 서비스 연동 성공으로 해석하지 않습니다.
 
-[수동 DB workflow](.github/workflows/postgres.yml)는 테스트용 PostgreSQL·Redis를 준비하고, 대상 테스트가 실행됐는지와 실패·건너뜀이 없는지를 검사합니다. 이 workflow의 결과 확인 도구만 `.github/scripts`에 유지합니다. Prism과 외부 서비스 E2E·복구 검증 스크립트는 제거했으며, 그 검증 범위가 서비스 내부 테스트로 모두 대체된 것은 아닙니다.
+CI는 변경된 서비스의 빌드·단위·일반 통합 테스트를 실행합니다. 서비스의 DB migration SQL이나 migration 태그 테스트가 바뀌면 해당 서비스의 `migrationTest`를 실제 PostgreSQL에서 추가 실행합니다. Redis 관련 코드·설정·테스트가 바뀌면 해당 서비스의 `redisTest`를 실제 Redis에서 추가 실행합니다. Java 주석·일반 문서 변경에는 외부 서버를 기동하지 않습니다. 별도 수동 DB workflow는 제거했습니다.
+
+일반 `integrationTest`는 `postgres`·`redis` 태그를 제외합니다. 실제 PostgreSQL 마이그레이션 검사는 `postgres`와 `migration` 태그를 함께 사용하고, Redis 검사는 캐시·Pub/Sub 구분 없이 `redis` 태그를 사용합니다. Redis 구분은 검사 시간이 길어질 때 검토합니다. 로컬 실행 시에는 격리된 서버와 해당 테스트 환경변수를 준비한 뒤 `:services:<서비스명>:migrationTest` 또는 `:services:<서비스명>:redisTest`를 실행합니다. Prism과 외부 서비스 E2E·복구 검증 범위가 이 검사로 모두 대체된 것은 아닙니다.
+
+별도 전체 PostgreSQL 검사 작업(`postgresTest`·`postgresCommerceTest`)은 제거했습니다. 실제 서버 검사는 위의 `migrationTest`·`redisTest`만 실행합니다. 기존 PostgreSQL 동시성·업무 테스트 코드는 남아 있으나 자동 CI 실행 대상은 아닙니다.
 
 ## 로컬 실행과 API 문서
 
