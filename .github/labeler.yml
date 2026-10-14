@@ -18,9 +18,9 @@ service:notification:
   - changed-files:
       - any-glob-to-any-file: "services/notification-service/**"
 
-libs:
+common-module:
   - changed-files:
-      - any-glob-to-any-file: "libs/**"
+      - any-glob-to-any-file: "common-module/**"
 
 contracts:
   - changed-files:
@@ -29,7 +29,6 @@ contracts:
 build:
   - changed-files:
       - any-glob-to-any-file:
-          - "build-logic/**"
           - "gradle/**"
           - "**/*.gradle.kts"
           - "gradlew"

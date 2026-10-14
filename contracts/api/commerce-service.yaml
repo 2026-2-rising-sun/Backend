@@ -941,7 +941,7 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {$ref: './common.yaml#/components/securitySchemes/BearerAuth'}
     ServiceToken: {"type": "apiKey", "in": "header", "name": "X-Service-Token", "description": "대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다."}
   parameters:
     GroupNumber:
@@ -1394,12 +1394,7 @@ components:
         status: {"$ref": "#/components/schemas/SalesStatus"}
         available: {"type": "integer", "format": "int64", "minimum": 0}
     ApiError:
-      type: "object"
-      required: ["code", "message", "requestId"]
-      properties:
-        code: {"type": "string"}
-        message: {"type": "string"}
-        requestId: {"type": ["string", "null"]}
+      $ref: './common.yaml#/components/schemas/ApiError'
     ErrorEnvelope:
       type: "object"
       required: ["success", "data", "error"]

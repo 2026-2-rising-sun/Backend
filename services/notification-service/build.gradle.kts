@@ -1,16 +1,15 @@
-plugins {
-    id("shoppinglive.spring-boot-service-conventions")
-    id("shoppinglive.module-boundary-conventions")
-}
+plugins { id("org.springframework.boot") }
 
 dependencies {
-    implementation(project(":libs:common-local"))
-    implementation(project(":libs:common-core"))
-    implementation(project(":libs:common-web"))
-    implementation(project(":libs:common-persistence"))
-    implementation(project(":libs:common-resilience"))
-    implementation(project(":libs:common-kafka"))
-    implementation(project(":contracts:events"))
+    implementation(project(":common-module"))
+    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 
-    testRuntimeOnly(libs.h2)
+    testRuntimeOnly("com.h2database:h2")
 }
+
+tasks.named<Jar>("jar") { enabled = false }

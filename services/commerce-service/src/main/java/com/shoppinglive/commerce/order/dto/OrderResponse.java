@@ -1,0 +1,43 @@
+package com.shoppinglive.commerce.order.dto;
+
+import com.shoppinglive.commerce.order.entity.Order;
+import com.shoppinglive.commerce.order.entity.OrderStatus;
+import java.time.Instant;
+
+/**
+ * 주문 조회 API 응답 DTO.
+ *
+ * <p>회원 식별자 · 멱등키 · buyerPhone 등 민감·내부 필드는 노출하지 않는다. buyerName 만 본인 확인용으로 표시.
+ */
+public record OrderResponse(
+        String orderNumber,
+        String productName,
+        Integer quantity,
+        Long unitPrice,
+        Long totalAmount,
+        Long discountAmount,
+        Long payableAmount,
+        OrderStatus status,
+        String buyerName,
+        Instant createdAt,
+        Instant expiresAt,
+        Instant cancelledAt,
+        String groupNumber) {
+
+    public static OrderResponse from(Order order) {
+        return new OrderResponse(
+                order.getOrderNumber(),
+                order.getProductNameSnapshot(),
+                order.getQuantity(),
+                order.getUnitPrice(),
+                order.getTotalAmount(),
+                order.getDiscountAmount(),
+                order.getPayableAmount(),
+                order.getStatus(),
+                order.getBuyerName(),
+                order.getCreatedAt(),
+                order.getExpiresAt(),
+                order.getCancelledAt(),
+                order.getPaymentGroup() == null ? null : order.getPaymentGroup().getGroupNumber());
+    }
+}
