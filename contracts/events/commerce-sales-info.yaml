@@ -2,16 +2,7 @@ asyncapi: 3.1.0
 info:
   title: Commerce 판매정보 이벤트 계약
   version: 1.0.0
-  description: |
-    commerce-service가 발행할 판매정보 전체 스냅샷의 계약이다.
-    현재 저장소에는 계약 타입과 생성 코드만 있으며, Kafka 발행자·구독자는 구현되지 않았다.
-    아래 send 동작은 구현 예정 계약이며 실제 발행·소비나 토픽 생성 완료를 의미하지 않는다.
-    브로커 주소·파티션 수·보관 기간·소비자 그룹 등 미확정 운영 설정은 명시하지 않는다.
-
-    공통 봉투 도입으로 기존 v1에 source와 aggregateId가 추가되었다.
-    기존 토픽과 schemaVersion은 유지했으며, 저장소 밖 기존 소비자와의 호환성은 확인되지 않았다.
-    이 명세와 코드를 자동 비교하는 이벤트 CI는 두지 않는다.
-x-implementation-status: contract-only
+  description: Commerce가 판매 등록·가격 변경·재고 변경·판매 상태 변경 시 전달하는 전체 판매정보 스냅샷의 계약.
 defaultContentType: application/json
 channels:
   salesInfo:
@@ -19,12 +10,11 @@ channels:
     description: |
       판매 등록·가격 변경·재고 변경·판매 상태 변경을 같은 토픽으로 전달하는 계약이다.
       Kafka key는 payload.salesId의 10진수 문자열이며 aggregateId와 같아야 한다.
-      같은 판매정보의 이벤트가 같은 파티션으로 가려면 발행 코드가 이 값을 key로 지정해야 한다.
+      같은 판매정보의 이벤트는 동일한 Kafka key를 사용한다.
 
       snapshotVersion은 판매정보별 전체 스냅샷의 변경 버전이다.
       소비자는 마지막으로 반영한 값보다 큰 버전만 반영하는 것을 계약으로 한다.
       occurredAt과 eventId로 순서를 판단하지 않는다.
-      이 규칙 자체가 중복 제거·순서 처리의 구현이나 동작 검증을 제공하지는 않는다.
     messages:
       SalesRegistered:
         $ref: '#/components/messages/SalesRegistered'
@@ -38,8 +28,7 @@ operations:
   publishSalesInfo:
     action: send
     title: 판매정보 스냅샷 발행 계약
-    description: commerce-service의 구현 예정 발행 동작. 구독 서비스의 내부 DTO는 이 명세에서 정의하지 않는다.
-    x-implementation-status: not-implemented
+    description: 판매정보 변경 시 해당 시점의 전체 스냅샷을 발행한다.
     channel:
       $ref: '#/channels/salesInfo'
     messages:
@@ -71,7 +60,7 @@ components:
                 const: SalesRegistered
       examples:
         - name: SalesRegistered예시
-          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          summary: 판매정보 전체 스냅샷 예시
           payload:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb1'
             eventType: SalesRegistered
@@ -102,7 +91,7 @@ components:
                 const: PriceChanged
       examples:
         - name: PriceChanged예시
-          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          summary: 판매정보 전체 스냅샷 예시
           payload:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb2'
             eventType: PriceChanged
@@ -133,7 +122,7 @@ components:
                 const: InventoryChanged
       examples:
         - name: InventoryChanged예시
-          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          summary: 판매정보 전체 스냅샷 예시
           payload:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb3'
             eventType: InventoryChanged
@@ -164,7 +153,7 @@ components:
                 const: SalesStatusChanged
       examples:
         - name: SalesStatusChanged예시
-          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          summary: 판매정보 전체 스냅샷 예시
           payload:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb4'
             eventType: SalesStatusChanged
@@ -186,7 +175,6 @@ components:
       description: |
         도메인 payload와 독립적인 공통 봉투. 필수값은 null일 수 없다.
         eventType·source·aggregateId는 공백만으로 구성될 수 없다.
-        구독자가 일부 payload 필드만 사용할 수 있지만, 알 수 없는 필드 무시는 구독 코드에서 설정해야 한다.
       required: [eventId, eventType, schemaVersion, source, aggregateId, occurredAt, payload]
       properties:
         eventId:
@@ -198,13 +186,13 @@ components:
           type: string
           minLength: 1
           pattern: '\S'
-          description: 이벤트 이름. 공통 Java 봉투는 문자열을 사용하며 지원 타입 판단은 도메인·소비자가 담당한다.
+          description: 이벤트 종류를 식별하는 이름
         schemaVersion:
           type: integer
           format: int32
           minimum: 1
           maximum: 2147483647
-          description: 이벤트 스키마 버전. 공통 봉투의 양수 검증과 소비자의 지원 버전 판단은 별개다.
+          description: 이벤트 데이터 형식의 버전
         source:
           type: string
           minLength: 1
@@ -214,11 +202,11 @@ components:
           type: string
           minLength: 1
           pattern: '\S'
-          description: 이벤트 대상의 식별자. Kafka key 지정은 별도 발행 구현이 담당한다.
+          description: 이벤트 대상의 식별자. 판매정보 이벤트에서는 판매 ID의 10진수 문자열이다.
         occurredAt:
           type: string
           format: date-time
-          description: 발생 시각을 표현하는 Instant. ISO 8601 형식으로 직렬화한다.
+          description: ISO 8601 형식의 이벤트 발생 시각
         payload:
           not: {type: 'null'}
           description: 이벤트별 업무 데이터. 판매정보 계약에서 전체 스냅샷으로 구체화한다.
@@ -247,7 +235,7 @@ components:
       examples: ['9001']
     SalesInfoSnapshot:
       type: object
-      description: 변경 필드만이 아닌 전체 판매정보 스냅샷. 일부 필드만 사용하는 구독 DTO와 공유할 필요는 없다.
+      description: 판매 ID·상품 ID·변경 버전·가격·상태·재고·통화를 포함한 전체 판매정보 스냅샷
       required: [salesId, productId, snapshotVersion, price, status, available, currency]
       properties:
         salesId:
