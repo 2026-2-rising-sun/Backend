@@ -1,67 +1,53 @@
-# Backend
+# ShoppingLive Backend
 
-라이브 커머스의 5개 서비스를 담은 JDK 21 / Gradle 멀티모듈 저장소입니다.
+JDK 21 / Gradle 기반 라이브 커머스 백엔드입니다.
 
-## 팀 문서
+| 서비스 | 담당 기능 | 로컬 포트 |
+|---|---|---|
+| [Member](services/member-service) | 회원·인증·세션 | 8081 |
+| [Shopping](services/shopping-service) | 상품·이미지 | 8082 |
+| [Commerce](services/commerce-service) | 판매·재고·쿠폰·장바구니·주문·결제·환불 | 8083 |
+| [Live](services/live-service) | 방송·채팅·좋아요·SSE | 8084 |
+| [Notification](services/notification-service) | 알림 서비스 시작 골격 | 8085 |
 
-팀 공유 문서의 최신 기준은 [📁 P2 백엔드](https://app.notion.com/p/3ec226545d158172991cd0137f4c7132)입니다.
-[ShoppingLive 팀 메인](https://app.notion.com/p/3e9226545d1581989a9edefd9da775c4)에서 전체 문서를 찾을 수 있습니다.
-진행 보고·테스트 방법·설계와 운영 절차는 Notion에서 관리하고, 실행 코드·OpenAPI YAML·검토 JSON은 Git에 유지합니다.
+서비스는 업무 도메인 안에 필요한 controller/service/repository/entity/dto 계층을 둡니다. 공통 웹·인증·JPA 코드와 인증 테스트 도구는 [common-module](common-module)에서 공유합니다. 서비스 사이의 Java 모듈 의존은 현재 사용하지 않으며, 이를 강제하는 별도 빌드 검사는 없습니다.
 
-- [진행 보고](https://app.notion.com/p/3ec226545d1581a392c6dfd15ca2e0a1) · [테스트 가이드](https://app.notion.com/p/3ec226545d1581b6a9c6f6820d0891e4)
-- [로컬 실행·수동 검수·회원 거래 전환](https://app.notion.com/p/3ec226545d158139b96fcba02d41c8f4)
-- [Apidog 협업](https://app.notion.com/p/3ec226545d1581978775f3425f4208ea) · [Prism·Swagger](https://app.notion.com/p/3ec226545d15813e81fdc4bc0e494a9a)
-- [계약 검토 기록](https://app.notion.com/p/3ec226545d1581cf807fe8a899c07787) · [Infra 설정](https://app.notion.com/p/3ec226545d15811087c4c552be01e341)
-
-## 실행 진입점
-
-빌드는 JDK 21과 저장소의 Gradle wrapper를 사용합니다. 로컬 API 도구는 Node.js 22 이상과 Docker가 필요합니다.
+## 빌드와 테스트
 
 ```sh
 ./gradlew build
-npm ci --prefix scripts/contracts --ignore-scripts
-node scripts/local/manual-review.cjs
+./gradlew test
+./gradlew integrationTest
+./gradlew spotlessApply
 ```
 
-수동 검수 도구는 전용 서비스·DB·키·계정을 준비하고, Ctrl-C로 자신의 자원만 정리합니다.
-개별 서비스의 필수 설정과 기존 DB 전환 절차는 위 로컬 실행 문서를 따릅니다.
+`build`는 단위·통합 테스트와 Java·KTS 포맷 검사를 포함합니다. 단위 테스트는 `src/test`, 통합 테스트는 `src/integrationTest`에 있습니다. 외부 PostgreSQL·Redis가 필요한 테스트는 환경을 지정하지 않으면 건너뛸 수 있습니다. 기본 빌드 성공을 실제 DB·전체 서비스 연동 성공으로 해석하지 않습니다.
 
-IntelliJ의 기본 Application 실행은 프로필 미지정 시 `local`을 선택합니다.
-로컬 인프라를 켠 뒤 Backend 루트에서 다음 명령을 한 번 실행하면 5개 서비스의 기본 실행 버튼을 사용할 수 있습니다.
-키·서비스 토큰은 Git에서 제외된 파일에만 저장되며, 기존 파일은 덮어쓰지 않습니다.
+[수동 DB workflow](.github/workflows/postgres.yml)는 테스트용 PostgreSQL·Redis를 준비하고, 대상 테스트가 실행됐는지와 실패·건너뜀이 없는지를 검사합니다. 이 workflow의 결과 확인 도구만 `.github/scripts`에 유지합니다. Prism과 외부 서비스 E2E·복구 검증 스크립트는 제거했으며, 그 검증 범위가 서비스 내부 테스트로 모두 대체된 것은 아닙니다.
+
+## 로컬 실행과 API 문서
 
 ```sh
 node scripts/local/auth-env.cjs create --access-ttl PT15M --refresh-ttl P30D --out build/local/ide-auth
+./gradlew :services:commerce-service:bootRun --args='--spring.profiles.active=local'
 ```
 
-명시적으로 지정한 프로필은 기존 실행 방식을 유지하고 로컬 자격 증명 파일을 읽지 않습니다.
-CLI·환경변수로 지정한 설정은 생성 파일보다 우선합니다.
+Notification 인증을 연결하려면 생성 파일에 `NOTIFICATION_MEMBER_SERVICE_TOKEN`이 있어야 합니다. 이전 생성 파일을 사용하는 경우 새 디렉터리에 인증 정보를 생성하고 모든 서비스가 같은 새 파일을 사용하도록 실행 설정을 갱신합니다. 기존 인증 파일은 생성 도구가 덮어쓰지 않습니다.
 
-| 목적 | 실행 파일·계약 |
-|---|---|
-| 실제 서비스 HTTP 통합 검사 | [run.cjs](scripts/integration/run.cjs) |
-| 수동 API 검수 환경 | [manual-review.cjs](scripts/local/manual-review.cjs) |
-| 로컬 키·서비스별 환경 준비 | [auth-env.cjs](scripts/local/auth-env.cjs) |
-| Prism·Swagger 실행 | [contracts.cjs](scripts/local/contracts.cjs) |
-| 계약 검사 명령 | [package.json](scripts/contracts/package.json) |
-| Apidog import용 bundle 생성 | [apidog-bundle.cjs](scripts/contracts/apidog-bundle.cjs) |
-| API 계약 원본·검토 근거 | [contracts/api](contracts/api) · [change-review.json](contracts/docs/change-review.json) |
+각 서비스에 필요한 DB·Redis와 외부 서비스 주소를 준비한 뒤 실행합니다. 인증 정보 생성 명령만으로 전체 실행 환경이 준비되는 것은 아닙니다. 기본 Application 실행은 프로필을 지정하지 않으면 local을 선택하며, 명시적으로 지정한 설정이 로컬 생성 파일보다 우선합니다.
 
-## 서비스와 인증 경계
+Member·Shopping·Commerce·Live의 local 프로필은 `/swagger-ui.html`과 `/v3/api-docs`를 제공합니다. 다른 환경에서는 `API_DOCS_ENABLED=true`로 활성화합니다. 현재 API 문서는 컨트롤러·DTO에서 Springdoc이 생성합니다.
 
-| 서비스 | 책임 | local 기본 포트 |
-|---|---|---|
-| [Member](services/member-service) | 회원·비밀번호·토큰·세션 | 8081 |
-| [Shopping](services/shopping-service) | 상품·이미지 | 8082 |
-| [Commerce](services/commerce-service) | 판매·재고·장바구니·주문·결제 | 8083 |
-| [Live](services/live-service) | 방송·방송 상품 연결 | 8084 |
-| [Notification](services/notification-service) | 알림 이벤트 소비 | 8085 |
+OpenAPI YAML 원본은 `contracts/api`에서만 관리합니다. CI는 서버를 실행하지 않고 Java 컨트롤러의 경로·HTTP 메서드를 문서와 양방향 비교합니다. 실제 응답·DTO 스키마·인증 동작은 이 검사 범위에 포함되지 않습니다. API 계약을 바꿀 때 문서도 함께 갱신하는 절차는 [AGENTS.md](AGENTS.md)에 있습니다. 기존 Flyway SQL은 적용 이력과 체크섬을 보존하기 위해 수정하지 않습니다. 옛 이관 문서 경로가 주석에 남아 있어도 현재 실행 안내로 사용하지 않습니다.
 
-Member·Shopping·Commerce·Live는 [common-security](libs/common-security)의 JWT 서명 검증을 사용하고 각 서비스에서 역할·리소스 소유권을 검사합니다.
-사용자 세션은 Member DB를 기준으로 확인하며 다른 서비스는 서명 검증 후 내부 상태 API를 호출합니다.
-상태 확인 장애는 인증된 요청의 503으로 처리하고, 무토큰 공개 조회와 별도 서비스 caller 인증은 분리합니다.
-장바구니·주문·결제는 회원 본인만 접근하며 상품·공개 방송 조회는 비회원에게 허용합니다. 판매자 관리 작업은 SELLER, 내부 API는 방향별 서비스 자격증명을 요구합니다.
+팀 문서: [ShoppingLive 팀 메인](https://app.notion.com/p/3e9226545d1581989a9edefd9da775c4)
 
-컨트롤러 경로는 `/v1/...`입니다. 이번 P2는 Gateway 없이 서비스에 직접 요청하며 프론트 연결도 포함하지 않습니다.
-서비스는 다른 서비스 모듈을 `project()`로 의존할 수 없습니다. 공통 라이브러리·이벤트 계약만 공유하며 모듈 경계 위반은 빌드에서 거절합니다.
-서비스 간 연결은 승인된 REST·이벤트 계약을 사용하고, 실제 결제·영상 연동의 검증 범위는 진행 보고에서 구분합니다.
+## API 정적 구조 검사
+
+```sh
+python3 -m venv .venv-api
+.venv-api/bin/python -m pip install -r .github/scripts/api/requirements.txt
+.venv-api/bin/python .github/scripts/api/check_structure.py
+```
+
+직접 선언한 Spring MVC 매핑을 읽습니다. 마지막 `/`, 조건부·개발용 매핑도 포함하며, 지원하지 않는 상속·매핑 표현식은 성공으로 넘기지 않고 실패합니다. 테스트는 `python -m unittest discover -s .github/scripts/api`로 실행합니다.

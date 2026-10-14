@@ -16,89 +16,42 @@ concurrency:
 
 jobs:
   build:
-    name: Build & unit tests
+    name: Build, unit and integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      application: ${{ steps.changes.outputs.application }}
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
-          fetch-depth: 0
-      - name: Select changed modules
-        id: changes
-        run: |
-          python3 - <<'PYTHON'
-          import json, os, subprocess
-          from pathlib import Path
-          known = {'member', 'shopping', 'commerce', 'live', 'notification'}
-          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
-          kind = os.environ['GITHUB_EVENT_NAME']
-          full = kind == 'workflow_dispatch'
-          paths = []
-          if kind == 'pull_request':
-              pr = event['pull_request']
-              comparison = pr['base']['sha'] + '...' + pr['head']['sha']
-          elif kind == 'push' and event['before'] != '0' * 40:
-              comparison = event['before'] + '..' + event['after']
-          else:
-              comparison, full = None, True
-          if comparison:
-              paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', comparison, '--']).decode().split('\0')[:-1]
-          selected, tooling = set(), False
-          for path in paths:
-              if path.lower().endswith(('.md', '.mdx', '.rst', '.adoc')) or path.startswith('docs/'):
-                  continue
-              if path.startswith(('.github/', 'scripts/')):
-                  tooling = True
-              elif path.startswith('contracts/') and not path.startswith('contracts/events/'):
-                  continue
-              elif path in {'.gitignore', '.gitattributes', '.editorconfig', 'LICENSE'}:
-                  continue
-              elif path.startswith('services/'):
-                  module = path.split('/')[1]
-                  service = module.removesuffix('-service')
-                  if service in known and module == service + '-service':
-                      selected.add(service)
-                  else:
-                      full = True
-              else:
-                  full = True
-          tasks = ['build'] if full else [f':services:{service}-service:build' for service in sorted(selected)]
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write('tasks=' + ' '.join(tasks) + '\n')
-              output.write('application=' + str(bool(tasks)).lower() + '\n')
-              output.write('tooling=' + str(tooling).lower() + '\n')
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-              summary.write('Gradle tasks: `' + (' '.join(tasks) or 'none (documentation/CI tooling only)') + '`\n')
-          PYTHON
-      - name: Check CI tooling syntax
-        if: steps.changes.outputs.tooling == 'true'
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Check workflow syntax
         run: |
           curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" .github/workflows/*.yml
-          node --test .github/scripts/test_size_labeler.cjs
-          for script in scripts/integration/*.cjs; do node --check "$script"; done
-      - uses: actions/setup-java@v5
-        if: steps.changes.outputs.application == 'true'
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-        if: steps.changes.outputs.application == 'true'
-      - name: Build and run unit tests
-        if: steps.changes.outputs.application == 'true'
-        env:
-          GRADLE_TASKS: ${{ steps.changes.outputs.tasks }}
+      - name: Check local configuration and database report tools
         run: |
-          read -ra tasks <<< "$GRADLE_TASKS"
-          ./gradlew "${tasks[@]}" --no-daemon --max-workers=2
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.changes.outputs.application == 'true'
+          node --test scripts/local/auth-env.test.cjs
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - uses: actions/setup-python@v5
         with:
-          name: unit-tests-${{ github.sha }}
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: .github/scripts/api/requirements.txt
+      - name: Compare declared API routes with OpenAPI
+        run: |
+          python -m pip install --requirement .github/scripts/api/requirements.txt
+          python -m unittest discover -s .github/scripts/api -p 'test_*.py'
+          python .github/scripts/api/check_structure.py
+      - name: Build and run tests
+        run: ./gradlew build --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-${{ github.sha }}
           path: |
             **/build/test-results/
             **/build/reports/tests/
@@ -107,7 +60,7 @@ jobs:
 
   publish:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.application == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       packages: write
