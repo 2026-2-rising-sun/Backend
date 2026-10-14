@@ -1,0 +1,315 @@
+package com.shoppinglive.commerce.order.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.shoppinglive.commerce.client.shopping.InMemoryShoppingClientStub;
+import com.shoppinglive.commerce.client.shopping.ProductSnapshot;
+import com.shoppinglive.commerce.sales.entity.Sales;
+import com.shoppinglive.commerce.sales.entity.SalesStatus;
+import com.shoppinglive.commerce.sales.entity.SalesStock;
+import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+
+/**
+ * 주문 1 주문서 확인 API 의 HTTP 계약 검증.
+ *
+ * <p>서비스 단위 테스트가 이미 판정 규칙을 덮으므로, 여기서는 상태코드와 라우팅처럼 서비스 계층에서 확인할 수 없는 것만 본다.
+ */
+@SpringBootTest(
+        properties =
+                "spring.datasource.url=jdbc:h2:mem:order_checkout_coupon_http;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
+@AutoConfigureMockMvc
+@Sql(
+        scripts = {
+            "/db/migration/V5__coupon_definitions.sql",
+            "/db/migration/V6__member_coupons.sql"
+        },
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
+class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSecurityTestSupport {
+
+    private static final long PRODUCT_ID = 700L;
+
+    @Autowired private MockMvc mockMvc;
+
+    @Autowired private InMemoryShoppingClientStub shoppingClientStub;
+
+    @Autowired private SalesJpaRepository salesRepository;
+
+    @Autowired private SalesStockJpaRepository salesStockRepository;
+
+    @Autowired private JdbcTemplate jdbc;
+
+    @Autowired private com.shoppinglive.commerce.order.repository.OrderJpaRepository orders;
+
+    @Autowired private com.shoppinglive.commerce.order.repository.PaymentGroupRepository groups;
+
+    @Autowired
+    private com.shoppinglive.commerce.payment.repository.PaymentAttemptJpaRepository payments;
+
+    private static final String COUPON_ID = "44444444-4444-4444-8444-444444444444";
+
+    @BeforeEach
+    void setUp() {
+        salesStockRepository.deleteAll();
+        salesRepository.deleteAll();
+        shoppingClientStub.clear();
+        shoppingClientStub.register(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null));
+
+        Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 15_000L, SalesStatus.ON_SALE));
+        salesStockRepository.save(new SalesStock(sales.getId(), 5, 0));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        jdbc.update(
+                """
+            INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,
+                starts_at,ends_at,expires_at,created_at) VALUES (?,?,?,5000,2,1,?,?,?,?)
+            """,
+                COUPON_ID,
+                SELLER,
+                "주문서 쿠폰",
+                Timestamp.from(now.minusSeconds(60)),
+                Timestamp.from(now.plusSeconds(3600)),
+                Timestamp.from(now.plusSeconds(7200)),
+                Timestamp.from(now));
+        jdbc.update(
+                "INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)",
+                COUPON_ID,
+                PRODUCT_ID);
+        jdbc.update(
+                "INSERT INTO member_coupon(id,coupon_id,member_id,status,claimed_at) VALUES (?,?,?,'AVAILABLE',?)",
+                "55555555-5555-4555-8555-555555555555",
+                COUPON_ID,
+                MEMBER_A,
+                Timestamp.from(now));
+    }
+
+    @AfterEach
+    void tearDown() {
+        payments.deleteAll();
+        orders.deleteAll();
+        groups.deleteAll();
+        jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_target WHERE coupon_id=?", COUPON_ID);
+        jdbc.update("DELETE FROM coupon_definition WHERE id=?", COUPON_ID);
+        salesStockRepository.deleteAll();
+        salesRepository.deleteAll();
+        shoppingClientStub.clear();
+    }
+
+    @Test
+    void 단건주문서에_보유쿠폰_할인을_계산하고_예약하지_않는다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=2&couponId=" + COUPON_ID)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.couponId").value(COUPON_ID))
+                .andExpect(jsonPath("$.totalAmount").value(30_000))
+                .andExpect(jsonPath("$.discountAmount").value(5_000))
+                .andExpect(jsonPath("$.payableAmount").value(25_000));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM member_coupon WHERE coupon_id=?",
+                                String.class,
+                                COUPON_ID))
+                .isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    void 단건주문생성은_미리보기와_같은_할인을_저장하고_쿠폰을_예약한다() throws Exception {
+        String body =
+                """
+            {"productId":%d,"quantity":2,"buyerName":"구매자","buyerPhone":"010-1234-5678",
+             "expectedTotalAmount":30000,"couponId":"%s"}
+            """
+                        .formatted(PRODUCT_ID, COUPON_ID);
+
+        mockMvc.perform(
+                        post("/v1/orders")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header(
+                                        OrderCreationController.IDEMPOTENCY_KEY_HEADER,
+                                        "single-coupon-order")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalAmount").value(30_000))
+                .andExpect(jsonPath("$.discountAmount").value(5_000))
+                .andExpect(jsonPath("$.payableAmount").value(25_000))
+                .andExpect(jsonPath("$.groupNumber").exists());
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM member_coupon WHERE coupon_id=?",
+                                String.class,
+                                COUPON_ID))
+                .isEqualTo("RESERVED");
+        assertThat(jdbc.queryForObject("SELECT coupon_id FROM payment_group", String.class))
+                .isEqualTo(COUPON_ID);
+        assertThat(jdbc.queryForObject("SELECT discount_amount FROM payment_group", Long.class))
+                .isEqualTo(5_000L);
+        assertThat(jdbc.queryForObject("SELECT payable_amount FROM payment_group", Long.class))
+                .isEqualTo(25_000L);
+
+        mockMvc.perform(
+                        post("/v1/orders")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header(
+                                        OrderCreationController.IDEMPOTENCY_KEY_HEADER,
+                                        "single-coupon-order")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.discountAmount").value(5_000));
+        mockMvc.perform(
+                        post("/v1/orders")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header(
+                                        OrderCreationController.IDEMPOTENCY_KEY_HEADER,
+                                        "single-coupon-order")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body.replace(",\"couponId\":\"" + COUPON_ID + "\"", "")))
+                .andExpect(status().isConflict());
+        assertThat(orders.count()).isEqualTo(1);
+    }
+
+    @Test
+    void 단건주문에_대상아닌_쿠폰을_보내면_주문재고쿠폰을_변경하지_않는다() throws Exception {
+        jdbc.update(
+                "UPDATE coupon_target SET product_id=? WHERE coupon_id=?",
+                PRODUCT_ID + 1,
+                COUPON_ID);
+        String body =
+                """
+            {"productId":%d,"quantity":2,"buyerName":"구매자","buyerPhone":"010-1234-5678",
+             "expectedTotalAmount":30000,"couponId":"%s"}
+            """
+                        .formatted(PRODUCT_ID, COUPON_ID);
+
+        mockMvc.perform(
+                        post("/v1/orders")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isConflict());
+
+        assertThat(orders.count()).isZero();
+        assertThat(groups.count()).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM member_coupon WHERE coupon_id=?",
+                                String.class,
+                                COUPON_ID))
+                .isEqualTo("AVAILABLE");
+        assertThat(salesStockRepository.findAll())
+                .extracting(SalesStock::getAvailable)
+                .containsExactly(5);
+        assertThat(salesStockRepository.findAll())
+                .extracting(SalesStock::getReserved)
+                .containsExactly(0);
+    }
+
+    @Test
+    void 구매불가_상품에는_쿠폰을_적용할_수_없다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=6&couponId=" + COUPON_ID)
+                .andExpect(status().isConflict());
+    }
+
+    private ResultActions checkout(String query) throws Exception {
+        return mockMvc.perform(
+                get("/v1/orders/checkout" + query).header("Authorization", bearer(MEMBER_A)));
+    }
+
+    @Test
+    void 주문_가능하면_200과_총액을_돌려준다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=2")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.productName").value("테스트 상품"))
+                .andExpect(jsonPath("$.unitPrice").value(15_000))
+                .andExpect(jsonPath("$.totalAmount").value(30_000))
+                .andExpect(jsonPath("$.orderable").value(true))
+                .andExpect(jsonPath("$.reason").doesNotExist());
+    }
+
+    @Test
+    void 재고보다_많으면_200이면서_사유를_준다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=6")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderable").value(false))
+                .andExpect(jsonPath("$.reason").value("EXCEEDS_STOCK"))
+                .andExpect(jsonPath("$.available").value(5));
+    }
+
+    /**
+     * 주문 1 완료 기준: "주문서 확인 중에는 재고가 줄지 않고, 실제 주문 생성 때만 재고를 확보한다". 주문서를 여러 번 열어봐도 DB 재고가 그대로여야 한다. 그렇지
+     * 않으면 결제까지 가지 않고 이탈한 사람들 때문에 팔 수 있는 물건이 묶인다.
+     */
+    @Test
+    void 주문서를_여러번_열어도_재고가_줄지_않는다() throws Exception {
+        Long salesId = salesRepository.findByProductId(PRODUCT_ID).orElseThrow().getId();
+
+        for (int i = 0; i < 3; i++) {
+            checkout("?productId=" + PRODUCT_ID + "&quantity=2").andExpect(status().isOk());
+        }
+
+        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        assertThat(stock.getAvailable()).isEqualTo(5);
+        assertThat(stock.getReserved()).isZero();
+    }
+
+    @Test
+    void 판매정보가_없는_상품이면_404() throws Exception {
+        checkout("?productId=999999&quantity=1")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void 수량이_잘못되면_400() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=0").andExpect(status().isBadRequest());
+        checkout("?productId=" + PRODUCT_ID + "&quantity=-1").andExpect(status().isBadRequest());
+        checkout("?productId=" + PRODUCT_ID + "&quantity=1.5").andExpect(status().isBadRequest());
+        checkout("?productId=" + PRODUCT_ID + "&quantity=abc").andExpect(status().isBadRequest());
+        checkout("?productId=" + PRODUCT_ID).andExpect(status().isBadRequest());
+    }
+
+    /**
+     * {@code productId} 를 {@code Long} 으로 받으면 숫자가 아닌 값은 타입 변환 실패가 된다. 공통 예외 핸들러에 맡기면 500 이 되므로 전용
+     * 매핑으로 400 을 보장한다.
+     */
+    @Test
+    void productId가_숫자가_아니면_400() throws Exception {
+        checkout("?productId=abc&quantity=1").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void productId가_없으면_400() throws Exception {
+        checkout("?quantity=1").andExpect(status().isBadRequest());
+    }
+
+    /**
+     * {@code /v1/orders/checkout} 은 {@code /v1/orders/&#123;orderNumber&#125;} 와 경로가 겹칠 수 있다. 리터럴이
+     * 먼저 매칭되는 것이 Spring 의 규칙이지만, 주문 조회 컨트롤러로 잘못 흘러가면 비밀번호 헤더가 없다는 이유로 엉뚱한 응답이 나가므로 회귀를 막아둔다.
+     */
+    @Test
+    void checkout_경로가_주문번호_조회로_새지_않는다() throws Exception {
+        checkout("?productId=" + PRODUCT_ID + "&quantity=1")
+                .andExpect(status().isOk())
+                .andExpect(handler().handlerType(OrderCheckoutController.class));
+    }
+}
