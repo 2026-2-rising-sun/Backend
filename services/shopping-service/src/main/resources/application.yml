@@ -40,6 +40,11 @@ shopping:
     connect-timeout: 1s
     read-timeout: 1s
     service-token: ${SHOPPING_COMMERCE_SERVICE_TOKEN:}
+  # 판매정보 조회 원본. http = Commerce 를 요청마다 호출(기본), replica = product_sales 사본을 읽는다.
+  # 기동 때 한 번만 읽으므로 바꾸면 rolling restart 가 필요하다. consume 은 두 모드 모두 계속 돈다.
+  # replica 로 바꾸는 것은 부모 이슈 #203 의 운영 전환 gate 를 모두 통과한 뒤에만 한다.
+  sales:
+    source: http
 
 shoppinglive:
   security:
@@ -112,6 +117,11 @@ spring:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
+  kafka:
+    # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
+    consumer:
+      group-id: shopping-service
 
 # 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
 # sales-client.base-url 은 로컬에서 따로 띄운 commerce-service(server.port 8083)다.
@@ -142,6 +152,11 @@ spring:
     url: jdbc:postgresql://postgres:5432/shopping
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
+  kafka:
+    # 클러스터 안에서는 브로커의 PLAINTEXT 리스너로 바로 붙는다 (local 의 EXTERNAL 29092 아님).
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: shopping-service
 
 # Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
 # 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.

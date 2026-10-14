@@ -27,6 +27,7 @@ public final class LocalApplication {
                     "SHOPPING_MEMBER_SERVICE_TOKEN",
                     "COMMERCE_MEMBER_SERVICE_TOKEN",
                     "LIVE_MEMBER_SERVICE_TOKEN",
+                    "NOTIFICATION_MEMBER_SERVICE_TOKEN",
                     "COMMERCE_SHOPPING_SERVICE_TOKEN",
                     "LIVE_SHOPPING_SERVICE_TOKEN",
                     "SHOPPING_COMMERCE_SERVICE_TOKEN",

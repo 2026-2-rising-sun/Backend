@@ -30,6 +30,8 @@ class CouponClaimPolicyTest {
                         "");
         new ResourceDatabasePopulator(
                         new ClassPathResource("db/migration/V5__coupon_definitions.sql"),
+                        new ClassPathResource(
+                                "db/migration/V17__coupon_display_snapshot_version.sql"),
                         new ClassPathResource("db/migration/V6__member_coupons.sql"))
                 .execute(ds);
         new JdbcTemplate(ds)
@@ -47,10 +49,24 @@ class CouponClaimPolicyTest {
         var ds = database();
         var jdbc = new JdbcTemplate(ds);
         var manager = new DataSourceTransactionManager(ds);
-        var atStart = new CouponClaimService(jdbc, manager, Clock.fixed(start, ZoneOffset.UTC));
+        var atStart =
+                new CouponClaimService(
+                        jdbc,
+                        manager,
+                        Clock.fixed(start, ZoneOffset.UTC),
+                        org.mockito.Mockito.mock(
+                                com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher
+                                        .class));
         var receipt = atStart.claim("member", "coupon");
         assertThat(receipt.created()).isTrue();
-        var atEnd = new CouponClaimService(jdbc, manager, Clock.fixed(end, ZoneOffset.UTC));
+        var atEnd =
+                new CouponClaimService(
+                        jdbc,
+                        manager,
+                        Clock.fixed(end, ZoneOffset.UTC),
+                        org.mockito.Mockito.mock(
+                                com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher
+                                        .class));
         assertThatThrownBy(() -> atEnd.claim("other", "coupon"))
                 .isInstanceOf(BusinessException.class);
         var replay = atEnd.claim("member", "coupon");
@@ -81,7 +97,10 @@ class CouponClaimPolicyTest {
                 new CouponClaimService(
                         failing,
                         new DataSourceTransactionManager(ds),
-                        Clock.fixed(start, ZoneOffset.UTC));
+                        Clock.fixed(start, ZoneOffset.UTC),
+                        org.mockito.Mockito.mock(
+                                com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher
+                                        .class));
         assertThatThrownBy(() -> service.claim("member", "coupon"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(jdbc.queryForObject("SELECT issued_count FROM coupon_definition", Integer.class))

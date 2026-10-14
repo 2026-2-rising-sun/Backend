@@ -37,15 +37,17 @@ class PostgresLikeTest extends LiveSecuritySupport {
                                         "arn:aws:ivs:channel/" + name,
                                         "https://example.com/" + name))
                         .getId();
-        jdbc.update("UPDATE broadcast SET status = 'LIVE' WHERE id = ?", id);
+        // 운영 전이와 맞추기 위해 started_at 도 함께 세팅한다. end() 가 Kafka payload 를 만들면서
+        // non-null startedAt 을 요구하기 때문.
+        jdbc.update(
+                "UPDATE broadcast SET status = 'LIVE', started_at = CURRENT_TIMESTAMP WHERE id = ?",
+                id);
         return id;
     }
 
     private void concurrent(List<Callable<Void>> work) throws Exception {
         try (var pool = Executors.newFixedThreadPool(12)) {
-            for (var result : pool.invokeAll(work)) {
-                result.get();
-            }
+            for (var result : pool.invokeAll(work)) result.get();
         }
     }
 
@@ -54,13 +56,12 @@ class PostgresLikeTest extends LiveSecuritySupport {
         final long id = live();
         final String member = UUID.randomUUID().toString(), key = UUID.randomUUID().toString();
         final List<Callable<Void>> work = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 100; i++)
             work.add(
                     () -> {
                         likes.set(id, member, key, true);
                         return null;
                     });
-        }
         concurrent(work);
         assertThat(likes.total(id).total()).isEqualTo(1);
         assertThat(
@@ -70,13 +71,12 @@ class PostgresLikeTest extends LiveSecuritySupport {
                                 id))
                 .isEqualTo(1);
         work.clear();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 100; i++)
             work.add(
                     () -> {
                         likes.set(id, member, UUID.randomUUID().toString(), true);
                         return null;
                     });
-        }
         concurrent(work);
         assertThat(likes.total(id).total()).isEqualTo(1);
         assertThat(likes.total(id).version()).isEqualTo(1);
@@ -100,13 +100,12 @@ class PostgresLikeTest extends LiveSecuritySupport {
         concurrent(work);
         assertThat(likes.total(id).total()).isEqualTo(100);
         work.clear();
-        for (String member : members) {
+        for (String member : members)
             work.add(
                     () -> {
                         likes.set(id, member, UUID.randomUUID().toString(), false);
                         return null;
                     });
-        }
         concurrent(work);
         assertThat(likes.total(id).total()).isZero();
         assertThat(likes.total(id).version()).isEqualTo(200);
@@ -140,7 +139,7 @@ class PostgresLikeTest extends LiveSecuritySupport {
     void failedLedgerWriteRollsBackTheStateAndAggregate() {
         final long id = live();
         final String member = UUID.randomUUID().toString();
-        // 회원 상태와 집계가 모두 변경된 뒤 트랜잭션의 마지막 단계에서 오류를 발생시킨다.
+        // Fail the final transaction step after both member state and aggregate were changed.
         jdbc.execute(
                 "ALTER TABLE broadcast_like_request ADD CONSTRAINT test_reject_like_ledger CHECK (broadcast_id <> "
                         + id

@@ -1,5 +1,6 @@
 package com.shoppinglive.commerce.order.service;
 
+import com.shoppinglive.commerce.sales.event.SalesInfoEventTracker;
 import com.shoppinglive.common.core.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,10 +10,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PurchaseGuard {
+    private final SalesInfoEventTracker events;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate independent;
 
-    public PurchaseGuard(JdbcTemplate jdbc, PlatformTransactionManager manager) {
+    public PurchaseGuard(
+            JdbcTemplate jdbc, PlatformTransactionManager manager, SalesInfoEventTracker events) {
+        this.events = events;
         this.jdbc = jdbc;
         independent = new TransactionTemplate(manager);
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -57,11 +61,6 @@ public class PurchaseGuard {
     }
 
     public void lockSales(long id) {
-        // 모든 재고 변경 경로에서 재고를 먼저 잠그고 판매정보를 잠그는 순서를 일관되게 유지한다.
-        jdbc.queryForObject(
-                "SELECT sales_info_id FROM sales_stock WHERE sales_info_id=? FOR UPDATE",
-                Long.class,
-                id);
-        jdbc.queryForObject("SELECT id FROM sales_info WHERE id=? FOR UPDATE", Long.class, id);
+        events.watch(id);
     }
 }

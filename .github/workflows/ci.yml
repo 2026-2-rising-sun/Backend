@@ -61,6 +61,9 @@ jobs:
       - name: Compare declared API routes with OpenAPI
         if: steps.changes.outputs.api == 'true'
         run: python .github/scripts/api/check_structure.py
+      - name: Check event contracts and examples
+        if: steps.changes.outputs.events == 'true'
+        run: python .github/scripts/api/check_events.py
       - name: Run selected Gradle work
         id: gradle
         if: steps.changes.outputs.gradle_tasks != '[]'
@@ -72,6 +75,9 @@ jobs:
           tasks = json.loads(os.environ['GRADLE_TASKS'])
           subprocess.run(['./gradlew', *tasks, '--no-daemon', '--max-workers=2'], check=True)
           PY
+      - name: Check serialized event samples
+        if: steps.changes.outputs.event_samples == 'true'
+        run: python .github/scripts/api/check_events.py --samples
       - name: Start PostgreSQL only for migration checks
         if: steps.changes.outputs.migration_tasks != '[]'
         env:
@@ -107,6 +113,9 @@ jobs:
           SHOPPING_TEST_POSTGRES_USER: postgres
           SHOPPING_TEST_POSTGRES_PASSWORD: test
           NOTIFICATION_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/notification_test
+          NOTIFICATION_TEST_DB_DRIVER: org.postgresql.Driver
+          NOTIFICATION_TEST_DB_USER: postgres
+          NOTIFICATION_TEST_DB_PASSWORD: test
           LIVE_PG_TEST: '1'
           LIVE_PG_PORT: '55432'
         run: |

@@ -17,6 +17,7 @@ shoppinglive:
       shopping: ${SHOPPING_MEMBER_SERVICE_TOKEN}
       commerce: ${COMMERCE_MEMBER_SERVICE_TOKEN}
       live: ${LIVE_MEMBER_SERVICE_TOKEN}
+      notification: ${NOTIFICATION_MEMBER_SERVICE_TOKEN}
 
 member:
   auth:

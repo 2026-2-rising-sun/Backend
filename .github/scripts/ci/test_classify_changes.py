@@ -155,6 +155,24 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(plan["redis_tasks"], [])
         self.assertFalse(plan["run_tests"])
 
+    def test_event_checks_follow_producer_builds_and_shared_changes(self):
+        for service in ("commerce-service", "live-service"):
+            plan = classify([Change("services/" + service + "/src/main/java/Example.java",
+                                    b'class Example {}', b'class Example { int value; }')])
+            self.assertTrue(plan["events"])
+            self.assertTrue(plan["event_samples"])
+        plan = classify([Change("services/member-service/src/main/java/Example.java",
+                                b'class Example {}', b'class Example { int value; }')])
+        self.assertFalse(plan["event_samples"])
+        self.assertFalse(plan["events"])
+        self.assertTrue(classify([Change("contracts/events/commerce-coupon.yaml", b"a", b"b")])["event_samples"])
+        self.assertFalse(classify([Change("README.md", b"a", b"b")])["events"])
+
+    def test_notification_migration_is_selected_by_sql_and_full_fallback(self):
+        plan = classify([Change("services/notification-service/src/main/resources/db/migration/V1__notification_baseline.sql", b"a", b"b")])
+        self.assertEqual(plan["migration_tasks"], [":services:notification-service:migrationTest"])
+        self.assertIn(":services:notification-service:migrationTest", classify([], "fallback")["migration_tasks"])
+
     def test_redis_config_values_not_unrelated_yaml_keys_select_redis(self):
         path = "services/live-service/src/main/resources/application.yml"
         before = b'spring:\n  data:\n    redis:\n      timeout: 1s\nserver:\n  port: 8084\n'

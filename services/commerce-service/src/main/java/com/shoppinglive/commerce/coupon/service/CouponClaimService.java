@@ -1,5 +1,7 @@
 package com.shoppinglive.commerce.coupon.service;
 
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher;
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher.Type;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.Timestamp;
@@ -34,16 +36,25 @@ public class CouponClaimService {
             Instant endsAt,
             Instant expiresAt) {}
 
+    private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public CouponClaimService(JdbcTemplate jdbc, PlatformTransactionManager manager) {
-        this(jdbc, manager, Clock.systemUTC());
+    public CouponClaimService(
+            JdbcTemplate jdbc,
+            PlatformTransactionManager manager,
+            CouponDisplayEventPublisher events) {
+        this(jdbc, manager, Clock.systemUTC(), events);
     }
 
-    public CouponClaimService(JdbcTemplate jdbc, PlatformTransactionManager manager, Clock clock) {
+    public CouponClaimService(
+            JdbcTemplate jdbc,
+            PlatformTransactionManager manager,
+            Clock clock,
+            CouponDisplayEventPublisher events) {
+        this.events = events;
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(manager);
         this.clock = clock;
@@ -85,6 +96,14 @@ public class CouponClaimService {
                             couponId,
                             member,
                             Timestamp.from(now));
+                    var definition = definitions.getFirst();
+                    if (((Number) definition.get("issued_count")).intValue() + 1
+                            == ((Number) definition.get("issuance_limit")).intValue()) {
+                        jdbc.update(
+                                "UPDATE coupon_definition SET snapshot_version=snapshot_version+1 WHERE id=?",
+                                couponId);
+                        events.publish(Type.CouponSoldOut, couponId);
+                    }
                     return new Claim(owned(member, couponId).getFirst(), true);
                 });
     }

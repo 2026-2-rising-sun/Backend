@@ -83,6 +83,20 @@ public class LiveSecurityConfiguration {
                                                 HttpMethod.DELETE,
                                                 "/v1/admin/broadcasts/{id}/products/{linkId}")
                                         .hasRole("SELLER")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/broadcasts/{broadcastId}/promotions")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/admin/broadcasts/{broadcastId}/promotions")
+                                        .hasRole("SELLER")
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/v1/admin/broadcasts/{broadcastId}/promotions",
+                                                "/v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/open",
+                                                "/v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/close")
+                                        .hasRole("SELLER")
                                         .anyRequest()
                                         .denyAll())
                 .oauth2ResourceServer(

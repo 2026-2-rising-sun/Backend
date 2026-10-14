@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.sales.service;
 import com.shoppinglive.commerce.sales.entity.Sales;
 import com.shoppinglive.commerce.sales.entity.SalesStatus;
 import com.shoppinglive.commerce.sales.entity.SalesStock;
+import com.shoppinglive.commerce.sales.event.SalesInfoEventTracker;
 import com.shoppinglive.commerce.sales.exception.ConcurrentStateChangeException;
 import com.shoppinglive.commerce.sales.exception.IllegalStateTransitionException;
 import com.shoppinglive.commerce.sales.exception.InsufficientStockException;
@@ -22,11 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SalesService {
 
+    private final SalesInfoEventTracker events;
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
 
     public SalesService(
-            SalesJpaRepository salesRepository, SalesStockJpaRepository salesStockRepository) {
+            SalesJpaRepository salesRepository,
+            SalesStockJpaRepository salesStockRepository,
+            SalesInfoEventTracker events) {
+        this.events = events;
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
     }
@@ -40,6 +45,7 @@ public class SalesService {
      */
     @Transactional
     public Sales changePrice(Long salesId, Long newPrice) {
+        events.watch(salesId);
         Sales sales =
                 salesRepository
                         .findById(salesId)
@@ -59,6 +65,7 @@ public class SalesService {
      */
     @Transactional
     public SalesStock adjustAvailable(Long salesId, int delta) {
+        events.watch(salesId);
         int updated = salesStockRepository.adjustAvailable(salesId, delta);
         if (updated == 0) {
             if (!salesStockRepository.existsById(salesId)) {
@@ -77,6 +84,7 @@ public class SalesService {
     /** 취소·만료·결제 실패의 재고 복구와 품절 해제를 같은 트랜잭션으로 처리한다. */
     @Transactional
     public void restoreReserved(Long salesId, int quantity) {
+        events.watch(salesId);
         if (salesStockRepository.restoreReserved(salesId, quantity) != 1) {
             throw new IllegalStateException("복원할 예약 재고가 부족합니다: salesId=" + salesId);
         }
@@ -123,6 +131,7 @@ public class SalesService {
                     "관리자가 직접 변경할 수 없는 판매 상태입니다: " + requestedTarget);
         }
 
+        events.watch(salesId);
         Sales sales =
                 salesRepository
                         .findById(salesId)

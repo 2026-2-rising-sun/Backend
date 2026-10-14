@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @Sql(
         scripts = {
             "/db/migration/V5__coupon_definitions.sql",
+            "/db/migration/V17__coupon_display_snapshot_version.sql",
             "/db/migration/V6__member_coupons.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)

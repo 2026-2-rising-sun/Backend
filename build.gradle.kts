@@ -79,11 +79,14 @@ subprojects {
             useJUnitPlatform { excludeTags("postgres", "redis") }
             dependsOn(tasks.named("testClasses"))
             shouldRunAfter(tasks.named("test"))
-            if (project.name == "member-service") {
-                // Member의 공통 테스트 지원 코드는 이 환경변수로 DB를 선택한다.
-                val dbEnvironment = System.getenv().filterKeys { it.startsWith("MEMBER_TEST_DB_") }
+            if (project.name in setOf("member-service", "notification-service")) {
+                // 이 두 서비스의 일반 테스트 설정은 환경변수로 DB를 선택한다.
+                val dbPrefix =
+                    if (project.name == "member-service") "MEMBER_TEST_DB_"
+                    else "NOTIFICATION_TEST_"
+                val dbEnvironment = System.getenv().filterKeys { it.startsWith(dbPrefix) }
                 inputs.properties(dbEnvironment)
-                outputs.upToDateWhen { dbEnvironment["MEMBER_TEST_DB_URL"].isNullOrBlank() }
+                outputs.upToDateWhen { dbEnvironment.values.all { it.isBlank() } }
             }
         }
     tasks.named("check") { dependsOn(integrationTest) }

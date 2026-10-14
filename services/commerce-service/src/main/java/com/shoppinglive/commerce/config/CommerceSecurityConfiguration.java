@@ -23,14 +23,15 @@ public class CommerceSecurityConfiguration {
             HttpSecurity http, ServiceCallerTokenValidator callers, JsonSecurityErrorHandler errors)
             throws Exception {
         return http.securityMatcher(
-                        request ->
-                                "GET".equals(request.getMethod())
-                                        && "/v1/sales"
-                                                .equals(
-                                                        request.getRequestURI()
-                                                                .substring(
-                                                                        request.getContextPath()
-                                                                                .length())))
+                        request -> {
+                            String path =
+                                    request.getRequestURI()
+                                            .substring(request.getContextPath().length());
+                            return "GET".equals(request.getMethod())
+                                    && ("/v1/sales".equals(path)
+                                            || "/v1/internal/coupon-snapshots".equals(path)
+                                            || path.startsWith("/v1/internal/coupon-snapshots/"));
+                        })
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -42,6 +43,11 @@ public class CommerceSecurityConfiguration {
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/v1/sales")
                                         .hasAnyAuthority("SERVICE_shopping", "SERVICE_live")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/internal/coupon-snapshots",
+                                                "/v1/internal/coupon-snapshots/*")
+                                        .hasAuthority("SERVICE_shopping")
                                         .anyRequest()
                                         .denyAll())
                 .addFilterBefore(

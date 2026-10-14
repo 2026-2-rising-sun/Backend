@@ -5,6 +5,7 @@ import com.shoppinglive.commerce.client.shopping.ShoppingClient;
 import com.shoppinglive.commerce.sales.entity.Sales;
 import com.shoppinglive.commerce.sales.entity.SalesStatus;
 import com.shoppinglive.commerce.sales.entity.SalesStock;
+import com.shoppinglive.commerce.sales.event.SalesInfoEventTracker;
 import com.shoppinglive.commerce.sales.exception.SalesAlreadyRegisteredException;
 import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
@@ -31,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class SalesRegistrationService {
 
+    private final SalesInfoEventTracker events;
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
     private final ShoppingClient shoppingClient;
@@ -40,7 +42,9 @@ public class SalesRegistrationService {
             SalesJpaRepository salesRepository,
             SalesStockJpaRepository salesStockRepository,
             ShoppingClient shoppingClient,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            SalesInfoEventTracker events) {
+        this.events = events;
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
         this.shoppingClient = shoppingClient;
@@ -99,6 +103,7 @@ public class SalesRegistrationService {
                                 salesRepository.saveAndFlush(
                                         new Sales(productId, price, SalesStatus.READY));
                         salesStockRepository.save(new SalesStock(saved.getId(), initialStock, 0));
+                        events.registered(saved.getId());
                         return saved;
                     });
         } catch (DataIntegrityViolationException e) {

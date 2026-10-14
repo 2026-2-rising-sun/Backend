@@ -1,11 +1,15 @@
 package com.shoppinglive.shopping.client.commerce;
 
 import com.shoppinglive.common.web.ServiceRestClientFactory;
+import com.shoppinglive.shopping.sales.repository.ProductSalesRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
@@ -25,7 +29,11 @@ public class SalesClientConfiguration {
             RestClient.Builder restClientBuilder,
             SalesClientProperties properties,
             CircuitBreakerRegistry circuitBreakerRegistry,
-            RetryRegistry retryRegistry) {
+            RetryRegistry retryRegistry,
+            @Value("${shopping.sales.source:http}") String source) {
+        if (!"http".equals(source) && !"replica".equals(source))
+            throw new IllegalStateException(
+                    "shopping.sales.source는 http 또는 replica여야 합니다: " + source);
         if (!StringUtils.hasText(properties.baseUrl())) {
             throw new IllegalStateException("shopping.sales-client.base-url 설정이 필요합니다.");
         }
@@ -45,5 +53,12 @@ public class SalesClientConfiguration {
                 restClient,
                 circuitBreakerRegistry.circuitBreaker(HttpSalesInfoClient.RESILIENCE_INSTANCE),
                 retryRegistry.retry(HttpSalesInfoClient.RESILIENCE_INSTANCE));
+    }
+
+    @Bean
+    @Primary
+    @ConditionalOnProperty(prefix = "shopping.sales", name = "source", havingValue = "replica")
+    ReplicaSalesInfoClient replicaSalesInfoClient(ProductSalesRepository replica) {
+        return new ReplicaSalesInfoClient(replica);
     }
 }
