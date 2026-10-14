@@ -24,6 +24,28 @@ class LiveBroadcastEventContractTest {
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Test
+    void exportsActualSerializedPromotionEventsForYamlValidation() throws Exception {
+        var directory = java.nio.file.Path.of("build/contract-samples");
+        java.nio.file.Files.createDirectories(directory);
+        var at = Instant.parse("2026-10-25T12:10:00Z");
+        Object[] payloads = {
+            new LiveBroadcastPromotionOpenedPayload(
+                    42, 11, 1, "COUPON_DROP", "쿠폰 안내", java.util.Map.of(), at, null),
+            new LiveBroadcastPromotionClosedPayload(
+                    42, 11, 2, "COUPON_DROP", "EXPIRED", at, at.plusSeconds(300))
+        };
+        var types = List.of("LiveBroadcastPromotionOpened", "LiveBroadcastPromotionClosed");
+        for (int index = 0; index < types.size(); index++) {
+            var type = types.get(index);
+            var event = EventEnvelope.create(type, 1, "live-service", "42", at, payloads[index]);
+            mapper.writeValue(
+                    directory.resolve(type + ".json").toFile(),
+                    java.util.Map.of(
+                            "contract", "live-broadcast.yaml", "message", type, "payload", event));
+        }
+    }
+
+    @Test
     void exportsActualSerializedEventsForYamlContractValidation() throws Exception {
         var directory = java.nio.file.Path.of("build/contract-samples");
         java.nio.file.Files.createDirectories(directory);
@@ -105,7 +127,12 @@ class LiveBroadcastEventContractTest {
         assertEquals("broadcastId", LiveBroadcastEventContract.MESSAGE_KEY_FIELD);
         assertEquals("42", LiveBroadcastEventContract.messageKey(42));
         assertEquals(
-                List.of("LiveBroadcastScheduled", "LiveBroadcastStarted", "LiveBroadcastEnded"),
+                List.of(
+                        "LiveBroadcastScheduled",
+                        "LiveBroadcastStarted",
+                        "LiveBroadcastEnded",
+                        "LiveBroadcastPromotionOpened",
+                        "LiveBroadcastPromotionClosed"),
                 Arrays.stream(LiveBroadcastEventType.values()).map(Enum::name).toList());
     }
 

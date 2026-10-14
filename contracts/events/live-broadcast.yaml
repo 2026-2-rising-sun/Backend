@@ -8,8 +8,10 @@ defaultContentType: application/json
 channels:
   broadcast:
     address: live.broadcast.v1
-    description: Kafka key와 aggregateId는 payload.broadcastId의 10진 문자열이다. eventId로
-      중복을 식별하고 방송 상태 스냅샷은 broadcastVersion으로 최신 여부를 판단한다. 모르는 eventType은 무시한다.
+    description: Kafka key와 aggregateId는 broadcastId의 10진 문자열이다. eventId로 중복을 식별한다.
+      방송 상태는 broadcastVersion, 프로모션 상태는 promotionId별 promotionVersion을 비교하며 서로 다른
+      집계의 버전을 비교하지 않는다. 단일 릴레이에서 종료와 함께 기록하는 Closed 이벤트들은 Ended보다 먼저 기록된다. 다중 릴레이의
+      도착 순서는 보장하지 않는다. 모르는 eventType은 무시한다.
     messages:
       LiveBroadcastScheduled:
         $ref: '#/components/messages/LiveBroadcastScheduled'
@@ -17,6 +19,10 @@ channels:
         $ref: '#/components/messages/LiveBroadcastStarted'
       LiveBroadcastEnded:
         $ref: '#/components/messages/LiveBroadcastEnded'
+      LiveBroadcastPromotionOpened:
+        $ref: '#/components/messages/LiveBroadcastPromotionOpened'
+      LiveBroadcastPromotionClosed:
+        $ref: '#/components/messages/LiveBroadcastPromotionClosed'
 operations:
   publishBroadcast:
     action: send
@@ -26,6 +32,8 @@ operations:
     - $ref: '#/channels/broadcast/messages/LiveBroadcastScheduled'
     - $ref: '#/channels/broadcast/messages/LiveBroadcastStarted'
     - $ref: '#/channels/broadcast/messages/LiveBroadcastEnded'
+    - $ref: '#/channels/broadcast/messages/LiveBroadcastPromotionOpened'
+    - $ref: '#/channels/broadcast/messages/LiveBroadcastPromotionClosed'
 components:
   schemas:
     EventEnvelope:
@@ -132,6 +140,67 @@ components:
         broadcastVersion: *id002
         startedAt: *id003
         endedAt: *id003
+        closedPromotionIds:
+          type: array
+          items: &id004
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 9223372036854775807
+          description: 방송 종료와 함께 닫힌 OPEN 프로모션 ID. 이전 이벤트에는 없을 수 있으며 없으면 빈 목록으로 처리한다.
+    LiveBroadcastPromotionOpenedPayload:
+      type: object
+      required:
+      - broadcastId
+      - promotionId
+      - promotionVersion
+      - type
+      - title
+      - attributes
+      - openedAt
+      - closesAt
+      properties:
+        broadcastId: *id004
+        promotionId: *id004
+        promotionVersion: &id006
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+        type: &id005
+          type: string
+          minLength: 1
+          pattern: \S
+        title: *id005
+        attributes:
+          type: object
+          additionalProperties: true
+        openedAt: &id008
+          type: string
+          format: date-time
+        closesAt: &id007
+          type:
+          - string
+          - 'null'
+          format: date-time
+    LiveBroadcastPromotionClosedPayload:
+      type: object
+      required:
+      - broadcastId
+      - promotionId
+      - promotionVersion
+      - type
+      - reason
+      - openedAt
+      - closedAt
+      properties:
+        broadcastId: *id004
+        promotionId: *id004
+        promotionVersion: *id006
+        type: *id005
+        reason: *id005
+        openedAt: *id007
+        closedAt: *id008
   messages:
     LiveBroadcastScheduled:
       name: LiveBroadcastScheduled
@@ -233,3 +302,74 @@ components:
             broadcastVersion: 3
             startedAt: '2026-10-25T12:01:05.482913Z'
             endedAt: '2026-10-25T13:00:00Z'
+    LiveBroadcastPromotionOpened:
+      name: LiveBroadcastPromotionOpened
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: LiveBroadcastPromotionOpened
+            schemaVersion:
+              const: 1
+            source:
+              const: live-service
+            aggregateId:
+              type: string
+              pattern: ^[1-9][0-9]*$
+            payload:
+              $ref: '#/components/schemas/LiveBroadcastPromotionOpenedPayload'
+      examples:
+      - name: LiveBroadcastPromotionOpened예시
+        payload:
+          eventId: c3d2e1f0-1a2b-4c3d-9e8f-7a6b5c4d3e21
+          eventType: LiveBroadcastPromotionOpened
+          schemaVersion: 1
+          source: live-service
+          aggregateId: '42'
+          occurredAt: '2026-10-25T12:10:00Z'
+          payload:
+            broadcastId: 42
+            promotionId: 11
+            promotionVersion: 1
+            type: COUPON_DROP
+            title: 쿠폰 안내
+            attributes: {}
+            openedAt: '2026-10-25T12:10:00Z'
+            closesAt: null
+    LiveBroadcastPromotionClosed:
+      name: LiveBroadcastPromotionClosed
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: LiveBroadcastPromotionClosed
+            schemaVersion:
+              const: 1
+            source:
+              const: live-service
+            aggregateId:
+              type: string
+              pattern: ^[1-9][0-9]*$
+            payload:
+              $ref: '#/components/schemas/LiveBroadcastPromotionClosedPayload'
+      examples:
+      - name: LiveBroadcastPromotionClosed예시
+        payload:
+          eventId: c3d2e1f0-1a2b-4c3d-9e8f-7a6b5c4d3e21
+          eventType: LiveBroadcastPromotionClosed
+          schemaVersion: 1
+          source: live-service
+          aggregateId: '42'
+          occurredAt: '2026-10-25T12:10:00Z'
+          payload:
+            broadcastId: 42
+            promotionId: 11
+            promotionVersion: 2
+            type: COUPON_DROP
+            reason: EXPIRED
+            openedAt: '2026-10-25T12:10:00Z'
+            closedAt: '2026-10-25T12:15:00Z'

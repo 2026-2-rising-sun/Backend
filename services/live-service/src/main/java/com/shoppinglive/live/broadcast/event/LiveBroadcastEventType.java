@@ -7,5 +7,7 @@ package com.shoppinglive.live.broadcast.event;
 public enum LiveBroadcastEventType {
     LiveBroadcastScheduled,
     LiveBroadcastStarted,
-    LiveBroadcastEnded
+    LiveBroadcastEnded,
+    LiveBroadcastPromotionOpened,
+    LiveBroadcastPromotionClosed
 }
