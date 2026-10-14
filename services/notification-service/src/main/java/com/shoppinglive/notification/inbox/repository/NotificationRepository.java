@@ -46,4 +46,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
      * 새어나간다.
      */
     Optional<Notification> findByIdAndMemberId(Long id, String memberId);
+
+    @org.springframework.data.jpa.repository.Modifying(
+            clearAutomatically = true,
+            flushAutomatically = true)
+    @Query(
+            "UPDATE Notification n SET n.readAt=:at, n.updatedAt=:at WHERE n.id=:id AND n.memberId=:member AND n.readAt IS NULL")
+    int markReadIfUnread(
+            @Param("id") Long id, @Param("member") String member, @Param("at") Instant at);
 }
