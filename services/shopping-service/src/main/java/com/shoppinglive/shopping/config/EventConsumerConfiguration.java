@@ -1,11 +1,8 @@
 package com.shoppinglive.shopping.config;
 
-import com.shoppinglive.shopping.coupon.event.CouponInfoEventMessage;
-import com.shoppinglive.shopping.sales.event.SalesInfoEventMessage;
 import java.time.Duration;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,10 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
-import org.springframework.kafka.core.KafkaOperations;
-import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -58,42 +52,12 @@ class EventConsumerConfiguration {
 
     @Bean
     DefaultErrorHandler eventErrorHandler(
-            KafkaOperations<?, ?> kafka,
             @Value("${shopping.events.consumer.retry-interval:1s}") Duration retryInterval) {
-        // 원문 key·value 를 그대로 보낸다 (consumer·producer 모두 String). partition 은 Kafka 가 key 로 고른다.
-        // 원본 partition 을 그대로 쓰면 DLT partition 수가 원본보다 적을 때 전송이 계속 실패한다. 원본 위치는 header 에 남는다.
-        DeadLetterPublishingRecoverer dlt =
-                new DeadLetterPublishingRecoverer(
-                        kafka, (record, e) -> new TopicPartition(record.topic() + DLT_SUFFIX, -1));
-        // DLT 전송이 실패하면 원본 offset 을 넘기지 않는다. 다시 처리하고 다시 보낸다.
-        dlt.setFailIfSendResultIsError(true);
-
-        ExponentialBackOffWithMaxRetries limited =
-                new ExponentialBackOffWithMaxRetries(MAX_RETRIES);
-        limited.setInitialInterval(retryInterval.toMillis());
-        limited.setMaxInterval(Math.max(retryInterval.toMillis(), MAX_RETRY_INTERVAL.toMillis()));
-
         DefaultErrorHandler handler =
                 new DefaultErrorHandler(
-                        (record, e) -> {
-                            log.error(
-                                    "{} topic={} partition={} offset={} cause={}",
-                                    DLT_MARKER,
-                                    record.topic(),
-                                    record.partition(),
-                                    record.offset(),
-                                    rootCause(e).toString());
-                            dlt.accept(record, e);
-                        },
-                        limited);
-        FixedBackOff unlimited =
-                new FixedBackOff(retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS);
-        handler.setBackOffFunction((record, e) -> isDbOutage(e) ? unlimited : null);
-        // 기본 즉시 포기 목록(ClassCastException 등)을 끈다. 버그성 예외도 몇 번은 다시 해 본다.
+                        new FixedBackOff(
+                                retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS));
         handler.setClassifications(Map.of(), true);
-        handler.addNotRetryableExceptions(
-                SalesInfoEventMessage.InvalidMessageException.class,
-                CouponInfoEventMessage.InvalidMessageException.class);
         return handler;
     }
 

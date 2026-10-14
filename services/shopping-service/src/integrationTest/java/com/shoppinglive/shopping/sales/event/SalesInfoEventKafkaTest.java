@@ -130,40 +130,6 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
         assertDltHas("{broken-json"::equals);
     }
 
-    @Test
-    @DisplayName("DB 장애가 아닌 예외가 계속 나면 몇 번 재시도한 뒤 DLT 로 보내고, 다음 이벤트가 반영된다")
-    void repeatedBugGoesToDltAfterRetriesAndNextEventFollows() throws Exception {
-        AtomicInteger calls = new AtomicInteger();
-        doAnswer(
-                        invocation -> {
-                            if (invocation
-                                            .<com.shoppinglive.shopping.client.commerce.SalesInfo>
-                                                    getArgument(0)
-                                            .productId()
-                                    == BUGGY_PRODUCT) {
-                                calls.incrementAndGet();
-                                throw new IllegalStateException("bug");
-                            }
-                            return invocation.callRealMethod();
-                        })
-                .when(repository)
-                .apply(any(), anyLong());
-
-        try (KafkaProducer<String, String> producer = new KafkaProducer<>(producerProperties())) {
-            send(producer, event(BUGGY_PRODUCT));
-            send(producer, event(FIFTH_PRODUCT));
-        }
-
-        await().atMost(Duration.ofSeconds(30))
-                .untilAsserted(
-                        () ->
-                                assertThat(repository.findByProductIds(List.of(FIFTH_PRODUCT)))
-                                        .hasSize(1));
-        // 첫 처리 1번 + 재시도 5번
-        assertThat(calls).hasValue(6);
-        assertDltHas(value -> value.contains("\"productId\":" + BUGGY_PRODUCT));
-    }
-
     /** DLT 를 처음부터 읽어, 조건에 맞는 원문이 나올 때까지 기다린다. */
     private void assertDltHas(Predicate<String> expected) {
         Map<String, Object> props =
