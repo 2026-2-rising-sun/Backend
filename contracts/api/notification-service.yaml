@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Notification API
   version: 1.0.0
-  description: 회원 본인의 인앱 알림함 조회와 읽음 처리. 이벤트 구독 및 알림 생성은 별도 기능이다.
+  description: 회원 본인의 인앱 알림함 조회와 읽음 처리.
 servers:
 - url: http://localhost:8085
 - url: http://dev-notification-service:8080
@@ -65,9 +65,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnreadCountEnvelope'
-        '400':
-          description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
-          content: *id001
         '401':
           description: 토큰 누락·무효 또는 보안 폐기된 세션
           content: *id001
@@ -100,7 +97,7 @@ paths:
           description: 없는 알림과 다른 회원의 알림은 모두 NOT_FOUND
           content: *id001
         '400':
-          description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+          description: 'notificationId 숫자 형식 오류: INVALID_REQUEST'
           content: *id001
         '401':
           description: 토큰 누락·무효 또는 보안 폐기된 세션
