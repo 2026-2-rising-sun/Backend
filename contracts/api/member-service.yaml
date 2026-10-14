@@ -238,7 +238,7 @@ paths:
       operationId: checkMemberSession
       security:
         - ServiceToken: []
-      description: Shopping/Commerce/Live caller만 허용한다. memberId와 sessionId가 일치하고 회원·세션이 유효하면 active=true. 미지·불일치·보안 폐기·탈퇴는 false. 일반 로그아웃은 기존 access를 즉시 차단하지 않는다. 이 응답은 캐시하지 않는다.
+      description: Shopping/Commerce/Live/Notification caller만 허용한다. memberId와 sessionId가 일치하고 회원·세션이 유효하면 active=true. 미지·불일치·보안 폐기·탈퇴는 false. 일반 로그아웃은 기존 access를 즉시 차단하지 않는다. 이 응답은 캐시하지 않는다.
       requestBody:
         required: true
         content:
@@ -280,7 +280,7 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
 components:
   securitySchemes:
-    BearerAuth: {"type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."}
+    BearerAuth: {$ref: './common.yaml#/components/securitySchemes/BearerAuth'}
     ServiceToken:
       type: apiKey
       in: header
@@ -398,12 +398,7 @@ components:
         data: {"$ref": "#/components/schemas/MemberProfile"}
         error: {"type": "null"}
     ApiError:
-      type: "object"
-      required: ["code", "message", "requestId"]
-      properties:
-        code: {"type": "string"}
-        message: {"type": "string"}
-        requestId: {"type": ["string", "null"]}
+      $ref: './common.yaml#/components/schemas/ApiError'
     ErrorEnvelope:
       type: "object"
       required: ["success", "data", "error"]

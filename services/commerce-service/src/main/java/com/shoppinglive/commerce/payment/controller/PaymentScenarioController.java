@@ -1,0 +1,66 @@
+package com.shoppinglive.commerce.payment.controller;
+
+import com.shoppinglive.commerce.order.service.OrderService;
+import com.shoppinglive.commerce.payment.dto.DevPaymentScenarioRegistry;
+import com.shoppinglive.commerce.payment.dto.SetPaymentScenarioRequest;
+import com.shoppinglive.common.security.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/** 명시적으로 켠 local/test 환경에서만 제공하는 Mock 결제 결과 제어. */
+@RestController
+@RequestMapping("/v1/dev/payment-scenarios")
+@Profile("(local | test) & !dev & !prod")
+@ConditionalOnProperty(
+        prefix = "commerce.dev.payment-scenario",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = false)
+public class PaymentScenarioController {
+
+    private final DevPaymentScenarioRegistry registry;
+    private final OrderService orders;
+
+    public PaymentScenarioController(DevPaymentScenarioRegistry registry, OrderService orders) {
+        this.registry = registry;
+        this.orders = orders;
+    }
+
+    /** 주문번호에 시나리오를 사전 지정한다. 결제 시작 요청에 scenario body 가 없을 때 이 값을 사용한다. */
+    @Operation(
+            summary = "본인 주문 Mock 결과 지정",
+            description =
+                    "local 또는 test 프로필 AND dev/prod 비활성 AND commerce.dev.payment-scenario.enabled=true에서만 제공. SELLER도 본인 주문만 허용. 외부 dev/prod는 금지.")
+    @SecurityRequirement(name = "BearerAuth")
+    @PutMapping("/{orderNumber}")
+    public ResponseEntity<Void> setScenario(
+            @PathVariable String orderNumber,
+            @Valid @RequestBody SetPaymentScenarioRequest request,
+            @AuthenticationPrincipal AuthenticatedUser member) {
+        orders.findByOrderNumberAndMemberId(orderNumber, member.memberId());
+        registry.set(orderNumber, request.scenario());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 지정된 시나리오를 제거한다. */
+    @Operation(summary = "본인 주문 Mock 결과 지정 제거", description = "PUT과 동일한 opt-in 프로필 및 본인 SELLER 조건.")
+    @SecurityRequirement(name = "BearerAuth")
+    @DeleteMapping("/{orderNumber}")
+    public ResponseEntity<Void> clearScenario(
+            @PathVariable String orderNumber, @AuthenticationPrincipal AuthenticatedUser member) {
+        orders.findByOrderNumberAndMemberId(orderNumber, member.memberId());
+        registry.clear(orderNumber);
+        return ResponseEntity.noContent().build();
+    }
+}
