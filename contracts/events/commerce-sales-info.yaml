@@ -1,0 +1,290 @@
+asyncapi: 3.1.0
+info:
+  title: Commerce 판매정보 이벤트 계약
+  version: 1.0.0
+  description: |
+    commerce-service가 발행할 판매정보 전체 스냅샷의 계약이다.
+    현재 저장소에는 계약 타입과 생성 코드만 있으며, Kafka 발행자·구독자는 구현되지 않았다.
+    아래 send 동작은 구현 예정 계약이며 실제 발행·소비나 토픽 생성 완료를 의미하지 않는다.
+    브로커 주소·파티션 수·보관 기간·소비자 그룹 등 미확정 운영 설정은 명시하지 않는다.
+
+    공통 봉투 도입으로 기존 v1에 source와 aggregateId가 추가되었다.
+    기존 토픽과 schemaVersion은 유지했으며, 저장소 밖 기존 소비자와의 호환성은 확인되지 않았다.
+    이 명세와 코드를 자동 비교하는 이벤트 CI는 두지 않는다.
+x-implementation-status: contract-only
+defaultContentType: application/json
+channels:
+  salesInfo:
+    address: commerce.sales-info.v1
+    description: |
+      판매 등록·가격 변경·재고 변경·판매 상태 변경을 같은 토픽으로 전달하는 계약이다.
+      Kafka key는 payload.salesId의 10진수 문자열이며 aggregateId와 같아야 한다.
+      같은 판매정보의 이벤트가 같은 파티션으로 가려면 발행 코드가 이 값을 key로 지정해야 한다.
+
+      snapshotVersion은 판매정보별 전체 스냅샷의 변경 버전이다.
+      소비자는 마지막으로 반영한 값보다 큰 버전만 반영하는 것을 계약으로 한다.
+      occurredAt과 eventId로 순서를 판단하지 않는다.
+      이 규칙 자체가 중복 제거·순서 처리의 구현이나 동작 검증을 제공하지는 않는다.
+    messages:
+      SalesRegistered:
+        $ref: '#/components/messages/SalesRegistered'
+      PriceChanged:
+        $ref: '#/components/messages/PriceChanged'
+      InventoryChanged:
+        $ref: '#/components/messages/InventoryChanged'
+      SalesStatusChanged:
+        $ref: '#/components/messages/SalesStatusChanged'
+operations:
+  publishSalesInfo:
+    action: send
+    title: 판매정보 스냅샷 발행 계약
+    description: commerce-service의 구현 예정 발행 동작. 구독 서비스의 내부 DTO는 이 명세에서 정의하지 않는다.
+    x-implementation-status: not-implemented
+    channel:
+      $ref: '#/channels/salesInfo'
+    messages:
+      - $ref: '#/channels/salesInfo/messages/SalesRegistered'
+      - $ref: '#/channels/salesInfo/messages/PriceChanged'
+      - $ref: '#/channels/salesInfo/messages/InventoryChanged'
+      - $ref: '#/channels/salesInfo/messages/SalesStatusChanged'
+components:
+  messageTraits:
+    salesInfo:
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/SalesInfoKey'
+          bindingVersion: '0.5.0'
+  messages:
+    SalesRegistered:
+      name: SalesRegistered
+      title: 판매정보 등록
+      summary: 판매정보 등록 시점의 전체 판매정보 스냅샷
+      traits:
+        - $ref: '#/components/messageTraits/salesInfo'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/SalesInfoEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: SalesRegistered
+      examples:
+        - name: SalesRegistered예시
+          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          payload:
+            eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb1'
+            eventType: SalesRegistered
+            schemaVersion: 1
+            source: commerce-service
+            aggregateId: '9001'
+            occurredAt: '2026-10-14T09:00:00Z'
+            payload:
+              salesId: 9001
+              productId: 501
+              snapshotVersion: 1
+              price: 25000
+              status: READY
+              available: 20
+              currency: KRW
+    PriceChanged:
+      name: PriceChanged
+      title: 판매 가격 변경
+      summary: 판매 가격 변경 시점의 전체 판매정보 스냅샷
+      traits:
+        - $ref: '#/components/messageTraits/salesInfo'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/SalesInfoEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: PriceChanged
+      examples:
+        - name: PriceChanged예시
+          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          payload:
+            eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb2'
+            eventType: PriceChanged
+            schemaVersion: 1
+            source: commerce-service
+            aggregateId: '9001'
+            occurredAt: '2026-10-14T09:00:00Z'
+            payload:
+              salesId: 9001
+              productId: 501
+              snapshotVersion: 2
+              price: 25000
+              status: ON_SALE
+              available: 20
+              currency: KRW
+    InventoryChanged:
+      name: InventoryChanged
+      title: 판매 재고 변경
+      summary: 판매 재고 변경 시점의 전체 판매정보 스냅샷
+      traits:
+        - $ref: '#/components/messageTraits/salesInfo'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/SalesInfoEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: InventoryChanged
+      examples:
+        - name: InventoryChanged예시
+          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          payload:
+            eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb3'
+            eventType: InventoryChanged
+            schemaVersion: 1
+            source: commerce-service
+            aggregateId: '9001'
+            occurredAt: '2026-10-14T09:00:00Z'
+            payload:
+              salesId: 9001
+              productId: 501
+              snapshotVersion: 3
+              price: 25000
+              status: ON_SALE
+              available: 20
+              currency: KRW
+    SalesStatusChanged:
+      name: SalesStatusChanged
+      title: 판매 상태 변경
+      summary: 판매 상태 변경 시점의 전체 판매정보 스냅샷
+      traits:
+        - $ref: '#/components/messageTraits/salesInfo'
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/SalesInfoEnvelope'
+          - type: object
+            properties:
+              eventType:
+                const: SalesStatusChanged
+      examples:
+        - name: SalesStatusChanged예시
+          summary: 형식 설명용 예시이며 실제 발행 기록이 아니다.
+          payload:
+            eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb4'
+            eventType: SalesStatusChanged
+            schemaVersion: 1
+            source: commerce-service
+            aggregateId: '9001'
+            occurredAt: '2026-10-14T09:00:00Z'
+            payload:
+              salesId: 9001
+              productId: 501
+              snapshotVersion: 4
+              price: 25000
+              status: ON_SALE
+              available: 20
+              currency: KRW
+  schemas:
+    EventEnvelope:
+      type: object
+      description: |
+        도메인 payload와 독립적인 공통 봉투. 필수값은 null일 수 없다.
+        eventType·source·aggregateId는 공백만으로 구성될 수 없다.
+        구독자가 일부 payload 필드만 사용할 수 있지만, 알 수 없는 필드 무시는 구독 코드에서 설정해야 한다.
+      required: [eventId, eventType, schemaVersion, source, aggregateId, occurredAt, payload]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          description: 표준 UUID 문자열. 동일 이벤트를 식별하며 순서를 나타내지 않는다.
+        eventType:
+          type: string
+          minLength: 1
+          pattern: '\S'
+          description: 이벤트 이름. 공통 Java 봉투는 문자열을 사용하며 지원 타입 판단은 도메인·소비자가 담당한다.
+        schemaVersion:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+          description: 이벤트 스키마 버전. 공통 봉투의 양수 검증과 소비자의 지원 버전 판단은 별개다.
+        source:
+          type: string
+          minLength: 1
+          pattern: '\S'
+          description: 발행 서비스 이름
+        aggregateId:
+          type: string
+          minLength: 1
+          pattern: '\S'
+          description: 이벤트 대상의 식별자. Kafka key 지정은 별도 발행 구현이 담당한다.
+        occurredAt:
+          type: string
+          format: date-time
+          description: 발생 시각을 표현하는 Instant. ISO 8601 형식으로 직렬화한다.
+        payload:
+          not: {type: 'null'}
+          description: 이벤트별 업무 데이터. 판매정보 계약에서 전체 스냅샷으로 구체화한다.
+    SalesInfoEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            eventType:
+              type: string
+              enum: [SalesRegistered, PriceChanged, InventoryChanged, SalesStatusChanged]
+            schemaVersion:
+              type: integer
+              const: 1
+            source:
+              type: string
+              const: commerce-service
+            aggregateId:
+              $ref: '#/components/schemas/SalesInfoKey'
+            payload:
+              $ref: '#/components/schemas/SalesInfoSnapshot'
+    SalesInfoKey:
+      type: string
+      pattern: '^[1-9][0-9]*$'
+      description: payload.salesId를 10진수 문자열로 표현한 값. aggregateId와 Kafka key가 동일해야 한다.
+      examples: ['9001']
+    SalesInfoSnapshot:
+      type: object
+      description: 변경 필드만이 아닌 전체 판매정보 스냅샷. 일부 필드만 사용하는 구독 DTO와 공유할 필요는 없다.
+      required: [salesId, productId, snapshotVersion, price, status, available, currency]
+      properties:
+        salesId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+          description: 판매정보 ID
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+          description: 상품 ID
+        snapshotVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+          description: 판매정보별 증가 버전. 재고를 포함해 전체 스냅샷의 어느 필드든 변경되면 증가한다는 계약이다.
+        price:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+          description: KRW 정수 판매 가격
+        status:
+          type: string
+          enum: [READY, ON_SALE, SOLD_OUT, PRIVATE]
+          description: Commerce 판매정보 상태
+        available:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 2147483647
+          description: 판매 가능 재고 수량
+        currency:
+          type: string
+          const: KRW
+          description: 현재 계약이 지원하는 통화
