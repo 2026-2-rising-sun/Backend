@@ -15,6 +15,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     testImplementation("org.springframework.security:spring-security-test")
+    compileOnly("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka")
     testRuntimeOnly("com.h2database:h2")
     testFixturesApi("org.springframework.security:spring-security-oauth2-jose")
     testFixturesImplementation(

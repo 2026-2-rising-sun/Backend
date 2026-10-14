@@ -35,7 +35,17 @@ class LikeTest extends LiveSecuritySupport {
                                         "arn:aws:ivs:ap-northeast-2:1:channel/" + name,
                                         "https://example.com/" + name))
                         .getId();
-        jdbc.update("UPDATE broadcast SET status = ? WHERE id = ?", status, id);
+        // 운영 전이와 맞추기 위해 LIVE/ENDED 로 넘길 때는 started_at 도 함께 세팅한다.
+        // outbox 로 나가는 Ended 이벤트 payload 가 non-null startedAt 을 요구하기 때문.
+        if ("LIVE".equals(status) || "ENDED".equals(status)) {
+            jdbc.update(
+                    "UPDATE broadcast SET status = ?, started_at = ? WHERE id = ?",
+                    status,
+                    java.sql.Timestamp.from(Instant.now()),
+                    id);
+        } else {
+            jdbc.update("UPDATE broadcast SET status = ? WHERE id = ?", status, id);
+        }
         return id;
     }
 

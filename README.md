@@ -51,3 +51,5 @@ python3 -m venv .venv-api
 ```
 
 직접 선언한 Spring MVC 매핑을 읽습니다. 마지막 `/`, 조건부·개발용 매핑도 포함하며, 지원하지 않는 상속·매핑 표현식은 성공으로 넘기지 않고 실패합니다. 테스트는 `python -m unittest discover -s .github/scripts/api`로 실행합니다.
+
+이벤트 계약 원본은 `contracts/events`의 AsyncAPI YAML입니다. `.github/scripts/api/check_events.py`는 참조·스키마·예시를 검사하고, `--samples`로 서비스 테스트가 생성한 실제 직렬화 표본을 검사합니다. 이는 실제 Kafka 전달이나 소비자 DB 반영을 검증하지 않습니다.
