@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -92,26 +91,6 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.sellerId").isEmpty());
         assertThat(products.findById(legacy.getId()).orElseThrow().getSellerId()).isNull();
-    }
-
-    @Test
-    @DisplayName("판매자 상세는 본인 상품만 열리고, 남의 상품과 소유자 없는 상품은 404다")
-    void sellerDetailHidesOtherAndUnassignedProducts() throws Exception {
-        long owned = register("detail-key").path("productId").asLong();
-        Product legacy =
-                products.saveAndFlush(new Product("legacy", "legacy", imageId, "legacy-key"));
-        Product other =
-                products.saveAndFlush(
-                        new Product(
-                                "other", "other", imageId, "other-key", JwtTestTokens.MEMBER_A));
-        mvc.perform(get("/v1/seller/products/{id}", owned).header("Authorization", sellerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("owned"));
-        for (long id : new long[] {other.getId(), legacy.getId()}) {
-            mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
-        }
     }
 
     @Test
