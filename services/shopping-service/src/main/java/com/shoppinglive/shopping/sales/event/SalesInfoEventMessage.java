@@ -19,9 +19,9 @@ import com.shoppinglive.shopping.client.commerce.SalesStatus;
  *   <li>지원하지 않는 {@code schemaVersion} 은 거부한다. 필드의 의미가 달라졌을 수 있어 일부만 읽어 저장하지 않는다.
  * </ul>
  *
- * 거부는 {@link InvalidMessageException} 으로 알리고, listener 가 그 메시지를 건너뛴다.
+ * 거부는 {@link InvalidMessageException} 으로 알린다. error handler 가 그 메시지를 DLT 로 보낸다.
  */
-record SalesInfoEventMessage(
+public record SalesInfoEventMessage(
         long productId,
         long salesId,
         long snapshotVersion,
@@ -158,8 +158,8 @@ record SalesInfoEventMessage(
         return new InvalidMessageException(reason);
     }
 
-    /** 해석·검증 실패. listener 가 이것만 잡아 건너뛴다. */
-    static final class InvalidMessageException extends RuntimeException {
+    /** 해석·검증 실패. 다시 읽어도 결과가 같아 error handler 가 재시도 없이 DLT 로 보낸다. */
+    public static final class InvalidMessageException extends RuntimeException {
 
         InvalidMessageException(String reason) {
             super(reason);

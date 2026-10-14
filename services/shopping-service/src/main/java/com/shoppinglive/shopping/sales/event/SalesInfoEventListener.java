@@ -10,16 +10,12 @@ import org.springframework.stereotype.Component;
  * SalesInfoEventMessage} 로 해석·검증하고, {@code SalesInfo} 로 바꿔 {@link ProductSalesRepository#apply} 에
  * 넘긴다.
  *
- * <p>실패는 둘로 나눈다. 해석·검증 실패는 다시 읽어도 같은 결과라 log 를 남기고 건너뛴다. 그 밖의 예외(DB 오류 등)는 잠시 뒤 성공할 수 있으므로 밖으로 던져
- * error handler 가 같은 offset 을 재시도하게 한다 ({@link SalesInfoConsumerConfiguration}).
+ * <p>해석·검증 실패는 {@link SalesInfoEventMessage.InvalidMessageException} 으로 던진다. 건너뛸지 다시 할지는 error
+ * handler 가 정한다 ({@code EventConsumerConfiguration}).
  */
 @Component
 public class SalesInfoEventListener {
 
-    static final String SKIP_MARKER = "SALES_EVENT_SKIPPED";
-
-    private static final org.slf4j.Logger log =
-            org.slf4j.LoggerFactory.getLogger(SalesInfoEventListener.class);
     private final ProductSalesRepository repository;
 
     public SalesInfoEventListener(ProductSalesRepository repository) {
@@ -28,24 +24,10 @@ public class SalesInfoEventListener {
 
     @KafkaListener(topics = SalesInfoEventContract.TOPIC_NAME)
     public void consume(ConsumerRecord<String, String> record) {
-        SalesInfoEventMessage message;
-        try {
-            message = SalesInfoEventMessage.parse(record.value());
-            if (!Long.toString(message.salesId()).equals(record.key())) {
-                throw new SalesInfoEventMessage.InvalidMessageException(
-                        "Kafka key와 판매 식별자가 일치하지 않습니다.");
-            }
-        } catch (SalesInfoEventMessage.InvalidMessageException e) {
-            // 원문은 다시 읽어도 같은 결과다. 여기서 멈추면 뒤의 정상 이벤트가 영원히 밀리므로 건너뛴다.
-            log.error(
-                    "{} topic={} partition={} offset={} reason={} raw={}",
-                    SKIP_MARKER,
-                    record.topic(),
-                    record.partition(),
-                    record.offset(),
-                    e.getMessage(),
-                    record.value());
-            return;
+        SalesInfoEventMessage message = SalesInfoEventMessage.parse(record.value());
+        if (!Long.toString(message.salesId()).equals(record.key())) {
+            throw new SalesInfoEventMessage.InvalidMessageException(
+                    "Kafka key와 판매 식별자가 일치하지 않습니다.");
         }
         repository.apply(message.toSalesInfo(), message.snapshotVersion());
     }

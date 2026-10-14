@@ -14,28 +14,36 @@ import com.shoppinglive.shopping.sales.repository.ProductSalesRepository;
 import com.shoppinglive.shopping.security.ShoppingSecuritySupport;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-/** DB 장애가 10회를 넘어도 offset 을 넘기지 않아, 복구 뒤 같은 이벤트가 반영되고 다음 이벤트도 이어진다. */
+/** 실패 분류를 실제 Kafka 로 확인한다. DB 장애는 끝까지 기다린다. 형식 오류와 계속 실패하는 메시지는 DLT 로 보내고 다음 이벤트로 넘어간다. */
 @SpringBootTest(
         properties = {
             "spring.kafka.listener.auto-startup=true",
-            "shopping.sales.consumer.retry-interval=10ms"
+            "shopping.events.consumer.retry-interval=10ms"
         })
 @EmbeddedKafka(partitions = 1, bootstrapServersProperty = "spring.kafka.bootstrap-servers")
 class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
@@ -44,6 +52,9 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
     private static final long FIRST_PRODUCT = 501L;
     private static final long SECOND_PRODUCT = 502L;
     private static final long THIRD_PRODUCT = 503L;
+    private static final long FOURTH_PRODUCT = 504L;
+    private static final long BUGGY_PRODUCT = 505L;
+    private static final long FIFTH_PRODUCT = 506L;
     private static final int CLASS_CAST_FAILURES = 3;
 
     @Autowired EmbeddedKafkaBroker broker;
@@ -101,6 +112,78 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
                         () ->
                                 assertThat(repository.findByProductIds(List.of(THIRD_PRODUCT)))
                                         .hasSize(1));
+    }
+
+    @Test
+    @DisplayName("형식이 틀린 메시지는 재시도 없이 원문 그대로 DLT 로 가고, 다음 이벤트가 반영된다")
+    void invalidMessageGoesToDltAndNextEventFollows() throws Exception {
+        try (KafkaProducer<String, String> producer = new KafkaProducer<>(producerProperties())) {
+            send(producer, "{broken-json");
+            send(producer, event(FOURTH_PRODUCT));
+        }
+
+        await().atMost(Duration.ofSeconds(30))
+                .untilAsserted(
+                        () ->
+                                assertThat(repository.findByProductIds(List.of(FOURTH_PRODUCT)))
+                                        .hasSize(1));
+        assertDltHas("{broken-json"::equals);
+    }
+
+    @Test
+    @DisplayName("DB 장애가 아닌 예외가 계속 나면 몇 번 재시도한 뒤 DLT 로 보내고, 다음 이벤트가 반영된다")
+    void repeatedBugGoesToDltAfterRetriesAndNextEventFollows() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        doAnswer(
+                        invocation -> {
+                            if (invocation
+                                            .<com.shoppinglive.shopping.client.commerce.SalesInfo>
+                                                    getArgument(0)
+                                            .productId()
+                                    == BUGGY_PRODUCT) {
+                                calls.incrementAndGet();
+                                throw new IllegalStateException("bug");
+                            }
+                            return invocation.callRealMethod();
+                        })
+                .when(repository)
+                .apply(any(), anyLong());
+
+        try (KafkaProducer<String, String> producer = new KafkaProducer<>(producerProperties())) {
+            send(producer, event(BUGGY_PRODUCT));
+            send(producer, event(FIFTH_PRODUCT));
+        }
+
+        await().atMost(Duration.ofSeconds(30))
+                .untilAsserted(
+                        () ->
+                                assertThat(repository.findByProductIds(List.of(FIFTH_PRODUCT)))
+                                        .hasSize(1));
+        // 첫 처리 1번 + 재시도 5번
+        assertThat(calls).hasValue(6);
+        assertDltHas(value -> value.contains("\"productId\":" + BUGGY_PRODUCT));
+    }
+
+    /** DLT 를 처음부터 읽어, 조건에 맞는 원문이 나올 때까지 기다린다. */
+    private void assertDltHas(Predicate<String> expected) {
+        Map<String, Object> props =
+                KafkaTestUtils.consumerProps(
+                        broker.getBrokersAsString(), "dlt-reader-" + UUID.randomUUID(), "false");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        try (Consumer<String, String> consumer =
+                new DefaultKafkaConsumerFactory<>(
+                                props, new StringDeserializer(), new StringDeserializer())
+                        .createConsumer()) {
+            consumer.subscribe(List.of(SalesInfoEventContract.TOPIC_NAME + ".shopping.dlt"));
+            List<String> values = new ArrayList<>();
+            await().atMost(Duration.ofSeconds(20))
+                    .until(
+                            () -> {
+                                consumer.poll(Duration.ofMillis(200))
+                                        .forEach(record -> values.add(record.value()));
+                                return values.stream().anyMatch(expected);
+                            });
+        }
     }
 
     private Map<String, Object> producerProperties() {
