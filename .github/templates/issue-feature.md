@@ -1,11 +1,3 @@
----
-name: "💻 기능 구현 이슈"
-about: "구현할 기능과 완료 조건을 정리합니다."
-title: "[FEAT][도메인] "
-labels: ''
-assignees: ''
----
-
 <!-- 제목 예시: [FEAT][commerce] 주문 생성 -->
 <!-- 도메인: shopping, commerce, live, common, member, notification, infra -->
 <!-- 다른 작업 타입: REFACTOR, TEST, DOCS, CHORE, BUILD, CI, PERF, REVERT -->

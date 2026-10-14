@@ -1,11 +1,3 @@
----
-name: "🐛 버그 리포트"
-about: "재현 가능한 오류와 기대 동작을 정리합니다."
-title: "[BUG][도메인] "
-labels: ''
-assignees: ''
----
-
 <!-- 제목 예시: [BUG][common] 잘못된 JSON 요청의 500 응답 -->
 <!-- 도메인: shopping, commerce, live, common, member, notification, infra -->
 
