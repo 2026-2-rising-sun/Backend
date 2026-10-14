@@ -17,6 +17,28 @@ class SalesInfoEventContractTest {
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Test
+    void exportsActualSerializedSnapshotsForYamlValidation() throws Exception {
+        var directory = java.nio.file.Path.of("build/contract-samples");
+        java.nio.file.Files.createDirectories(directory);
+        var payload =
+                new SalesInfoSnapshot(9001, 501, 1, 25000, SalesInfoStatus.ON_SALE, 20, "KRW");
+        for (var type : SalesInfoEventType.values()) {
+            var event =
+                    SalesInfoEventContract.create(
+                            type, java.time.Instant.parse("2026-10-14T09:00:00Z"), payload);
+            mapper.writeValue(
+                    directory.resolve(type.name() + ".json").toFile(),
+                    java.util.Map.of(
+                            "contract",
+                            "commerce-sales-info.yaml",
+                            "message",
+                            type.name(),
+                            "payload",
+                            event));
+        }
+    }
+
+    @Test
     void 공통_봉투로_전체_판매정보를_직렬화하고_복원한다() throws Exception {
         var event =
                 SalesInfoEventContract.create(
