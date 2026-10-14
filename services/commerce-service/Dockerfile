@@ -10,14 +10,7 @@ RUN --mount=type=cache,target=/root/.gradle \
     chmod +x gradlew && ./gradlew --no-daemon --version
 
 COPY settings.gradle.kts build.gradle.kts ./
-COPY build-logic build-logic
-COPY contracts/events/build.gradle.kts contracts/events/
-COPY libs/common-core/build.gradle.kts libs/common-core/
-COPY libs/common-web/build.gradle.kts libs/common-web/
-COPY libs/common-security/build.gradle.kts libs/common-security/
-COPY libs/common-persistence/build.gradle.kts libs/common-persistence/
-COPY libs/common-kafka/build.gradle.kts libs/common-kafka/
-COPY libs/common-resilience/build.gradle.kts libs/common-resilience/
+COPY common-module common-module
 # settings.gradle.kts가 include하는 프로젝트는 디렉터리가 실재해야 하므로 5개 서비스의 빌드 스크립트를 모두 가져온다.
 COPY services/member-service/build.gradle.kts services/member-service/
 COPY services/shopping-service/build.gradle.kts services/shopping-service/
@@ -28,13 +21,6 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :services:commerce-service:dependencies --configuration runtimeClasspath
 
 # commerce-service가 사용하는 모듈 소스만 복사한다.
-COPY contracts/events contracts/events
-COPY libs/common-core libs/common-core
-COPY libs/common-web libs/common-web
-COPY libs/common-security libs/common-security
-COPY libs/common-persistence libs/common-persistence
-COPY libs/common-resilience libs/common-resilience
-COPY libs/common-kafka libs/common-kafka
 COPY services/commerce-service services/commerce-service
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon :services:commerce-service:bootJar

@@ -89,6 +89,14 @@ resilience4j:
           - org.springframework.web.client.HttpServerErrorException
           - org.springframework.web.client.ResourceAccessException
 
+
+# API documentation is enabled in local development or by an explicit environment setting.
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
+
 ---
 # 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
 # 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.
@@ -96,18 +104,12 @@ spring:
   config:
     activate:
       on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
   datasource:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/commerce
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  kafka:
-    # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
-    bootstrap-servers: localhost:${KAFKA_PORT:29092}
-    consumer:
-      group-id: commerce-service
-      properties:
-        spring.json.trusted.packages: com.shoppinglive.contracts.events
-
 # Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
 # 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
 
@@ -129,18 +131,12 @@ spring:
   config:
     activate:
       on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
   datasource:
     url: jdbc:postgresql://postgres:5432/commerce
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
-  kafka:
-    # 클러스터 안에서는 브로커의 PLAINTEXT 리스너로 바로 붙는다 (local 의 EXTERNAL 29092 아님).
-    bootstrap-servers: kafka:9092
-    consumer:
-      group-id: commerce-service
-      properties:
-        spring.json.trusted.packages: com.shoppinglive.contracts.events
-
 commerce:
   shopping-client:
     base-url: http://dev-shopping-service:8080
