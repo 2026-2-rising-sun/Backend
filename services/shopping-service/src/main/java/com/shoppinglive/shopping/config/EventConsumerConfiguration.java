@@ -17,6 +17,7 @@ import org.springframework.dao.TransientDataAccessException;
 import org.springframework.kafka.core.KafkaOperations;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -67,6 +68,11 @@ class EventConsumerConfiguration {
         // DLT 전송이 실패하면 원본 offset 을 넘기지 않는다. 다시 처리하고 다시 보낸다.
         dlt.setFailIfSendResultIsError(true);
 
+        ExponentialBackOffWithMaxRetries limited =
+                new ExponentialBackOffWithMaxRetries(MAX_RETRIES);
+        limited.setInitialInterval(retryInterval.toMillis());
+        limited.setMaxInterval(Math.max(retryInterval.toMillis(), MAX_RETRY_INTERVAL.toMillis()));
+
         DefaultErrorHandler handler =
                 new DefaultErrorHandler(
                         (record, e) -> {
@@ -79,8 +85,10 @@ class EventConsumerConfiguration {
                                     rootCause(e).toString());
                             dlt.accept(record, e);
                         },
-                        new FixedBackOff(
-                                retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS));
+                        limited);
+        FixedBackOff unlimited =
+                new FixedBackOff(retryInterval.toMillis(), FixedBackOff.UNLIMITED_ATTEMPTS);
+        handler.setBackOffFunction((record, e) -> isDbOutage(e) ? unlimited : null);
         // 기본 즉시 포기 목록(ClassCastException 등)을 끈다. 버그성 예외도 몇 번은 다시 해 본다.
         handler.setClassifications(Map.of(), true);
         handler.addNotRetryableExceptions(
