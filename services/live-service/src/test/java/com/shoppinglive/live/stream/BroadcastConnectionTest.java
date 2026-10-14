@@ -1,0 +1,333 @@
+package com.shoppinglive.live.stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+@DisplayName("SSE 연결의 순서·대기량 제한·격리")
+class BroadcastConnectionTest {
+    private static final long BROADCAST = 1L;
+
+    private final BroadcastStreamRegistry registry =
+            new BroadcastStreamRegistry(
+                    new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 2));
+
+    @AfterEach
+    void stop() {
+        registry.shutdown();
+    }
+
+    /** 실제 네트워크 대신 전송 내용을 기록한다. gate 가 있으면 열릴 때까지 전송이 막힌다. */
+    private static final class RecordingEmitter extends SseEmitter {
+        final List<String> sent = new CopyOnWriteArrayList<>();
+        final CountDownLatch firstSendStarted = new CountDownLatch(1);
+        final CountDownLatch completed = new CountDownLatch(1);
+        final CountDownLatch gate;
+
+        RecordingEmitter(final CountDownLatch gate) {
+            this.gate = gate;
+        }
+
+        @Override
+        public void send(final SseEventBuilder builder) {
+            writeLock.lock();
+            try {
+                firstSendStarted.countDown();
+                if (gate != null) {
+                    try {
+                        gate.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+                final StringBuilder text = new StringBuilder();
+                builder.build().forEach(part -> text.append(part.getData()));
+                sent.add(text.toString());
+            } finally {
+                writeLock.unlock();
+            }
+        }
+
+        @Override
+        public void complete() {
+            super.complete();
+            completed.countDown();
+        }
+    }
+
+    private static StreamEvent chat(final int number) {
+        return new StreamEvent("chat.created", String.valueOf(number), number);
+    }
+
+    private static StreamEvent ready(final long broadcastId) {
+        return StreamEvent.of("stream.ready", Map.of("broadcastId", broadcastId));
+    }
+
+    @Test
+    @DisplayName("방송 상태 확인 중 이벤트는 준비 완료까지 대기하고 순서를 유지한다")
+    void eventsDuringStateLookupWaitUntilReadyAndKeepTheirOrder() throws Exception {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final BroadcastConnection connection = registry.register(BROADCAST, emitter);
+
+        registry.publish(BROADCAST, chat(1));
+        registry.heartbeat();
+        assertThat(emitter.sent).isEmpty();
+
+        connection.activate(ready(BROADCAST));
+        awaitSent(emitter, 3);
+
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:chat.created", "data:1");
+        assertThat(emitter.sent.get(2)).contains(":heartbeat");
+    }
+
+    @Test
+    @DisplayName("상태 확인 중 종료 이벤트는 준비 완료 뒤 전송하고 연결을 닫는다")
+    void endedDuringStateLookupIsSentAfterReadyAndClosesTheConnection() throws Exception {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final BroadcastConnection connection = registry.register(BROADCAST, emitter);
+
+        registry.publishAndClose(BROADCAST, StreamEvent.of("broadcast.ended", "bye"));
+        assertThat(emitter.sent).isEmpty();
+        connection.activate(ready(BROADCAST));
+
+        assertThat(emitter.completed.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(emitter.sent).hasSize(2);
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:broadcast.ended");
+        assertThat(registry.connectionCount(BROADCAST)).isZero();
+    }
+
+    @Test
+    @DisplayName("방송 상태 확인 실패 시 스트림을 시작하지 않고 대기 이벤트를 버린다")
+    void rejectedStateLookupDiscardsBufferedEventsWithoutStartingTheStream() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final BroadcastConnection connection = registry.register(BROADCAST, emitter);
+        registry.publish(BROADCAST, chat(1));
+
+        connection.close();
+        connection.activate(ready(BROADCAST));
+
+        assertThat(emitter.sent).isEmpty();
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(registry.connectionCount(BROADCAST)).isZero();
+    }
+
+    @Test
+    @DisplayName("연결 완료 실패가 다른 연결과 전송 작업의 종료를 막지 않는다")
+    void completionFailureDoesNotPreventOtherConnectionsOrWritersFromClosing() {
+        final AtomicInteger attempts = new AtomicInteger();
+        final SseEmitter failed =
+                new SseEmitter() {
+                    @Override
+                    public void complete() {
+                        attempts.incrementAndGet();
+                        throw new IllegalStateException("response has been recycled");
+                    }
+                };
+        final RecordingEmitter normal = new RecordingEmitter(null);
+        registry.register(BROADCAST, failed);
+        registry.register(2L, normal);
+
+        assertThatCode(registry::shutdown).doesNotThrowAnyException();
+
+        assertThat(attempts.get()).isEqualTo(1);
+        assertThat(normal.completed.getCount()).isZero();
+        assertThat(registry.connectionCount(BROADCAST)).isZero();
+        assertThat(registry.connectionCount(2L)).isZero();
+        assertThat(
+                        ((ExecutorService) ReflectionTestUtils.getField(registry, "writers"))
+                                .isShutdown())
+                .isTrue();
+    }
+
+    @DisplayName("느린 연결은 대기량을 넘으면 닫히고 등록이 지워지며 다른 연결은 순서대로 모두 받는다")
+    @Test
+    void slowConnectionIsClosedWithoutBlockingOthers() throws Exception {
+        final CountDownLatch gate = new CountDownLatch(1);
+        final RecordingEmitter slow = new RecordingEmitter(gate);
+        final RecordingEmitter fast = new RecordingEmitter(null);
+        registry.register(BROADCAST, slow).activate(ready(BROADCAST));
+        registry.register(BROADCAST, fast).activate(ready(BROADCAST));
+        awaitSent(fast, 1);
+
+        registry.publish(BROADCAST, chat(1));
+        assertThat(slow.firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+        // slow 는 ready 전송에 막혀 있다. 채팅 1·2번이 목록(용량 2)을 채우고 3번에서 넘친다.
+        awaitSent(fast, 2);
+        for (int number = 2; number <= 5; number++) {
+            registry.publish(BROADCAST, chat(number));
+            awaitSent(fast, number + 1);
+        }
+
+        assertThat(slow.completed.getCount()).isEqualTo(1);
+        assertThat(registry.connectionCount(BROADCAST)).isEqualTo(1);
+        assertThat(fast.sent.stream().filter(text -> text.contains("event:chat.created")).toList())
+                .extracting(text -> text.substring(text.lastIndexOf("data:")).strip())
+                .containsExactly("data:1", "data:2", "data:3", "data:4", "data:5");
+        gate.countDown();
+        assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @DisplayName("다른 방송의 이벤트는 전달하지 않는다")
+    @Test
+    void eventsStayInsideTheirBroadcast() throws Exception {
+        final RecordingEmitter mine = new RecordingEmitter(null);
+        final RecordingEmitter other = new RecordingEmitter(null);
+        registry.register(BROADCAST, mine).activate(ready(BROADCAST));
+        registry.register(2L, other).activate(ready(2L));
+
+        registry.publish(BROADCAST, chat(1));
+        registry.publish(2L, chat(2));
+        awaitSent(mine, 2);
+        awaitSent(other, 2);
+
+        assertThat(mine.sent.get(1)).contains("data:1");
+        assertThat(other.sent.get(1)).contains("data:2");
+    }
+
+    @DisplayName("마지막 이벤트를 보낸 뒤 연결을 닫고 등록을 지운다")
+    @Test
+    void publishAndCloseDeliversTheLastEventThenCloses() throws Exception {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        registry.register(BROADCAST, emitter).activate(ready(BROADCAST));
+
+        registry.publishAndClose(BROADCAST, StreamEvent.of("broadcast.ended", "bye"));
+
+        assertThat(emitter.completed.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(emitter.sent).hasSize(2);
+        assertThat(emitter.sent.get(1)).contains("event:broadcast.ended");
+        assertThat(registry.connectionCount(BROADCAST)).isZero();
+    }
+
+    @DisplayName("종료 이벤트를 넣는 중 다른 publisher가 실행되어도 종료 뒤에 이벤트가 전달되지 않는다")
+    @Test
+    void terminalEventRejectsAnInterleavedPublisher() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicBoolean inject = new AtomicBoolean();
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection[] holder = new BroadcastConnection[1];
+        holder[0] =
+                new BroadcastConnection(
+                        emitter,
+                        8,
+                        task -> {
+                            task.run();
+                            // 첫 offer의 writer 예약 직후 다른 publisher가 실행되는 순서를 고정한다.
+                            if (inject.getAndSet(false)) {
+                                holder[0].offer(StreamEvent.of("likes.updated", "late"));
+                            }
+                        },
+                        removed::incrementAndGet);
+        holder[0].activate(ready(BROADCAST));
+        inject.set(true);
+
+        holder[0].offerThenClose(StreamEvent.of("broadcast.ended", "bye"));
+        holder[0].offer(chat(9));
+        holder[0].offerThenClose(StreamEvent.of("broadcast.ended", "again"));
+
+        assertThat(emitter.sent).hasSize(2);
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:broadcast.ended", "data:bye");
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
+    }
+
+    @DisplayName("대기 이벤트와 종료 이벤트가 용량 안에 있으면 준비 뒤 모두 보내고 닫는다")
+    @Test
+    void terminalEventNeedsNoExtraQueueSlotAndRejectsLaterOffers() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection connection =
+                new BroadcastConnection(emitter, 2, Runnable::run, removed::incrementAndGet);
+        connection.offer(chat(1));
+        connection.offerThenClose(StreamEvent.of("broadcast.ended", "bye"));
+        connection.offer(StreamEvent.of("likes.updated", "late"));
+        connection.offerThenClose(StreamEvent.of("broadcast.ended", "again"));
+        connection.activate(ready(BROADCAST));
+
+        assertThat(emitter.sent).hasSize(3);
+        assertThat(emitter.sent.get(0)).contains("event:stream.ready");
+        assertThat(emitter.sent.get(1)).contains("event:chat.created", "data:1");
+        assertThat(emitter.sent.get(2)).contains("event:broadcast.ended", "data:bye");
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("다른 종료가 먼저 수행되어도 거절된 전송 작업의 연결을 완료한다")
+    void rejectedDrainCompletesEvenWhenAnotherCloseAlreadyWon() {
+        final RecordingEmitter emitter = new RecordingEmitter(null);
+        final AtomicInteger removed = new AtomicInteger();
+        final BroadcastConnection[] holder = new BroadcastConnection[1];
+        holder[0] =
+                new BroadcastConnection(
+                        emitter,
+                        2,
+                        task -> {
+                            holder[0].close();
+                            throw new RejectedExecutionException("writer stopped");
+                        },
+                        removed::incrementAndGet);
+
+        holder[0].activate(ready(BROADCAST));
+        holder[0].offer(chat(1));
+        holder[0].close();
+
+        assertThat(emitter.completed.getCount()).isZero();
+        assertThat(removed.get()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("종료 시 전송 작업이 대기 중인 연결도 완료한다")
+    void shutdownCompletesConnectionsWhoseDrainIsStillQueued() throws Exception {
+        final BroadcastStreamRegistry singleWriter =
+                new BroadcastStreamRegistry(
+                        new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 1));
+        final CountDownLatch gate = new CountDownLatch(1);
+        final RecordingEmitter slow = new RecordingEmitter(gate);
+        final RecordingEmitter queued = new RecordingEmitter(null);
+        try {
+            singleWriter.register(BROADCAST, slow).activate(ready(BROADCAST));
+            singleWriter.publish(BROADCAST, chat(1));
+            assertThat(slow.firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            singleWriter.register(2L, queued).activate(ready(2L));
+            singleWriter.publish(2L, chat(1));
+
+            singleWriter.shutdown();
+            gate.countDown();
+
+            assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(queued.completed.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(queued.sent).isEmpty();
+        } finally {
+            gate.countDown();
+            singleWriter.shutdown();
+        }
+    }
+
+    private static void awaitSent(final RecordingEmitter emitter, final int count)
+            throws InterruptedException {
+        final long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (emitter.sent.size() < count && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(emitter.sent).hasSize(count);
+    }
+}
