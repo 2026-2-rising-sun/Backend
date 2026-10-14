@@ -5,12 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commerce.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commerce.payment.exception.MockRefundResultUnknownException;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;

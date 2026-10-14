@@ -19,37 +19,144 @@ jobs:
     name: Build, unit and integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      application-build: ${{ steps.changes.outputs.run_tests }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
         with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-      - name: Check workflow syntax
-        run: |
-          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" .github/workflows/*.yml
-      - name: Check local configuration and database report tools
-        run: |
-          node --test scripts/local/auth-env.test.cjs
-          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: .github/scripts/api/requirements.txt
-      - name: Compare declared API routes with OpenAPI
+      - name: Install static analysis dependencies
+        run: python -m pip install --requirement .github/scripts/api/requirements.txt
+      - name: Select work from changed files
+        id: changes
+        run: python .github/scripts/ci/classify_changes.py
+      - uses: actions/setup-java@v5
+        if: steps.changes.outputs.gradle_tasks != '[]'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+        if: steps.changes.outputs.gradle_tasks != '[]'
+      - name: Check workflow syntax
+        if: steps.changes.outputs.workflow == 'true'
         run: |
-          python -m pip install --requirement .github/scripts/api/requirements.txt
-          python -m unittest discover -s .github/scripts/api -p 'test_*.py'
-          python .github/scripts/api/check_structure.py
-      - name: Build and run tests
-        run: ./gradlew build --no-daemon --max-workers=2
+          curl -fsSL --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
+      - name: Check change selection
+        if: steps.changes.outputs.classifier == 'true'
+        run: python -m unittest discover -s .github/scripts/ci -p 'test_*.py'
+      - name: Check local authentication configuration tool
+        if: steps.changes.outputs.local_auth == 'true'
+        run: node --test scripts/local/auth-env.test.cjs
+      - name: Check API inspection tool
+        if: steps.changes.outputs.api_tests == 'true'
+        run: python -m unittest discover -s .github/scripts/api -p 'test_*.py'
+      - name: Compare declared API routes with OpenAPI
+        if: steps.changes.outputs.api == 'true'
+        run: python .github/scripts/api/check_structure.py
+      - name: Run selected Gradle work
+        id: gradle
+        if: steps.changes.outputs.gradle_tasks != '[]'
+        env:
+          GRADLE_TASKS: ${{ steps.changes.outputs.gradle_tasks }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          tasks = json.loads(os.environ['GRADLE_TASKS'])
+          subprocess.run(['./gradlew', *tasks, '--no-daemon', '--max-workers=2'], check=True)
+          PY
+      - name: Start PostgreSQL only for migration checks
+        if: steps.changes.outputs.migration_tasks != '[]'
+        env:
+          MIGRATION_SERVICES: ${{ steps.changes.outputs.migration_services }}
+        run: |
+          docker run --detach --name ci-migration-postgres \
+            --env POSTGRES_PASSWORD=test --publish 127.0.0.1:55432:5432 postgres:16
+          for attempt in {1..30}; do
+            if docker exec ci-migration-postgres pg_isready --username postgres; then break; fi
+            echo "Waiting for PostgreSQL ($attempt/30)"
+            sleep 1
+          done
+          docker exec ci-migration-postgres pg_isready --username postgres
+          python - <<'PY'
+          import json, os, subprocess
+          for service in json.loads(os.environ['MIGRATION_SERVICES']):
+              database = service.removesuffix('-service') + '_test'
+              subprocess.run(['docker', 'exec', 'ci-migration-postgres', 'createdb',
+                              '--username', 'postgres', database], check=True)
+          PY
+      - name: Run migration-tagged PostgreSQL tests
+        if: steps.changes.outputs.migration_tasks != '[]'
+        env:
+          MIGRATION_TASKS: ${{ steps.changes.outputs.migration_tasks }}
+          MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
+          MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
+          MEMBER_TEST_DB_USER: postgres
+          MEMBER_TEST_DB_PASSWORD: test
+          COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
+          COMMERCE_TEST_POSTGRES_USER: postgres
+          COMMERCE_TEST_POSTGRES_PASSWORD: test
+          SHOPPING_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/shopping_test
+          SHOPPING_TEST_POSTGRES_USER: postgres
+          SHOPPING_TEST_POSTGRES_PASSWORD: test
+          NOTIFICATION_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/notification_test
+          LIVE_PG_TEST: '1'
+          LIVE_PG_PORT: '55432'
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          subprocess.run(['./gradlew', *json.loads(os.environ['MIGRATION_TASKS']),
+                          '--no-daemon', '--max-workers=2'], check=True)
+          PY
+      - name: Start Redis only for Redis checks
+        if: steps.changes.outputs.redis_tasks != '[]'
+        run: |
+          docker run --detach --name ci-redis \
+            --publish 127.0.0.1:56379:6379 redis:7-alpine
+          for attempt in {1..30}; do
+            if docker exec ci-redis redis-cli ping; then break; fi
+            echo "Waiting for Redis ($attempt/30)"
+            sleep 1
+          done
+          docker exec ci-redis redis-cli ping
+      - name: Run Redis-tagged tests
+        if: steps.changes.outputs.redis_tasks != '[]'
+        env:
+          REDIS_TASKS: ${{ steps.changes.outputs.redis_tasks }}
+          LIVE_REDIS_TEST: '1'
+          LIVE_REDIS_PORT: '56379'
+          MEMBER_REDIS_TEST: '1'
+          MEMBER_REDIS_PORT: '56379'
+          SHOPPING_REDIS_TEST: '1'
+          SHOPPING_REDIS_PORT: '56379'
+          COMMERCE_REDIS_TEST: '1'
+          COMMERCE_REDIS_PORT: '56379'
+          NOTIFICATION_REDIS_TEST: '1'
+          NOTIFICATION_REDIS_PORT: '56379'
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          subprocess.run(['./gradlew', *json.loads(os.environ['REDIS_TASKS']),
+                          '--no-daemon', '--max-workers=2'], check=True)
+          PY
+      - name: Stop temporary external services
+        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
+        run: |
+          for container in ci-migration-postgres ci-redis; do
+            if docker container inspect "$container" >/dev/null 2>&1; then
+              docker stop "$container"
+              docker container rm "$container"
+            fi
+          done
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.changes.outputs.run_tests == 'true' && steps.gradle.outcome != 'skipped'
         with:
           name: test-reports-${{ github.sha }}
           path: |
@@ -57,10 +164,18 @@ jobs:
             **/build/reports/tests/
           if-no-files-found: error
           retention-days: 7
+      - name: Upload CI selection
+        if: always() && steps.changes.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-selection-${{ github.sha }}
+          path: build/ci/selection.json
+          if-no-files-found: error
+          retention-days: 7
 
   publish:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.build.outputs.application-build == 'true'
     permissions:
       contents: read
       packages: write

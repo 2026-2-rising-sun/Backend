@@ -8,6 +8,7 @@ import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles({"test", "postgres"})
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "LIVE_PG_TEST", matches = "1")
 class PostgresLikeTest extends LiveSecuritySupport {
     @Autowired LikeService likes;

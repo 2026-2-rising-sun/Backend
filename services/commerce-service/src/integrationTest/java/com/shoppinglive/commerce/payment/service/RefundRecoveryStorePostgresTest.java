@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -23,6 +24,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class RefundRecoveryStorePostgresTest {
     private static final Duration LEASE = Duration.ofMinutes(1);
@@ -94,6 +96,7 @@ class RefundRecoveryStorePostgresTest {
     }
 
     @Test
+    @Tag("migration")
     void migrationPreservesLegacyBusinessDataAndConstrainsRecoveryMetadata() {
         assertThat(
                         jdbc.queryForObject(

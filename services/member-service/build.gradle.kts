@@ -1,22 +1,5 @@
 plugins { id("org.springframework.boot") }
 
-tasks.named<Test>("integrationTest") { useJUnitPlatform { excludeTags("postgres") } }
-
-tasks.register<Test>("postgresTest") {
-    description =
-        "Run Member API, Flyway and concurrency tests against an isolated PostgreSQL database"
-    group = "verification"
-    testClassesDirs = sourceSets["integrationTest"].output.classesDirs
-    classpath = sourceSets["integrationTest"].runtimeClasspath
-    useJUnitPlatform { includeTags("postgres") }
-    outputs.upToDateWhen { false }
-    doFirst {
-        require(System.getenv("MEMBER_TEST_DB_URL")?.startsWith("jdbc:postgresql:") == true) {
-            "postgresTest requires MEMBER_TEST_DB_URL pointing to a disposable PostgreSQL database"
-        }
-    }
-}
-
 dependencies {
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1")
     implementation(project(":common-module"))
