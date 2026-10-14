@@ -39,15 +39,18 @@ public class OutboxRelay {
     private final OutboxMessageRepository repository;
     private final KafkaTemplate<String, String> kafka;
     private final OutboxProperties properties;
+    private final java.util.concurrent.Executor fastPath;
     private final AtomicBoolean draining = new AtomicBoolean();
 
     public OutboxRelay(
             final OutboxMessageRepository repository,
             final KafkaTemplate<String, String> kafka,
-            final OutboxProperties properties) {
+            final OutboxProperties properties,
+            java.util.concurrent.Executor fastPath) {
         this.repository = repository;
         this.kafka = kafka;
         this.properties = properties;
+        this.fastPath = fastPath;
     }
 
     @Scheduled(fixedDelayString = "${shoppinglive.outbox.relay.fixed-delay:1s}")
@@ -58,7 +61,14 @@ public class OutboxRelay {
     /** append 트랜잭션이 커밋되면 즉시 drain 을 시도한다. 이미 돌고 있으면 skip. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onOutboxCommitted(final OutboxCommittedEvent event) {
-        relay();
+        fastPath.execute(
+                () -> {
+                    try {
+                        relay();
+                    } catch (RuntimeException failure) {
+                        log.warn("Outbox 빠른 발행 실패. 정기 작업에서 재시도합니다.", failure);
+                    }
+                });
     }
 
     /** 이번 주기에 발행한 건수를 돌려준다. 재진입은 막혀, 폴링과 fast-path 가 겹쳐도 1회만 돈다. */

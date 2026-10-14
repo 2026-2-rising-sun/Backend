@@ -69,6 +69,8 @@ spring:
   config:
     activate:
       on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
   datasource:
     url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/live
     username: ${POSTGRES_USER:shoppinglive}
@@ -111,6 +113,8 @@ spring:
   config:
     activate:
       on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
   datasource:
     url: jdbc:postgresql://postgres:5432/live
     username: ${POSTGRES_USER:shoppinglive}

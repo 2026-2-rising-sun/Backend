@@ -31,7 +31,11 @@ class OutboxRelayTest {
 
     private final OutboxMessageRepository repository = mock(OutboxMessageRepository.class);
     private final OutboxRelay relay =
-            new OutboxRelay(repository, kafka, new OutboxProperties(100, Duration.ofSeconds(1)));
+            new OutboxRelay(
+                    repository,
+                    kafka,
+                    new OutboxProperties(100, Duration.ofSeconds(1)),
+                    Runnable::run);
 
     @Test
     void sendsPendingMessagesInOrderWithKeyAndTypeHeaderThenMarksThemPublished() {

@@ -14,14 +14,16 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, Lo
     /** 기록 순서(id)대로 읽어야 같은 key 의 이벤트 순서가 Kafka 에서도 유지된다. */
     List<OutboxMessage> findByPublishedAtIsNullOrderByIdAsc(Pageable pageable);
 
-    @Transactional
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @Modifying
     @Query(
             "UPDATE OutboxMessage m SET m.publishedAt = :at, m.attempts = m.attempts + 1, "
                     + "m.lastError = null WHERE m.id = :id")
     int markPublished(@Param("id") long id, @Param("at") Instant at);
 
-    @Transactional
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @Modifying
     @Query(
             "UPDATE OutboxMessage m SET m.attempts = m.attempts + 1, m.lastError = :error "

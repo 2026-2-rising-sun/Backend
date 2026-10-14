@@ -49,6 +49,18 @@ public class OutboxConfiguration {
                         ProducerConfig.MAX_BLOCK_MS_CONFIG, properties.sendTimeout().toMillis()));
     }
 
+    @Bean(destroyMethod = "shutdown")
+    public java.util.concurrent.ThreadPoolExecutor outboxFastPathExecutor() {
+        return new java.util.concurrent.ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                java.util.concurrent.TimeUnit.MILLISECONDS,
+                new java.util.concurrent.ArrayBlockingQueue<>(1),
+                Thread.ofPlatform().name("outbox-fast-path-", 0).factory(),
+                new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    }
+
     @Bean
     @ConditionalOnProperty(
             prefix = "shoppinglive.outbox.relay",
@@ -58,7 +70,8 @@ public class OutboxConfiguration {
     public OutboxRelay outboxRelay(
             final OutboxMessageRepository repository,
             final KafkaTemplate<String, String> outboxKafkaTemplate,
-            final OutboxProperties properties) {
-        return new OutboxRelay(repository, outboxKafkaTemplate, properties);
+            final OutboxProperties properties,
+            java.util.concurrent.ThreadPoolExecutor outboxFastPathExecutor) {
+        return new OutboxRelay(repository, outboxKafkaTemplate, properties, outboxFastPathExecutor);
     }
 }
