@@ -5,7 +5,7 @@ info:
   license: { name: UNLICENSED }
   description: |-
     Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
-    가격, 재고, 판매 상태는 Commerce 소유이며 공개와 판매자 조회에서 조회 시점에 결합한다.
+    가격·재고·판매 상태는 Commerce 소유다. 기본적으로 Commerce에서 조회하며 shopping.sales.source=replica에서는 이벤트로 갱신한 사본을 사용하므로 최신 상태와 차이가 있을 수 있다.
     JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 SELLER이 필요하다.
     공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
     상품 관리는 SELLER 권한을 요구한다. 새 상품은 등록한 판매자의 회원 ID를 저장하며 다른 판매자의 수정·멱등 재조회를 거절한다.
@@ -71,7 +71,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200':
-          description: Commerce 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
+          description: 판매정보 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminProductPageEnvelope' }
@@ -94,7 +94,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200':
-          description: Commerce 조회 실패 시 salesStatus는 UNKNOWN이다.
+          description: 판매정보 조회 실패 시 salesStatus는 UNKNOWN이다.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminProductDetailEnvelope' }
@@ -192,7 +192,7 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
-          description: 상품과 Commerce 판매정보를 결합한 조회 시점 스냅샷이다.
+          description: 상품과 판매정보를 결합한 조회 결과다. 최종 가격·재고는 주문 생성 시 확인한다.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PublicProductDetailEnvelope' }
@@ -489,7 +489,7 @@ components:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
           examples: { conflict: { value: { success: false, data: null, error: { code: CONFLICT, message: 다른 수정이 먼저 반영되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요., requestId: request-001 } } } }
     SalesUnavailable:
-      description: Commerce 판매정보를 조회할 수 없음
+      description: 판매정보를 조회할 수 없음
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }

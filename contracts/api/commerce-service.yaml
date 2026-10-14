@@ -5,16 +5,14 @@ info:
   license: { name: UNLICENSED }
   description: |-
     회원 전용 주문·결제·장바구니와 판매자 판매·재고 API. 모든 거래 소유자는 검증된 JWT sub에서 얻는다.
-    USER와 SELLER의 타인 주문·결제·장바구니 접근은 404. 비회원 주문번호+비밀번호 구매/조회는 제거되었다.
-    기존 거래 정상 응답은 봉투 없는 DTO/배열이다. 쿠폰 API는 성공·오류 모두 ApiResponse 봉투이다. 204는 본문 없음.
-    현재 결제 외부 연동은 Mock이며 성공 예시는 실제 PG 승인 증거가 아니다. Gateway 없이 서비스가 JWT를 직접 검증한다.
+    USER와 SELLER의 타인 주문·결제·장바구니 접근은 404.
+    주문·결제·장바구니·판매정보의 JSON 성공 응답은 봉투 없는 DTO/배열이고, 쿠폰·환불은 ApiResponse 봉투이다. 오류는 공통 ApiResponse 봉투이며 204는 본문이 없다.
+    현재 결제 연동은 Mock이다. 서비스가 JWT를 직접 검증한다.
 
     단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 결제 전 15분 만료, 확인 중 결과 불명은 재확인한다.
     장바구니는 주문 생성 뒤에도 편집할 수 있으며 결제 성공 때 원본 ID·version 일치 항목만 삭제한다.
 
-    V4는 기존 단건 주문을 결제 묶음으로 연결한다. 회원별 활성 주문이 여러 건이면 자동 취소·삭제 없이 마이그레이션을 중단하므로 먼저 기존 거래를 명시적으로 정리해야 한다.
-
-    JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
+    JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 서비스 토큰 전용 요청은 Member 세션 확인과 독립이다.
 security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8083
@@ -370,6 +368,7 @@ paths:
               examples:
                 pending: {"value": {"paymentId": 1, "orderId": 1, "scenario": "INSTANT_SUCCESS", "status": "PROCESSING", "requestedAt": "2026-10-01T00:00:00Z", "resolvedAt": null, "scheduledResolveAt": "2026-10-01T00:00:00Z"}}
                 success: {"value": {"paymentId": 1, "orderId": 1, "scenario": "INSTANT_SUCCESS", "status": "SUCCESS", "requestedAt": "2026-10-01T00:00:00Z", "resolvedAt": "2026-10-01T00:00:01Z", "scheduledResolveAt": "2026-10-01T00:00:00Z"}}
+        '400': { $ref: '#/components/responses/BadRequest' }
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
@@ -454,6 +453,7 @@ paths:
       x-required-roles: ["USER", "SELLER"]
       responses:
         "204": {"description": "삭제, 본문 없음"}
+        '400': { $ref: '#/components/responses/BadRequest' }
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
@@ -509,18 +509,18 @@ paths:
             schema: {"$ref":"#/components/schemas/CartCheckoutRequest"}
             example: {"items":[{"itemId":1,"version":0},{"itemId":2,"version":0}],"couponId":"33333333-3333-4333-8333-333333333334"}
       responses:
-        200:
+        '200':
           description: "성공"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/CartCheckout"}
               example: {"items":[{"itemId":1,"version":0,"productId":1,"productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000,"discountAmount":2000,"payableAmount":18000},{"itemId":2,"version":0,"productId":2,"productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000,"discountAmount":0,"payableAmount":5000}],"totalAmount":25000,"couponId":"33333333-3333-4333-8333-333333333334","discountAmount":2000,"payableAmount":23000}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        409: {"$ref":"#/components/responses/Conflict"}
-        503: {"$ref":"#/components/responses/ShoppingUnavailable"}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '409': {"$ref":"#/components/responses/Conflict"}
+        '503': {"$ref":"#/components/responses/ShoppingUnavailable"}
   /v1/cart/orders:
     post:
       tags: ["Cart"]
@@ -536,24 +536,24 @@ paths:
             schema: {"$ref":"#/components/schemas/CreateCartGroupRequest"}
             example: {"items":[{"itemId":1,"version":0},{"itemId":2,"version":0}],"buyerName":"구매자","buyerPhone":"01012345678","expectedTotalAmount":25000}
       responses:
-        200:
+        '200':
           description: "동일 입력 재전송, 현재 묶음 결과"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
               example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
-        201:
+        '201':
           description: "새 묶음과 상품별 주문 생성"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
               example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        409: {"$ref":"#/components/responses/Conflict"}
-        503: {"$ref":"#/components/responses/ShoppingUnavailable"}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '409': {"$ref":"#/components/responses/Conflict"}
+        '503': {"$ref":"#/components/responses/ShoppingUnavailable"}
   /v1/payment-groups/active:
     get:
       tags: ["Payment Groups"]
@@ -562,16 +562,16 @@ paths:
       description: "회원의 PENDING_PAYMENT 또는 PAYMENT_CONFIRMING 묶음 하나를 반환한다. 생성·결제 응답 유실 또는 새로고침 후 결과 복구에 사용한다. 활성 묶음이 없으면 204이며 실패·취소·만료·완료 묶음은 활성 조회에서 제외한다."
       x-required-roles: ["USER","SELLER"]
       responses:
-        200:
+        '200':
           description: "성공"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
               example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
-        204: {"description":"활성 묶음 없음, 본문 없음"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '204': {"description":"활성 묶음 없음, 본문 없음"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     get:
@@ -581,16 +581,16 @@ paths:
       description: "다른 회원 묶음과 없는 묶음은 동일 404. 합계와 상품별 주문 목록 및 결제 시도 ID를 반환한다. 각 주문은 내 주문 목록·상세에서 별도로 조회된다."
       x-required-roles: ["USER","SELLER"]
       responses:
-        200:
+        '200':
           description: "성공"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
               example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}/payments:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     post:
@@ -607,24 +607,24 @@ paths:
             schema: {"$ref":"#/components/schemas/StartPaymentRequest"}
             example: {}
       responses:
-        200:
+        '200':
           description: "0원 결제 즉시 완료 또는 완료된 동일 결제 시도 재전송"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentAttempt"}
               example: {"paymentId":2,"orderId":2,"scenario":"INSTANT_SUCCESS","status":"SUCCESS","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":"2026-10-08T00:00:00Z","scheduledResolveAt":"2026-10-08T00:00:00Z"}
-        202:
+        '202':
           description: "양수 결제 승인 요청 접수 또는 진행 중인 동일 결제 시도 재전송"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentAttempt"}
               example: {"paymentId":1,"orderId":1,"scenario":"INSTANT_SUCCESS","status":"PROCESSING","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":null,"scheduledResolveAt":"2026-10-08T00:00:00Z"}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        409: {"$ref":"#/components/responses/Conflict"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '409': {"$ref":"#/components/responses/Conflict"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}/payments/{id}:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"},{"$ref":"#/components/parameters/GroupPaymentId"}]
     get:
@@ -634,32 +634,32 @@ paths:
       description: "본인 묶음에 연결된 결제 시도만 조회한다. 타인 묶음·다른 묶음의 시도·없는 시도는 동일 404."
       x-required-roles: ["USER","SELLER"]
       responses:
-        200:
+        '200':
           description: "성공"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentAttempt"}
               example: {"paymentId":1,"orderId":1,"scenario":"INSTANT_SUCCESS","status":"PROCESSING","requestedAt":"2026-10-08T00:00:00Z","resolvedAt":null,"scheduledResolveAt":"2026-10-08T00:00:00Z"}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}/cancel:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     post:
       tags: ["Payment Groups"]
       summary: "결제 전 전체 주문 취소"
       operationId: "cancelMyPaymentGroup"
-      description: "PENDING_PAYMENT 묶음의 상품별 주문 전체를 취소하고 예약 재고를 한 트랜잭션에서 반환한다. CANCELLED 재전송은 204. 결제 확인 중·완료·실패·만료는 409. 부분 취소/환불은 지원하지 않는다. 카트는 삭제하지 않는다."
+      description: "PENDING_PAYMENT 묶음의 상품별 주문 전체를 취소하고 예약 재고를 함께 반환한다. CANCELLED 재전송은 204. 결제 확인 중·완료·실패·만료는 409. 이 경로는 묶음 전체 취소만 지원하며 결제 후 환불은 별도 환불 API를 사용한다. 카트는 삭제하지 않는다."
       x-required-roles: ["USER","SELLER"]
       responses:
-        204: {"description":"전체 취소 및 예약 재고 복구, 본문 없음"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        409: {"$ref":"#/components/responses/Conflict"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '204': {"description":"전체 취소 및 예약 재고 복구, 본문 없음"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '409': {"$ref":"#/components/responses/Conflict"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}/refunds:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     post:
@@ -679,37 +679,38 @@ paths:
             schema: {"$ref":"#/components/schemas/RefundRequest"}
             example: {cartItemIds: [101]}
       responses:
-        201:
+        '201':
           description: 환불 접수 및 대상·실부담액 스냅샷 저장
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/RefundViewEnvelope"}
               example: {success: true, data: {id: 51, paymentGroupNumber: PG-EXAMPLE, refundAmount: 1900, cumulativeRefundAmount: 0, status: PROCESSING, requestedAt: '2026-10-09T00:00:00Z', resolvedAt: null, targets: [{cartItemId: 101, orderId: 301, productId: 1, productName: A, quantity: 2, refundAmount: 1900}], recovery: {retryCount: 0, retryExhausted: false, nextActionAt: '2026-10-09T00:00:00Z'}}, error: null}
-        200:
+        '200':
           description: 동일 멱등 키·동일 입력 재요청, 기존 요청 반환
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/RefundViewEnvelope"}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        409: {"$ref":"#/components/responses/Conflict"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '409': {"$ref":"#/components/responses/Conflict"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
     get:
       tags: [Payment Groups]
       operationId: listMyRefunds
       summary: 본인 결제 묶음 환불 이력
       x-required-roles: [USER, SELLER]
       responses:
-        200:
+        '200':
           description: 회원 본인 결제 묶음의 환불 요청 목록
           content:
             application/json:
               schema: {type: object, required: [success, data, error], properties: {success: {const: true}, data: {type: array, items: {$ref: '#/components/schemas/RefundView'}}, error: {type: 'null'}}}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/payment-groups/{number}/refunds/{id}:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"},{"$ref":"#/components/parameters/RefundId"}]
     get:
@@ -718,10 +719,12 @@ paths:
       summary: 본인 환불 요청 상세
       x-required-roles: [USER, SELLER]
       responses:
-        200: {description: 환불 요청과 전체 대상 상세, content: {application/json: {schema: {$ref: '#/components/schemas/RefundViewEnvelope'}}}}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '200': {description: 환불 요청과 전체 대상 상세, content: {application/json: {schema: {$ref: '#/components/schemas/RefundViewEnvelope'}}}}
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/seller/refunds:
     get:
       tags: [Sales Admin]
@@ -733,11 +736,11 @@ paths:
         - {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
         - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
       responses:
-        200: {description: 판매자 본인 대상 환불만 조회, content: {application/json: {schema: {type: object, required: [success, data, error], properties: {success: {const: true}, data: {type: array, items: {$ref: '#/components/schemas/SellerRefundView'}}, error: {type: 'null'}}}}}}
-        400: {"$ref":"#/components/responses/BadRequest"}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '200': {description: 판매자 본인 대상 환불만 조회, content: {application/json: {schema: {type: object, required: [success, data, error], properties: {success: {const: true}, data: {type: array, items: {$ref: '#/components/schemas/SellerRefundView'}}, error: {type: 'null'}}}}}}
+        '400': {"$ref":"#/components/responses/BadRequest"}
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/seller/refunds/{id}:
     parameters: [{"$ref":"#/components/parameters/RefundId"}]
     get:
@@ -747,11 +750,12 @@ paths:
       description: 요청의 판매자별 대상 금액과 주문만 반환하며 타 판매자 정보와 결제 묶음 총액은 숨긴다.
       x-required-roles: [SELLER]
       responses:
-        200: {description: 판매자 본인 환불 대상만 조회, content: {application/json: {schema: {$ref: '#/components/schemas/SellerRefundViewEnvelope'}}}}
-        401: {"$ref":"#/components/responses/Unauthorized"}
-        403: {"$ref":"#/components/responses/Forbidden"}
-        404: {"$ref":"#/components/responses/NotFound"}
-        503: {"$ref":"#/components/responses/AuthUnavailable"}
+        '200': {description: 판매자 본인 환불 대상만 조회, content: {application/json: {schema: {$ref: '#/components/schemas/SellerRefundViewEnvelope'}}}}
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': {"$ref":"#/components/responses/Unauthorized"}
+        '403': {"$ref":"#/components/responses/Forbidden"}
+        '404': {"$ref":"#/components/responses/NotFound"}
+        '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/sales:
     get:
       tags: ["Internal Sales"]
@@ -843,6 +847,7 @@ paths:
               schema: {"$ref": "#/components/schemas/SalesStock"}
               examples:
                 normal: {"value": {"salesInfoId": 1, "available": 10, "reserved": 0}}
+        '400': { $ref: '#/components/responses/BadRequest' }
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
@@ -1108,13 +1113,6 @@ components:
           examples:
             shoppingUnavailable: {"value": {"success": false, "data": null, "error": {"code": "SHOPPING_UNAVAILABLE", "message": "상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", "requestId": "request-001"}}}
             authUnavailable: {"value": {"success": false, "data": null, "error": {"code": "SERVICE_UNAVAILABLE", "message": "인증 상태를 확인할 수 없습니다.", "requestId": "request-001"}}}
-    InternalError:
-      description: "서버 내부 오류"
-      content:
-        application/json:
-          schema: {"$ref": "#/components/schemas/ErrorEnvelope"}
-          examples:
-            internalError: {"value": {"success": false, "data": null, "error": {"code": "INTERNAL_ERROR", "message": "서버 내부 오류가 발생했습니다.", "requestId": "request-001"}}}
     AuthUnavailable:
       description: JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.
       content:
@@ -1229,7 +1227,7 @@ components:
         refundAmount: {type: integer, format: int64, minimum: 0}
     RefundRecovery:
       type: [object, 'null']
-      description: PROCESSING/UNKNOWN의 영속 복구 정보. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤 새 금전 실행 없이 1분마다 기존 결과만 조회하며 자동 실패 종료하지 않는다. nextActionAt은 작업 선점 만료를 고려한 가장 이른 재탐색 시각이며 실행/결과 적용 완료를 보장하는 시각은 아니다. 내부 소유 토큰·멱등키는 반환하지 않는다.
+      description: PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다.
       required: [retryCount, retryExhausted, nextActionAt]
       properties:
         retryCount: {type: integer, minimum: 0, maximum: 3}
@@ -1494,13 +1492,13 @@ components:
         status:
           type: string
           enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
-          description: "PROCESSING은 처리 중, UNKNOWN은 승인 결과 미확정이다. UNKNOWN 동안 주문 PAYMENT_CONFIRMING·재고·쿠폰 예약을 유지한다. 기존 결과를 먼저 조회하고, 없으면 동일 결제 시도 ID·키·금액으로 최초 실행 외 최대 3회 Full Jitter(0–1/0–2/0–4초) 재시도한다. 소진 후 UNKNOWN을 유지하며 1분마다 결과만 조회하고 자동 종료하지 않는다. 실행 횟수·작업 선점은 DB에 저장해 서버 재시작에도 한도를 보존한다. PENDING은 호환용 미사용 상태로 신규 결제는 PROCESSING으로 시작한다. TIMEOUT은 기존 데이터/API 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
+          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이며 주문 PAYMENT_CONFIRMING·재고·쿠폰 예약을 유지한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
         scheduledResolveAt:
           type: [string, 'null']
           format: date-time
-          description: "미확정 결제의 다음 자동 처리 대상 시각이다. 최초에는 시나리오 지연 시각, 이후에는 재시도 또는 결과 조회 시각이며 완료 예정 시각을 보장하지 않는다. 작업 선점·서버 부하로 실제 처리는 늦어질 수 있다. 확정 결제에서도 마지막 예약 시각은 호환용으로 남는다."
+          description: "미확정 결제의 다음 자동 처리 대상 시각이며 완료 시각을 보장하지 않는다. 확정 결제에서도 마지막 예약 시각은 남는다."
       description: "현재 결제 게이트웨이는 Mock이다. scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
     PaymentScenario:
       type: "string"
