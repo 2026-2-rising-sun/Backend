@@ -184,7 +184,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isForbidden());
-        for (String caller : new String[] {"shopping", "commerce", "live"}) {
+        for (String caller : new String[] {"shopping", "commerce", "live", "notification"}) {
             check(caller, memberId, family(token))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.active").value(true));

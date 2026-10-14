@@ -64,6 +64,9 @@ public abstract class MemberAuthTestSupport {
                 "shoppinglive.security.service-tokens.live",
                 () -> "test-live-member-credential-0123456789");
         properties.add(
+                "shoppinglive.security.service-tokens.notification",
+                () -> "test-notification-member-credential-0123456789");
+        properties.add(
                 "shoppinglive.security.service-tokens.other",
                 () -> "test-other-member-credential-0123456789");
         // 확정된 정책을 테스트 설정에 명시한다.
