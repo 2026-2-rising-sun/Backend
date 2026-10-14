@@ -939,6 +939,104 @@ paths:
         "404": {"$ref": "#/components/responses/NotFound"}
         "503":
           $ref: "#/components/responses/AuthUnavailable"
+  /v1/internal/coupon-snapshots:
+    get:
+      security: &id001
+      - ServiceToken: []
+      x-allowed-callers: &id002
+      - shopping
+      tags: &id003
+      - Internal Coupons
+      operationId: listCouponDisplaySnapshots
+      summary: 쿠폰 표시 사본 초기 적재·주기적 동기화
+      description: Shopping 전용. endsAt > 서버 현재 시각인 미래·진행 쿠폰을 ID 오름차순으로 반환하며 소진 쿠폰도 포함한다.
+        afterId는 마지막 ID를 그대로 전달한다. 페이지 전체는 단일 시점이 아니므로 이벤트 소비를 먼저 시작하고 API와 이벤트의 snapshotVersion
+        중 더 큰 값을 적용한다. 재동기화 중 누락될 수 있는 동시 생성은 이벤트 소비와 다음 전체 순회로 복구한다. 일반 상품 조회마다 호출하지
+        않는다.
+      parameters:
+      - name: afterId
+        in: query
+        required: false
+        schema: &id004
+          type: string
+          minLength: 1
+          maxLength: 36
+          pattern: \S
+          description: 기존 ID를 유지하는 opaque 문자열. UUID 형식으로 한정하지 않는다.
+        description: 미지정은 첫 페이지. 빈 문자열은 400. 반환한 nextCursor를 그대로 전달한다.
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - error
+                properties:
+                  success:
+                    const: true
+                  data:
+                    $ref: '#/components/schemas/CouponSnapshotPage'
+                  error:
+                    type: 'null'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/internal/coupon-snapshots/{couponId}:
+    get:
+      security: *id001
+      x-allowed-callers: *id002
+      tags: *id003
+      operationId: getCouponDisplaySnapshot
+      summary: 쿠폰 표시 사본 단건 복구
+      description: Shopping 전용. 종료된 쿠폰도 현재 전체 상태를 반환한다. 미존재 ID는 404이며 기존 opaque ID를
+        유지한다. 사용자 JWT로는 접근할 수 없다. 회원 쿠폰 상태는 반환하지 않는다.
+      parameters:
+      - name: couponId
+        in: path
+        required: true
+        schema: *id004
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - error
+                properties:
+                  success:
+                    const: true
+                  data:
+                    $ref: '#/components/schemas/CouponDisplaySnapshot'
+                  error:
+                    type: 'null'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
   securitySchemes:
     BearerAuth: {$ref: './common.yaml#/components/securitySchemes/BearerAuth'}
@@ -1033,6 +1131,83 @@ components:
                   message: 인증 상태를 확인할 수 없습니다.
                   requestId: request-001
   schemas:
+    CouponDisplaySnapshot:
+      type: object
+      required:
+      - couponId
+      - snapshotVersion
+      - name
+      - fixedDiscount
+      - productIds
+      - startsAt
+      - endsAt
+      - expiresAt
+      - soldOut
+      properties:
+        couponId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          pattern: \S
+          description: 기존 ID를 유지하는 opaque 문자열. UUID 형식으로 한정하지 않는다.
+        snapshotVersion:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 표시 스냅샷의 쿠폰별 버전. 판매자 설정 version과 독립적이다.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        fixedDiscount:
+          type: integer
+          format: int64
+          minimum: 1
+        productIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+          description: 정렬된 전체 대상 상품 목록. 이전 목록을 교체한다. 빈 목록은 기존 연결을 전부 제거한다.
+        startsAt:
+          type: string
+          format: date-time
+          description: 발급 시작 시각, 포함 경계.
+        endsAt:
+          type: string
+          format: date-time
+          description: 발급 종료 시각, 제외 경계. 별도 시간 경계 이벤트는 발행하지 않는다.
+        expiresAt:
+          type: string
+          format: date-time
+          description: 발급된 회원 쿠폰의 사용 만료 시각.
+        soldOut:
+          type: boolean
+          description: 발급 수량 소진 여부. 사용·환불로 발급 수량을 되돌리지 않는다.
+      description: 상품 표시용 전체 쿠폰 스냅샷. 회원 발급/사용 상태와 발급 잔여 수량은 포함하지 않는다. 실제 발급·사용 판정은 Commerce가
+        수행한다.
+    CouponSnapshotPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      - hasNext
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CouponDisplaySnapshot'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+          description: 다음 페이지가 있을 때 마지막 반환 쿠폰 ID, 없으면 null.
+        hasNext:
+          type: boolean
+
     RefundStatus:
       type: string
       enum: [PROCESSING, UNKNOWN, SUCCESS, FAILED]

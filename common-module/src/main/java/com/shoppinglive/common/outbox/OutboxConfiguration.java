@@ -37,16 +37,40 @@ public class OutboxConfiguration {
      * OutboxProperties#sendTimeout()} 로 맞춰, 브로커 메타데이터를 못 받는 상황에서도 {@code send()} 호출이 producer 기본 60
      * 초가 아닌 설정값에서 풀리게 한다.
      */
+    @Bean(destroyMethod = "close")
+    public OutboxProducerResource outboxProducerResource(
+            final ProducerFactory<?, ?> producerFactory, final OutboxProperties properties) {
+        final var configuration =
+                new java.util.HashMap<String, Object>(producerFactory.getConfigurationProperties());
+        configuration.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configuration.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configuration.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, properties.sendTimeout().toMillis());
+        return new OutboxProducerResource(configuration);
+    }
+
     @Bean
     public KafkaTemplate<String, String> outboxKafkaTemplate(
-            final ProducerFactory<String, String> producerFactory,
-            final OutboxProperties properties) {
-        return new KafkaTemplate<>(
-                producerFactory,
-                Map.of(
-                        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                        ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                        ProducerConfig.MAX_BLOCK_MS_CONFIG, properties.sendTimeout().toMillis()));
+            final OutboxProducerResource resource) {
+        return resource.template;
+    }
+
+    /** 별도 factory를 Spring bean으로 노출하지 않아 Boot의 도메인 producer factory를 보존한다. */
+    public static final class OutboxProducerResource implements AutoCloseable {
+        private final org.springframework.kafka.core.DefaultKafkaProducerFactory<String, String>
+                factory;
+        private final KafkaTemplate<String, String> template;
+
+        OutboxProducerResource(Map<String, Object> configuration) {
+            factory =
+                    new org.springframework.kafka.core.DefaultKafkaProducerFactory<>(
+                            configuration, StringSerializer::new, StringSerializer::new);
+            template = new KafkaTemplate<>(factory);
+        }
+
+        @Override
+        public void close() {
+            factory.destroy();
+        }
     }
 
     @Bean(destroyMethod = "shutdown")

@@ -10,7 +10,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-@Import({JpaAuditingConfig.class, WebConfiguration.class, AuthenticationConfiguration.class})
+@Import({
+    JpaAuditingConfig.class,
+    WebConfiguration.class,
+    AuthenticationConfiguration.class,
+    com.shoppinglive.common.outbox.OutboxConfiguration.class
+})
 public class CommerceServiceApplication {
 
     public static void main(String[] args) {

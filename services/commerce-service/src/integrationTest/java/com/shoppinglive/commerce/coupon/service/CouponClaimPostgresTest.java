@@ -58,7 +58,12 @@ class CouponClaimPostgresTest {
 
     private List<String> claims(DriverManagerDataSource ds, boolean sameMember) {
         var service =
-                new CouponClaimService(new JdbcTemplate(ds), new DataSourceTransactionManager(ds));
+                new CouponClaimService(
+                        new JdbcTemplate(ds),
+                        new DataSourceTransactionManager(ds),
+                        org.mockito.Mockito.mock(
+                                com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher
+                                        .class));
         var ready = new CountDownLatch(20);
         var go = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(20)) {
@@ -164,7 +169,12 @@ class CouponClaimPostgresTest {
                                     () ->
                                             new CouponClaimService(
                                                             failing,
-                                                            new DataSourceTransactionManager(ds))
+                                                            new DataSourceTransactionManager(ds),
+                                                            org.mockito.Mockito.mock(
+                                                                    com.shoppinglive.commerce.coupon
+                                                                            .event
+                                                                            .CouponDisplayEventPublisher
+                                                                            .class))
                                                     .claim("member", "coupon"))
                             .isInstanceOf(DataIntegrityViolationException.class);
                     assertThat(
@@ -174,7 +184,12 @@ class CouponClaimPostgresTest {
                             .isZero();
                     assertThat(
                                     new CouponClaimService(
-                                                    jdbc, new DataSourceTransactionManager(ds))
+                                                    jdbc,
+                                                    new DataSourceTransactionManager(ds),
+                                                    org.mockito.Mockito.mock(
+                                                            com.shoppinglive.commerce.coupon.event
+                                                                    .CouponDisplayEventPublisher
+                                                                    .class))
                                             .claim("member", "coupon")
                                             .created())
                             .isTrue();

@@ -51,6 +51,8 @@ tasks.register<Test>("postgresCommerceTest") {
                 "OrderCancellationConcurrencyTest",
                 "SalesStockConcurrencyTest",
                 "SalesInfoEventIntegrationTest",
+                "CouponSyncIntegrationTest",
+                "CouponSyncKafkaTest",
                 "SalesStatusConcurrencyTest",
                 "PaymentFlowIntegrationTest",
                 "PaymentSchedulingAfterCommitTest",

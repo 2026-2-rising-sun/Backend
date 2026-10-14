@@ -2,6 +2,8 @@ package com.shoppinglive.commerce.coupon.service;
 
 import com.shoppinglive.commerce.client.shopping.ShoppingClient;
 import com.shoppinglive.commerce.coupon.entity.CouponDefinition;
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher;
+import com.shoppinglive.commerce.coupon.event.CouponDisplayEventPublisher.Type;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.ResultSet;
@@ -20,13 +22,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class CouponManagementService {
     public record Page(List<CouponDefinition> items, int page, int size, long totalElements) {}
 
+    private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
     private final ShoppingClient shopping;
     private final TransactionTemplate transaction;
     private final TransactionTemplate readTransaction;
 
     public CouponManagementService(
-            JdbcTemplate jdbc, ShoppingClient shopping, PlatformTransactionManager manager) {
+            JdbcTemplate jdbc,
+            ShoppingClient shopping,
+            PlatformTransactionManager manager,
+            CouponDisplayEventPublisher events) {
+        this.events = events;
         this.jdbc = jdbc;
         this.shopping = shopping;
         this.transaction = new TransactionTemplate(manager);
@@ -104,7 +111,7 @@ public class CouponManagementService {
                         throw new BusinessException(ErrorCode.CONFLICT, "이미 발급한 수량보다 줄일 수 없습니다.");
                     }
                     jdbc.update(
-                            "UPDATE coupon_definition SET name=?,fixed_discount=?,issuance_limit=?,starts_at=?,ends_at=?,expires_at=?,version=version+1 WHERE id=?",
+                            "UPDATE coupon_definition SET name=?,fixed_discount=?,issuance_limit=?,starts_at=?,ends_at=?,expires_at=?,version=version+1,snapshot_version=snapshot_version+1 WHERE id=?",
                             name,
                             discount,
                             limit,
@@ -119,6 +126,7 @@ public class CouponManagementService {
                                 id,
                                 productId);
                     }
+                    events.publish(Type.CouponUpdated, id);
                     return owned(seller, id, false);
                 });
     }

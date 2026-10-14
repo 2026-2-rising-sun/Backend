@@ -66,11 +66,31 @@ class CouponManagementPostgresTest {
                     var shopping = shopping();
                     Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
                     var coupon =
-                            new CouponCreationService(jdbc, shopping, tx)
+                            new CouponCreationService(
+                                            jdbc,
+                                            shopping,
+                                            tx,
+                                            org.mockito.Mockito.mock(
+                                                    com.shoppinglive.commerce.coupon.event
+                                                            .CouponDisplayEventPublisher.class))
                                     .create("seller", "old", 100, 1, start, end, end, List.of(1L));
                     var paused = new PausingJdbc(ds);
-                    var read = new CouponManagementService(paused, shopping, tx);
-                    var write = new CouponManagementService(jdbc, shopping, tx);
+                    var read =
+                            new CouponManagementService(
+                                    paused,
+                                    shopping,
+                                    tx,
+                                    org.mockito.Mockito.mock(
+                                            com.shoppinglive.commerce.coupon.event
+                                                    .CouponDisplayEventPublisher.class));
+                    var write =
+                            new CouponManagementService(
+                                    jdbc,
+                                    shopping,
+                                    tx,
+                                    org.mockito.Mockito.mock(
+                                            com.shoppinglive.commerce.coupon.event
+                                                    .CouponDisplayEventPublisher.class));
                     try (var executor = Executors.newSingleThreadExecutor()) {
                         var result = executor.submit(() -> read.get("seller", coupon.id()));
                         try {
@@ -111,9 +131,22 @@ class CouponManagementPostgresTest {
                     var shopping = shopping();
                     Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
                     var coupon =
-                            new CouponCreationService(jdbc, shopping, tx)
+                            new CouponCreationService(
+                                            jdbc,
+                                            shopping,
+                                            tx,
+                                            org.mockito.Mockito.mock(
+                                                    com.shoppinglive.commerce.coupon.event
+                                                            .CouponDisplayEventPublisher.class))
                                     .create("seller", "old", 100, 1, start, end, end, List.of(1L));
-                    var service = new CouponManagementService(jdbc, shopping, tx);
+                    var service =
+                            new CouponManagementService(
+                                    jdbc,
+                                    shopping,
+                                    tx,
+                                    org.mockito.Mockito.mock(
+                                            com.shoppinglive.commerce.coupon.event
+                                                    .CouponDisplayEventPublisher.class));
                     var ready = new CountDownLatch(2);
                     var go = new CountDownLatch(1);
                     try (var executor = Executors.newFixedThreadPool(2)) {
