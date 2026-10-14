@@ -1,34 +1,99 @@
 package com.shoppinglive.shopping.product.controller;
 
 import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
-import com.shoppinglive.shopping.product.dto.SellerProductPage;
-import com.shoppinglive.shopping.product.service.ProductQueryService;
+import com.shoppinglive.shopping.product.dto.ProductResponse;
+import com.shoppinglive.shopping.product.dto.RegisterProductRequest;
+import com.shoppinglive.shopping.product.dto.UpdateProductRequest;
+import com.shoppinglive.shopping.product.entity.Product;
+import com.shoppinglive.shopping.product.service.ProductRegistrationService;
+import com.shoppinglive.shopping.product.service.ProductUpdateService;
+import com.shoppinglive.shopping.storage.ImageUrlResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 판매자 상품 API. 기본정보만 등록된 상품은 Commerce 판매정보(판매 1)가 생기기 전까지 공개·주문 대상이 아니다. Member JWT와 세션을 검증하고 SELLER
+ * 역할만 허용한다.
+ */
 @RestController
+@RequestMapping("/v1/seller/products")
 public class SellerProductController {
-    private final ProductQueryService products;
 
-    public SellerProductController(ProductQueryService products) {
-        this.products = products;
+    static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+    private static final int IDEMPOTENCY_KEY_MAX_LENGTH = 64;
+
+    private final ProductRegistrationService registrationService;
+    private final ProductUpdateService updateService;
+    private final ImageUrlResolver imageUrlResolver;
+
+    public SellerProductController(
+            ProductRegistrationService registrationService,
+            ProductUpdateService updateService,
+            ImageUrlResolver imageUrlResolver) {
+        this.registrationService = registrationService;
+        this.updateService = updateService;
+        this.imageUrlResolver = imageUrlResolver;
     }
 
-    @Operation(
-            summary = "본인 소유 상품 목록",
-            description =
-                    "인증된 판매자의 상품만 최신 등록순으로 조회한다. 기존 소유자 미지정 상품과 다른 판매자의 상품은 제외한다. 판매정보 조회와 독립이다. page와 size는 정수이며 page × size가 2147483647을 초과하면 400으로 거절한다.")
+    /**
+     * 상품 기본정보 등록. 같은 {@code X-Idempotency-Key} 로 다시 보내면 새 상품을 만들지 않고 처음 등록된 상품을 같은 201 응답으로 돌려준다
+     * (재전송한 클라이언트가 첫 응답과 구분할 필요가 없도록). 재요청 본문은 보지 않는다.
+     */
+    @Operation(summary = "상품 기본정보 등록")
     @SecurityRequirement(name = "BearerAuth")
-    @GetMapping("/v1/seller/products")
-    public ApiResponse<SellerProductPage> list(
+    @PostMapping
+    public ResponseEntity<ApiResponse<ProductResponse>> register(
             @AuthenticationPrincipal AuthenticatedUser seller,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(products.findOwnedProducts(seller.memberId(), page, size));
+            @RequestHeader(name = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @Valid @RequestBody RegisterProductRequest request) {
+        // 헤더 누락을 스프링에 맡기면 공통 핸들러가 500 으로 돌려서 직접 검사한다.
+        if (!StringUtils.hasText(idempotencyKey)
+                || idempotencyKey.length() > IDEMPOTENCY_KEY_MAX_LENGTH) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    IDEMPOTENCY_KEY_HEADER + " 헤더가 필요합니다 (1~" + IDEMPOTENCY_KEY_MAX_LENGTH + "자).");
+        }
+        Product product =
+                registrationService.register(
+                        request.toCommand(), idempotencyKey, seller.memberId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(toResponse(product)));
+    }
+
+    /** 수정 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
+    @PatchMapping("/")
+    public ApiResponse<Void> missingProductId() {
+        throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
+    }
+
+    /** 기본정보 부분 수정·대표 이미지 교체. 응답의 version 을 다음 수정 요청에 그대로 보내야 한다. */
+    @Operation(summary = "상품 기본정보 부분 수정")
+    @SecurityRequirement(name = "BearerAuth")
+    @PatchMapping("/{productId}")
+    public ApiResponse<ProductResponse> update(
+            @AuthenticationPrincipal AuthenticatedUser seller,
+            @PathVariable Long productId,
+            @Valid @RequestBody UpdateProductRequest request) {
+        return ApiResponse.ok(
+                toResponse(
+                        updateService.update(productId, request.toCommand(), seller.memberId())));
+    }
+
+    private ProductResponse toResponse(Product product) {
+        return ProductResponse.of(product, imageUrlResolver.urlOf(product.getMainImageId()));
     }
 }

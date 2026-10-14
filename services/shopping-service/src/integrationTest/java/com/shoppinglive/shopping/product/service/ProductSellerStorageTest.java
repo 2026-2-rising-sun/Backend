@@ -72,7 +72,7 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
         JsonNode result = register("shared-key");
         String other = "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("SELLER"));
         mvc.perform(
-                        post("/v1/admin/products")
+                        post("/v1/seller/products")
                                 .header("Authorization", other)
                                 .header("X-Idempotency-Key", "shared-key")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -87,7 +87,7 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
                                                         imageId))))
                 .andExpect(status().isConflict());
         mvc.perform(
-                        patch("/v1/admin/products/{id}", result.path("productId").asLong())
+                        patch("/v1/seller/products/{id}", result.path("productId").asLong())
                                 .header("Authorization", other)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
@@ -116,8 +116,8 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
     private JsonNode register(String key) throws Exception {
         String result =
                 mvc.perform(
-                                post("/v1/admin/products")
-                                        .header("Authorization", adminBearer())
+                                post("/v1/seller/products")
+                                        .header("Authorization", sellerBearer())
                                         .header("X-Idempotency-Key", key)
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(

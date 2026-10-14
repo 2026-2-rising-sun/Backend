@@ -56,10 +56,10 @@ class PublicProductInputHttpTest extends ShoppingSecuritySupport {
 
     @ParameterizedTest
     @ValueSource(strings = {"GET", "PATCH"})
-    void administratorMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
-        expect(request(method, "/v1/admin/products/", adminBearer()), 400, "INVALID_REQUEST");
-        expect(request(method, "/v1/admin/products/", null), 401, "UNAUTHORIZED");
-        expect(request(method, "/v1/admin/products/", userBearer()), 403, "FORBIDDEN");
+    void sellerMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
+        expect(request(method, "/v1/seller/products/", sellerBearer()), 400, "INVALID_REQUEST");
+        expect(request(method, "/v1/seller/products/", null), 401, "UNAUTHORIZED");
+        expect(request(method, "/v1/seller/products/", userBearer()), 403, "FORBIDDEN");
     }
 
     @Test
@@ -70,7 +70,7 @@ class PublicProductInputHttpTest extends ShoppingSecuritySupport {
                 "INVALID_REQUEST");
         expect(request("GET", "/v1/internal/products/", null, LIVE_KEY), 400, "INVALID_REQUEST");
         expect(request("GET", "/v1/internal/products/", null), 401, "UNAUTHORIZED");
-        expect(request("GET", "/v1/internal/products/", adminBearer()), 401, "UNAUTHORIZED");
+        expect(request("GET", "/v1/internal/products/", sellerBearer()), 401, "UNAUTHORIZED");
         expect(request("GET", "/v1/internal/products/", null, OTHER_KEY), 403, "FORBIDDEN");
     }
 
@@ -89,15 +89,15 @@ class PublicProductInputHttpTest extends ShoppingSecuritySupport {
     @Test
     void missingIdHandlingDoesNotOpenOtherMethodsOrProtectedRoutes() throws Exception {
         expect(request("POST", "/v1/products/", null), 401, "UNAUTHORIZED");
-        expect(request("GET", "/v1/admin/products", null), 401, "UNAUTHORIZED");
-        expect(request("GET", "/v1/admin/products", userBearer()), 403, "FORBIDDEN");
+        expect(request("GET", "/v1/seller/products", null), 401, "UNAUTHORIZED");
+        expect(request("GET", "/v1/seller/products", userBearer()), 403, "FORBIDDEN");
         expect(request("GET", "/v1/internal/products", null), 401, "UNAUTHORIZED");
     }
 
     @Test
     void invalidUploadMediaTypeKeepsItsDistinct415Response() throws Exception {
         expect(
-                request("POST", "/v1/admin/product-images", adminBearer()),
+                request("POST", "/v1/seller/product-images", sellerBearer()),
                 415,
                 "UNSUPPORTED_MEDIA_TYPE");
     }

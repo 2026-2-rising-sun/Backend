@@ -50,7 +50,7 @@ public abstract class ShoppingSecuritySupport {
         properties.add("shoppinglive.security.service-tokens.member", () -> OTHER_KEY);
     }
 
-    public static String adminBearer() {
+    public static String sellerBearer() {
         return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER"));
     }
 

@@ -26,14 +26,14 @@ class DevApiAuthorizationTest extends ShoppingSecuritySupport {
     @Autowired ProductImageRepository images;
 
     @Test
-    void enabledLocalTestResetStillRequiresAdministratorBeforeDeleting() throws Exception {
+    void enabledLocalTestResetStillRequiresSellerBeforeDeleting() throws Exception {
         images.saveAndFlush(
                 new ProductImage("dev-auth.png", ImageFormat.PNG, 1, 1, 1, "dev-auth.png"));
         mvc.perform(delete("/v1/dev/product-images")).andExpect(status().isUnauthorized());
         mvc.perform(delete("/v1/dev/product-images").header("Authorization", userBearer()))
                 .andExpect(status().isForbidden());
         assertThat(images.count()).isEqualTo(1);
-        mvc.perform(delete("/v1/dev/product-images").header("Authorization", adminBearer()))
+        mvc.perform(delete("/v1/dev/product-images").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
         assertThat(images.count()).isZero();
     }
