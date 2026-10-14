@@ -14,6 +14,7 @@ const serviceKeys = {
     'SHOPPING_MEMBER_SERVICE_TOKEN',
     'COMMERCE_MEMBER_SERVICE_TOKEN',
     'LIVE_MEMBER_SERVICE_TOKEN',
+    'NOTIFICATION_MEMBER_SERVICE_TOKEN',
   ],
   shopping: [
     'MEMBER_SESSION_BASE_URL',
@@ -28,6 +29,10 @@ const serviceKeys = {
     'COMMERCE_SHOPPING_SERVICE_TOKEN',
     'SHOPPING_COMMERCE_SERVICE_TOKEN',
     'LIVE_COMMERCE_SERVICE_TOKEN',
+  ],
+  notification: [
+    'MEMBER_SESSION_BASE_URL',
+    'NOTIFICATION_MEMBER_SERVICE_TOKEN',
   ],
   live: [
     'MEMBER_SESSION_BASE_URL',
@@ -130,7 +135,7 @@ function execute(args) {
   const [service, option, envPath, separator, command, ...commandArgs] = args;
   if (!serviceKeys[service] || option !== '--env' || !envPath || separator !== '--' || !command) {
     throw new Error(
-      'Usage: auth-env.cjs exec <member|shopping|commerce|live> --env <env.json> -- <command> [args]',
+      'Usage: auth-env.cjs exec <member|shopping|commerce|live|notification> --env <env.json> -- <command> [args]',
     );
   }
   let record;

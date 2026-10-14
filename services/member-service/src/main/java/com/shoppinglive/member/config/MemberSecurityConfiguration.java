@@ -42,7 +42,8 @@ public class MemberSecurityConfiguration {
                                         .hasAnyAuthority(
                                                 "SERVICE_shopping",
                                                 "SERVICE_commerce",
-                                                "SERVICE_live")
+                                                "SERVICE_live",
+                                                "SERVICE_notification")
                                         .anyRequest()
                                         .denyAll())
                 .exceptionHandling(
