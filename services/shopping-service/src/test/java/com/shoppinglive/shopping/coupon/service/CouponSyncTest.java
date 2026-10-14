@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.shoppinglive.shopping.client.commerce.HttpCouponSnapshotClient;
@@ -60,6 +61,25 @@ class CouponSyncTest {
         assertThat(applied.getAllValues())
                 .extracting(CouponSnapshot::couponId)
                 .containsExactly("c1", "c2", "c3");
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("replica 에서 진행 중인데 목록에 없던 쿠폰은 단건 API 로 다시 읽는다")
+    void refreshesOpenCouponsMissingFromList() {
+        expectPage(null, "null", false, coupon("c1"));
+        when(replica.findOpenCouponIds(NOW)).thenReturn(List.of("c1", "ended", "gone"));
+        server.expect(requestTo(BASE + "/v1/internal/coupon-snapshots/ended"))
+                .andRespond(
+                        withSuccess(
+                                "{\"success\":true,\"data\":"
+                                        + coupon("ended")
+                                        + ",\"error\":null}",
+                                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/internal/coupon-snapshots/gone"))
+                .andRespond(withResourceNotFound());
+
+        assertThat(sync.sync()).isEqualTo(2);
         server.verify();
     }
 
