@@ -1,15 +1,13 @@
-plugins {
-    id("shoppinglive.spring-boot-service-conventions")
-    id("shoppinglive.module-boundary-conventions")
-}
+plugins { id("org.springframework.boot") }
 
-tasks.named<Test>("test") { useJUnitPlatform { excludeTags("postgres") } }
+tasks.named<Test>("integrationTest") { useJUnitPlatform { excludeTags("postgres") } }
 
 tasks.register<Test>("postgresTest") {
-    description = "Run Member API, Flyway and concurrency tests against an isolated PostgreSQL database"
+    description =
+        "Run Member API, Flyway and concurrency tests against an isolated PostgreSQL database"
     group = "verification"
-    testClassesDirs = sourceSets["test"].output.classesDirs
-    classpath = sourceSets["test"].runtimeClasspath
+    testClassesDirs = sourceSets["integrationTest"].output.classesDirs
+    classpath = sourceSets["integrationTest"].runtimeClasspath
     useJUnitPlatform { includeTags("postgres") }
     outputs.upToDateWhen { false }
     doFirst {
@@ -20,17 +18,22 @@ tasks.register<Test>("postgresTest") {
 }
 
 dependencies {
-    implementation(project(":libs:common-local"))
-    implementation(project(":libs:common-core"))
-    implementation(project(":libs:common-web"))
-    implementation(project(":libs:common-security"))
-    implementation(project(":libs:common-persistence"))
-    implementation(project(":libs:common-resilience"))
-    implementation(project(":contracts:events"))
-    implementation(libs.flyway.core)
-    runtimeOnly(libs.flyway.database.postgresql)
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1")
+    implementation(project(":common-module"))
+    testImplementation(testFixtures(project(":common-module")))
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 
-    testImplementation(testFixtures(project(":libs:common-security")))
+    implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+
     testImplementation("org.springframework.security:spring-security-test")
-    testRuntimeOnly(libs.h2)
+    testRuntimeOnly("com.h2database:h2")
 }
+
+tasks.named<Jar>("jar") { enabled = false }

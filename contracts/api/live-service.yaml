@@ -726,13 +726,60 @@ paths:
         '409': { $ref: '#/components/responses/BroadcastNotLive' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
 
+  /v1/admin/broadcasts/:
+    get:
+      operationId: missingAdminBroadcastIdOnGet
+      summary: 누락된 ID 요청 거절
+      description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
+      tags:
+      - Admin Broadcast
+      x-required-roles:
+      - SELLER
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+    patch:
+      operationId: missingAdminBroadcastIdOnPatch
+      summary: 누락된 ID 요청 거절
+      description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
+      tags:
+      - Admin Broadcast
+      x-required-roles:
+      - SELLER
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+  /v1/broadcasts/:
+    get:
+      operationId: missingPublicBroadcastId
+      summary: 누락된 ID 요청 거절
+      description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
+      tags:
+      - Public Broadcast
+      security: []
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+
 components:
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: "Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다."
+    BearerAuth: {$ref: './common.yaml#/components/securitySchemes/BearerAuth'}
   parameters:
     BroadcastId:
       name: id
@@ -871,14 +918,13 @@ components:
       enum: [READY, NOT_READY, UNAVAILABLE]
 
     ApiError:
-      type: object
-      required: [code, message, requestId]
-      properties:
-        code:
-          type: string
-          enum: [INVALID_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, SERVICE_UNAVAILABLE, INTERNAL_ERROR]
-        message: { type: string }
-        requestId: { type: ['string', 'null'] }
+      allOf:
+        - $ref: './common.yaml#/components/schemas/ApiError'
+        - type: object
+          properties:
+            code:
+              type: string
+              enum: [INVALID_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, SERVICE_UNAVAILABLE, INTERNAL_ERROR]
     ErrorEnvelope:
       type: object
       required: [success, data, error]

@@ -1,15 +1,16 @@
 package com.shoppinglive.live;
 
-import com.shoppinglive.common.persistence.JpaAuditingConfig;
-import com.shoppinglive.common.kafka.KafkaCommonConfig;
 import com.shoppinglive.common.local.LocalApplication;
+import com.shoppinglive.common.persistence.JpaAuditingConfig;
+import com.shoppinglive.common.security.AuthenticationConfiguration;
+import com.shoppinglive.common.web.WebConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @EnableScheduling
-@Import({JpaAuditingConfig.class, KafkaCommonConfig.class})
+@Import({JpaAuditingConfig.class, WebConfiguration.class, AuthenticationConfiguration.class})
 public class LiveServiceApplication {
 
     public static void main(String[] args) {

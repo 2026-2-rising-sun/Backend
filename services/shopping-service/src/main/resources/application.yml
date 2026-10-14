@@ -75,7 +75,7 @@ logging:
   pattern:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
 
-# http 모드 HttpSalesInfoClient 의 resilience 인스턴스. 값은 libs/common-resilience 공용 기본값을 따른다.
+# http 모드 HttpSalesInfoClient 의 resilience 인스턴스. 값은 이 서비스의 shoppinglive-resilience-defaults.yml을 따른다.
 # retry-exceptions 는 base-config 목록에 합쳐지지 않고 통째로 덮어쓰므로 기본 목록을 다시 적는다.
 # RestClient 는 I/O 오류(연결 거부·read timeout)를 ResourceAccessException 으로 감싸므로 추가해야 재시도된다.
 resilience4j:
@@ -92,6 +92,14 @@ resilience4j:
           - java.io.IOException
           - org.springframework.web.client.HttpServerErrorException
           - org.springframework.web.client.ResourceAccessException
+
+
+# API documentation is enabled in local development or by an explicit environment setting.
+springdoc:
+  api-docs:
+    enabled: ${API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${API_DOCS_ENABLED:false}
 
 ---
 # 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
