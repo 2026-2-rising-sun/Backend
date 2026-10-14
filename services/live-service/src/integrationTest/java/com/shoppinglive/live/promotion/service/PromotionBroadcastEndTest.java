@@ -1,6 +1,7 @@
 package com.shoppinglive.live.promotion.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +38,8 @@ class PromotionBroadcastEndTest extends LiveSecuritySupport {
     @Autowired OutboxMessageRepository outbox;
     @Autowired ObjectMapper mapper;
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Autowired com.shoppinglive.live.broadcast.repository.BroadcastRepository broadcastRepository;
 
     private long liveBroadcast() {
         final String name = UUID.randomUUID().toString();
@@ -136,5 +139,63 @@ class PromotionBroadcastEndTest extends LiveSecuritySupport {
                                 .orElseThrow()
                                 .wasOpen())
                 .isFalse();
+    }
+
+    @Test
+    @DisplayName("종료가 방송 잠금을 잡은 동안 생성은 대기하고 종료 커밋 뒤 충돌로 거절된다")
+    void creationWaitingForEndCannotLeaveReadyPromotion() throws Exception {
+        final long id = liveBroadcast();
+        final var locked = new java.util.concurrent.CountDownLatch(1);
+        final var releaseEnd = new java.util.concurrent.CountDownLatch(1);
+        final var creationStarted = new java.util.concurrent.CountDownLatch(1);
+        final var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            final var end =
+                    executor.submit(
+                            () ->
+                                    new org.springframework.transaction.support.TransactionTemplate(
+                                                    transactionManager)
+                                            .executeWithoutResult(
+                                                    status -> {
+                                                        broadcastRepository
+                                                                .findForLikeUpdate(id)
+                                                                .orElseThrow();
+                                                        locked.countDown();
+                                                        try {
+                                                            if (!releaseEnd.await(
+                                                                    10,
+                                                                    java.util.concurrent.TimeUnit
+                                                                            .SECONDS)) {
+                                                                throw new IllegalStateException(
+                                                                        "생성 대기 확인 시간이 초과되었습니다.");
+                                                            }
+                                                        } catch (InterruptedException exception) {
+                                                            Thread.currentThread().interrupt();
+                                                            throw new IllegalStateException(
+                                                                    exception);
+                                                        }
+                                                        broadcasts.end(id);
+                                                    }));
+            assertThat(locked.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            final var creation =
+                    executor.submit(
+                            () -> {
+                                creationStarted.countDown();
+                                return ready(id);
+                            });
+            assertThat(creationStarted.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            // 이전 구현은 상태를 잠금 없이 읽고 READY 행을 즉시 삽입하므로 이 대기가 실패한다.
+            assertThatThrownBy(() -> creation.get(300, java.util.concurrent.TimeUnit.MILLISECONDS))
+                    .isInstanceOf(java.util.concurrent.TimeoutException.class);
+            releaseEnd.countDown();
+            end.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThatThrownBy(() -> creation.get(10, java.util.concurrent.TimeUnit.SECONDS))
+                    .isInstanceOf(java.util.concurrent.ExecutionException.class)
+                    .hasCauseInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+            assertThat(promotions.list(id)).isEmpty();
+        } finally {
+            releaseEnd.countDown();
+            executor.shutdownNow();
+        }
     }
 }

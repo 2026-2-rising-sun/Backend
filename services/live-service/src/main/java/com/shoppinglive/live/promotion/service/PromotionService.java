@@ -63,36 +63,41 @@ public class PromotionService {
      */
     public BroadcastPromotion create(
             final long broadcastId, final String idempotencyKey, final PromotionInput input) {
-        final Broadcast broadcast =
-                broadcasts
-                        .findById(broadcastId)
-                        .orElseThrow(
-                                () -> new BusinessException(ErrorCode.NOT_FOUND, "방송을 찾을 수 없습니다."));
-        if (broadcast.getStatus() == BroadcastStatus.ENDED) {
-            throw new BusinessException(ErrorCode.CONFLICT, "종료된 방송에는 프로모션을 만들 수 없습니다.");
-        }
         final String canonicalAttributes = canonicalize(input.attributes());
         final String fingerprint =
                 fingerprint(
                         input.type(), input.title(), canonicalAttributes, input.durationSeconds());
 
-        final BroadcastPromotion existing =
-                promotions.findByRequestKey(idempotencyKey).orElse(null);
-        if (existing != null) {
-            return replay(existing, broadcastId, fingerprint);
-        }
         try {
             return transaction.execute(
-                    status ->
-                            promotions.saveAndFlush(
-                                    new BroadcastPromotion(
-                                            broadcastId,
-                                            idempotencyKey,
-                                            fingerprint,
-                                            input.type(),
-                                            input.title(),
-                                            canonicalAttributes,
-                                            input.durationSeconds())));
+                    status -> {
+                        final Broadcast broadcast =
+                                broadcasts
+                                        .findForLikeUpdate(broadcastId)
+                                        .orElseThrow(
+                                                () ->
+                                                        new BusinessException(
+                                                                ErrorCode.NOT_FOUND,
+                                                                "방송을 찾을 수 없습니다."));
+                        if (broadcast.getStatus() == BroadcastStatus.ENDED) {
+                            throw new BusinessException(
+                                    ErrorCode.CONFLICT, "종료된 방송에는 프로모션을 만들 수 없습니다.");
+                        }
+                        final BroadcastPromotion existing =
+                                promotions.findByRequestKey(idempotencyKey).orElse(null);
+                        if (existing != null) {
+                            return replay(existing, broadcastId, fingerprint);
+                        }
+                        return promotions.saveAndFlush(
+                                new BroadcastPromotion(
+                                        broadcastId,
+                                        idempotencyKey,
+                                        fingerprint,
+                                        input.type(),
+                                        input.title(),
+                                        canonicalAttributes,
+                                        input.durationSeconds()));
+                    });
         } catch (DataIntegrityViolationException exception) {
             return promotions
                     .findByRequestKey(idempotencyKey)
