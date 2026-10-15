@@ -120,8 +120,11 @@ components:
       type: object
       required:
       - id
+      - eventType
       - title
       - body
+      - linkType
+      - linkValue
       - occurredAt
       - readAt
       properties:
@@ -129,12 +132,34 @@ components:
           type: integer
           format: int64
           minimum: 1
+        eventType:
+          type: string
+          maxLength: 64
+          description: 알림을 만들게 한 이벤트 이름. 화면이 아이콘을 고르는 근거다. 새 알림이 생기면 값이 늘어나므로
+            모르는 값을 받아도 동작해야 한다.
+          example: LiveBroadcastStarted
         title:
           type: string
           maxLength: 100
         body:
           type: string
           maxLength: 500
+        linkType:
+          type:
+          - string
+          - 'null'
+          enum:
+          - BROADCAST
+          - PRODUCT
+          - null
+          description: 눌렀을 때 보낼 곳의 종류. 보낼 곳이 없는 알림은 linkValue 와 함께 null 이다.
+        linkValue:
+          type:
+          - string
+          - 'null'
+          maxLength: 100
+          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID.
+          example: '42'
         occurredAt:
           type: string
           format: date-time
