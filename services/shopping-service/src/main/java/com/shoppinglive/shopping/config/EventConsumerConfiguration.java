@@ -2,10 +2,12 @@ package com.shoppinglive.shopping.config;
 
 import com.shoppinglive.shopping.coupon.event.CouponInfoEventMessage;
 import com.shoppinglive.shopping.sales.event.SalesInfoEventMessage;
+import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.TopicPartition;
+import org.hibernate.exception.JDBCConnectionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +35,8 @@ import org.springframework.util.backoff.FixedBackOff;
  *   <li><b>그 밖의 예외</b> (코드 버그 등): 몇 번 재시도한 뒤 DLT 로 보낸다. 이 메시지 하나 때문에 partition 전체가 멈추지 않게 한다.
  * </ul>
  *
- * <p>DLT 로 보낸 상품·쿠폰은 다음 이벤트가 오면 version 비교로 최신 상태가 된다. 쿠폰은 주기 동기화도 맞춘다.
+ * <p>DLT 로 보낸 상품·쿠폰은 다음 이벤트가 오면 version 비교로 최신 상태가 된다. 쿠폰은 주기 동기화도 맞춘다. 판매정보는 주기 대조가 없어서, 그 판매정보가
+ * 다시 바뀌지 않으면 DLT 로 간 직전 상태가 반영되지 않은 채 남는다. DLT 메시지 수가 0 이 아니면 사람이 확인해야 한다.
  */
 @Configuration(proxyBeanMethods = false)
 class EventConsumerConfiguration {
@@ -97,11 +100,33 @@ class EventConsumerConfiguration {
         return handler;
     }
 
-    // listener 예외는 ListenerExecutionFailedException 으로 감싸여 오므로 원인을 따라 내려간다.
+    /**
+     * DB 에 잠시 닿지 못한 실패인지 본다. 이 경우만 offset 을 넘기지 않고 끝없이 재시도한다.
+     *
+     * <p>listener 예외는 {@code ListenerExecutionFailedException} 으로 감싸여 오므로 원인을 끝까지 따라 내려간다. 같은 장애라도
+     * 어디서 났는지에 따라 예외 모양이 다르다.
+     *
+     * <ul>
+     *   <li>{@code JdbcTemplate} 으로 SQL 을 실행하다 실패: Spring 이 {@link TransientDataAccessException} 이나
+     *       {@link DataAccessResourceFailureException} 으로 바꿔 준다. (예: 판매정보 저장)
+     *   <li>{@code @Transactional} 이 transaction 을 시작하며 연결을 얻지 못함: Spring 이 바꿔 주지 않는다. 실제 체인은
+     *       {@code CannotCreateTransactionException →
+     *       org.hibernate.exception.JDBCConnectionException →
+     *       java.sql.SQLTransientConnectionException} 이다. (예: 쿠폰 저장, 커넥션 풀 고갈·DB 접속 불가)
+     * </ul>
+     *
+     * <p>감수한 비용: 커넥션 풀 고갈은 DB 가 멀쩡해도(예: 앱 안의 연결 누수, 오래 걸리는 transaction) 같은 예외로 온다. 원인이 풀리지 않으면 해당
+     * partition 의 소비가 DLT 없이 멈춘다. 이벤트를 버리지 않는 쪽을 택했으므로 consumer lag 로 정지를 알아채야 한다.
+     *
+     * <p>{@code SQLException} 이나 {@code TransactionException} 전체를 넣지 않는다. 제약 위반·SQL 문법 오류처럼 다시 해도
+     * 같은 실패까지 무한 재시도하게 되어 partition 이 멈춘다.
+     */
     static boolean isDbOutage(Throwable e) {
         for (Throwable cause = e; cause != null; cause = cause.getCause()) {
             if (cause instanceof TransientDataAccessException
-                    || cause instanceof DataAccessResourceFailureException) {
+                    || cause instanceof DataAccessResourceFailureException
+                    || cause instanceof SQLTransientConnectionException
+                    || cause instanceof JDBCConnectionException) {
                 return true;
             }
         }
