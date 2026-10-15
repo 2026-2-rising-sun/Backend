@@ -111,11 +111,84 @@ paths:
         '500':
           description: 서버 내부 오류
           content: *id001
+  /v1/broadcast-alerts:
+    post:
+      summary: 방송 시작 알림 신청
+      operationId: registerBroadcastAlert
+      description: 신청자는 토큰의 회원이다. 이미 신청한 방송을 다시 신청해도 201이며 신청은 하나만 남는다. 방송 존재 여부는
+        알림이 Live 이벤트로 받아 둔 일정 사본으로 확인하므로, 아직 일정을 받지 못한 방송은 404이다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BroadcastAlertRequest'
+      responses:
+        '201':
+          description: 신청 완료. 이미 신청했던 경우도 같다. 본문 없음.
+        '400':
+          description: 'broadcastId 누락·형식 오류 또는 0 이하: INVALID_REQUEST'
+          content: *id001
+        '404':
+          description: '일정 사본에 없는 방송: NOT_FOUND'
+          content: *id001
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
+  /v1/broadcast-alerts/{broadcastId}:
+    delete:
+      summary: 방송 시작 알림 해제
+      operationId: unregisterBroadcastAlert
+      description: 신청한 적이 없어도 204이다. 원한 상태가 이미 달성돼 있으므로 오류로 보지 않는다.
+      parameters:
+      - name: broadcastId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '204':
+          description: 해제 완료. 신청이 없었던 경우도 같다. 본문 없음.
+        '400':
+          description: 'broadcastId 숫자 형식 오류: INVALID_REQUEST'
+          content: *id001
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
 components:
   securitySchemes:
     BearerAuth:
       $ref: ./common.yaml#/components/securitySchemes/BearerAuth
   schemas:
+    BroadcastAlertRequest:
+      type: object
+      required:
+      - broadcastId
+      properties:
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 알림을 받을 방송. Live 가 발행한 일정 이벤트로 알림이 받아 둔 방송이어야 한다.
     Notification:
       type: object
       required:
