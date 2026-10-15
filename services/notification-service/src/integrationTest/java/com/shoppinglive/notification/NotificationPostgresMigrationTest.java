@@ -32,10 +32,11 @@ class NotificationPostgresMigrationTest extends NotificationSecuritySupport {
                                 "SELECT count(*) FROM flyway_schema_history WHERE success",
                                 Integer.class))
                 .isPositive();
+        // 알림함 테이블과, 이벤트로 받아 두는 사본 테이블이 모두 만들어져야 한다.
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'notification'",
+                                "SELECT count(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name IN ('notification', 'broadcast_schedule')",
                                 Integer.class))
-                .isEqualTo(1);
+                .isEqualTo(2);
     }
 }
