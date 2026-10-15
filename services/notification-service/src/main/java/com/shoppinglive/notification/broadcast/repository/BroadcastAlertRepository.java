@@ -3,6 +3,7 @@ package com.shoppinglive.notification.broadcast.repository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -55,6 +56,16 @@ public class BroadcastAlertRepository {
                         """,
                         Map.of("memberId", memberId, "broadcastId", broadcastId))
                 == 1;
+    }
+
+    /** 그 방송의 신청자 전원. 방송이 시작되면 이 목록이 알림 생성의 대상이 된다. */
+    public List<String> findMemberIds(long broadcastId) {
+        return jdbc.queryForList(
+                """
+                SELECT member_id FROM broadcast_alert WHERE broadcast_id = :broadcastId
+                """,
+                Map.of("broadcastId", broadcastId),
+                String.class);
     }
 
     public boolean exists(String memberId, long broadcastId) {
