@@ -2,6 +2,7 @@ package com.shoppinglive.notification.broadcast.event;
 
 import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
+import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,9 +30,13 @@ public class BroadcastEventListener {
     private static final Logger log = LoggerFactory.getLogger(BroadcastEventListener.class);
 
     private final BroadcastScheduleRepository schedules;
+    private final BroadcastStartNotificationService startNotifications;
 
-    public BroadcastEventListener(BroadcastScheduleRepository schedules) {
+    public BroadcastEventListener(
+            BroadcastScheduleRepository schedules,
+            BroadcastStartNotificationService startNotifications) {
         this.schedules = schedules;
+        this.startNotifications = startNotifications;
     }
 
     @KafkaListener(topics = LiveBroadcastEventContract.TOPIC_NAME)
@@ -43,17 +48,15 @@ public class BroadcastEventListener {
             skip(record, e);
             return;
         }
-        if (!LiveBroadcastEventContract.SCHEDULED.equals(message.eventType())) {
-            return;
-        }
-        BroadcastSchedule schedule;
         try {
-            schedule = toSchedule(message, record.key());
+            if (LiveBroadcastEventContract.SCHEDULED.equals(message.eventType())) {
+                schedules.apply(toSchedule(message, record.key()));
+            } else if (LiveBroadcastEventContract.STARTED.equals(message.eventType())) {
+                createStartNotifications(message, record.key());
+            }
         } catch (LiveBroadcastEventMessage.InvalidMessageException e) {
             skip(record, e);
-            return;
         }
-        schedules.apply(schedule);
     }
 
     private static BroadcastSchedule toSchedule(
@@ -65,6 +68,23 @@ public class BroadcastEventListener {
                 message.payloadLongAtLeast("broadcastVersion", 0),
                 message.payloadText("title", TITLE_MAX_LENGTH),
                 message.payloadInstant("scheduledAt"));
+    }
+
+    /**
+     * 신청자가 0명이면 아무것도 만들지 않는다. 방송이 시작될 때마다 오는 이벤트라서, 아무도 신청하지 않은 방송에도 온다.
+     *
+     * <p>알림 시각은 받은 시각이 아니라 payload 의 {@code startedAt} 을 쓴다. 이벤트가 늦게 도착해도 사용자에게는 실제로 일어난 순서로 보여야
+     * 한다.
+     */
+    private void createStartNotifications(LiveBroadcastEventMessage message, String messageKey) {
+        long broadcastId = message.payloadLongAtLeast("broadcastId", 1);
+        message.requireKeyMatches(messageKey, broadcastId);
+        startNotifications.create(
+                message.eventId(),
+                message.eventType(),
+                broadcastId,
+                message.payloadText("title", TITLE_MAX_LENGTH),
+                message.payloadInstant("startedAt"));
     }
 
     private static void skip(
