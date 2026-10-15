@@ -1,71 +1,87 @@
-# ShoppingLive Backend
+# ShoppingLive
 
-JDK 21 / Gradle 기반 라이브 커머스 백엔드입니다.
+**방송 시청부터 상품 구매까지 연결하는 라이브 커머스 백엔드**
 
-| 서비스 | 담당 기능 | 로컬 포트 |
+판매자는 상품과 판매정보를 등록하고 방송에 상품을 연결합니다. 사용자는 방송을 보며 채팅과 좋아요로 참여하고, 상품을 장바구니에 담아 쿠폰을 적용해 주문·결제할 수 있습니다.
+
+회원, 상품, 거래, 방송, 알림의 책임을 5개 Spring Boot 서비스로 나눴습니다. 서비스별 데이터를 PostgreSQL의 독립된 데이터베이스에 저장하며, 필요한 조회는 HTTP로 요청하고 변경 정보는 Kafka 이벤트로 전달합니다.
+
+## 아키텍처
+
+![ShoppingLive 백엔드 서비스와 데이터 소유 구조](docs/assets/architecture/backend-architecture.png)
+
+각 서비스는 자신의 데이터를 소유하고 API와 이벤트로 협력합니다. 상품의 기본정보·이미지는 Shopping이, 가격·재고·주문·결제는 Commerce가 담당합니다. 공통 응답, 인증 검증, 요청 추적, JPA 감사와 Outbox 구현은 `common-module`에서 공유합니다.
+
+## 서비스 간 통신
+
+![HTTP 조회, Kafka 이벤트와 Redis 실시간 중계 흐름](docs/assets/architecture/service-communication.png)
+
+| 방식 | 주요 흐름 |
+|---|---|
+| HTTP | Commerce → Shopping 상품 검증, Shopping → Commerce 판매정보 조회, Live → Shopping·Commerce 방송 상품 조회, Live → Member 회원 표시 이름 조회 |
+| 인증 확인 | Shopping·Commerce·Live·Notification → Member 세션 활성 상태 확인 |
+| Kafka | Commerce 판매정보 → Shopping 조회용 사본 갱신. 쿠폰과 방송·프로모션 이벤트는 Outbox를 통해 발행 |
+| Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |
+
+판매정보 조회는 HTTP가 기본이며 `shopping.sales.source=replica`로 사본 조회를 선택할 수 있습니다. 판매정보 이벤트는 DB 커밋 후 직접 발행하고, 쿠폰·방송·프로모션 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다. 쿠폰·방송 이벤트의 소비 연동은 별도 작업입니다.
+
+## 주요 기능
+
+| 서비스 | 책임 | 구현된 기능 |
 |---|---|---|
-| [Member](services/member-service) | 회원·인증·세션 | 8081 |
-| [Shopping](services/shopping-service) | 상품·이미지 | 8082 |
-| [Commerce](services/commerce-service) | 판매·재고·쿠폰·장바구니·주문·결제·환불 | 8083 |
-| [Live](services/live-service) | 방송·채팅·좋아요·SSE | 8084 |
-| [Notification](services/notification-service) | 알림 서비스 시작 골격 | 8085 |
+| [Member](services/member-service) | 회원·인증·세션 | 회원가입, 로그인, JWT 발급, Refresh Token 교체, 로그아웃, 회원정보 수정·탈퇴, 세션 폐기·확인 |
+| [Shopping](services/shopping-service) | 상품 기본정보·이미지 | 상품 등록·수정, 공개·판매자 상품 조회, 이미지 업로드·조회, 서비스용 상품 스냅샷, 판매정보 이벤트 수신·사본 저장 |
+| [Commerce](services/commerce-service) | 판매·재고·거래 | 판매·재고 관리, 장바구니, 단건·여러 상품 주문, 결제 묶음, 정액 쿠폰 생성·수령·예약·사용, 주문 취소, 결제·환불 및 결과 재확인 |
+| [Live](services/live-service) | 방송·실시간 참여 | 방송 등록·시작·종료, 방송 상품 연결·정렬, 프로모션 생성·열기·닫기, 채팅, 회원별 좋아요, SSE |
+| [Notification](services/notification-service) | 내 알림함 | 커서 기반 알림 목록, 안 읽은 알림 개수, 본인 알림 읽음 처리 |
 
-서비스는 업무 도메인 안에 필요한 controller/service/repository/entity/dto 계층을 둡니다. 공통 웹·인증·JPA 코드와 인증 테스트 도구는 [common-module](common-module)에서 공유합니다. 서비스 사이의 Java 모듈 의존은 현재 사용하지 않으며, 이를 강제하는 별도 빌드 검사는 없습니다.
+결제·환불은 현재 Mock 제공자로 구현되어 있습니다. Live는 로컬 IVS stub과 AWS IVS 조회 어댑터를 제공하며, 실제 PG·방송 플랫폼의 운영 연동과는 구분합니다. Notification은 알림함 API를 제공하고 이벤트 수신을 통한 알림 생성은 별도 작업입니다.
 
-## 빌드와 테스트
+## 기술 스택
 
-```sh
-./gradlew build
-./gradlew test
-./gradlew integrationTest
-./gradlew spotlessApply
-```
+| 구분 | 기술 | 사용 목적 |
+|---|---|---|
+| 언어·프레임워크 | Java 21, Spring Boot 3.5, Spring MVC | 도메인별 HTTP API와 애플리케이션 구성 |
+| 데이터 | PostgreSQL 16, Spring Data JPA, JDBC | 업무 상태 저장, 잠금과 조건부 갱신 |
+| 스키마 | Flyway | 서비스별 데이터베이스 마이그레이션 |
+| 인증 | Spring Security, JWT | 사용자 인증·권한과 서비스 간 접근 제어 |
+| 메시징 | Apache Kafka | 판매정보·쿠폰·방송 이벤트 발행과 판매정보 수신 |
+| 실시간 통신 | Redis Pub/Sub, SSE | Live 인스턴스 간 이벤트 중계와 시청자 전달 |
+| 외부 호출 | RestClient, Resilience4j | 서비스 간 조회, 선택적 재시도·회로 차단 |
+| 계약·문서 | OpenAPI, AsyncAPI | API·이벤트 계약 관리 |
+| 빌드·검증 | Gradle 멀티 모듈, JUnit 5, H2, Spotless, GitHub Actions | 빌드, 테스트, 포맷 검사와 CI |
+| 개발 인프라 | Docker Compose, Kubernetes 개발 매니페스트 | PostgreSQL·Redis·Kafka와 서비스 실행 구성 |
 
-`build`는 단위·통합 테스트와 Java·KTS 포맷 검사를 포함합니다. 단위 테스트는 `src/test`, 통합 테스트는 `src/integrationTest`에 있습니다. 외부 PostgreSQL·Redis가 필요한 테스트는 환경을 지정하지 않으면 건너뛸 수 있습니다. 기본 빌드 성공을 실제 DB·전체 서비스 연동 성공으로 해석하지 않습니다.
+## 주요 설계
 
-[수동 DB workflow](.github/workflows/postgres.yml)는 테스트용 PostgreSQL·Redis를 준비하고, 대상 테스트가 실행됐는지와 실패·건너뜀이 없는지를 검사합니다. 이 workflow의 결과 확인 도구만 `.github/scripts`에 유지합니다. Prism과 외부 서비스 E2E·복구 검증 스크립트는 제거했으며, 그 검증 범위가 서비스 내부 테스트로 모두 대체된 것은 아닙니다.
+### 재시도와 동시 요청을 고려한 주문·재고 처리
 
-## 로컬 실행과 API 문서
+주문 생성은 회원과 멱등 키로 기존 주문을 찾아 재요청을 처리합니다. 재고 예약은 `available >= quantity` 조건이 있는 UPDATE로 수행하고, 결제 성공·취소·만료에 따라 예약 재고를 소진하거나 복구합니다. 여러 상품 주문은 상품별 주문과 결제 묶음을 함께 관리합니다.
 
-```sh
-node scripts/local/auth-env.cjs create --access-ttl PT15M --refresh-ttl P30D --out build/local/ide-auth
-./gradlew :services:commerce-service:bootRun --args='--spring.profiles.active=local'
-```
+### 결제·환불의 불확실한 결과 재확인
 
-Notification 인증을 연결하려면 생성 파일에 `NOTIFICATION_MEMBER_SERVICE_TOKEN`이 있어야 합니다. 이전 생성 파일을 사용하는 경우 새 디렉터리에 인증 정보를 생성하고 모든 서비스가 같은 새 파일을 사용하도록 실행 설정을 갱신합니다. 기존 인증 파일은 생성 도구가 덮어쓰지 않습니다.
+결제·환불 요청과 결과를 저장하고, 결과가 확정되지 않은 경우 재확인 작업으로 후속 상태를 결정합니다. 환불 접수와 실행·결과 반영을 분리하며, 주문·재고·쿠폰 상태도 처리 결과에 맞춰 갱신합니다.
 
-각 서비스에 필요한 DB·Redis와 외부 서비스 주소를 준비한 뒤 실행합니다. 인증 정보 생성 명령만으로 전체 실행 환경이 준비되는 것은 아닙니다. 기본 Application 실행은 프로필을 지정하지 않으면 local을 선택하며, 명시적으로 지정한 설정이 로컬 생성 파일보다 우선합니다.
+### JWT와 서버 세션 상태를 함께 확인하는 인증
 
-Member·Shopping·Commerce·Live의 local 프로필은 `/swagger-ui.html`과 `/v3/api-docs`를 제공합니다. 다른 환경에서는 `API_DOCS_ENABLED=true`로 활성화합니다. 현재 API 문서는 컨트롤러·DTO에서 Springdoc이 생성합니다.
+각 서비스가 JWT 서명을 검증한 뒤 Member에 세션 활성 상태를 확인합니다. 로그아웃·세션 폐기 이후의 토큰 사용을 차단하며, 내부 API는 호출 서비스별 `X-Service-Token`으로 구분합니다.
 
-OpenAPI YAML 원본은 `contracts/api`에서만 관리합니다. CI는 서버를 실행하지 않고 Java 컨트롤러의 경로·HTTP 메서드를 문서와 양방향 비교합니다. 실제 응답·DTO 스키마·인증 동작은 이 검사 범위에 포함되지 않습니다. API 계약을 바꿀 때 문서도 함께 갱신하는 절차는 [AGENTS.md](AGENTS.md)에 있습니다. 기존 Flyway SQL은 적용 이력과 체크섬을 보존하기 위해 수정하지 않습니다. 옛 이관 문서 경로가 주석에 남아 있어도 현재 실행 안내로 사용하지 않습니다.
+### 조회용 사본과 이벤트 발행 경계
 
-팀 문서: [ShoppingLive 팀 메인](https://app.notion.com/p/3e9226545d1581989a9edefd9da775c4)
+Shopping은 판매정보를 조회용 사본에 저장하며 더 큰 `snapshotVersion`만 반영해 중복·역순 이벤트가 최신 값을 덮지 않게 합니다. 쿠폰·방송·프로모션 이벤트는 공통 Outbox 릴레이로 발행하고, 판매정보의 커밋 후 직접 발행과는 전달 방식을 구분합니다.
 
-## API 정적 구조 검사
+### 여러 Live 인스턴스에서 실시간 이벤트 전달
 
-```sh
-python3 -m venv .venv-api
-.venv-api/bin/python -m pip install -r .github/scripts/api/requirements.txt
-.venv-api/bin/python .github/scripts/api/check_structure.py
-```
+채팅과 방송 종료 이벤트를 Redis Pub/Sub으로 중계하고 각 Live 인스턴스가 자신에게 연결된 시청자에게 SSE로 전달합니다. 채팅 내역과 좋아요 상태는 PostgreSQL에 저장하며, 좋아요 합계는 주기적으로 변경분을 전달합니다.
 
-직접 선언한 Spring MVC 매핑을 읽습니다. 마지막 `/`, 조건부·개발용 매핑도 포함하며, 지원하지 않는 상속·매핑 표현식은 성공으로 넘기지 않고 실패합니다. 테스트는 `python -m unittest discover -s .github/scripts/api`로 실행합니다.
+## API · 문서
 
-이벤트 계약 원본은 `contracts/events`의 AsyncAPI YAML입니다. `.github/scripts/api/check_events.py`는 참조·스키마·예시를 검사하고, `--samples`로 서비스 테스트가 생성한 실제 직렬화 표본을 검사합니다. 이는 실제 Kafka 전달이나 소비자 DB 반영을 검증하지 않습니다.
+- [Backend 팀 하네스](harness/README.md): AI 작업 지침·검증 안내·이슈와 PR 작성 템플릿.
 
-### 쿠폰 표시정보 생산자 검증
+API 문서 원본은 [서비스별 OpenAPI YAML](contracts/api)입니다. Apidog·Postman에 서비스 YAML을 가져와 API를 확인하고 호출하거나, curl로 직접 요청합니다. YAML의 `servers`에 서비스별 로컬 주소가 정의되어 있습니다.
 
-Commerce는 쿠폰 생성·설정 변경·발급 수량 소진을 `commerce.coupon-info.v1`에 전체 스냅샷으로 전달한다. 계약 원본은 [`contracts/events/commerce-coupon-info.yaml`](contracts/events/commerce-coupon-info.yaml)이며, 초기 적재·주기적 복구 API는 [`contracts/api/commerce-service.yaml`](contracts/api/commerce-service.yaml)의 `/v1/internal/coupon-snapshots` 목록·단건 경로다. Shopping 서비스 토큰만 허용한다. 일반 상품 조회는 Shopping의 이벤트 사본을 사용하도록 구현할 예정이며 수신 작업은 [#229](https://github.com/2026-2-rising-sun/Backend/issues/229)에서 관리한다.
+서비스 YAML이 `common.yaml`을 참조하므로 가져올 때 함께 제공하거나 도구의 외부 참조 해석 기능을 사용합니다. 인증이 필요한 API는 계약에 따라 `Authorization: Bearer <JWT>` 또는 `X-Service-Token` 헤더를 보냅니다.
 
-쿠폰별 `snapshotVersion`은 이벤트와 API에 동일하게 적용한다. 목록은 미래·진행 쿠폰과 소진 쿠폰을 포함하며 페이지 전체의 단일 시점 일관성을 보장하지 않는다. 소비를 먼저 시작하고 전체 페이지를 주기적으로 순회한다. 이미 저장한 쿠폰은 단건 조회로 종료·기간 변경·대상 변경 누락도 복구해야 한다. 발급 시작 포함·종료 제외의 시간 경계는 소비자가 현재 시각으로 판단한다.
-
-기본 `:services:commerce-service:build`는 H2에서 업무·API·Outbox 원자성을 검사한다. 실제 PostgreSQL은 다음 환경으로 실행하며, 실행마다 격리 스키마를 만들고 종료 시 제거한다.
-
-```bash
-COMMERCE_TEST_POSTGRES_URL=jdbc:postgresql://localhost:55432/commerce_test \
-COMMERCE_TEST_POSTGRES_USER=postgres COMMERCE_TEST_POSTGRES_PASSWORD=test \
-./gradlew :services:commerce-service:postgresCommerceTest --tests '*CouponSyncIntegrationTest'
-```
-
-실제 Kafka를 함께 확인하려면 위 PostgreSQL 환경에 `COMMERCE_TEST_KAFKA_SERVERS=localhost:29092`를 더하고 `--tests '*CouponSyncKafkaTest'`를 실행한다. 이 테스트는 실제 Outbox 행을 production 릴레이·template으로 전송하고 판매 이벤트 template과 직렬화가 섞이지 않는지 확인한다. 별도 서비스 전체 E2E를 보장하지 않는다. 브로커 없이 돌리는 테스트에서는 `shoppinglive.outbox.relay.enabled=false`로 주기적 발행을 끈다.
+- [이벤트 계약](contracts/events): Kafka 이벤트의 AsyncAPI YAML 원본.
+- [Infra 저장소](https://github.com/2026-2-rising-sun/Infra): 로컬 미들웨어와 Kubernetes 개발 환경 구성.
+- [팀 프로젝트 문서](https://app.notion.com/p/3e9226545d1581989a9edefd9da775c4): 기능명세·ERD·설계·협업 문서.

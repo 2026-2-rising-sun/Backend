@@ -7,8 +7,6 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
 import com.shoppinglive.common.web.QuantityParser;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,11 +42,6 @@ public class OrderCheckoutController {
      * MethodArgumentTypeMismatchException} 이 되고, 이 예외는 공통 예외 핸들러의 {@code Exception} 처리로 떨어져 400 이
      * 아니라 500 이 된다.
      */
-    @Operation(
-            summary = "주문 가능 여부와 최신 금액 확인",
-            description =
-                    "재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400.")
-    @SecurityRequirement(name = "BearerAuth")
     @GetMapping
     public OrderCheckoutResponse checkout(
             @AuthenticationPrincipal AuthenticatedUser member,

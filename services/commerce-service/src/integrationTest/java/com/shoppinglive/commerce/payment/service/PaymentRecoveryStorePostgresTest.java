@@ -16,6 +16,7 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class PaymentRecoveryStorePostgresTest {
     private Flyway flyway;
@@ -78,6 +79,7 @@ class PaymentRecoveryStorePostgresTest {
     }
 
     @Test
+    @Tag("migration")
     void migrationKeepsBusinessDataAndLimitsMetadata() {
         assertThat(
                         jdbc.queryForList(

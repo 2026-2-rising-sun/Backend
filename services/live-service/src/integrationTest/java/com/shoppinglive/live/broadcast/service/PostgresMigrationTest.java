@@ -15,6 +15,7 @@ import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,8 @@ import org.springframework.test.context.ActiveProfiles;
  */
 @SpringBootTest
 @ActiveProfiles({"test", "postgres"})
+@Tag("postgres")
+@Tag("migration")
 @EnabledIfEnvironmentVariable(named = "LIVE_PG_TEST", matches = "1")
 @DisplayName("실제 PostgreSQL에서 Flyway 마이그레이션과 DB 불변조건 검증")
 class PostgresMigrationTest extends LiveSecuritySupport {

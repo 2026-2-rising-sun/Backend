@@ -3,7 +3,6 @@ package com.shoppinglive.shopping.coupon.controller;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.shopping.coupon.dto.ProductCouponResponse;
 import com.shoppinglive.shopping.coupon.service.ProductCouponQueryService;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,12 +19,14 @@ public class ProductCouponController {
         this.couponService = couponService;
     }
 
-    @Operation(summary = "상품에 적용 가능한 쿠폰")
+    /**
+     * 상품에 지금 적용 가능한 쿠폰.
+     *
+     * <p>{@code productId} 는 계약({@code contracts/api/shopping-service.yaml} 의 {@code ProductId},
+     * minimum 1)대로 양수만 받는다. 0·음수는 빈 목록이 아니라 400 이다.
+     */
     @GetMapping("/v1/products/{productId}/coupons")
-    public ApiResponse<List<ProductCouponResponse>> list(
-            // contracts/api/shopping-service.yaml 의 ProductId(minimum: 1)와 맞춘다. 0·음수는 빈 목록이 아니라 400
-            // 이다.
-            @PathVariable @Positive long productId) {
+    public ApiResponse<List<ProductCouponResponse>> list(@PathVariable @Positive long productId) {
         return ApiResponse.ok(couponService.findActive(productId));
     }
 }

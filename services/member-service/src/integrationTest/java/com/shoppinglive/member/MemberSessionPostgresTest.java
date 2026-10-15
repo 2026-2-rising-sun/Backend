@@ -124,6 +124,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
     }
 
     @Test
+    @Tag("migration")
     void v3MigrationPreservesDataButInvalidatesPreSidFamilies() throws Exception {
         String schema = "member_upgrade_" + UUID.randomUUID().toString().replace("-", "");
         String url = System.getenv("MEMBER_TEST_DB_URL"),
@@ -174,6 +175,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
     }
 
     @Test
+    @Tag("migration")
     void v4MigrationRenamesOnlyAdminAndRevokesOnlyTheirExistingFamilies() throws Exception {
         String schema = "member_role_" + UUID.randomUUID().toString().replace("-", "");
         String url = System.getenv("MEMBER_TEST_DB_URL"),

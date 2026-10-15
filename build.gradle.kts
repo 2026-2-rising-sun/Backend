@@ -1,5 +1,8 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
 import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
 
 plugins {
     id("org.springframework.boot") version "3.5.16" apply false
@@ -9,6 +12,27 @@ plugins {
 allprojects {
     group = "com.shoppinglive"
     version = "0.0.1-SNAPSHOT"
+}
+
+fun Test.requireExecutedExternalTests() {
+    outputs.upToDateWhen { false }
+    addTestListener(
+        object : TestListener {
+            override fun beforeSuite(suite: TestDescriptor) {}
+
+            override fun beforeTest(test: TestDescriptor) {}
+
+            override fun afterTest(test: TestDescriptor, result: TestResult) {}
+
+            override fun afterSuite(suite: TestDescriptor, result: TestResult) {
+                if (suite.parent == null) {
+                    check(result.testCount > 0 && result.skippedTestCount == 0L) {
+                        "Tagged external tests must execute without skips: $name"
+                    }
+                }
+            }
+        }
+    )
 }
 
 subprojects {
@@ -52,28 +76,57 @@ subprojects {
             group = "verification"
             testClassesDirs = integrationSources.output.classesDirs
             classpath = integrationSources.runtimeClasspath
+            useJUnitPlatform { excludeTags("postgres", "redis") }
             dependsOn(tasks.named("testClasses"))
             shouldRunAfter(tasks.named("test"))
-            val externalTestEnvironment =
-                listOf(
-                    "MEMBER_TEST_DB_URL",
-                    "COMMERCE_TEST_POSTGRES_URL",
-                    "SHOPPING_TEST_POSTGRES_URL",
-                    "NOTIFICATION_TEST_POSTGRES_URL",
-                    "NOTIFICATION_TEST_DB_DRIVER",
-                    "NOTIFICATION_TEST_DB_USER",
-                    "NOTIFICATION_TEST_DB_PASSWORD",
-                    "LIVE_PG_TEST",
-                    "LIVE_REDIS_TEST",
-                    "LIVE_PG_PORT",
-                    "LIVE_REDIS_PORT",
-                )
-            inputs.properties(externalTestEnvironment.associateWith { System.getenv(it).orEmpty() })
-            outputs.upToDateWhen {
-                externalTestEnvironment.none { !System.getenv(it).isNullOrBlank() }
+            if (project.name in setOf("member-service", "notification-service")) {
+                // 이 두 서비스의 일반 테스트 설정은 환경변수로 DB를 선택한다.
+                val dbPrefix =
+                    if (project.name == "member-service") "MEMBER_TEST_DB_"
+                    else "NOTIFICATION_TEST_"
+                val dbEnvironment = System.getenv().filterKeys { it.startsWith(dbPrefix) }
+                inputs.properties(dbEnvironment)
+                outputs.upToDateWhen { dbEnvironment.values.all { it.isBlank() } }
             }
         }
     tasks.named("check") { dependsOn(integrationTest) }
+
+    if (path.startsWith(":services:")) {
+        val validateExternalTestClasses =
+            tasks.register("validateExternalTestClasses") {
+                dependsOn(tasks.named("integrationTestClasses"))
+                doLast {
+                    check(
+                        integrationSources.output.classesDirs.asFileTree.any {
+                            it.extension == "class"
+                        }
+                    ) {
+                        "External tests are missing for ${project.name}"
+                    }
+                }
+            }
+        val prefix = name.removeSuffix("-service").uppercase()
+        val postgresUrl =
+            if (prefix == "MEMBER") "MEMBER_TEST_DB_URL" else "${prefix}_TEST_POSTGRES_URL"
+        val postgresEnabled = {
+            if (prefix == "LIVE") System.getenv("LIVE_PG_TEST") == "1"
+            else System.getenv(postgresUrl)?.startsWith("jdbc:postgresql:") == true
+        }
+        fun registerExternalTest(taskName: String, tag: String, enabled: () -> Boolean) =
+            tasks.register<Test>(taskName) {
+                description = "격리된 외부 환경에서 $tag 태그 테스트 실행"
+                group = "verification"
+                testClassesDirs = integrationSources.output.classesDirs
+                classpath = integrationSources.runtimeClasspath
+                dependsOn(validateExternalTestClasses)
+                shouldRunAfter(tasks.named("test"))
+                useJUnitPlatform { includeTags(tag) }
+                requireExecutedExternalTests()
+                doFirst { check(enabled()) { "$taskName 실행에 필요한 격리된 DB·Redis 환경이 없습니다." } }
+            }
+        registerExternalTest("migrationTest", "postgres & migration", postgresEnabled)
+        registerExternalTest("redisTest", "redis") { System.getenv("${prefix}_REDIS_TEST") == "1" }
+    }
 
     extensions.configure<SpotlessExtension> {
         java {
