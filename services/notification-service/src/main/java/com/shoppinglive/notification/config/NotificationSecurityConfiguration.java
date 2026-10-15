@@ -54,6 +54,11 @@ public class NotificationSecurityConfiguration {
                                         .requestMatchers(
                                                 HttpMethod.POST, "/v1/notifications/{id}/read")
                                         .hasAnyRole("USER", "SELLER")
+                                        .requestMatchers(HttpMethod.POST, "/v1/broadcast-alerts")
+                                        .hasAnyRole("USER", "SELLER")
+                                        .requestMatchers(
+                                                HttpMethod.DELETE, "/v1/broadcast-alerts/{id}")
+                                        .hasAnyRole("USER", "SELLER")
                                         .anyRequest()
                                         .denyAll())
                 .oauth2ResourceServer(
