@@ -8,7 +8,7 @@ AI가 팀의 코드·테스트·협업 기준에 맞춰 작업하도록 돕는 �
 
 | 문서 | 내용 |
 |---|---|
-| [코드](rules/code.md) | 한국어·가독성·주석·YAGNI·패키지·공통화 |
+| [코드](rules/code.md) | 한국어·이름·가독성·주석·YAGNI·패키지·공통화 |
 | [테스트](rules/tests.md) | 검증 대상·설명·위치·태그·검증 범위 |
 | [계약](rules/contracts.md) | API·이벤트 계약과 구현의 정합성 |
 | [협업](rules/collaboration.md) | 이름·Git·리뷰·이슈와 PR 설명 작성 |
