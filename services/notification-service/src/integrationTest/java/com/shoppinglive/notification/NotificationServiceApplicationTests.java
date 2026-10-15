@@ -3,6 +3,7 @@ package com.shoppinglive.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shoppinglive.notification.inbox.entity.Notification;
+import com.shoppinglive.notification.inbox.entity.NotificationLinkType;
 import com.shoppinglive.notification.inbox.repository.NotificationRepository;
 import com.shoppinglive.notification.security.NotificationSecuritySupport;
 import java.time.Instant;
@@ -24,8 +25,12 @@ class NotificationServiceApplicationTests extends NotificationSecuritySupport {
                 notifications.saveAndFlush(
                         new Notification(
                                 "11111111-1111-4111-8111-111111111111",
+                                "22222222-2222-4222-8222-222222222222",
+                                "LiveBroadcastStarted",
                                 "방송 시작",
                                 "방송이 시작되었습니다.",
+                                NotificationLinkType.BROADCAST,
+                                "42",
                                 Instant.parse("2026-10-14T00:00:00Z")));
         var firstRead = Instant.parse("2026-10-14T00:01:00Z");
         notification.markRead(firstRead);
