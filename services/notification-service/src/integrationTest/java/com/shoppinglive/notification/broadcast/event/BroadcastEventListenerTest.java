@@ -11,6 +11,7 @@ import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
 import com.shoppinglive.notification.broadcast.repository.BroadcastAlertRepository;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
 import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
+import com.shoppinglive.notification.event.InvalidEventMessageException;
 import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import java.time.Instant;
 import javax.sql.DataSource;
@@ -92,26 +93,29 @@ class BroadcastEventListenerTest {
     }
 
     @Test
-    @DisplayName("다시 읽어도 실패할 메시지는 건너뛴다 — 재시도하면 뒤의 알림이 모두 멈춘다")
-    void skipsMessagesThatCanNeverSucceed() {
-        assertThatCode(
-                        () -> {
-                            listener.consume(record("깨진 JSON"));
-                            // 발행 서비스가 계약과 다르다.
-                            listener.consume(
-                                    record(
-                                            envelope("LiveBroadcastScheduled", "{}")
-                                                    .replace("live-service", "attacker")));
-                            // 메시지 key 가 payload 의 방송 ID 와 다르면 파티션이 흩어져 순서가 깨진 것이다.
-                            listener.consume(
-                                    new ConsumerRecord<>(
-                                            LiveBroadcastEventContract.TOPIC_NAME,
-                                            0,
-                                            0L,
-                                            "999",
-                                            scheduled(1, "가을 신상 라이브", "2026-10-20T12:00:00Z")));
-                        })
-                .doesNotThrowAnyException();
+    @DisplayName("다시 읽어도 실패할 메시지는 보관함으로 보내도록 던진다")
+    void throwsInvalidEventForMessagesThatCanNeverSucceed() {
+        assertThatThrownBy(() -> listener.consume(record("깨진 JSON")))
+                .isInstanceOf(InvalidEventMessageException.class);
+        // 발행 서비스가 계약과 다르다.
+        assertThatThrownBy(
+                        () ->
+                                listener.consume(
+                                        record(
+                                                envelope("LiveBroadcastScheduled", "{}")
+                                                        .replace("live-service", "attacker"))))
+                .isInstanceOf(InvalidEventMessageException.class);
+        // 메시지 key 가 payload 의 방송 ID 와 다르면 파티션이 흩어져 순서가 깨진 것이다.
+        assertThatThrownBy(
+                        () ->
+                                listener.consume(
+                                        new ConsumerRecord<>(
+                                                LiveBroadcastEventContract.TOPIC_NAME,
+                                                0,
+                                                0L,
+                                                "999",
+                                                scheduled(1, "가을 신상 라이브", "2026-10-20T12:00:00Z"))))
+                .isInstanceOf(InvalidEventMessageException.class);
 
         assertThat(schedules.findById(BROADCAST)).isEmpty();
     }
