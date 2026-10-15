@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.*;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,6 +14,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 class MemberCouponMigrationTest {
+    @DisplayName("마이그레이션 후에도 회원별 평생 수령 유일성과 DB 수량 제약을 유지한다")
     @Test
     void retainsLifetimeUniquenessAndDatabaseQuantityConstraints() {
         var ds =

@@ -12,6 +12,7 @@ import com.shoppinglive.commerce.payment.entity.RefundStatus;
 import com.shoppinglive.commerce.payment.exception.MockRefundResultUnknownException;
 import java.time.Duration;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -30,6 +31,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundOutcomeService outcomes;
     @MockitoSpyBean DurableMockRefundGateway gateway;
 
+    @DisplayName("최초 실행과 세 번의 재시도로 한도를 소진해도 새 금전 실패나 재고 복구를 만들지 않는다")
     @Test
     void initialCallPlusThreeRetriesExhaustsWithoutNewMoneyFailureOrStockRestore() {
         var group = createAndPay();
@@ -84,6 +86,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(3);
     }
 
+    @DisplayName("최초 처리 중단 후에는 다음 재시도 한 번만 소비하며 7일 뒤에도 복구한다")
     @Test
     void interruptedInitialProcessingConsumesOnlyTheNextRetryAndRecoversAfterSevenDays() {
         var group = createAndPay();
@@ -114,6 +117,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
+    @DisplayName("한도 소진 후 확인된 결과는 새 실행 없이 반영한다")
     @Test
     void knownResultAfterExhaustionIsAppliedWithoutConsumingOrSendingAnotherExecution() {
         var group = createAndPay();
@@ -147,6 +151,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 .isTrue();
     }
 
+    @DisplayName("다른 작업자가 선점하면 이전 작업자는 금전 결과·재고 복구를 반영할 수 없다")
     @Test
     void staleWorkerCannotApplyMoneyResultOrRestoreStockAfterAnotherWorkerClaims() {
         var group = createAndPay();
@@ -174,6 +179,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(20000L);
     }
 
+    @DisplayName("게이트웨이 실행은 업무 트랜잭션과 결제 묶음 잠금 밖에서 수행한다")
     @Test
     void gatewayExecutionRunsOutsideTheBusinessTransactionAndGroupLock() {
         var group = createAndPay();
@@ -207,6 +213,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
         assertThat(executions.execute(request.id())).isTrue();
     }
 
+    @DisplayName("확정 실패는 최종 상태이며 임대와 실행 횟수를 재사용하지 않는다")
     @Test
     void confirmedFailureIsTerminalAndTheLeaseAndCounterAreNotReused() {
         var group = createAndPay();
@@ -234,6 +241,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 "SELECT retry_count FROM refund_request WHERE id=?", Integer.class, id);
     }
 
+    @DisplayName("예상하지 못한 전송 실패도 미확정 상태와 같은 요청의 실행 예산을 유지한다")
     @Test
     void unexpectedDeliveryFailureAlsoStaysUnknownAndRetainsTheSameRequestBudget() {
         var group = createAndPay();

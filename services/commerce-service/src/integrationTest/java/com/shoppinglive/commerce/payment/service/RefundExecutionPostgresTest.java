@@ -8,6 +8,7 @@ import com.shoppinglive.commerce.payment.entity.PaymentStatus;
 import com.shoppinglive.commerce.payment.entity.RefundStatus;
 import com.shoppinglive.common.core.BusinessException;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -21,6 +22,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
     @Autowired RefundExecutionService executions;
 
+    @DisplayName("환불 성공은 대상 주문을 환불 처리하고 판매 재고를 한 번만 복구한다")
     @Test
     void successRefundsTargetOrderAndRestoresSoldStockOnce() {
         var group = createAndPay();
@@ -85,6 +87,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(PaymentStatus.SUCCESS);
     }
 
+    @DisplayName("결제 묶음은 모든 주문이 환불된 뒤에만 환불 완료로 변경한다")
     @Test
     void paymentGroupIsRefundedOnlyAfterEveryOrderIsRefunded() {
         var group = createAndPay();
@@ -116,6 +119,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .containsOnly(OrderStatus.REFUNDED);
     }
 
+    @DisplayName("금전 처리 성공 후 DB 반영에 실패하면 재실행 없이 저장된 결과를 반영한다")
     @Test
     void persistedMoneySuccessIsAppliedAfterDatabaseFailureWithoutExecutingAgain() {
         var group = createAndPay();
@@ -164,6 +168,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("환불이 성공해도 이미 사용한 쿠폰은 복원하지 않는다")
     @Test
     void successfulRefundDoesNotRestoreUsedCoupon() {
         var group = createAndPayWithCoupon();
@@ -202,6 +207,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(REFUND_COUPON);
     }
 
+    @DisplayName("확정 환불 실패는 최종 상태이며 다시 실행하지 않는다")
     @Test
     void confirmedFailureIsTerminalAndDoesNotExecuteAgain() {
         var group = createAndPay();
@@ -222,6 +228,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo("FAILED");
     }
 
+    @DisplayName("게이트웨이 결과가 없는 미확정 환불은 같은 요청으로 재시도할 수 있다")
     @Test
     void unknownWithoutGatewayResultCanBeRetriedUsingTheSameRequest() {
         var group = createAndPay();
@@ -250,6 +257,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
+    @DisplayName("결과가 저장된 미확정 환불은 재시도 시 기존 결과를 재사용한다")
     @Test
     void unknownAfterPersistedResultReusesItOnRetry() {
         var group = createAndPay();
@@ -284,6 +292,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("누적 환불액은 결제 묶음의 실제 결제액을 넘을 수 없다")
     @Test
     void cumulativeRefundCannotExceedThePaidGroupAmount() {
         var group = createAndPay();
@@ -305,6 +314,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 .isZero();
     }
 
+    @DisplayName("0원 환불은 Mock 게이트웨이를 호출하지 않는다")
     @Test
     void zeroAmountRefundDoesNotCallTheMockGateway() {
         var group = createAndPay();

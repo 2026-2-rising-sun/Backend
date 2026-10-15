@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,10 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.shoppinglive.member.auth.repository.RefreshSessionRepository;
 import com.shoppinglive.member.auth.service.MemberTokenIssuer;
+import com.shoppinglive.member.security.MemberAuthTestSupport;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -29,6 +31,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
     @MockitoSpyBean MemberTokenIssuer issuer;
     @MockitoSpyBean RefreshSessionRepository sessions;
 
+    @DisplayName("실제 로그인은 서명된 접근 토큰을 반환하고 최초 갱신 토큰은 해시만 저장한다")
     @Test
     void actualLoginReturnsSignedAccessAndOnlyHashIsStoredForInitialRefresh() throws Exception {
         register();
@@ -70,6 +73,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
         assertThat(response.getHeaders("Set-Cookie")).isEmpty();
     }
 
+    @DisplayName("없는 계정·잘못된 비밀번호·잠긴 계정은 같은 오류를 반환하고 실패 횟수를 커밋한다")
     @Test
     void unknownWrongAndLockedAccountsReturnSameGenericErrorAndFailuresCommit() throws Exception {
         register();
@@ -94,6 +98,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
                 .isZero();
     }
 
+    @DisplayName("서명에 실패하면 세션을 남기거나 토큰을 반환하지 않는다")
     @Test
     void signingFailureDoesNotLeaveSessionOrReturnTokens() throws Exception {
         register();
@@ -106,6 +111,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
         assertNoSessions();
     }
 
+    @DisplayName("잠금 만료 후 실패 횟수를 한 번 초기화하고 반복 실패 시 다시 잠근다")
     @Test
     void expiredLockResetsOnceAndRepeatedFailuresLockTheAccountAgain() throws Exception {
         register();
@@ -137,6 +143,7 @@ class MemberLoginTest extends MemberAuthTestSupport {
         assertNoSessions();
     }
 
+    @DisplayName("세션 저장 후 DB 오류가 발생하면 세션 가족·토큰을 롤백하고 접근 토큰을 반환하지 않는다")
     @Test
     void databaseFailureAfterSessionInsertRollsBackFamilyAndTokenWithoutReturningAccess()
             throws Exception {

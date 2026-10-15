@@ -131,8 +131,8 @@ class OrderCreationServiceTest {
     // ----- 정상 생성 -----
 
     @Test
-    @DisplayName("주문을 만들고 재고를 배정한다")
-    void create_주문을_만들고_재고를_배정한다() {
+    @DisplayName("주문을 생성하고 재고를 예약한다")
+    void createsOrderAndReservesStock() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -152,8 +152,8 @@ class OrderCreationServiceTest {
 
     /** 상품명·단가는 주문 시점 값으로 고정된다. 나중에 Shopping 이 이름을 바꾸거나 관리자가 가격을 올려도 이미 만들어진 주문의 영수증은 그대로여야 한다. */
     @Test
-    @DisplayName("주문 당시 상품명과 단가를 스냅샷으로 남긴다")
-    void create_주문_당시_상품명과_단가를_스냅샷으로_남긴다() {
+    @DisplayName("주문 당시 상품명과 단가를 스냅샷으로 저장한다")
+    void snapshotsProductNameAndUnitPriceAtCreation() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -167,8 +167,8 @@ class OrderCreationServiceTest {
 
     /** 검증된 회원 식별자를 주문에 저장한다. */
     @Test
-    @DisplayName("회원 소유권을 저장한다")
-    void create_회원_소유권을_저장한다() {
+    @DisplayName("주문에 인증된 회원 소유권을 저장한다")
+    void storesAuthenticatedMemberOwnership() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -181,8 +181,8 @@ class OrderCreationServiceTest {
 
     /** 결제 기한이 없으면 이정 님의 만료 스케줄러가 대상을 찾지 못해, 결제 없이 이탈한 주문의 재고가 영원히 묶인다. */
     @Test
-    @DisplayName("결제 기한을 설정한다")
-    void create_결제_기한을_설정한다() {
+    @DisplayName("주문 생성 시 결제 기한을 설정한다")
+    void setsPaymentDeadline() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -200,8 +200,8 @@ class OrderCreationServiceTest {
     // ----- 품절 자동 전이 -----
 
     @Test
-    @DisplayName("재고가 0이 되면 품절로 전이한다")
-    void create_재고가_0이_되면_품절로_전이한다() {
+    @DisplayName("주문 예약으로 재고가 0이 되면 품절로 전이한다")
+    void marksSaleSoldOutWhenReservationLeavesZeroStock() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -213,8 +213,8 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("재고가 남아있으면 품절 전이하지 않는다")
-    void create_재고가_남아있으면_품절_전이하지_않는다() {
+    @DisplayName("주문 예약 후 재고가 남으면 품절로 전이하지 않는다")
+    void keepsSaleActiveWhenStockRemains() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -228,8 +228,8 @@ class OrderCreationServiceTest {
     // ----- 판매 상태 -----
 
     @Test
-    @DisplayName("판매중이 아니면 409이고 재고를 건드리지 않는다")
-    void create_판매중이_아니면_409이고_재고를_건드리지_않는다() {
+    @DisplayName("판매중이 아니면 409로 거절하고 재고를 변경하지 않는다")
+    void rejectsInactiveSaleWithoutChangingStock() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.PRIVATE);
@@ -243,8 +243,8 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("판매정보가 없으면 404")
-    void create_판매정보가_없으면_404() {
+    @DisplayName("판매정보가 없으면 주문 생성은 404로 응답한다")
+    void returns404ForMissingSale() {
         productExists();
         executeTransactionInline();
         given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.empty());
@@ -254,8 +254,8 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("Shopping에 상품이 없으면 재고를 건드리기 전에 멈춘다")
-    void create_Shopping에_상품이_없으면_재고를_건드리기_전에_멈춘다() {
+    @DisplayName("Shopping에 상품이 없으면 재고를 변경하기 전에 중단한다")
+    void stopsBeforeStockMutationWhenShoppingProductIsMissing() {
         given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
@@ -272,8 +272,8 @@ class OrderCreationServiceTest {
      * 예외가 올라오는 것까지 확인하고, 롤백 자체는 {@code OrderCreationApiTest} 가 실제 DB 로 검증한다.
      */
     @Test
-    @DisplayName("배정에 실패하면 409를 던진다")
-    void create_배정에_실패하면_409를_던진다() {
+    @DisplayName("재고 예약에 실패하면 주문 생성은 409로 거절한다")
+    void returns409WhenStockReservationFails() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -291,8 +291,8 @@ class OrderCreationServiceTest {
     // ----- 금액 확인 -----
 
     @Test
-    @DisplayName("확인 금액이 현재 금액과 같으면 통과한다")
-    void create_확인_금액이_현재_금액과_같으면_통과한다() {
+    @DisplayName("확인 금액이 현재 금액과 같으면 검증을 통과한다")
+    void acceptsExpectedAmountMatchingCurrentPrice() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -305,8 +305,8 @@ class OrderCreationServiceTest {
 
     /** 사용자가 15,000 원인 줄 알고 눌렀는데 20,000 원이 조용히 결제되면 안 된다. */
     @Test
-    @DisplayName("확인 금액이 다르면 409이고 재고를 건드리지 않는다")
-    void create_확인_금액이_다르면_409이고_재고를_건드리지_않는다() {
+    @DisplayName("확인 금액이 다르면 409로 거절하고 재고를 변경하지 않는다")
+    void rejectsExpectedAmountMismatchWithoutChangingStock() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -320,8 +320,8 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("확인 금액을 안 보내면 검증을 건너뛴다")
-    void create_확인_금액을_안_보내면_검증을_건너뛴다() {
+    @DisplayName("확인 금액을 생략하면 금액 비교를 생략한다")
+    void skipsExpectedAmountCheckWhenOmitted() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -333,8 +333,8 @@ class OrderCreationServiceTest {
     // ----- 멱등 처리 -----
 
     @Test
-    @DisplayName("같은 멱등키 재전송은 기존 주문을 돌려주고 새로 만들지 않는다")
-    void create_같은_멱등키_재전송은_기존_주문을_돌려주고_새로_만들지_않는다() {
+    @DisplayName("같은 멱등 키의 재요청은 새 주문 없이 기존 주문을 반환한다")
+    void returnsExistingOrderForIdempotentReplayWithoutCreatingAnother() {
         Order existing = existingOrder();
         given(salesRepository.findById(SALES_ID))
                 .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
@@ -353,8 +353,8 @@ class OrderCreationServiceTest {
 
     /** 두 재전송이 동시에 멱등키 조회를 통과하면 한쪽은 UNIQUE 제약에 걸린다. 그 요청도 실패가 아니라 기존 주문을 받아야 한다. */
     @Test
-    @DisplayName("멱등키 UNIQUE 충돌시 기존 주문으로 연결한다")
-    void create_멱등키_UNIQUE_충돌시_기존_주문으로_연결한다() {
+    @DisplayName("멱등 키의 UNIQUE 충돌은 기존 주문으로 연결한다")
+    void loadsExistingOrderAfterIdempotencyUniqueConflict() {
         productExists();
         Order existing = existingOrder();
         given(salesRepository.findById(SALES_ID))
@@ -375,8 +375,8 @@ class OrderCreationServiceTest {
 
     /** 멱등키 없이 오는 요청도 허용한다. 이때는 재전송이 별개 주문이 되는데, 이는 클라이언트가 키를 안 보낸 결과이지 서버 오류가 아니다. */
     @Test
-    @DisplayName("멱등키가 없으면 조회하지 않는다")
-    void create_멱등키가_없으면_조회하지_않는다() {
+    @DisplayName("멱등 키가 없으면 기존 주문을 조회하지 않는다")
+    void skipsIdempotencyLookupWhenKeyIsMissing() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -389,8 +389,8 @@ class OrderCreationServiceTest {
 
     /** 주문번호는 난수라 같은 날 겹칠 수 있다. 유일성은 DB 제약이 보장하고, 서비스는 새 번호로 다시 시도한다. */
     @Test
-    @DisplayName("주문번호가 겹치면 새 번호로 재시도한다")
-    void create_주문번호가_겹치면_새_번호로_재시도한다() {
+    @DisplayName("주문번호가 충돌하면 새 번호로 재시도한다")
+    void retriesWithNewNumberAfterOrderNumberCollision() {
         productExists();
         given(transactionTemplate.execute(any()))
                 .willThrow(new DataIntegrityViolationException("uk_orders_order_number"))
@@ -404,8 +404,8 @@ class OrderCreationServiceTest {
     // ----- 입력 검증 -----
 
     @Test
-    @DisplayName("필수값이 없으면 400이고 아무것도 조회하지 않는다")
-    void create_필수값이_없으면_400이고_아무것도_조회하지_않는다() {
+    @DisplayName("필수값이 없으면 400으로 거절하고 외부·DB 조회를 하지 않는다")
+    void rejectsMissingRequiredFieldsBeforeAnyLookup() {
         CreateOrderCommand noName =
                 new CreateOrderCommand(
                         PRODUCT_ID,
@@ -424,8 +424,8 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("수량이 0이하면 400")
-    void create_수량이_0이하면_400() {
+    @DisplayName("주문 수량이 0 이하면 400으로 거절한다")
+    void returns400ForNonPositiveQuantity() {
         assertThatThrownBy(() -> orderCreationService.create(command(0, null), null))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> orderCreationService.create(command(-1, null), null))
@@ -448,8 +448,8 @@ class OrderCreationServiceTest {
 
     /** 스냅샷 필드가 요청 값 그대로 저장되는지 확인용. */
     @Test
-    @DisplayName("주문자 정보를 그대로 저장한다")
-    void create_주문자_정보를_그대로_저장한다() {
+    @DisplayName("주문자 정보를 입력값 그대로 저장한다")
+    void preservesBuyerInformation() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);

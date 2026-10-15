@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commerce.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commerce.payment.exception.MockRefundResultUnknownException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -18,6 +19,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
     @Autowired DurableMockRefundGateway gateway;
 
+    @DisplayName("같은 요청은 변경되지 않는 게이트웨이 결과 하나를 재사용한다")
     @Test
     void sameRequestReusesOneImmutableGatewayResult() {
         var group = createAndPay();
@@ -43,6 +45,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("성공 응답 유실 후 재시도해도 저장된 성공 결과를 유지한다")
     @Test
     void persistedSuccessSurvivesLostResponseAndRetry() {
         var group = createAndPay();
@@ -73,6 +76,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("결과가 없으면 결과를 임의로 만들지 않고 재시도를 허용한다")
     @Test
     void missingResultCanBeRetriedWithoutInventingAnOutcome() {
         var group = createAndPay();
@@ -97,6 +101,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                 .isEqualTo(MockRefundOutcome.SUCCESS);
     }
 
+    @DisplayName("재요청 금액이 저장된 요청과 다르면 거절한다")
     @Test
     void replayRejectsAnAmountDifferentFromThePersistedRequest() {
         var group = createAndPay();

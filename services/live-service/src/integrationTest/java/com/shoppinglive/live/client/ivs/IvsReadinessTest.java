@@ -122,7 +122,6 @@ class IvsReadinessTest {
     @DisplayName("stub-unavailable 이면 준비 상태·재생 정보 조회 모두 UNAVAILABLE로 실패한다")
     @Test
     void stubUnavailableThrowsOnReadinessAndPlayback() {
-        // given
         context.withPropertyValues(
                         "spring.profiles.active=test",
                         "live.ivs.mode=stub",
@@ -133,7 +132,6 @@ class IvsReadinessTest {
                             final IvsReadinessClient stubClient =
                                     application.getBean(IvsReadinessClient.class);
 
-                            // when & then
                             assertThatThrownBy(() -> stubClient.isReady(ARN))
                                     .isInstanceOf(IvsUnavailableException.class);
                             assertThatThrownBy(() -> stubClient.getPlaybackInfo(ARN))
@@ -145,13 +143,11 @@ class IvsReadinessTest {
     @Test
     void stubAvailableFollowsStubReady() {
         for (final boolean ready : new boolean[] {true, false}) {
-            // given
             context.withPropertyValues(
                             "spring.profiles.active=test",
                             "live.ivs.mode=stub",
                             "live.ivs.stub-ready=" + ready,
                             "live.ivs.stub-unavailable=false")
-                    // when & then
                     .run(
                             application ->
                                     assertThat(

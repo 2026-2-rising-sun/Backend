@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +41,7 @@ class CouponManagementUpdateTest extends CommerceSecurityTestSupport {
         shopping.clear();
     }
 
+    @DisplayName("버전이 충돌하거나 행사가 시작되면 쿠폰 설정을 변경하지 않는다")
     @Test
     void versionConflictAndEventStartedDoNotChangeSettings() {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
@@ -85,6 +87,7 @@ class CouponManagementUpdateTest extends CommerceSecurityTestSupport {
         assertThat(management.get(SELLER, coupon.id()).fixedDiscount()).isEqualTo(200);
     }
 
+    @DisplayName("같은 버전의 동시 수정은 한 요청만 성공한다")
     @Test
     void concurrentUpdatesWithSameVersionHaveExactlyOneWinner() throws Exception {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);

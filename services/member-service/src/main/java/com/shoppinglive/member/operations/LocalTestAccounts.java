@@ -11,7 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Local fixtures use normal BCrypt login and session issuance, never an authentication bypass. */
+/** 로컬 계정도 일반 BCrypt 로그인과 세션 발급을 거치며 인증을 우회하지 않는다. */
 @Component
 @Profile("local & !dev & !prod & !production")
 @ConditionalOnProperty(name = "member.local-test-accounts.enabled", havingValue = "true")
@@ -47,7 +47,7 @@ public class LocalTestAccounts implements ApplicationRunner {
                     || member.get("withdrawn_at") != null
                     || !passwords.matches(login, member.get("password_hash").toString())) {
                 throw new IllegalStateException(
-                        "Local test account collision; disable fixtures or use a disposable local database");
+                        "로컬 테스트 계정이 기존 회원과 충돌합니다. 테스트 계정을 끄거나 전용 로컬 DB를 사용해 주세요.");
             }
             return;
         }

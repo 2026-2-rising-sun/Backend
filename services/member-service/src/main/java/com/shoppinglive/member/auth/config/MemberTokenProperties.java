@@ -15,8 +15,7 @@ public record MemberTokenProperties(
                 || !privateKeyLocation.isFile()
                 || keyId == null
                 || keyId.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Member signing private key file and key ID are required");
+            throw new IllegalArgumentException("회원 토큰 서명용 개인 키 파일과 키 ID는 필수입니다.");
         }
         requirePositiveSeconds(accessTokenTtl, "access-token-ttl");
         requirePositiveSeconds(refreshTokenTtl, "refresh-token-ttl");
@@ -24,8 +23,7 @@ public record MemberTokenProperties(
 
     private static void requirePositiveSeconds(Duration value, String field) {
         if (value == null || value.isNegative() || value.isZero() || value.getNano() != 0) {
-            throw new IllegalArgumentException(
-                    field + " is required and must be a positive whole number of seconds");
+            throw new IllegalArgumentException(field + "은 필수이며 양수의 정수 초 단위여야 합니다.");
         }
     }
 }

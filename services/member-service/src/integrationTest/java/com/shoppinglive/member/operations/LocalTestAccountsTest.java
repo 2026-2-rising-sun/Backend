@@ -1,12 +1,13 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.operations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.member.operations.LocalTestAccounts;
+import com.shoppinglive.member.security.MemberAuthTestSupport;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.DefaultApplicationArguments;
@@ -21,6 +22,7 @@ class LocalTestAccountsTest extends MemberAuthTestSupport {
     @Autowired LocalTestAccounts fixtures;
     @Autowired JwtDecoder decoder;
 
+    @DisplayName("짧은 로컬 비밀번호도 실제 서명 로그인으로 검증하고 반복 초기화 시 ID를 유지한다")
     @Test
     void bothShortPasswordsUseRealSignedLoginAndRepeatedInitializationPreservesIds()
             throws Exception {
@@ -70,6 +72,7 @@ class LocalTestAccountsTest extends MemberAuthTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("계정이 충돌하면 승격·덮어쓰기 없이 새 사용자 생성도 롤백한다")
     @Test
     void collisionDoesNotPromoteOrOverwriteAccountAndRollsBackNewUser() {
         var existing =

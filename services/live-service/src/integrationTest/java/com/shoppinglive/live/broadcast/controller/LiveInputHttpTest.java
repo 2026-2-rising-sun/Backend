@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -58,12 +59,14 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         repository.deleteById(broadcast.getId());
     }
 
+    @DisplayName("공개 경로의 ID 누락과 잘못된 형식은 400으로 응답한다")
     @ParameterizedTest
     @ValueSource(strings = {"/", "/?id=null", "/null", "/abc", "/%7Bid%7D"})
     void publicMissingOrMalformedIdIs400(String suffix) throws Exception {
         expect(request("GET", "/v1/broadcasts" + suffix, null, null), 400, "INVALID_REQUEST");
     }
 
+    @DisplayName("목록·미존재 자원·보안 응답의 경계를 유지한다")
     @Test
     void collectionMissingResourceAndSecurityKeepTheirBoundaries() throws Exception {
         assertThat(request("GET", "/v1/broadcasts", null, null).statusCode()).isEqualTo(200);
@@ -74,6 +77,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         expect(request("GET", "/v1/admin/broadcasts", userBearer(), null), 403, "FORBIDDEN");
     }
 
+    @DisplayName("관리자 경로는 ID 누락 검증 전에 인증을 확인한다")
     @ParameterizedTest
     @ValueSource(strings = {"GET", "PATCH"})
     void administratorMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
@@ -85,6 +89,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         expect(request(method, "/v1/admin/broadcasts/", userBearer(), null), 403, "FORBIDDEN");
     }
 
+    @DisplayName("잘못된 PATCH 요청은 저장된 필드를 변경하지 않는다")
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -111,6 +116,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         assertUnchanged();
     }
 
+    @DisplayName("PATCH에서 생략한 필드는 유지하고 유효한 문자열은 수정한다")
     @Test
     void omittedPatchFieldsRemainUnchangedAndStringsStillUpdate() throws Exception {
         assertThat(request("PATCH", patchPath(), adminBearer(), "{}").statusCode()).isEqualTo(200);
@@ -123,6 +129,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
                 .isGreaterThan(broadcast.getVersion());
     }
 
+    @DisplayName("잘못된 연결 버전은 링크를 생성하지 않고 400으로 거절한다")
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -143,6 +150,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         assertUnchanged();
     }
 
+    @DisplayName("음수 버전은 변경이나 무변경 처리 전에 입력 오류로 거절한다")
     @Test
     void negativeVersionsAreInputErrorsBeforeMutationOrNoOp() throws Exception {
         String path = "/v1/admin/broadcasts/" + broadcast.getId();

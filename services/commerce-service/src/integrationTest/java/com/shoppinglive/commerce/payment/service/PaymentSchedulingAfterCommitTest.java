@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -91,8 +92,9 @@ class PaymentSchedulingAfterCommitTest
     }
 
     /** 커밋이 늦어져도 결제는 반드시 확정된다. 예약이 커밋 이후에 걸리면 비동기 스레드는 항상 저장된 결제 건을 보게 된다. */
+    @DisplayName("커밋이 늦어져도 INSTANT_SUCCESS 결제를 확정한다")
     @Test
-    void 커밋이_늦어져도_INSTANT_SUCCESS_는_확정된다() {
+    void confirmsInstantSuccessAfterDelayedCommit() {
         startPaymentInsideLongTransaction(PaymentScenario.INSTANT_SUCCESS);
 
         await().atMost(Duration.ofSeconds(10))
@@ -112,8 +114,9 @@ class PaymentSchedulingAfterCommitTest
                         });
     }
 
+    @DisplayName("커밋이 늦어져도 INSTANT_FAIL 결제를 확정하고 재고를 복구한다")
     @Test
-    void 커밋이_늦어져도_INSTANT_FAIL_은_확정되고_재고가_복구된다() {
+    void confirmsInstantFailureAndRestoresStockAfterDelayedCommit() {
         startPaymentInsideLongTransaction(PaymentScenario.INSTANT_FAIL);
 
         await().atMost(Duration.ofSeconds(10))
@@ -132,8 +135,9 @@ class PaymentSchedulingAfterCommitTest
     }
 
     /** 트랜잭션이 롤백되면 결제 건 자체가 없으므로 예약도 걸리지 않아야 한다. 커밋 전에 예약을 걸면 존재하지 않는 결제를 처리하려 드는 일이 생긴다. */
+    @DisplayName("트랜잭션이 롤백되면 결제 처리를 예약하지 않는다")
     @Test
-    void 롤백되면_결제_처리가_예약되지_않는다() {
+    void doesNotSchedulePaymentWhenTransactionRollsBack() {
         try {
             transactionTemplate.executeWithoutResult(
                     status -> {

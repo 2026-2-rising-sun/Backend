@@ -75,20 +75,19 @@ public class ShoppingSecurityConfiguration {
                                     .permitAll()
                                     .requestMatchers(
                                             HttpMethod.GET,
-                                            "/v1/admin/products",
-                                            "/v1/admin/products/",
-                                            "/v1/admin/products/{id}",
-                                            "/v1/seller/products")
+                                            "/v1/seller/products",
+                                            "/v1/seller/products/",
+                                            "/v1/seller/products/{id}")
                                     .hasRole("SELLER")
                                     .requestMatchers(
                                             HttpMethod.POST,
-                                            "/v1/admin/products",
-                                            "/v1/admin/product-images")
+                                            "/v1/seller/products",
+                                            "/v1/seller/product-images")
                                     .hasRole("SELLER")
                                     .requestMatchers(
                                             HttpMethod.PATCH,
-                                            "/v1/admin/products/",
-                                            "/v1/admin/products/{id}")
+                                            "/v1/seller/products/",
+                                            "/v1/seller/products/{id}")
                                     .hasRole("SELLER");
                             if (devEnabled) {
                                 auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images")
@@ -107,8 +106,7 @@ public class ShoppingSecurityConfiguration {
 
     private HttpSecurity stateless(HttpSecurity http, JsonSecurityErrorHandler errors)
             throws Exception {
-        // Only explicit Bearer/service headers are accepted; this service never authenticates
-        // cookies.
+        // 명시적인 Bearer·서비스 헤더만 허용하고 쿠키로 인증하지 않는다.
         return http.csrf(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)

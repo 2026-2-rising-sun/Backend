@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Instant;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -43,6 +44,7 @@ class JsonTypePolicyTest {
     @Autowired MockMvc mvc;
     @Autowired TestRestTemplate http;
 
+    @DisplayName("잘못된 JSON 자료형은 Boot 매퍼와 MVC에서 거절한다")
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -81,6 +83,7 @@ class JsonTypePolicyTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
+    @DisplayName("유효한 숫자·ISO 날짜·null은 실제 HTTP 요청에서도 허용한다")
     @Test
     void validNumbersIsoDateTimeAndNullRemainValidOverActualHttp() throws Exception {
         String body =
@@ -105,6 +108,7 @@ class JsonTypePolicyTest {
         assertThat(send("{\"quantity\":1,\"price\":2}").getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    @DisplayName("실제 HTTP에서 잘못된 본문 자료형을 거절하되 쿼리 변환은 유지한다")
     @Test
     void actualHttpRejectsWrongTypesWithoutChangingQueryParameterConversion() throws Exception {
         var response = send("{\"name\":123,\"quantity\":1.5}");
@@ -116,6 +120,7 @@ class JsonTypePolicyTest {
                 .andExpect(jsonPath("$").value(2));
     }
 
+    @DisplayName("JSON 트리 변환에도 같은 엄격한 자료형 규칙을 적용한다")
     @Test
     void treeToValueUsesTheSameStrictTypes() throws Exception {
         var invalid = mapper.readTree("{\"quantity\":1.5}");
@@ -128,6 +133,7 @@ class JsonTypePolicyTest {
                 .isEqualTo(2L);
     }
 
+    @DisplayName("소수 부분이 없는 정수는 JSON 숫자 표기 방식과 무관하게 허용한다")
     @ParameterizedTest
     @ValueSource(strings = {"1.0", "1e0", "9223372036854775807.0", "-9223372036854775808.0"})
     void exactIntegerValuesAreAcceptedRegardlessOfJsonNumberNotation(String number)
@@ -142,6 +148,7 @@ class JsonTypePolicyTest {
                 .isEqualTo(expected);
     }
 
+    @DisplayName("정수 역직렬화는 기본형·래퍼·큰 정수의 범위 규칙을 유지한다")
     @Test
     void integerDeserializerKeepsPrimitiveWrapperAndLargeNumberRangeRules() throws Exception {
         for (Class<?> type :

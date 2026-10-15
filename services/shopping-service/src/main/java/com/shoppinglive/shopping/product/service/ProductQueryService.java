@@ -3,7 +3,6 @@ package com.shoppinglive.shopping.product.service;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.product.dto.ProductSnapshot;
-import com.shoppinglive.shopping.product.dto.SellerProductPage;
 import com.shoppinglive.shopping.product.entity.Product;
 import com.shoppinglive.shopping.product.repository.ProductRepository;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
@@ -13,8 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 /** 서비스 간 상품 조회. */
@@ -53,27 +50,6 @@ public class ProductQueryService {
                 .filter(Objects::nonNull)
                 .map(this::toSnapshot)
                 .toList();
-    }
-
-    public SellerProductPage findOwnedProducts(String sellerId, int page, int size) {
-        if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE) {
-            throw new BusinessException(
-                    ErrorCode.INVALID_REQUEST,
-                    "page는 0 이상, size는 1~100, page × size는 2147483647 이하여야 합니다.");
-        }
-        var result =
-                productRepository.findBySellerId(
-                        sellerId,
-                        PageRequest.of(
-                                page,
-                                size,
-                                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
-        return new SellerProductPage(
-                result.getContent().stream().map(this::toSnapshot).toList(),
-                page,
-                size,
-                result.getTotalElements(),
-                result.getTotalPages());
     }
 
     private ProductSnapshot toSnapshot(Product product) {

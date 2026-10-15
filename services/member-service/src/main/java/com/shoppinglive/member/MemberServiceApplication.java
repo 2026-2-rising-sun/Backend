@@ -17,7 +17,7 @@ public class MemberServiceApplication {
         if (Arrays.asList(args).contains("--bootstrap-seller")) {
             if (args.length != 1) {
                 throw new IllegalArgumentException(
-                        "Seller bootstrap accepts only --bootstrap-seller; use environment variables");
+                        "--bootstrap-seller 인자만 허용합니다. 판매자 정보는 환경변수로 지정해 주세요.");
             }
             try (var context = SellerBootstrapCommand.openNonWebContext()) {
                 var memberId =

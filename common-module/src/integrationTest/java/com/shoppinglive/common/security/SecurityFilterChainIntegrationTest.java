@@ -14,6 +14,7 @@ import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -53,6 +54,7 @@ class SecurityFilterChainIntegrationTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
+    @DisplayName("공개 경로는 익명 접근을 허용하되 잘못된 인증 정보는 거절한다")
     @Test
     void publicEndpointAllowsAnonymousAndInvalidCredentialsStillFail() throws Exception {
         mvc.perform(get("/public")).andExpect(status().isOk());
@@ -61,6 +63,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
+    @DisplayName("안전하지 않은 경로는 인증 체인에 진입하기 전에 방화벽에서 거절한다")
     @ParameterizedTest
     @ValueSource(
             strings = {"/public//extra", "/admin%2Fextra", "/admin%2fextra", "/admin%252Fextra"})
@@ -75,6 +78,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
+    @DisplayName("실제 Bearer 서명을 검증하고 도메인 사용자 정보만 노출한다")
     @Test
     void verifiesRealBearerSignatureAndExposesOnlyDomainPrincipal() throws Exception {
         mvc.perform(get("/member").header("Authorization", userBearer()))
@@ -94,6 +98,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @DisplayName("세션이 폐기되면 이미 발급된 토큰도 다음 요청부터 거절한다")
     @Test
     void revokedSessionRejectsAnAlreadyIssuedTokenOnItsNextRequest() throws Exception {
         String bearer = userBearer();
@@ -104,6 +109,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
+    @DisplayName("인증 기관 장애는 503이며 익명 공개 요청과 서비스 호출에는 영향을 주지 않는다")
     @Test
     void authorityOutageIs503WhileAnonymousPublicAndServiceCallersStayIndependent()
             throws Exception {
@@ -122,6 +128,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @DisplayName("토큰 누락은 401이고 역할 부족은 공통 오류 형식의 403이다")
     @Test
     void missingTokenReturns401AndInsufficientRoleReturns403WithCommonEnvelope() throws Exception {
         mvc.perform(get("/member"))
@@ -134,6 +141,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @DisplayName("서비스 키와 사용자 토큰은 서로의 인증 주체로 사용할 수 없다")
     @Test
     void serviceKeyCannotBecomeMemberOrAdministratorAndUserTokenCannotBecomeCaller()
             throws Exception {
@@ -145,6 +153,7 @@ class SecurityFilterChainIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @DisplayName("서비스 키로 호출자를 식별하고 도메인별 허용 작업을 적용한다")
     @Test
     void serviceIdentityComesFromKeyAndDomainOperationAllowlistIsEnforced() throws Exception {
         mvc.perform(

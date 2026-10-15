@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -85,8 +86,9 @@ class OrderCancellationConcurrencyTest
         salesRepository.deleteAll();
     }
 
+    @DisplayName("같은 주문의 동시 취소 요청 두 건은 한쪽만 성공한다")
     @RepeatedTest(3)
-    void 동일_주문에_동시_취소_요청_2건은_한쪽만_성공() throws Exception {
+    void allowsOnlyOneConcurrentCancellation() throws Exception {
         int threads = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -130,8 +132,9 @@ class OrderCancellationConcurrencyTest
         assertThat(finalStock.getReserved()).isZero();
     }
 
+    @DisplayName("취소와 결제 시작을 동시에 요청하면 한쪽만 성공한다")
     @RepeatedTest(3)
-    void 취소와_결제_시작_동시_요청시_정확히_한쪽만_성공() throws Exception {
+    void allowsExactlyOneOfConcurrentCancellationAndPaymentStart() throws Exception {
         Long orderId = orderRepository.findByOrderNumber(orderNumber).orElseThrow().getId();
 
         ExecutorService executor = Executors.newFixedThreadPool(2);

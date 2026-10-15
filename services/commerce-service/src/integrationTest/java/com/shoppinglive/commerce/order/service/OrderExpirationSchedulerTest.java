@@ -13,6 +13,7 @@ import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,8 +71,9 @@ class OrderExpirationSchedulerTest
                 expiresAt);
     }
 
+    @DisplayName("기한이 지난 PENDING 주문만 EXPIRED로 변경하고 재고를 복구한다")
     @Test
-    void 만료된_PENDING_주문만_EXPIRED_로_전이되고_재고_복구() {
+    void expiresOnlyOverduePendingOrdersAndRestoresStock() {
         Order expired =
                 orderRepository.save(buildOrder("OD-EXPIRED-1", 1, Instant.now().minusSeconds(60)));
         Order stillPending =
@@ -96,8 +98,9 @@ class OrderExpirationSchedulerTest
         assertThat(stock.getReserved()).isEqualTo(1);
     }
 
+    @DisplayName("스케줄러를 두 번 실행해도 재고를 중복 복구하지 않는다")
     @Test
-    void 스케줄러_두_번_실행해도_이중_복구_없음() {
+    void doesNotRestoreStockTwiceAcrossSchedulerRuns() {
         orderRepository.save(buildOrder("OD-EXPIRED-2", 1, Instant.now().minusSeconds(60)));
 
         scheduler.processExpiredOrders();

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -20,6 +21,7 @@ class RefundExecutionConcurrencyPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
     @Autowired RefundExecutionService executions;
 
+    @DisplayName("환불 요청 하나를 동시에 실행해도 게이트웨이 결과 하나만 생성한다")
     @Test
     void concurrentExecutionOfOneRequestCreatesOneGatewayResult() throws Exception {
         var group = createAndPay();

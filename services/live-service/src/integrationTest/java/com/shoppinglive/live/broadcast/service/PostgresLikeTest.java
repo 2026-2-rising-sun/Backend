@@ -8,6 +8,7 @@ import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -51,6 +52,7 @@ class PostgresLikeTest extends LiveSecuritySupport {
         }
     }
 
+    @DisplayName("같은 회원의 동일·다른 키 동시 요청은 좋아요 한 번만 집계한다")
     @Test
     void concurrentSameKeyAndDistinctKeysCountOneMemberOnce() throws Exception {
         final long id = live();
@@ -83,6 +85,7 @@ class PostgresLikeTest extends LiveSecuritySupport {
         assertThat(likes.mine(id, member).stateVersion()).isEqualTo(1);
     }
 
+    @DisplayName("여러 회원의 좋아요·취소가 동시에 실행되어도 정확한 합계를 유지한다")
     @Test
     void concurrentDistinctMembersAndCancelsKeepExactAggregate() throws Exception {
         final long id = live();
@@ -117,6 +120,7 @@ class PostgresLikeTest extends LiveSecuritySupport {
                 .isZero();
     }
 
+    @DisplayName("과거 요청 재전송은 취소한 좋아요를 되살리지 않고 키 범위는 독립적이다")
     @Test
     void oldReplayNeverRestoresCancelledLikeAndKeyScopeIsIndependent() {
         final long id = live(), other = live();
@@ -135,11 +139,12 @@ class PostgresLikeTest extends LiveSecuritySupport {
         assertThat(likes.total(other).total()).isEqualTo(1);
     }
 
+    @DisplayName("요청 이력 저장에 실패하면 회원 상태와 합계도 롤백한다")
     @Test
     void failedLedgerWriteRollsBackTheStateAndAggregate() {
         final long id = live();
         final String member = UUID.randomUUID().toString();
-        // Fail the final transaction step after both member state and aggregate were changed.
+        // 회원 상태와 합계가 모두 바뀐 뒤 마지막 저장 단계에서 실패하도록 한다.
         jdbc.execute(
                 "ALTER TABLE broadcast_like_request ADD CONSTRAINT test_reject_like_ledger CHECK (broadcast_id <> "
                         + id
@@ -163,6 +168,7 @@ class PostgresLikeTest extends LiveSecuritySupport {
         }
     }
 
+    @DisplayName("종료된 방송은 기록된 좋아요 결과만 반환한다")
     @Test
     void endedBroadcastAllowsOnlyRecordedResults() throws Exception {
         final long id = live();

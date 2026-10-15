@@ -146,6 +146,7 @@ class LikeRealtimeRedisTest extends LiveSecuritySupport {
         return data;
     }
 
+    @DisplayName("좋아요 취소는 더 높은 버전으로 감소한 합계를 발행한다")
     @Test
     void cancellationPublishesLowerTotalWithHigherVersion() throws Exception {
         final long id = broadcast("likes-realtime", "LIVE", null);
@@ -164,6 +165,7 @@ class LikeRealtimeRedisTest extends LiveSecuritySupport {
         }
     }
 
+    @DisplayName("방송 종료는 커밋된 합계를 유지하고 연결을 닫는다")
     @Test
     void endKeepsCommittedTotalAndClosesConnections() throws Exception {
         final long id = broadcast("likes-end", "LIVE", null);

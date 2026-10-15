@@ -91,6 +91,7 @@ class MemberJwtDecoderTest {
                 .isInstanceOf(AccessSessionUnavailableException.class);
     }
 
+    @DisplayName("필수 JWT 클레임이 잘못되면 토큰을 거절한다")
     @TestFactory
     Stream<DynamicTest> rejectsInvalidRequiredClaims() {
         Instant now = Instant.now();

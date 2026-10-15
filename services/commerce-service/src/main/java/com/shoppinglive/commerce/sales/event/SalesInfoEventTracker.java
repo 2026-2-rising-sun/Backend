@@ -14,9 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * Collects final per-sale snapshots inside the owning transaction, then sends only after commit.
- */
+/** 업무 트랜잭션 안에서 판매별 최종 스냅샷을 수집하고 커밋 후에만 발행한다. */
 @Component
 public class SalesInfoEventTracker {
     private final JdbcTemplate jdbc;
@@ -28,7 +26,7 @@ public class SalesInfoEventTracker {
         this.producer = producer;
     }
 
-    /** Must precede every price/status/stock mutation. Matches the existing purchase lock order. */
+    /** 기존 구매 잠금 순서를 유지하도록 가격·상태·재고 변경 전에 호출한다. */
     public void watch(long salesId) {
         Pending pending = pending();
         if (pending.before.containsKey(salesId)) return;
@@ -46,7 +44,7 @@ public class SalesInfoEventTracker {
         pending.before.put(salesId, snapshot(salesId));
     }
 
-    /** Called after inserting both sales_info and sales_stock in the registration transaction. */
+    /** 등록 트랜잭션에서 판매정보와 재고를 모두 저장한 뒤 호출한다. */
     public void registered(long salesId) {
         pending().before.put(salesId, null);
     }
@@ -55,10 +53,9 @@ public class SalesInfoEventTracker {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()
                 || TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
-            throw new IllegalStateException("Sales events require an active writable transaction");
+            throw new IllegalStateException("판매 이벤트 수집에는 쓰기 가능한 활성 트랜잭션이 필요합니다.");
         }
-        // Synchronizations are suspended with REQUIRES_NEW, so collection never leaks between
-        // transactions.
+        // REQUIRES_NEW에서 기존 동기화가 중단되므로 트랜잭션별 수집 상태가 섞이지 않는다.
         for (TransactionSynchronization synchronization :
                 TransactionSynchronizationManager.getSynchronizations()) {
             if (synchronization instanceof Pending pending && pending.owner() == this)
@@ -116,7 +113,7 @@ public class SalesInfoEventTracker {
                     if (jdbc.update(
                                     "UPDATE sales_info SET snapshot_version=snapshot_version+1 WHERE id=?",
                                     entry.getKey())
-                            != 1) throw new IllegalStateException("Sales snapshot disappeared");
+                            != 1) throw new IllegalStateException("판매정보 스냅샷이 사라졌습니다.");
                     current = snapshot(entry.getKey());
                 }
                 Instant occurredAt = Instant.now();

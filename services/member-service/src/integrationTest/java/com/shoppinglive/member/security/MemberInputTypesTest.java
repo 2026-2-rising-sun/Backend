@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.shoppinglive.member.auth.service.MemberLoginService;
 import com.shoppinglive.member.members.service.MemberService;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -19,6 +20,7 @@ class MemberInputTypesTest extends MemberAuthTestSupport {
     @Autowired MemberService memberService;
     @Autowired MemberLoginService loginService;
 
+    @DisplayName("가입 시 숫자 비밀번호와 문자열이 아닌 이름을 거절하고 회원을 생성하지 않는다")
     @Test
     void signupRejectsNumericPasswordAndNonStringNamesWithoutCreatingMembers() throws Exception {
         for (Map<String, Object> body :
@@ -54,6 +56,7 @@ class MemberInputTypesTest extends MemberAuthTestSupport {
         assertThat(members.count()).isZero();
     }
 
+    @DisplayName("잘못된 문자열 자료형은 인증 확인 전에 400으로 거절하고 회원·세션을 변경하지 않는다")
     @Test
     void invalidStringTypesAre400BeforeCredentialChecksAndDoNotMutateMemberOrSessions()
             throws Exception {

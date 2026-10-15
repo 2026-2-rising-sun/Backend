@@ -24,6 +24,7 @@ import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -127,6 +128,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isEqualTo(1);
     }
 
+    @DisplayName("승인 응답이 유실되면 예약을 유지하고 재승인 없이 기존 승인을 반영한다")
     @Test
     void lostSuccessResponseKeepsReservationsAndExistingApprovalAppliesWithoutRetry() {
         var p = start(PaymentScenario.SUCCESS_RESPONSE_LOST);
@@ -148,6 +150,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         assertThat(service.resolvePayment(p.getId())).isFalse();
     }
 
+    @DisplayName("실패 응답이 유실되면 확정 실패를 조회할 때까지 예약을 해제하지 않는다")
     @Test
     void lostFailureResponseDoesNotReleaseUntilAuthoritativeFailureIsRead() {
         var p = start(PaymentScenario.FAILURE_RESPONSE_LOST);
@@ -162,6 +165,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
                 .isEqualTo(PaymentStatus.FAILED);
     }
 
+    @DisplayName("실행 네 번이 실패하면 한도를 소진하고 저장소 재생성 후에는 조회만 수행한다")
     @Test
     void fourFailedInvocationsExhaustBudgetAndRecreatedStoreOnlyQueries() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
@@ -197,6 +201,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
                 .isBetween(55.0, 60.0);
     }
 
+    @DisplayName("한도 소진 후 조회에 실패해도 1분 간격을 유지하고 새 실행을 하지 않는다")
     @Test
     void queryFailureAtExhaustionKeepsOneMinuteIntervalAndDoesNotExecute() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
@@ -218,6 +223,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
                 .isBetween(55.0, 60.0);
     }
 
+    @DisplayName("업무 반영이 롤백되어도 승인을 보존하고 실행 횟수를 추가 소비하지 않는다")
     @Test
     void approvalSurvivesBusinessRollbackAndDoesNotConsumeAnotherInvocation() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
@@ -243,6 +249,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         assertThat(coupon()).isEqualTo("USED");
     }
 
+    @DisplayName("최종 저장 시 작업 토큰이 만료되면 주문·재고·쿠폰 반영을 롤백하고 승인은 보존한다")
     @Test
     void tokenExpiryAtFinalWriteRollsBackOrderStockCouponAndRetainsApproval() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
@@ -266,6 +273,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
     }
 
+    @DisplayName("실행 중단은 제공자 호출 전에 실행 예산 한 번을 소비한다")
     @Test
     void interruptedInvocationConsumesOneBudgetSlotBeforeProviderIsCalled() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
@@ -287,6 +295,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
 
     @Autowired PaymentDelayReconciler scanner;
 
+    @DisplayName("스캐너는 만료된 처리 임대를 복구하고 저장된 승인을 한 번만 반영한다")
     @Test
     void scannerRecoversExpiredProcessingLeaseAndAppliesExistingApprovalOnlyOnce() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
@@ -310,6 +319,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
                 .isZero();
     }
 
+    @DisplayName("한도 소진 후 스캐너는 새 승인 없이 조회하고 다음 실행을 1분 뒤로 예약한다")
     @Test
     void scannerAtExhaustionQueriesWithoutNewAuthorizationAndSchedulesOneMinute() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);

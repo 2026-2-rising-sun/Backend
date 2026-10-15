@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,6 +58,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
         images.deleteAll();
     }
 
+    @DisplayName("내부 단건·일괄 상품 조회는 판매자 소유자를 반환한다")
     @Test
     void internalSingleAndBulkLookupExposeOwner() throws Exception {
         JsonNode result = register("owner-key");
@@ -74,6 +76,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(jsonPath("$.data[0].sellerId").value(JwtTestTokens.SELLER));
     }
 
+    @DisplayName("본인 상품 목록은 타인·소유자 없는 상품을 제외하고 기존 조회는 유지한다")
     @Test
     void sellerListExcludesOtherAndUnassignedProductsAndRetainsLegacyLookup() throws Exception {
         register("owned-key");
@@ -81,7 +84,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 products.saveAndFlush(new Product("legacy", "legacy", imageId, "legacy-key"));
         products.saveAndFlush(
                 new Product("other", "other", imageId, "other-key", JwtTestTokens.MEMBER_A));
-        mvc.perform(get("/v1/seller/products").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.items[0].name").value("owned"));
@@ -93,6 +96,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
         assertThat(products.findById(legacy.getId()).orElseThrow().getSellerId()).isNull();
     }
 
+    @DisplayName("본인 상품 목록은 판매자 권한과 유효한 페이지를 요구한다")
     @Test
     void ownListRequiresSellerAndValidPagination() throws Exception {
         mvc.perform(get("/v1/seller/products")).andExpect(status().isUnauthorized());
@@ -100,33 +104,64 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isForbidden());
         mvc.perform(
                         get("/v1/seller/products")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("size", "101"))
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("offset 범위 초과를 거절하고 최대 지원 offset은 허용한다")
     @Test
     void rejectsOffsetOverflowAndAcceptsLargestSupportedOffset() throws Exception {
         mvc.perform(
                         get("/v1/seller/products")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("page", "2147483647")
                                 .param("size", "100"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         mvc.perform(
                         get("/v1/seller/products")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("page", "2147483647")
                                 .param("size", "1"))
                 .andExpect(status().isOk());
     }
 
+    @Test
+    @DisplayName("판매자 상세는 본인 상품만 열고, 남의 상품과 소유자 없는 상품은 존재 여부를 숨기도록 404 를 준다")
+    void sellerDetailOpensOnlyOwnProduct() throws Exception {
+        long own = register("detail-own-key").path("productId").asLong();
+        long other =
+                products.saveAndFlush(
+                                new Product(
+                                        "other",
+                                        "other",
+                                        imageId,
+                                        "detail-other-key",
+                                        JwtTestTokens.MEMBER_A))
+                        .getId();
+        long unassigned =
+                products.saveAndFlush(new Product("legacy", "legacy", imageId, "detail-legacy-key"))
+                        .getId();
+
+        mvc.perform(get("/v1/seller/products/{id}", own).header("Authorization", sellerBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("owned"));
+        // 남의 상품도 "없는 상품"과 같은 상태 코드·오류 코드여야 다른 판매자의 상품 ID 존재 여부가 드러나지 않는다.
+        for (long hidden : new long[] {other, unassigned, Long.MAX_VALUE}) {
+            mvc.perform(
+                            get("/v1/seller/products/{id}", hidden)
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+        }
+    }
+
     private JsonNode register(String key) throws Exception {
         String result =
                 mvc.perform(
-                                post("/v1/admin/products")
-                                        .header("Authorization", adminBearer())
+                                post("/v1/seller/products")
+                                        .header("Authorization", sellerBearer())
                                         .header("X-Idempotency-Key", key)
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(

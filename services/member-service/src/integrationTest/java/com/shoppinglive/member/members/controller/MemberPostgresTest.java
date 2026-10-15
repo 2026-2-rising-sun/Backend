@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.members.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,6 +14,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,9 +22,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 /** 실제 PostgreSQL의 마이그레이션·DB 제약을 검증한다. H2 성공으로 이 검증을 대신하지 않는다. */
 @Tag("postgres")
-class MemberPostgresTest extends MemberServiceApplicationTests {
+class MemberPostgresTest extends MemberControllerTest {
     @Autowired MemberService service;
 
+    @DisplayName("실제 PostgreSQL 마이그레이션과 DB 제약을 검증한다")
     @Test
     @Tag("migration")
     void validatesRealPostgresMigrationAndDatabaseConstraints() {
@@ -44,6 +46,7 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @DisplayName("중복 회원가입이 동시에 실행되면 하나만 생성하고 다른 요청은 충돌로 응답한다")
     @Test
     void concurrentDuplicateSignupCreatesOneMemberAndReturnsConflictForLoser() throws Exception {
         var ready = new CountDownLatch(2);
@@ -83,6 +86,7 @@ class MemberPostgresTest extends MemberServiceApplicationTests {
                 role);
     }
 
+    @DisplayName("판매자 초기화는 새 판매자만 생성하고 기존 회원을 승격하지 않는다")
     @Test
     void bootstrapOnlyCreatesNewAdminAndNeverPromotesExistingUser() {
         service.register("user@example.com", "password123", "user");

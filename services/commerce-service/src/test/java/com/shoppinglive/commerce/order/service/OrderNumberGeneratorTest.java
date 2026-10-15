@@ -15,8 +15,8 @@ class OrderNumberGeneratorTest {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Test
-    @DisplayName("포맷은 OD 날짜8자리 일련번호6자리")
-    void generate_포맷은_OD_날짜8자리_일련번호6자리() {
+    @DisplayName("주문번호는 OD 접두사·날짜 8자리·일련번호 6자리로 생성한다")
+    void generatesOrderNumberWithPrefixDateAndSixDigitSequence() {
         OrderNumberGenerator generator =
                 new OrderNumberGenerator(Clock.fixed(Instant.parse("2026-09-20T03:00:00Z"), KST));
 
@@ -28,8 +28,8 @@ class OrderNumberGeneratorTest {
      * 사용자가 보는 주문 일자와 맞는다.
      */
     @Test
-    @DisplayName("날짜는 UTC가 아니라 한국시간 기준")
-    void generate_날짜는_UTC가_아니라_한국시간_기준() {
+    @DisplayName("주문번호의 날짜는 한국 시간을 기준으로 생성한다")
+    void usesKoreanDateInsteadOfUtcDate() {
         OrderNumberGenerator generator =
                 new OrderNumberGenerator(Clock.fixed(Instant.parse("2026-09-19T23:30:00Z"), KST));
 
@@ -38,8 +38,8 @@ class OrderNumberGeneratorTest {
 
     /** 일련번호는 6 자리로 zero-padding 된다. 자리수가 들쭉날쭉하면 주문번호 길이가 달라져 화면·로그에서 다루기 번거롭다. */
     @Test
-    @DisplayName("일련번호는 항상 6자리로 채워진다")
-    void generate_일련번호는_항상_6자리로_채워진다() {
+    @DisplayName("주문번호의 일련번호는 6자리로 채운다")
+    void padsSequenceToSixDigits() {
         OrderNumberGenerator generator =
                 new OrderNumberGenerator(Clock.fixed(Instant.parse("2026-09-20T03:00:00Z"), KST));
 
@@ -50,8 +50,8 @@ class OrderNumberGeneratorTest {
 
     /** 유일성 자체는 DB UNIQUE 제약이 보장하지만, 생성기가 사실상 같은 값만 뱉으면 재시도가 무한 반복된다. 난수 분포가 살아있는지만 확인한다. */
     @Test
-    @DisplayName("반복 호출시 사실상 서로 다른 값")
-    void generate_반복_호출시_사실상_서로_다른_값() {
+    @DisplayName("반복 호출하면 서로 다른 주문번호를 생성한다")
+    void generatesDistinctNumbersAcrossRepeatedCalls() {
         OrderNumberGenerator generator =
                 new OrderNumberGenerator(Clock.fixed(Instant.parse("2026-09-20T03:00:00Z"), KST));
 

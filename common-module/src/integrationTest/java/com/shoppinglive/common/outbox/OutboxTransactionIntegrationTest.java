@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -47,6 +48,7 @@ class OutboxTransactionIntegrationTest {
         repository.deleteAll();
     }
 
+    @DisplayName("호출 트랜잭션이 커밋되면 이벤트를 발행하고 별도 트랜잭션에 발행 표시를 저장한다")
     @Test
     void committedAppendPublishesAndPersistsMarkerOutsideCallerTransaction() {
         when(kafka.send(any(org.apache.kafka.clients.producer.ProducerRecord.class)))
@@ -62,6 +64,7 @@ class OutboxTransactionIntegrationTest {
                         });
     }
 
+    @DisplayName("전송에 실패하면 커밋된 업무를 유지하고 재시도 상태를 저장한다")
     @Test
     void failedSendPersistsRetryStateWithoutFailingCommittedAppend() {
         when(kafka.send(any(org.apache.kafka.clients.producer.ProducerRecord.class)))
@@ -79,6 +82,7 @@ class OutboxTransactionIntegrationTest {
                         });
     }
 
+    @DisplayName("호출 트랜잭션이 롤백되면 Outbox 행을 남기지 않는다")
     @Test
     void rollbackDoesNotLeaveAnOutboxRow() {
         new TransactionTemplate(manager)

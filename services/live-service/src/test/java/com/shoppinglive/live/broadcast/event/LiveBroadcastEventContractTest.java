@@ -12,6 +12,7 @@ import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class LiveBroadcastEventContractTest {
@@ -23,6 +24,7 @@ class LiveBroadcastEventContractTest {
                     .registerModule(new JavaTimeModule())
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+    @DisplayName("실제 직렬화한 프로모션 이벤트를 YAML 검증 표본으로 내보낸다")
     @Test
     void exportsActualSerializedPromotionEventsForYamlValidation() throws Exception {
         var directory = java.nio.file.Path.of("build/contract-samples");
@@ -45,6 +47,7 @@ class LiveBroadcastEventContractTest {
         }
     }
 
+    @DisplayName("실제 직렬화한 방송 이벤트를 YAML 계약 검증 표본으로 내보낸다")
     @Test
     void exportsActualSerializedEventsForYamlContractValidation() throws Exception {
         var directory = java.nio.file.Path.of("build/contract-samples");
@@ -66,6 +69,7 @@ class LiveBroadcastEventContractTest {
         }
     }
 
+    @DisplayName("방송 시작 이벤트를 공통 봉투 안에 직렬화한다")
     @Test
     void serializesTheStartedEventInsideTheCommonEnvelope() throws Exception {
         EventEnvelope<LiveBroadcastStartedPayload> event =
@@ -103,6 +107,7 @@ class LiveBroadcastEventContractTest {
                         new TypeReference<EventEnvelope<LiveBroadcastStartedPayload>>() {}));
     }
 
+    @DisplayName("소비자가 모르는 이벤트 타입도 공통 봉투를 읽을 수 있다")
     @Test
     void consumersCanReadTheEnvelopeOfAnEventTypeTheyDoNotKnowYet() throws Exception {
         String future =
@@ -121,6 +126,7 @@ class LiveBroadcastEventContractTest {
         assertEquals("drp_1", envelope.payload().get("dropId").asText());
     }
 
+    @DisplayName("모든 방송 이벤트는 방송 ID를 키로 같은 토픽을 사용한다")
     @Test
     void definesOneTopicKeyedByBroadcastIdForEveryBroadcastEvent() {
         assertEquals("live.broadcast.v1", LiveBroadcastEventContract.TOPIC_NAME);
@@ -136,6 +142,7 @@ class LiveBroadcastEventContractTest {
                 Arrays.stream(LiveBroadcastEventType.values()).map(Enum::name).toList());
     }
 
+    @DisplayName("방송 예약 이벤트는 알림 예약 시각 계산에 필요한 정보를 담는다")
     @Test
     void scheduledEventCarriesWhatNotificationNeedsToComputeTheReminderTime() throws Exception {
         EventEnvelope<LiveBroadcastScheduledPayload> event =
@@ -156,6 +163,7 @@ class LiveBroadcastEventContractTest {
         assertEquals(0, json.at("/payload/broadcastVersion").asLong());
     }
 
+    @DisplayName("잘못된 이벤트 봉투와 payload 값을 거절한다")
     @Test
     void rejectsInvalidEnvelopeAndPayloadValues() {
         Instant now = Instant.parse("2026-10-25T12:00:00Z");

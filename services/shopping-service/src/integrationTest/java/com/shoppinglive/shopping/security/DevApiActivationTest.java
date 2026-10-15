@@ -7,6 +7,7 @@ import com.shoppinglive.shopping.product.controller.DevProductImageController;
 import com.shoppinglive.shopping.product.repository.ProductImageRepository;
 import com.shoppinglive.shopping.product.service.DevImageResetService;
 import com.shoppinglive.shopping.storage.ImageStorage;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -19,6 +20,7 @@ class DevApiActivationTest {
                 .withBean(ImageStorage.class, () -> mock(ImageStorage.class));
     }
 
+    @DisplayName("local·test에서도 명시적 플래그가 필요하고 dev 설정으로 우회할 수 없다")
     @Test
     void localOrTestAlsoRequiresExplicitFlagAndDevCannotOverrideIt() {
         for (String profile : new String[] {"local", "test"}) {

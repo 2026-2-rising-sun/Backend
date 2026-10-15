@@ -11,6 +11,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -70,6 +71,7 @@ class CouponReservationPostgresTest {
         }
     }
 
+    @DisplayName("동시 쿠폰 예약은 한 요청만 성공하고 상태 전이를 원자적으로 처리한다")
     @Test
     void oneConcurrentReservationWinsAndTransitionsAreAtomic() {
         verify(
@@ -157,6 +159,7 @@ class CouponReservationPostgresTest {
                 });
     }
 
+    @DisplayName("호출 트랜잭션이 롤백되면 쿠폰 예약도 롤백한다")
     @Test
     void reservationRollsBackWithItsCallerTransaction() {
         verify(
@@ -171,6 +174,7 @@ class CouponReservationPostgresTest {
                 });
     }
 
+    @DisplayName("행사 종료 후에도 수령한 쿠폰은 예약할 수 있지만 쿠폰 만료 후에는 거절한다")
     @Test
     void claimedCouponCanBeReservedAfterEventEndsButNotAfterCouponExpiry() {
         verify(

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -41,6 +42,7 @@ class RefundSchemaPostgresTest {
         }
     }
 
+    @DisplayName("환불 테이블은 요청·주문별 금액과 판매자 소유권 스냅샷을 유지한다")
     @Test
     void refundTablesKeepRequestAndOrderLevelAmountsAndSellerOwnershipSnapshot() {
         verify(
@@ -67,6 +69,7 @@ class RefundSchemaPostgresTest {
                 });
     }
 
+    @DisplayName("환불 금액은 0을 허용하고 상태 제약은 환불 생명주기를 포함한다")
     @Test
     void refundAmountsAllowZeroAndStatusConstraintContainsTheRefundLifecycle() {
         verify(
@@ -94,6 +97,7 @@ class RefundSchemaPostgresTest {
                 });
     }
 
+    @DisplayName("환불 요청은 멱등 키와 요청 지문을 필수로 요구한다")
     @Test
     void refundRequestsRequireIdempotencyKeyAndFingerprint() {
         verify(

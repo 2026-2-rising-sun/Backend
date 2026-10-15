@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.auth.controller;
 
 import org.junit.jupiter.api.Tag;
 

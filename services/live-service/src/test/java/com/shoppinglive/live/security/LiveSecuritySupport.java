@@ -13,10 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/**
- * Actual signatures and the production decoder/filter; no mocked Authentication or disabled
- * filters.
- */
+/** 실제 서명과 운영 검증기·필터를 사용하며 인증 객체나 필터를 우회하지 않는다. */
 @Import(LiveSecuritySupport.SessionTestConfiguration.class)
 public abstract class LiveSecuritySupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;

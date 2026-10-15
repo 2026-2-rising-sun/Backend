@@ -117,8 +117,8 @@ class PaymentServiceTest {
     // ----- startPayment (결제 1) -----
 
     @Test
-    @DisplayName("성공하면 저장하고 엔진에 예약")
-    void startPayment_성공하면_저장하고_엔진에_예약() {
+    @DisplayName("결제 시작에 성공하면 시도를 저장하고 엔진에 처리를 예약한다")
+    void storesPaymentAndSchedulesEngineAfterSuccessfulStart() {
         Order order = sampleOrder();
         given(
                         orderService.findByOrderNumberAndMemberId(
@@ -142,8 +142,8 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("전이 실패시 OrderNotEligibleForPaymentException")
-    void startPayment_전이_실패시_OrderNotEligibleForPaymentException() {
+    @DisplayName("주문 상태 전이에 실패하면 결제 시작을 거절한다")
+    void rejectsPaymentStartWhenOrderTransitionFails() {
         Order order = sampleOrder();
         given(
                         orderService.findByOrderNumberAndMemberId(
@@ -184,8 +184,8 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("FAILED 시나리오면 FAILED 전이 restoreReserved")
-    void resolvePayment_FAILED_시나리오면_FAILED_전이_restoreReserved() {
+    @DisplayName("결제 실패 결과는 FAILED로 전이하고 예약 재고를 복구한다")
+    void marksFailedPaymentAndRestoresReservedStock() {
         executeTransactionInline();
         PaymentAttempt attempt =
                 sampleAttempt(PaymentScenario.INSTANT_FAIL, PaymentStatus.PROCESSING);
@@ -202,8 +202,8 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("이미 terminal이면 no op")
-    void resolvePayment_이미_terminal이면_no_op() {
+    @DisplayName("이미 최종 상태인 결제 결과는 중복 반영하지 않는다")
+    void ignoresPaymentResolutionAfterTerminalState() {
         PaymentAttempt attempt =
                 sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.SUCCESS);
         given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
@@ -215,8 +215,8 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("조건부 UPDATE 실패시 후속 처리 스킵")
-    void resolvePayment_조건부_UPDATE_실패시_후속_처리_스킵() {
+    @DisplayName("결제 조건부 UPDATE에 실패하면 후속 처리를 생략한다")
+    void skipsFollowUpWhenConditionalPaymentUpdateFails() {
         executeTransactionInline();
         PaymentAttempt attempt =
                 sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
@@ -262,8 +262,8 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("attempt 없으면 no op")
-    void resolvePayment_attempt_없으면_no_op() {
+    @DisplayName("결제 시도가 없으면 결과 반영을 생략한다")
+    void ignoresResolutionWhenPaymentAttemptIsMissing() {
         given(paymentAttemptRepository.findById(999L)).willReturn(Optional.empty());
 
         paymentService.resolvePayment(999L);

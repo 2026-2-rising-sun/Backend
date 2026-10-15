@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,9 +67,10 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
         salesRepository.deleteAll();
     }
 
+    @DisplayName("예약에 성공하면 available이 줄고 reserved가 같은 수량만큼 늘어난다")
     @Test
     @Transactional
-    void reserve_성공하면_available은_줄고_reserved는_같은만큼_늘어난다() {
+    void movesReservedQuantityFromAvailableToReserved() {
         int updated = salesStockRepository.reserve(salesId, 2);
 
         assertThat(updated).isEqualTo(1);
@@ -80,18 +82,20 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
     /**
      * 재고 총량은 배정으로 변하지 않는다. 소유만 available 에서 reserved 로 옮겨갈 뿐이라, 관리자가 보는 "판매 가능 + 배정" 합계가 흔들리면 안 된다.
      */
+    @DisplayName("재고를 예약해도 available과 reserved의 합을 유지한다")
     @Test
     @Transactional
-    void reserve_해도_available과_reserved의_합은_보존된다() {
+    void preservesTotalStockWhenReserving() {
         salesStockRepository.reserve(salesId, 3);
 
         SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
         assertThat(stock.getAvailable() + stock.getReserved()).isEqualTo(INITIAL_AVAILABLE);
     }
 
+    @DisplayName("가용 재고보다 많은 예약은 실패하고 재고를 유지한다")
     @Test
     @Transactional
-    void reserve_available보다_많은_수량은_실패하고_재고는_그대로() {
+    void rejectsReservationAboveAvailableStockWithoutMutation() {
         int updated = salesStockRepository.reserve(salesId, INITIAL_AVAILABLE + 1);
 
         assertThat(updated).isZero();
@@ -101,9 +105,10 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
     }
 
     /** 경계값. 남은 재고를 정확히 다 가져가는 요청은 성공해야 한다. */
+    @DisplayName("가용 재고와 같은 수량의 예약은 성공한다")
     @Test
     @Transactional
-    void reserve_available과_정확히_같은_수량은_성공한다() {
+    void acceptsReservationEqualToAvailableStock() {
         int updated = salesStockRepository.reserve(salesId, INITIAL_AVAILABLE);
 
         assertThat(updated).isEqualTo(1);
@@ -112,16 +117,18 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
         assertThat(stock.getReserved()).isEqualTo(INITIAL_AVAILABLE);
     }
 
+    @DisplayName("판매 재고가 없으면 예약 UPDATE는 0을 반환한다")
     @Test
     @Transactional
-    void reserve_판매정보가_없으면_0을_반환한다() {
+    void returnsZeroWhenReservingMissingStock() {
         assertThat(salesStockRepository.reserve(-1L, 1)).isZero();
     }
 
     /** 주문 4 · 주문 5 · 결제 실패가 쓰는 복구 경로와 왕복이 맞는지 확인한다. 배정 후 복구하면 원래 상태로 정확히 돌아와야 한다. */
+    @DisplayName("예약 후 복구하면 원래 재고로 돌아온다")
     @Test
     @Transactional
-    void reserve_후_restoreReserved하면_원래_재고로_돌아온다() {
+    void restoresOriginalStockAfterReservation() {
         salesStockRepository.reserve(salesId, 2);
         int restored = salesStockRepository.restoreReserved(salesId, 2);
 
@@ -132,9 +139,10 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
     }
 
     /** 결제 성공 경로. 배정분이 소진되면 총량이 실제로 줄어든다 (판매 확정). */
+    @DisplayName("예약 후 소진하면 전체 재고 수량이 줄어든다")
     @Test
     @Transactional
-    void reserve_후_consumeReserved하면_총량이_줄어든다() {
+    void reducesTotalStockWhenConsumingReservation() {
         salesStockRepository.reserve(salesId, 2);
         int consumed = salesStockRepository.consumeReserved(salesId, 2);
 
@@ -148,8 +156,9 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
      * P1 통합 완료 기준: "재고 5개에 수량 1개 주문 10건 동시 요청 → 성공 최대 5건, 재고 음수 안 됨". 주문 유스케이스를 붙이기 전에 쿼리 계층에서 먼저
      * 보장되는지 확인한다.
      */
+    @DisplayName("재고 5개에 수량 1개의 예약을 10건 동시 요청하면 최대 5건 성공한다")
     @RepeatedTest(3)
-    void 재고_5에_수량_1_배정_10건_동시요청시_성공은_최대_5건() throws Exception {
+    void allowsAtMostFiveOneItemReservationsAcrossTenRequests() throws Exception {
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         CountDownLatch startGate = new CountDownLatch(1);

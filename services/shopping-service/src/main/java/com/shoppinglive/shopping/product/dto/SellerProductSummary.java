@@ -9,7 +9,7 @@ import java.time.Instant;
  * @param price 판매정보가 없거나({@code NOT_REGISTERED}) 조회에 실패하면({@code UNKNOWN}) {@code null}
  * @param available price 와 같은 규칙
  */
-public record AdminProductSummary(
+public record SellerProductSummary(
         Long productId,
         String name,
         String mainImageUrl,

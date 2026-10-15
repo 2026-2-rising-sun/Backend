@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -94,8 +95,9 @@ class OrderCreationConcurrencyTest
      * 실패한 요청은 "재고 부족" 또는 "품절" 중 하나를 받는다. 두 가지가 되는 이유: 재고를 정확히 소진시킨 주문이 판매 상태를 품절로 바꾸기 때문에, 그 뒤에 도착한
      * 요청은 재고 조건에 닿기도 전에 판매 상태에서 먼저 걸린다. 사용자에게는 둘 다 "지금 살 수 없다" 로 같다.
      */
+    @DisplayName("재고 5개에 10명이 동시에 주문하면 5명만 성공한다")
     @RepeatedTest(3)
-    void 재고_5에_10명이_동시_주문하면_5명만_성공하고_나머지는_주문_불가() throws Exception {
+    void allowsFiveOrdersAmongTenConcurrentRequestsForFiveItems() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneGate = new CountDownLatch(THREADS);
@@ -147,8 +149,9 @@ class OrderCreationConcurrencyTest
     }
 
     /** 재고를 정확히 소진하면 판매 상태가 품절로 바뀌어야 한다. 남아 있으면 공개 목록에 "판매 중" 으로 뜨는데 정작 아무도 못 사는 상태가 된다. */
+    @DisplayName("재고가 모두 예약되면 품절로 전이한다")
     @RepeatedTest(3)
-    void 재고가_모두_소진되면_품절로_전이된다() throws Exception {
+    void marksSaleSoldOutWhenAllStockIsReserved() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneGate = new CountDownLatch(THREADS);
@@ -178,8 +181,9 @@ class OrderCreationConcurrencyTest
     }
 
     /** 같은 멱등키로 동시에 들어온 요청은 주문 한 건만 만들고 재고도 한 번만 잡아야 한다. 사용자가 버튼을 연타하거나 네트워크 재전송이 겹치는 상황이다. */
+    @DisplayName("같은 멱등 키로 동시에 요청해도 주문 한 건만 생성한다")
     @RepeatedTest(3)
-    void 같은_멱등키_동시_요청은_주문_한건만_만든다() throws Exception {
+    void createsOneOrderForConcurrentIdempotentRequests() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(THREADS);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneGate = new CountDownLatch(THREADS);

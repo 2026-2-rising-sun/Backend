@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -59,6 +60,7 @@ class CouponManagementPostgresTest {
         return client;
     }
 
+    @DisplayName("동시에 수정되어도 쿠폰 상세의 정의와 대상 상품은 같은 스냅샷을 유지한다")
     @Test
     void detailKeepsDefinitionAndTargetsInOneSnapshotAcrossConcurrentEdit() {
         verify(
@@ -124,6 +126,7 @@ class CouponManagementPostgresTest {
                 });
     }
 
+    @DisplayName("PostgreSQL에서 같은 버전으로 동시에 수정하면 한 요청만 성공한다")
     @Test
     void concurrentVersionsHaveOneWinnerOnPostgres() {
         verify(

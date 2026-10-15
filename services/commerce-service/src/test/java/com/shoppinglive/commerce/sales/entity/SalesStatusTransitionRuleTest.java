@@ -2,6 +2,7 @@ package com.shoppinglive.commerce.sales.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -12,6 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 class SalesStatusTransitionRuleTest {
 
+    @DisplayName("판매 상태는 전이표에 정의된 전이만 허용한다")
     @ParameterizedTest(name = "{0} -> {1} = {2}")
     @CsvSource({
         // READY 에서
@@ -35,10 +37,12 @@ class SalesStatusTransitionRuleTest {
         "PRIVATE, PRIVATE, false",
         "PRIVATE, READY, false",
     })
-    void canTransitionTo_전이표대로(SalesStatus from, SalesStatus to, boolean allowed) {
+    void allowsOnlyTransitionsDefinedInStatusTable(
+            SalesStatus from, SalesStatus to, boolean allowed) {
         assertThat(from.canTransitionTo(to)).isEqualTo(allowed);
     }
 
+    @DisplayName("관리자는 ON_SALE과 PRIVATE만 직접 지정할 수 있다")
     @ParameterizedTest(name = "{0}.isAdminChangeable() = {1}")
     @CsvSource({
         "READY, false",
@@ -46,7 +50,8 @@ class SalesStatusTransitionRuleTest {
         "SOLD_OUT, false",
         "PRIVATE, true",
     })
-    void isAdminChangeable_ON_SALE와_PRIVATE만(SalesStatus status, boolean adminChangeable) {
+    void allowsOnlyOnSaleAndPrivateAsAdministrativeTargets(
+            SalesStatus status, boolean adminChangeable) {
         assertThat(status.isAdminChangeable()).isEqualTo(adminChangeable);
     }
 }

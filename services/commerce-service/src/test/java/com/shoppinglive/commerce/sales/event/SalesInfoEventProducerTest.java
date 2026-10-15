@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -30,6 +31,7 @@ class SalesInfoEventProducerTest {
                     Instant.now(),
                     new SalesInfoSnapshot(42, 7, 3, 1000, SalesInfoStatus.ON_SALE, 2, "KRW"));
 
+    @DisplayName("계약 토픽과 판매 ID 키로 이벤트를 발행한다")
     @Test
     void publishesUsingContractTopicAndSalesIdKey() {
         when(kafka.send(eq("commerce.sales-info.v1"), eq("42"), any()))
@@ -38,6 +40,7 @@ class SalesInfoEventProducerTest {
         verify(kafka).send("commerce.sales-info.v1", "42", event);
     }
 
+    @DisplayName("동기·비동기 전송 실패는 로그에 남기고 커밋된 요청을 실패시키지 않는다")
     @Test
     void synchronousAndAsynchronousFailuresAreLoggedWithoutFailingCommittedRequest(
             CapturedOutput output) {
@@ -58,6 +61,7 @@ class SalesInfoEventProducerTest {
                         "async failure");
     }
 
+    @DisplayName("전송이 비활성화되면 Kafka에 연결하지 않는다")
     @Test
     void disabledTransportNeverConnectsToKafka() {
         new SalesInfoEventProducer(kafka, false).send(event);

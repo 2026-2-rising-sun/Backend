@@ -10,11 +10,13 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class CouponEventContractTest {
+    @DisplayName("실제 쿠폰 봉투·스냅샷 직렬화 표본을 YAML 검사에 제공한다")
     @Test
-    void 실제_봉투와_스냅샷_직렬화_표본을_YAML_검사에_제공한다() throws Exception {
+    void exportsSerializedCouponEnvelopeAndSnapshotForYamlValidation() throws Exception {
         var mapper =
                 new ObjectMapper()
                         .findAndRegisterModules()

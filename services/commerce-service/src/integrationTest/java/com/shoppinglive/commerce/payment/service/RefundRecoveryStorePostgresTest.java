@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -95,6 +96,7 @@ class RefundRecoveryStorePostgresTest {
         }
     }
 
+    @DisplayName("마이그레이션은 기존 업무 데이터를 보존하고 환불 복구 메타데이터를 제한한다")
     @Test
     @Tag("migration")
     void migrationPreservesLegacyBusinessDataAndConstrainsRecoveryMetadata() {
@@ -128,6 +130,7 @@ class RefundRecoveryStorePostgresTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @DisplayName("작업자가 동시에 실행되면 한 명만 소유권을 얻는다")
     @Test
     void simultaneousWorkersAcquireExactlyOneOwner() throws Exception {
         var start = new CountDownLatch(1);
@@ -160,6 +163,7 @@ class RefundRecoveryStorePostgresTest {
                 .isEqualTo("UNKNOWN");
     }
 
+    @DisplayName("잠긴 환불 요청이 기한에 도달한 다른 요청을 막지 않는다")
     @Test
     void lockedRequestDoesNotBlockAnotherDueRequest() throws Exception {
         var locked = new CountDownLatch(1);
@@ -199,6 +203,7 @@ class RefundRecoveryStorePostgresTest {
         }
     }
 
+    @DisplayName("만료된 임대를 다시 선점하면 이전 소유자의 갱신·재예약을 거절한다")
     @Test
     void expiredLeaseIsReclaimedAndOldOwnerCannotRenewOrReschedule() {
         Lease old = store.claim(2, LEASE).orElseThrow();
@@ -216,6 +221,7 @@ class RefundRecoveryStorePostgresTest {
         assertThat(store.release(current, Duration.ZERO)).isTrue();
     }
 
+    @DisplayName("예정 시각 전이거나 최종 상태인 요청은 선점하지 않는다")
     @Test
     void futureActionsAndTerminalRequestsAreNotClaimed() {
         Lease owner = store.claim(1, LEASE).orElseThrow();
@@ -227,6 +233,7 @@ class RefundRecoveryStorePostgresTest {
         assertThat(store.renew(owner, LEASE)).isFalse();
     }
 
+    @DisplayName("커밋된 임대는 호출자 롤백과 7일 후 저장소 재생성에도 유지된다")
     @Test
     void committedLeaseSurvivesCallerRollbackAndStoreRecreationAfterSevenDays() {
         var tx = new TransactionTemplate(manager);

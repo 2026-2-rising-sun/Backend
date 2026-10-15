@@ -148,8 +148,8 @@ class ProductHttpContractTest extends ShoppingSecuritySupport {
     @DisplayName("깨진 JSON은 400 INVALID_REQUEST이며 상품을 만들지 않는다")
     void malformedJsonReturnsBadRequestWithoutMutation() throws Exception {
         mvc.perform(
-                        post("/v1/admin/products")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/products")
+                                .header("Authorization", sellerBearer())
                                 .header("X-Idempotency-Key", "malformed")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{"))
@@ -177,8 +177,8 @@ class ProductHttpContractTest extends ShoppingSecuritySupport {
 
         String updated =
                 mvc.perform(
-                                patch("/v1/admin/products/{id}", id)
-                                        .header("Authorization", adminBearer())
+                                patch("/v1/seller/products/{id}", id)
+                                        .header("Authorization", sellerBearer())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
                                                 mapper.writeValueAsString(
@@ -196,8 +196,8 @@ class ProductHttpContractTest extends ShoppingSecuritySupport {
         assertThat(updatedVersion).isGreaterThan(originalVersion);
 
         mvc.perform(
-                        patch("/v1/admin/products/{id}", id)
-                                .header("Authorization", adminBearer())
+                        patch("/v1/seller/products/{id}", id)
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         mapper.writeValueAsString(
@@ -230,8 +230,8 @@ class ProductHttpContractTest extends ShoppingSecuritySupport {
     private JsonNode register() throws Exception {
         String response =
                 mvc.perform(
-                                post("/v1/admin/products")
-                                        .header("Authorization", adminBearer())
+                                post("/v1/seller/products")
+                                        .header("Authorization", sellerBearer())
                                         .header("X-Idempotency-Key", "product-http-contract")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
