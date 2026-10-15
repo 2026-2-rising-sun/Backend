@@ -19,12 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 
-/** postgresTest 작업은 PostgreSQL URL이 없으면 실패한다. H2 성공으로 이 검증을 대신하지 않는다. */
+/** 실제 PostgreSQL의 마이그레이션·DB 제약을 검증한다. H2 성공으로 이 검증을 대신하지 않는다. */
 @Tag("postgres")
 class MemberPostgresTest extends MemberServiceApplicationTests {
     @Autowired MemberService service;
 
     @Test
+    @Tag("migration")
     void validatesRealPostgresMigrationAndDatabaseConstraints() {
         assertThat(jdbc.queryForObject("SELECT version()", String.class)).contains("PostgreSQL");
         assertThat(jdbc.queryForObject("SELECT current_schema()", String.class))

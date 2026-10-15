@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1330" viewBox="0 0 1440 1330" role="img" aria-labelledby="title desc">
+<title id="title">ShoppingLive · Service Communication</title><desc id="desc">실선은 HTTP 요청 방향, 점선은 Kafka 이벤트 전달 방향을 나타낸다</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#64748b"/></marker><marker id="event" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b45309"/></marker></defs>
+<style>text{font-family:"Apple SD Gothic Neo","Noto Sans KR",sans-serif;fill:#172b45} .muted{fill:#52657e} .title{font-weight:700} .mono{font-family:Menlo,monospace}</style>
+<rect width="1440" height="1330" fill="#f7f9fc"/>
+<rect x="0" y="0" width="1440" height="8" fill="#2563eb"/>
+<text x="48" y="70" font-size="38" class="title">ShoppingLive · Service Communication</text>
+<text x="48" y="111" font-size="21" class="muted">실선은 HTTP 요청 방향, 점선은 Kafka 이벤트 전달 방향을 나타낸다</text>
+<rect x="32" y="146" width="1376" height="398" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="60" y="189" font-size="27" text-anchor="start" class="title">01  HTTP · 서비스 간 조회와 세션 확인</text>
+<rect x="70" y="235" width="280" height="68" rx="16" fill="#f4efff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="210.0" y="278" font-size="26" text-anchor="middle" style="fill:#7c3aed" class="title">Live</text>
+<rect x="570" y="235" width="300" height="68" rx="16" fill="#eef4ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="720.0" y="278" font-size="26" text-anchor="middle" style="fill:#2563eb" class="title">Shopping</text>
+<rect x="1070" y="235" width="300" height="68" rx="16" fill="#fff4e9" stroke="#c05b12" stroke-width="1.5"/>
+<text x="1220.0" y="278" font-size="26" text-anchor="middle" style="fill:#c05b12" class="title">Commerce</text>
+<rect x="1070" y="425" width="300" height="68" rx="16" fill="#fff0f6" stroke="#be185d" stroke-width="1.5"/>
+<text x="1220.0" y="468" font-size="26" text-anchor="middle" style="fill:#be185d" class="title">Notification</text>
+<rect x="570" y="425" width="300" height="68" rx="16" fill="#eaf8f5" stroke="#0f766e" stroke-width="1.5"/>
+<text x="720.0" y="468" font-size="26" text-anchor="middle" style="fill:#0f766e" class="title">Member</text>
+<path d="M310 235 V217 H1220 V233" fill="none" stroke="#64748b" stroke-width="2.3"/>
+<polygon points="1220.0,233.0 1215.0,221.0 1225.0,221.0" fill="#64748b"/>
+<text x="980" y="208" font-size="18" text-anchor="middle">Live → Commerce · 판매정보</text>
+<path d="M350 263 H568" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="568.0,263.0 556.0,268.0 556.0,258.0" fill="#64748b"/>
+<text x="455" y="249" font-size="19" text-anchor="middle">상품 기본정보</text>
+<path d="M870 277 H1068" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="1068.0,277.0 1056.0,282.0 1056.0,272.0" fill="#64748b"/>
+<text x="970" y="263" font-size="18" text-anchor="middle">판매정보 조회</text>
+<path d="M1218 303 V365 H720 V305" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="720.0,305.0 725.0,317.0 715.0,317.0" fill="#64748b"/>
+<text x="963" y="351" font-size="19" text-anchor="middle">상품 검증 · 스냅샷</text>
+<path d="M210 303 V390 H620 V423" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="620.0,423.0 615.0,411.0 625.0,411.0" fill="#64748b"/>
+<text x="335" y="381" font-size="18" text-anchor="start">회원 표시 이름</text>
+<path d="M1070 459 H872" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="872.0,459.0 884.0,454.0 884.0,464.0" fill="#64748b"/>
+<text x="969" y="443" font-size="18" text-anchor="middle">세션 확인</text>
+<text x="60" y="518" font-size="21" text-anchor="start" style="fill:#52657e">Shopping · Commerce · Live · Notification은 인증된 사용자 요청에서 Member에 세션 상태를 확인한다.</text>
+<rect x="32" y="572" width="1376" height="480" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="60" y="617" font-size="27" text-anchor="start" class="title">02  Kafka · 발행 방식과 수신 범위</text>
+<rect x="64" y="654" width="250" height="78" rx="16" fill="#fff4e9" stroke="#c05b12" stroke-width="1.5"/>
+<text x="189" y="701" font-size="27" text-anchor="middle" style="fill:#c05b12" class="title">Commerce</text>
+<rect x="1024" y="654" width="350" height="78" rx="16" fill="#eef4ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="1199" y="701" font-size="23" text-anchor="middle" style="fill:#2563eb" class="title">Shopping · product_sales</text>
+<path d="M314 693 H1020" fill="none" stroke="#b45309" stroke-width="2.3" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<polygon points="1020.0,693.0 1008.0,698.0 1008.0,688.0" fill="#b45309"/>
+<text x="665" y="679" font-size="23" text-anchor="middle" style="fill:#b45309" class="title">commerce.sales-info.v1</text>
+<text x="64" y="767" font-size="21" text-anchor="start">DB 커밋 후 직접 발행</text>
+<text x="1024" y="767" font-size="20" text-anchor="start">snapshotVersion 비교 후 반영</text>
+<text x="64" y="804" font-size="21" text-anchor="start" style="fill:#52657e">조회 원본: HTTP가 기본이며, replica 설정으로 판매정보 사본 조회를 선택한다.</text>
+<rect x="64" y="842" width="250" height="64" rx="16" fill="#fff4e9" stroke="#c05b12" stroke-width="1.5"/>
+<text x="189" y="882" font-size="22" text-anchor="middle" style="fill:#c05b12" class="title">Commerce Outbox</text>
+<rect x="64" y="944" width="250" height="64" rx="16" fill="#f4efff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="189" y="984" font-size="23" text-anchor="middle" style="fill:#7c3aed" class="title">Live Outbox</text>
+<rect x="1024" y="842" width="350" height="166" rx="16" fill="#fff8eb" stroke="#e7c38f" stroke-width="1.5"/>
+<text x="1046" y="889" font-size="27" text-anchor="start" style="fill:#b45309" class="title">Kafka</text>
+<text x="1046" y="930" font-size="21" text-anchor="start">발행 구현 · 수신 연동 별도</text>
+<text x="1046" y="970" font-size="19" text-anchor="start" style="fill:#52657e">현재 기준 브랜치에 소비자 없음</text>
+<path d="M314 874 H1020" fill="none" stroke="#b45309" stroke-width="2.3" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<polygon points="1020.0,874.0 1008.0,879.0 1008.0,869.0" fill="#b45309"/>
+<text x="663" y="859" font-size="23" text-anchor="middle" style="fill:#b45309" class="title">commerce.coupon-info.v1</text>
+<path d="M314 976 H1020" fill="none" stroke="#b45309" stroke-width="2.3" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<polygon points="1020.0,976.0 1008.0,981.0 1008.0,971.0" fill="#b45309"/>
+<text x="663" y="961" font-size="23" text-anchor="middle" style="fill:#b45309" class="title">live.broadcast.v1</text>
+<rect x="32" y="1080" width="1376" height="210" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="60" y="1126" font-size="27" text-anchor="start" class="title">03  Realtime · 채팅과 방송 상태 전달</text>
+<rect x="64" y="1155" width="260" height="65" rx="16" fill="#f4efff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="194.0" y="1197" font-size="24" text-anchor="middle" style="fill:#7c3aed" class="title">Live 인스턴스 A</text>
+<rect x="554" y="1155" width="290" height="65" rx="16" fill="#fff0f0" stroke="#b91c1c" stroke-width="1.5"/>
+<text x="699.0" y="1197" font-size="24" text-anchor="middle" style="fill:#b91c1c" class="title">Redis Pub/Sub</text>
+<rect x="1074" y="1155" width="300" height="65" rx="16" fill="#f4efff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="1224.0" y="1197" font-size="24" text-anchor="middle" style="fill:#7c3aed" class="title">Live 인스턴스 B</text>
+<path d="M324 1187 H552" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="552.0,1187.0 540.0,1192.0 540.0,1182.0" fill="#64748b"/>
+<path d="M844 1187 H1072" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="1072.0,1187.0 1060.0,1192.0 1060.0,1182.0" fill="#64748b"/>
+<text x="60" y="1261" font-size="21" text-anchor="start" style="fill:#52657e">발행 인스턴스도 Redis 구독으로 수신하며, 각 인스턴스가 연결된 시청자에게 SSE로 전달한다.</text>
+</svg>

@@ -104,14 +104,6 @@ resilience4j:
           - org.springframework.web.client.HttpServerErrorException
           - org.springframework.web.client.ResourceAccessException
 
-
-# API documentation is enabled in local development or by an explicit environment setting.
-springdoc:
-  api-docs:
-    enabled: ${API_DOCS_ENABLED:false}
-  swagger-ui:
-    enabled: ${API_DOCS_ENABLED:false}
-
 ---
 # 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
 # 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.

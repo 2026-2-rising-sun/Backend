@@ -5,8 +5,6 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.product.dto.ProductSnapshot;
 import com.shoppinglive.shopping.product.service.ProductQueryService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,8 +35,6 @@ public class InternalProductController {
      * 벌크 조회 {@code ?ids=1,2,3} 또는 {@code ?ids=1&ids=2}. 중복을 제거한 뒤 1~{@value #MAX_IDS} 개여야 한다. 없는
      * 상품은 결과에서 빠진다. 파라미터 누락·형식 오류를 스프링에 맡기면 공통 핸들러가 500 을 주므로 직접 해석한다.
      */
-    @Operation(summary = "내부 상품 스냅샷 벌크 조회")
-    @SecurityRequirement(name = "ServiceToken")
     @GetMapping
     public ApiResponse<List<ProductSnapshot>> getAll(
             @RequestParam(name = "ids", required = false) List<String> ids) {
@@ -46,16 +42,12 @@ public class InternalProductController {
     }
 
     /** 상세 경로의 누락 ID도 허용된 서비스 caller 확인 후 입력 오류로 응답한다. */
-    @Operation(summary = "내부 상품 스냅샷 벌크 조회")
-    @SecurityRequirement(name = "ServiceToken")
     @GetMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
     }
 
     /** 없으면 404 NOT_FOUND. */
-    @Operation(summary = "내부 상품 스냅샷 단건 조회")
-    @SecurityRequirement(name = "ServiceToken")
     @GetMapping("/{productId}")
     public ApiResponse<ProductSnapshot> get(@PathVariable Long productId) {
         return ApiResponse.ok(productQueryService.getSnapshot(productId));

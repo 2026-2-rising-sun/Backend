@@ -4,7 +4,7 @@
 #   docker run -d --name live-pg-test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=live_test \
 #     -p 55432:5432 postgres:16
 # 실행:
-#   LIVE_PG_TEST=1 ./gradlew :services:live-service:integrationTest --tests '*Postgres*' --no-daemon
+#   LIVE_PG_TEST=1 ./gradlew :services:live-service:migrationTest --no-daemon
 spring:
   datasource:
     url: jdbc:postgresql://localhost:${LIVE_PG_PORT:55432}/live_test

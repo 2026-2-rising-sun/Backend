@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.DriverManager;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -20,6 +21,8 @@ class ProductSellerMigrationTest {
     }
 
     @Test
+    @Tag("postgres")
+    @Tag("migration")
     @EnabledIfEnvironmentVariable(named = "SHOPPING_TEST_POSTGRES_URL", matches = ".+")
     void postgresMigrationRetainsExistingProductsWithoutAssigningSeller() throws Exception {
         verify(

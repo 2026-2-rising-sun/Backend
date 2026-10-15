@@ -10,7 +10,6 @@ import com.shoppinglive.shopping.product.dto.PublicProductPage;
 import com.shoppinglive.shopping.product.service.PublicProductCursor;
 import com.shoppinglive.shopping.product.service.PublicProductListService;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
-import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,7 +37,6 @@ public class PublicProductListController {
     }
 
     /** 상세 경로에서 ID를 비운 요청은 목록 조회와 구분하여 입력 오류로 응답한다. */
-    @Operation(summary = "공개 상품 목록")
     @GetMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
@@ -48,7 +46,6 @@ public class PublicProductListController {
      * 판매중·품절 상품을 최신 등록순으로 {@code size} 개까지. 다음 페이지는 응답의 {@code nextCursor} 를 {@code cursor} 로 넘긴다.
      * 범위 밖 size·손상된 cursor 는 400 INVALID_REQUEST.
      */
-    @Operation(summary = "공개 상품 목록")
     @GetMapping
     public ApiResponse<PublicProductListResponse> list(
             @RequestParam(name = "cursor", required = false) String cursor,
