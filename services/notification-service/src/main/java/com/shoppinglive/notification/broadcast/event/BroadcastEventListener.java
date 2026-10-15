@@ -4,30 +4,21 @@ import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
 import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code live.broadcast.v1} 을 받아 방송 일정 사본을 갱신한다.
- *
- * <p>실패를 두 가지로 나눈다.
- *
- * <ul>
- *   <li><b>해석·검증 실패</b> — 다시 읽어도 같은 결과다. 건너뛴다. 재시도하면 그 메시지에 막혀 뒤의 모든 알림이 멈춘다.
- *   <li><b>그 밖의 실패</b>(DB 장애 등) — 던져서 재시도한다. 잠시 뒤면 성공할 수 있는 일이라 버리면 알림이 유실된다.
- * </ul>
+ * {@code live.broadcast.v1} 을 받아 방송 일정 사본을 갱신하고, 방송이 시작되면 신청자에게 알림을 만든다.
  *
  * <p>모르는 {@code eventType} 은 오류가 아니다. 방송 단위 이벤트는 모두 이 토픽에 들어오므로, 알림이 쓰지 않는 종류는 조용히 넘긴다.
+ *
+ * <p>실패를 직접 다루지 않는다. 해석과 검증 실패는 {@code InvalidEventMessageException} 으로 올라가 <b>보관함 토픽</b>으로 가고, DB
+ * 장애 같은 일시 실패는 복구될 때까지 재시도된다. 분류는 {@code NotificationConsumerConfiguration} 에 한 곳으로 모아 뒀다.
  */
 @Component
 public class BroadcastEventListener {
 
-    static final String SKIP_MARKER = "BROADCAST_EVENT_SKIPPED";
     private static final int TITLE_MAX_LENGTH = 100;
-
-    private static final Logger log = LoggerFactory.getLogger(BroadcastEventListener.class);
 
     private final BroadcastScheduleRepository schedules;
     private final BroadcastStartNotificationService startNotifications;
@@ -41,21 +32,11 @@ public class BroadcastEventListener {
 
     @KafkaListener(topics = LiveBroadcastEventContract.TOPIC_NAME)
     public void consume(ConsumerRecord<String, String> record) {
-        LiveBroadcastEventMessage message;
-        try {
-            message = LiveBroadcastEventMessage.parse(record.value());
-        } catch (LiveBroadcastEventMessage.InvalidMessageException e) {
-            skip(record, e);
-            return;
-        }
-        try {
-            if (LiveBroadcastEventContract.SCHEDULED.equals(message.eventType())) {
-                schedules.apply(toSchedule(message, record.key()));
-            } else if (LiveBroadcastEventContract.STARTED.equals(message.eventType())) {
-                createStartNotifications(message, record.key());
-            }
-        } catch (LiveBroadcastEventMessage.InvalidMessageException e) {
-            skip(record, e);
+        LiveBroadcastEventMessage message = LiveBroadcastEventMessage.parse(record.value());
+        if (LiveBroadcastEventContract.SCHEDULED.equals(message.eventType())) {
+            schedules.apply(toSchedule(message, record.key()));
+        } else if (LiveBroadcastEventContract.STARTED.equals(message.eventType())) {
+            createStartNotifications(message, record.key());
         }
     }
 
@@ -85,18 +66,5 @@ public class BroadcastEventListener {
                 broadcastId,
                 message.payloadText("title", TITLE_MAX_LENGTH),
                 message.payloadInstant("startedAt"));
-    }
-
-    private static void skip(
-            ConsumerRecord<String, String> record,
-            LiveBroadcastEventMessage.InvalidMessageException cause) {
-        log.error(
-                "{} topic={} partition={} offset={} reason={} raw={}",
-                SKIP_MARKER,
-                record.topic(),
-                record.partition(),
-                record.offset(),
-                cause.getMessage(),
-                record.value());
     }
 }
