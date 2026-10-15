@@ -8,7 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
+import com.shoppinglive.notification.broadcast.repository.BroadcastAlertRepository;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
+import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
+import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import java.time.Instant;
 import javax.sql.DataSource;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -47,7 +50,7 @@ class BroadcastEventListenerTest {
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         jdbc.getJdbcTemplate().update("DELETE FROM broadcast_schedule");
         schedules = new BroadcastScheduleRepository(jdbc);
-        listener = new BroadcastEventListener(schedules);
+        listener = new BroadcastEventListener(schedules, startNotifications(jdbc));
     }
 
     @Test
@@ -121,7 +124,7 @@ class BroadcastEventListenerTest {
 
         assertThatThrownBy(
                         () ->
-                                new BroadcastEventListener(failing)
+                                new BroadcastEventListener(failing, startNotifications(jdbc))
                                         .consume(
                                                 record(
                                                         scheduled(
@@ -129,6 +132,12 @@ class BroadcastEventListenerTest {
                                                                 "가을 신상 라이브",
                                                                 "2026-10-20T12:00:00Z"))))
                 .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    private static BroadcastStartNotificationService startNotifications(
+            NamedParameterJdbcTemplate jdbc) {
+        return new BroadcastStartNotificationService(
+                new BroadcastAlertRepository(jdbc), new NotificationWriteRepository(jdbc));
     }
 
     private static ConsumerRecord<String, String> record(String value) {
