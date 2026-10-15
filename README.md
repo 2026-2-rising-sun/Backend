@@ -76,6 +76,8 @@ Shopping은 판매정보를 조회용 사본에 저장하며 더 큰 `snapshotVe
 
 ## API · 문서
 
+- [Backend 팀 하네스](harness/README.md): AI 작업 지침·검증 안내·이슈와 PR 작성 템플릿.
+
 API 문서 원본은 [서비스별 OpenAPI YAML](contracts/api)입니다. Apidog·Postman에 서비스 YAML을 가져와 API를 확인하고 호출하거나, curl로 직접 요청합니다. YAML의 `servers`에 서비스별 로컬 주소가 정의되어 있습니다.
 
 서비스 YAML이 `common.yaml`을 참조하므로 가져올 때 함께 제공하거나 도구의 외부 참조 해석 기능을 사용합니다. 인증이 필요한 API는 계약에 따라 `Authorization: Bearer <JWT>` 또는 `X-Service-Token` 헤더를 보냅니다.
