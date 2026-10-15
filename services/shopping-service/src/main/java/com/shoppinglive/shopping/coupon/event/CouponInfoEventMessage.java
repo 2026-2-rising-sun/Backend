@@ -163,7 +163,7 @@ public final class CouponInfoEventMessage {
         return new InvalidMessageException(reason);
     }
 
-    /** 해석·검증 실패. 다시 읽어도 결과가 같다. */
+    /** 해석·검증 실패. 다시 읽어도 결과가 같아 error handler 가 재시도 없이 DLT 로 보낸다. */
     public static final class InvalidMessageException extends RuntimeException {
 
         InvalidMessageException(String reason) {

@@ -1,7 +1,6 @@
 package com.shoppinglive.shopping.sales.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -108,12 +107,13 @@ class SalesInfoEventListenerTest {
         assertThat(stored().get(PRODUCT).price()).isEqualTo(27000);
     }
 
-    @ParameterizedTest(name = "{0} is skipped and the next valid event is applied")
-    @DisplayName("잘못된 메시지는 예외 없이 건너뛰고 다음 정상 이벤트는 반영된다")
+    @ParameterizedTest(name = "{0} is rejected and the next valid event is applied")
+    @DisplayName("잘못된 메시지는 형식 오류로 던져 DLT 대상이 되고, 다음 정상 이벤트는 반영된다")
     @MethodSource("invalidMessages")
-    void invalidMessageIsSkippedAndNextValidEventIsApplied(String name, String raw)
+    void invalidMessageIsRejectedAndNextValidEventIsApplied(String name, String raw)
             throws Exception {
-        assertThatCode(() -> listener.consume(record(raw))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> listener.consume(record(raw)))
+                .isInstanceOf(SalesInfoEventMessage.InvalidMessageException.class);
         assertThat(stored()).isEmpty();
 
         listener.consume(record(json(event(2, SalesStatus.ON_SALE, 27000))));
