@@ -4,9 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shoppinglive.shopping.coupon.dto.CouponSnapshot;
 import com.shoppinglive.shopping.coupon.dto.ProductCouponResponse;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -181,51 +186,61 @@ class CouponDisplayRepositoryTest {
         Fixture f = open(db);
         // 쓰기 A(version 2)가 첫 SQL 을 실행한 직후, 다른 스레드의 쓰기 B(version 1)를 끼워 넣는다.
         // 예전 순서(UPDATE → INSERT)에서는 B 가 이 틈에 commit 해서 A 가 0건으로 끝나고 version 1 이 남았다.
-        AtomicReference<Thread> writerB = new AtomicReference<>();
-        Fixture interleaved =
-                f.withHookAfterFirstStatement(
-                        () -> {
-                            Thread b =
-                                    Thread.ofPlatform()
-                                            .start(
-                                                    () ->
-                                                            applyWithRetry(
-                                                                    f,
-                                                                    coupon(
-                                                                            "c1",
-                                                                            1,
-                                                                            "옛 이름",
-                                                                            List.of(501L),
-                                                                            false)));
-                            writerB.set(b);
-                            // B 가 A 의 commit 을 기다리며 막힐 수 있으므로 끝까지 기다리지 않는다.
-                            join(b, Duration.ofMillis(500));
-                        });
-
-        boolean appliedA = interleaved.apply(coupon("c1", 2, "새 이름", List.of(502L), true));
-        join(writerB.get(), Duration.ofSeconds(10));
-
-        assertThat(appliedA).isTrue();
-        assertThat(names(f, 501L, DURING)).isEmpty();
-        assertThat(names(f, 502L, DURING)).containsExactly("새 이름");
-        assertThat(f.repository().findActiveByProductId(502L, DURING).getFirst().soldOut())
-                .isTrue();
-    }
-
-    /** 동기화({@code CouponSync})와 같은 방식: 키 충돌이면 transaction 밖에서 한 번 더 부른다. */
-    private static void applyWithRetry(Fixture f, CouponSnapshot snapshot) {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AtomicReference<Future<Boolean>> writerB = new AtomicReference<>();
         try {
-            f.apply(snapshot);
-        } catch (DuplicateKeyException e) {
-            f.apply(snapshot);
-        } catch (RuntimeException e) {
-            // DB 마다 잠금 대기 방식이 달라 B 가 어떻게 실패하는지는 이 테스트가 확인할 대상이 아니다.
+            Fixture interleaved =
+                    f.withHookAfterFirstStatement(
+                            () -> {
+                                writerB.set(
+                                        executor.submit(
+                                                () ->
+                                                        applyWithRetryOnKeyConflict(
+                                                                f,
+                                                                coupon(
+                                                                        "c1",
+                                                                        1,
+                                                                        "옛 이름",
+                                                                        List.of(501L),
+                                                                        false))));
+                                // B 가 A 의 commit 을 기다리며 막힐 수 있다(A 가 먼저 INSERT 한 경우).
+                                // 그래서 여기서는 끝까지 기다리지 않고, B 가 끼어들 시간만 준다.
+                                waitBriefly(writerB.get());
+                            });
+
+            boolean appliedA = interleaved.apply(coupon("c1", 2, "새 이름", List.of(502L), true));
+            // A 가 commit 된 뒤에는 B 가 반드시 끝나야 한다. B 의 예외도 여기서 그대로 테스트 실패가 된다.
+            boolean appliedB = writerB.get().get(10, TimeUnit.SECONDS);
+
+            assertThat(appliedA).isTrue();
+            assertThat(appliedB).as("낮은 version 인 B 는 반영되면 안 된다").isFalse();
+            assertThat(names(f, 501L, DURING)).isEmpty();
+            assertThat(names(f, 502L, DURING)).containsExactly("새 이름");
+            assertThat(f.repository().findActiveByProductId(502L, DURING).getFirst().soldOut())
+                    .isTrue();
+        } finally {
+            executor.shutdownNow();
         }
     }
 
-    private static void join(Thread thread, Duration timeout) {
+    /**
+     * 동기화({@code CouponSync})와 같은 방식: 키 충돌이면 transaction 밖에서 한 번 더 부른다. 키 충돌은 다른 쓰기가 같은 신규 쿠폰을 먼저
+     * 넣었다는 뜻이라 예상된 실패다. 그 밖의 예외는 잡지 않고 호출한 쪽(테스트)으로 그대로 올린다.
+     */
+    private static boolean applyWithRetryOnKeyConflict(Fixture f, CouponSnapshot snapshot) {
         try {
-            thread.join(timeout);
+            return f.apply(snapshot);
+        } catch (DuplicateKeyException e) {
+            return f.apply(snapshot);
+        }
+    }
+
+    /** B 가 끝났으면 바로, 막혀 있으면 잠시 뒤 돌아온다. B 의 예외는 무시하지 않고 나중에 {@code get} 에서 확인한다. */
+    private static void waitBriefly(Future<?> writer) {
+        try {
+            writer.get(500, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException | ExecutionException e) {
+            // 막혀 있거나 실패했다. 어느 쪽이든 테스트 본문의 get(10초)이 결과를 다시 확인한다.
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
