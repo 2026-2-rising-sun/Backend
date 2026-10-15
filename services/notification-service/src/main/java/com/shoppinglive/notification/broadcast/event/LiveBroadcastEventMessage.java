@@ -23,14 +23,14 @@ record LiveBroadcastEventMessage(
     static LiveBroadcastEventMessage parse(String raw) {
         JsonNode root = readRoot(raw);
         if (!isSupportedSchemaVersion(root.get("schemaVersion"))) {
-            throw invalid("unsupported schemaVersion");
+            throw invalid("지원하지 않는 schemaVersion입니다.");
         }
         if (!LiveBroadcastEventContract.SOURCE.equals(textOf(root, "source"))) {
-            throw invalid("source must be " + LiveBroadcastEventContract.SOURCE);
+            throw invalid("source는 " + LiveBroadcastEventContract.SOURCE + "여야 합니다.");
         }
         JsonNode payload = root.get("payload");
         if (payload == null || !payload.isObject()) {
-            throw invalid("payload is missing");
+            throw invalid("payload가 없거나 JSON 객체가 아닙니다.");
         }
         return new LiveBroadcastEventMessage(
                 textOf(root, "eventId"),
@@ -46,7 +46,7 @@ record LiveBroadcastEventMessage(
      */
     void requireKeyMatches(String messageKey, long broadcastId) {
         if (!Long.toString(broadcastId).equals(messageKey)) {
-            throw invalid("message key does not match broadcastId");
+            throw invalid("메시지 key와 broadcastId가 일치하지 않습니다.");
         }
     }
 
@@ -56,7 +56,7 @@ record LiveBroadcastEventMessage(
                 || !value.isIntegralNumber()
                 || !value.canConvertToLong()
                 || value.longValue() < min) {
-            throw invalid(field + " must be an integer >= " + min);
+            throw invalid(field + "는 " + min + " 이상의 정수여야 합니다.");
         }
         return value.longValue();
     }
@@ -64,7 +64,7 @@ record LiveBroadcastEventMessage(
     String payloadText(String field, int maxLength) {
         String value = textOf(payload, field);
         if (value.length() > maxLength) {
-            throw invalid(field + " must be at most " + maxLength + " characters");
+            throw invalid(field + "는 " + maxLength + "자 이하여야 합니다.");
         }
         return value;
     }
@@ -75,16 +75,16 @@ record LiveBroadcastEventMessage(
 
     private static JsonNode readRoot(String raw) {
         if (raw == null) {
-            throw invalid("message value is empty");
+            throw invalid("메시지 값이 비어 있습니다.");
         }
         JsonNode root;
         try {
             root = MAPPER.readTree(raw);
         } catch (JsonProcessingException e) {
-            throw invalid("broken JSON");
+            throw invalid("JSON 형식이 올바르지 않습니다.");
         }
         if (root == null || !root.isObject()) {
-            throw invalid("message must be a JSON object");
+            throw invalid("메시지는 JSON 객체여야 합니다.");
         }
         return root;
     }
@@ -99,7 +99,7 @@ record LiveBroadcastEventMessage(
     private static String textOf(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || !value.isTextual() || value.textValue().isBlank()) {
-            throw invalid(field + " is missing");
+            throw invalid(field + "가 없거나 비어 있습니다.");
         }
         return value.textValue();
     }
@@ -108,7 +108,7 @@ record LiveBroadcastEventMessage(
         try {
             return Instant.parse(textOf(node, field));
         } catch (DateTimeException e) {
-            throw invalid(field + " must be an ISO-8601 instant");
+            throw invalid(field + "는 ISO-8601 시각이어야 합니다.");
         }
     }
 
