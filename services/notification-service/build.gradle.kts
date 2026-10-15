@@ -2,7 +2,6 @@ plugins { id("org.springframework.boot") }
 
 dependencies {
     implementation(project(":common-module"))
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.9.1")
     testImplementation(testFixtures(project(":common-module")))
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     testImplementation("org.springframework.security:spring-security-test")

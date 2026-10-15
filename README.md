@@ -48,7 +48,7 @@
 | 메시징 | Apache Kafka | 판매정보·쿠폰·방송 이벤트 발행과 판매정보 수신 |
 | 실시간 통신 | Redis Pub/Sub, SSE | Live 인스턴스 간 이벤트 중계와 시청자 전달 |
 | 외부 호출 | RestClient, Resilience4j | 서비스 간 조회, 선택적 재시도·회로 차단 |
-| 계약·문서 | Springdoc, OpenAPI, AsyncAPI | Swagger UI와 API·이벤트 계약 관리 |
+| 계약·문서 | OpenAPI, AsyncAPI | API·이벤트 계약 관리 |
 | 빌드·검증 | Gradle 멀티 모듈, JUnit 5, H2, Spotless, GitHub Actions | 빌드, 테스트, 포맷 검사와 CI |
 | 개발 인프라 | Docker Compose, Kubernetes 개발 매니페스트 | PostgreSQL·Redis·Kafka와 서비스 실행 구성 |
 
@@ -76,17 +76,10 @@ Shopping은 판매정보를 조회용 사본에 저장하며 더 큰 `snapshotVe
 
 ## API · 문서
 
-`local` 프로필에서 각 서비스를 실행하면 아래 Swagger 주소로 접속할 수 있습니다. 다른 환경에서는 `API_DOCS_ENABLED=true`로 활성화합니다. 인증이 필요한 API는 Swagger의 **Authorize**에 JWT를 입력해 호출합니다.
+API 문서 원본은 [서비스별 OpenAPI YAML](contracts/api)입니다. Apidog·Postman에 서비스 YAML을 가져와 API를 확인하고 호출하거나, curl로 직접 요청합니다. YAML의 `servers`에 서비스별 로컬 주소가 정의되어 있습니다.
 
-| 서비스 | Swagger |
-|---|---|
-| Member | [localhost:8081/swagger](http://localhost:8081/swagger) |
-| Shopping | [localhost:8082/swagger](http://localhost:8082/swagger) |
-| Commerce | [localhost:8083/swagger](http://localhost:8083/swagger) |
-| Live | [localhost:8084/swagger](http://localhost:8084/swagger) |
-| Notification | [localhost:8085/swagger](http://localhost:8085/swagger) |
+서비스 YAML이 `common.yaml`을 참조하므로 가져올 때 함께 제공하거나 도구의 외부 참조 해석 기능을 사용합니다. 인증이 필요한 API는 계약에 따라 `Authorization: Bearer <JWT>` 또는 `X-Service-Token` 헤더를 보냅니다.
 
-- [API 계약](contracts/api): 서비스별 OpenAPI YAML 원본. Swagger 화면은 컨트롤러·DTO에서 별도로 생성합니다.
 - [이벤트 계약](contracts/events): Kafka 이벤트의 AsyncAPI YAML 원본.
 - [Infra 저장소](https://github.com/2026-2-rising-sun/Infra): 로컬 미들웨어와 Kubernetes 개발 환경 구성.
 - [팀 프로젝트 문서](https://app.notion.com/p/3e9226545d1581989a9edefd9da775c4): 기능명세·ERD·설계·협업 문서.

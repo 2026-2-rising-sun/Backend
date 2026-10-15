@@ -14,8 +14,6 @@ import com.shoppinglive.commerce.sales.service.SalesRegistrationService;
 import com.shoppinglive.commerce.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,11 +74,6 @@ public class SalesController {
      * @return 판매정보가 있는 상품만 담긴 배열. 순서는 보장하지 않는다
      * @throws BusinessException 파라미터 누락·숫자 아님·개수 초과 (400)
      */
-    @Operation(
-            summary = "서비스용 판매정보 배치 조회",
-            description =
-                    "Shopping/Live 전용. 미등록 상품은 결과에서 제외하며 순서 미보장. 파라미터 누락은 400, 빈 값은 빈 배열. 반복 또는 단일 쉼표 목록을 지원하며 중복 제거 후 100개 제한. 반복과 쉼표를 섞은 형식은 보장하지 않는다.")
-    @SecurityRequirement(name = "ServiceToken")
     @GetMapping
     public List<SalesLookupResponse> findByProductIds(
             @RequestParam(name = "productIds", required = false) List<String> productIds) {
@@ -122,8 +115,6 @@ public class SalesController {
      *
      * <p>상품 없음은 404, 이미 판매정보가 있는 상품은 409, 가격·재고 입력 제약 위반은 400.
      */
-    @Operation(summary = "판매·초기 재고 등록", description = "Shopping 상품 존재 확인 후 READY로 등록한다.")
-    @SecurityRequirement(name = "BearerAuth")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public SalesResponse register(@Valid @RequestBody RegisterSalesRequest request) {
@@ -134,8 +125,6 @@ public class SalesController {
     }
 
     /** 판매정보의 가격을 변경한다 (판매 2). */
-    @Operation(summary = "판매가 변경", description = "클라이언트 version을 받지 않는다. 서버 트랜잭션 간 낙관적 충돌은 409.")
-    @SecurityRequirement(name = "BearerAuth")
     @PatchMapping("/{id}/price")
     public SalesResponse changePrice(
             @PathVariable Long id, @Valid @RequestBody ChangePriceRequest request) {
@@ -144,8 +133,6 @@ public class SalesController {
     }
 
     /** 판매 재고를 조회한다 (판매 3). */
-    @Operation(summary = "판매 재고 조회")
-    @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/{id}/stock")
     public SalesStockResponse getStock(@PathVariable Long id) {
         SalesStock stock = salesService.getStock(id);
@@ -157,8 +144,6 @@ public class SalesController {
      *
      * <p>delta 양수: 추가. 음수: 감소. 감소 후 available 이 음수가 되면 409 Conflict.
      */
-    @Operation(summary = "판매 가능 재고 증감")
-    @SecurityRequirement(name = "BearerAuth")
     @PatchMapping("/{id}/stock")
     public SalesStockResponse adjustStock(
             @PathVariable Long id, @Valid @RequestBody AdjustStockRequest request) {
@@ -172,8 +157,6 @@ public class SalesController {
      * <p>관리자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은 400, 조회 실패는 404, 동시 변경
      * 감지는 409.
      */
-    @Operation(summary = "판매 상태 변경")
-    @SecurityRequirement(name = "BearerAuth")
     @PatchMapping("/{id}/status")
     public SalesResponse changeStatus(
             @PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request) {

@@ -53,8 +53,3 @@ shoppinglive:
   outbox:
     relay:
       enabled: false
-
-# 서비스 기본 설정과 같은 Swagger 진입 경로를 사용한다.
-springdoc:
-  swagger-ui:
-    path: /swagger
