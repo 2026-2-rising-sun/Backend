@@ -52,6 +52,9 @@ jobs:
       - name: Check change selection
         if: steps.changes.outputs.classifier == 'true'
         run: python -m unittest discover -s .github/scripts/ci -p 'test_*.py'
+      - name: Check local verification runner
+        if: steps.changes.outputs.harness == 'true'
+        run: python -m unittest discover -s harness -p 'test_*.py'
       - name: Check local authentication configuration tool
         if: steps.changes.outputs.local_auth == 'true'
         run: node --test scripts/local/auth-env.test.cjs

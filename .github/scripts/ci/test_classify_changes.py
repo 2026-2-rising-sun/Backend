@@ -270,6 +270,33 @@ class GitDiffTests(unittest.TestCase):
         self.assertEqual(plan["gradle_tasks"], ["build"])
 
 
+class HarnessSelectionTests(unittest.TestCase):
+    def test_runner_changes_select_harness_tests_without_build(self):
+        """실행기 변경은 자체 검사만 선택하고 업무 빌드를 요구하지 않는다."""
+        for path in ("harness/verify.py", "harness/test_verify.py"):
+            with self.subTest(path=path):
+                plan = classify([Change(path, None, b"code")])
+                self.assertTrue(plan["harness"])
+                self.assertEqual(plan["gradle_tasks"], [])
+        self.assertTrue(classify([], "비교 불가")["harness"])
+
+    def test_harness_documents_do_not_select_runner_tests(self):
+        """같은 폴더의 지침 변경은 문서로 분류하고 실행기 검사를 추가하지 않는다."""
+        plan = classify([Change("harness/README.md", b"old", b"new")])
+        self.assertFalse(plan["harness"])
+        self.assertEqual(plan["gradle_tasks"], [])
+
+    def test_ci_runs_harness_tests_only_when_selected(self):
+        """로컬 실행기 회귀 검사를 CI 선택 결과와 연결한다."""
+        import yaml
+        root = Path(__file__).resolve().parents[3]
+        ci = yaml.safe_load((root / ".github/workflows/ci.yml").read_text())
+        step = next(s for s in ci["jobs"]["build"]["steps"]
+                    if s.get("name") == "Check local verification runner")
+        self.assertIn("outputs.harness == 'true'", step["if"])
+        self.assertIn("unittest discover -s harness", step["run"])
+
+
 class WorkflowTests(unittest.TestCase):
     def test_workflow_can_complete_without_gradle_and_publish_requires_build(self):
         import yaml

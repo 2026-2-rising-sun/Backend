@@ -1,8 +1,35 @@
 # 도구 실행 참고
 
-명령이나 실행 조건이 필요할 때 해당 절만 참고한다. 아래 명령을 매 작업마다 전부 실행할 필요는 없다. 검증 범위는 변경 영향과 [테스트](rules/tests.md)·[계약](rules/contracts.md) 기준에 따라 선택한다.
+명령이나 실행 조건이 필요할 때 해당 절만 참고한다. 아래 명령을 매 작업마다 전부 실행할 필요는 없다. 검증 범위는 변경 영향과 [테스트](quality/tests.md)·[계약](workflow/contracts.md) 기준에 따라 선택한다.
 
 현재 저장소는 Gradle Wrapper와 Java 21을 사용한다. 설정 원본은 [build.gradle.kts](../build.gradle.kts), [.editorconfig](../.editorconfig), 각 서비스의 테스트 설정이다. 안내와 다르면 실제 설정을 확인하고 관련 설명을 갱신한다.
+
+## 로컬 검증 실행기
+
+[verify.py](verify.py)는 변경 내용으로 기존 CI 검사 선택기를 호출한다. 실행 전 [API 검사 의존성](#api이벤트-계약-검사)이 설치된 Python 환경을 사용한다. Python은 3.10 이상, Gradle 검사는 Java 21과 기존 도구가 필요하다.
+
+```bash
+# 검사 목록·선택 이유만 출력. 파일이나 Git 상태를 수정하지 않는다.
+.venv-api/bin/python harness/verify.py --dry-run
+
+# HEAD 이후 staged·unstaged·새 파일을 포함한 현재 작업 트리 검사
+.venv-api/bin/python harness/verify.py
+
+# PR 단위: 기준 ref와 HEAD의 merge-base부터 현재 작업 트리까지 검사
+.venv-api/bin/python harness/verify.py --base origin/dev
+
+# 격리 DB·Redis를 직접 준비하고 연결 설정을 확인한 경우만 외부 검사 실행
+.venv-api/bin/python harness/verify.py --external
+```
+
+- staged와 작업 트리가 다르면 둘 다 검사 선택에 반영하지만 실제 실행 대상은 작업 트리다. 이 결과로 서로 다른 staged 내용까지 검증했다고 보고하지 않는다.
+- 기준 ref는 자동 fetch하지 않는다. 원격 최신성은 [동기화 절차](workflow/README.md#시작과-동기화)에서 확인한다. 잘못된 ref나 충돌은 준비 실패다.
+- 기본은 선택된 일반 검사만 실행한다. 선택된 외부 검사가 있으면 `--external`과 서비스별 환경 조건이 갖춰지기 전까지 미실행으로 남긴다. 테스트 대상 서비스에 DB URL 환경변수가 주입돼 있으면 일반 빌드·테스트도 `--external`이 필요하다. 테스트를 실행하지 않는 `spotlessCheck`는 이 제한을 받지 않는다. 인프라나 자격증명을 자동 생성하지 않는다.
+- 결과와 명령별 로그는 무시되는 `build/harness/`에 저장하고 최신 결과 파일을 덮어쓴다. 종료 코드는 `0` 정상(변경 없음·자동 검사 대상 없음 포함), `1` 실패, `2` 미완료(미실행·스킵·0건·검사 중 diff 변경)다. 검사 대상 없음은 테스트 통과가 아니다.
+- Gradle XML에서 실패·스킵·건수와 작업의 `UP-TO-DATE`·`FROM-CACHE`·`NO-SOURCE`를 구분한다. 빌드는 대상 모듈의 `test`·`integrationTest` 작업 결과를 모두 확인하며, 작업 출력이나 필요한 XML이 빠지면 종료 코드가 0이어도 미완료다. 조건부 Kafka 스킵도 미완료로 표시한다. 원래 테스트가 없는 단위 작업의 NO-SOURCE는 그대로 보고한다.
+- 현재 diff와 실행 결과를 묶어 기록하며 검사 중 소스가 바뀌면 미완료로 표시한다. 이후 소스 변경의 유효성을 보장하는 인증서가 아니므로 최종 diff가 바뀌면 필요한 검사를 다시 선택한다.
+- API 자동 선택은 경로·HTTP 메서드 중심이다. DTO·응답·인증·멱등성 의미는 직접 계약과 대조하고 필요한 기존 검사를 추가 실행한다. 선택기가 postgres 단독 테스트의 실행 공백을 해결하지는 않는다.
+- 포맷 자동 수정·코드 수정·Git 작업은 실행기 기능이 아니다. 실패 로그를 읽고 에이전트가 범위 안에서 수정·재검증한다.
 
 ## 포맷과 빌드
 
@@ -78,7 +105,7 @@ python3 -m venv .venv-api
 .venv-api/bin/python .github/scripts/api/check_events.py
 ```
 
-API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한다. 이벤트 기본 검사는 YAML 참조·스키마·예시를 확인한다. 보장 범위와 구현 대조 절차는 [계약 규칙](rules/contracts.md)을 따른다.
+API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한다. 이벤트 기본 검사는 YAML 참조·스키마·예시를 확인한다. 보장 범위와 구현 대조 절차는 [계약 규칙](workflow/contracts.md)을 따른다.
 
 이벤트 직렬화 표본까지 확인하려면 현재 코드로 표본을 먼저 생성한다.
 
@@ -87,10 +114,10 @@ API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한�
 .venv-api/bin/python .github/scripts/api/check_events.py --samples
 ```
 
-표본은 서비스별 `build/contract-samples`에 생성된다. 오래된 표본만 검사한 결과를 현재 구현의 검증으로 보고하지 않는다. 직렬화 표본 통과도 실제 생산자→브로커→소비자 전달·DB 반영 증거와 구분한다.
+표본은 서비스별 `build/contract-samples`에 생성된다. 실행기는 앞선 빌드가 실패·미완료·미실행이면 표본 검사도 실행하지 않는다. 오래된 표본만 검사한 결과를 현재 구현의 검증으로 보고하지 않는다. 직렬화 표본 통과도 실제 생산자→브로커→소비자 전달·DB 반영 증거와 구분한다.
 
 ## 검증 범위 판단
 
-문서 변경은 링크와 내용 정합성, 코드 변경은 영향을 받는 모듈과 동작을 중심으로 확인한다. 공통 코드·계약·외부 저장소 변경은 실제 소비자와 실행 환경에 따라 범위를 넓힌다. 필수 계약 검사는 [계약 규칙](rules/contracts.md)을 따른다.
+문서 변경은 링크와 내용 정합성, 코드 변경은 영향을 받는 모듈과 동작을 중심으로 확인한다. 공통 코드·계약·외부 저장소 변경은 실제 소비자와 실행 환경에 따라 범위를 넓힌다. 필수 계약 검사는 [계약 규칙](workflow/contracts.md)을 따른다.
 
 기존 [CI 선택 로직](../.github/scripts/ci/classify_changes.py)의 결과를 전체 테스트 성공으로 확대하지 않는다. 이미 통과한 검사는 변경·실패·미해결 우려가 없으면 반복하지 않는다.

@@ -162,7 +162,7 @@ def classify(changes, full_reason=None):
     full, api = bool(full_reason), bool(full_reason)
     tools = {"workflow": bool(full_reason), "classifier": bool(full_reason),
              "api_tests": bool(full_reason),
-             "local_auth": bool(full_reason)}
+             "local_auth": bool(full_reason), "harness": bool(full_reason)}
     migrations = set(MIGRATION_SERVICES) if full_reason else set()
     redis = {"live-service"} if full_reason else set()
     if full_reason:
@@ -186,6 +186,9 @@ def classify(changes, full_reason=None):
         elif path.startswith(".github/scripts/"):
             tools["classifier"] = True
             action = "ci-tool"
+        elif path.startswith("harness/"):
+            tools["harness"] = True
+            action = "harness-tool"
         elif path.startswith("scripts/local/auth-env."):
             tools["local_auth"] = True
             action = "local-auth-tool"
