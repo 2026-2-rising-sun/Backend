@@ -15,8 +15,11 @@ public final class LiveBroadcastEventContract {
     public static final String SOURCE = "live-service";
     public static final int SCHEMA_VERSION = 1;
 
-    /** 방송 등록·일정 변경. 시작 임박 알림 시각의 근거다. */
+    /** 방송 등록과 일정 변경. 시작 임박 알림 시각의 근거다. */
     public static final String SCHEDULED = "LiveBroadcastScheduled";
+
+    /** 준비중에서 진행중으로 바뀔 때 한 번. 이미 진행중인 멱등 재시도에서는 발행되지 않는다. */
+    public static final String STARTED = "LiveBroadcastStarted";
 
     private LiveBroadcastEventContract() {}
 }
