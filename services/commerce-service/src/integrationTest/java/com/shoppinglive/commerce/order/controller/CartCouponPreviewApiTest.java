@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -78,6 +79,7 @@ class CartCouponPreviewApiTest extends CommerceSecurityTestSupport {
         shopping.clear();
     }
 
+    @DisplayName("쿠폰은 대상 장바구니 상품에만 적용하고 재고·쿠폰을 예약하지 않는다")
     @Test
     void appliesCouponOnlyToEligibleCartOrdersWithoutReservingAnything() throws Exception {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);

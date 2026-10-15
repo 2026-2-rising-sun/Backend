@@ -6,6 +6,7 @@ import jakarta.persistence.Entity;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -24,8 +25,9 @@ class AuditedEntityPersistenceTest {
     @Autowired TestEntityManager em;
     @Autowired AtomicReference<Instant> time;
 
+    @DisplayName("자동 ID와 감사 시각을 상속하고 수정해도 생성 시각을 유지한다")
     @Test
-    void 자동_ID와_시간을_상속하고_수정시_생성시간은_유지한다() {
+    void inheritsGeneratedIdAndAuditTimesWhilePreservingCreationTime() {
         Instant created = Instant.parse("2026-10-14T00:00:00Z");
         time.set(created);
         var entity = new AuditedFixture();

@@ -20,6 +20,7 @@ import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -103,8 +104,9 @@ class SalesRegistrationServiceTest {
 
     // ----- 정상 등록 -----
 
+    @DisplayName("판매정보와 초기 재고를 함께 저장한다")
     @Test
-    void register_판매정보와_재고를_함께_저장한다() {
+    void storesSalesInformationAndInitialStockTogether() {
         productExists();
         executeTransactionInline();
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
@@ -122,8 +124,9 @@ class SalesRegistrationServiceTest {
     }
 
     /** 등록만으로 판매가 시작되면 안 된다. 관리자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
+    @DisplayName("판매 등록 직후 상태는 READY다")
     @Test
-    void register_등록_직후_상태는_판매준비다() {
+    void createsSaleInReadyStatus() {
         productExists();
         executeTransactionInline();
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
@@ -135,8 +138,9 @@ class SalesRegistrationServiceTest {
     }
 
     /** 재고 0 으로 먼저 등록해 두고 판매 3 으로 채우는 운영 흐름을 허용한다. */
+    @DisplayName("초기 재고가 0이어도 판매를 등록한다")
     @Test
-    void register_초기_재고가_0이어도_등록된다() {
+    void allowsRegistrationWithZeroInitialStock() {
         productExists();
         executeTransactionInline();
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
@@ -151,8 +155,9 @@ class SalesRegistrationServiceTest {
 
     // ----- 상품 확인 -----
 
+    @DisplayName("상품이 없으면 판매 등록을 거절하고 저장하지 않는다")
     @Test
-    void register_상품이_없으면_ProductNotFoundException이고_저장하지_않는다() {
+    void rejectsMissingProductWithoutPersistingSale() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
         given(shoppingClient.exists(PRODUCT_ID)).willReturn(false);
 
@@ -167,8 +172,9 @@ class SalesRegistrationServiceTest {
      * 판매 1 완료 기준: "상품이 없거나 <b>존재 여부를 확인하지 못하면</b> 설정을 완료하지 않는다". Shopping 장애를 "상품 없음" 으로 단정하지 않고
      * 그대로 전파해, 호출자가 재시도를 안내할 수 있게 한다.
      */
+    @DisplayName("Shopping 장애를 상품 미존재로 단정하지 않고 전파한다")
     @Test
-    void register_Shopping_장애는_상품없음으로_단정하지_않고_전파한다() {
+    void propagatesShoppingOutageWithoutAssumingProductIsMissing() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
         given(shoppingClient.exists(PRODUCT_ID))
                 .willThrow(new ShoppingUnavailableException("shopping timeout"));
@@ -182,8 +188,9 @@ class SalesRegistrationServiceTest {
 
     // ----- 중복 등록 -----
 
+    @DisplayName("이미 판매정보가 있으면 409로 거절하고 Shopping을 호출하지 않는다")
     @Test
-    void register_이미_판매정보가_있으면_409이고_Shopping을_부르지_않는다() {
+    void rejectsDuplicateSaleWithoutCallingShopping() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(true);
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
@@ -198,8 +205,9 @@ class SalesRegistrationServiceTest {
     /**
      * 중복 검사를 동시에 통과한 두 요청 중 한쪽은 UNIQUE 제약에 걸린다. 그 DB 예외를 그대로 500 으로 흘리지 않고 중복 등록과 같은 409 로 되돌린다.
      */
+    @DisplayName("UNIQUE 위반도 중복 판매 등록과 같은 409로 처리한다")
     @Test
-    void register_UNIQUE_제약_위반도_중복등록과_같은_409로_바꾼다() {
+    void mapsUniqueConstraintViolationToDuplicateSaleConflict() {
         productExists();
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
         given(transactionTemplate.execute(any()))
@@ -212,8 +220,9 @@ class SalesRegistrationServiceTest {
 
     // ----- 입력 검증 -----
 
+    @DisplayName("판매 등록 가격이 0 이하면 400으로 거절한다")
     @Test
-    void register_가격이_0이하면_400() {
+    void rejectsNonPositiveRegistrationPrice() {
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 0L, 10))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())
@@ -223,16 +232,18 @@ class SalesRegistrationServiceTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("판매 등록 재고가 음수면 400으로 거절한다")
     @Test
-    void register_재고가_음수면_400() {
+    void rejectsNegativeRegistrationStock() {
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, -1))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
     }
 
+    @DisplayName("판매 등록 필수값이 null이면 400으로 거절한다")
     @Test
-    void register_필수값이_null이면_400() {
+    void rejectsNullRegistrationFields() {
         assertThatThrownBy(() -> salesRegistrationService.register(null, 15_000L, 10))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, null, 10))
@@ -242,8 +253,9 @@ class SalesRegistrationServiceTest {
     }
 
     /** 검증 실패는 DB·Shopping 어디에도 닿기 전에 끝나야 한다. */
+    @DisplayName("판매 등록 검증에 실패하면 DB·Shopping에 접근하지 않는다")
     @Test
-    void register_검증_실패시_DB와_Shopping에_접근하지_않는다() {
+    void rejectsInvalidRegistrationBeforeDatabaseAndShoppingAccess() {
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, -1L, 10))
                 .isInstanceOf(BusinessException.class);
 

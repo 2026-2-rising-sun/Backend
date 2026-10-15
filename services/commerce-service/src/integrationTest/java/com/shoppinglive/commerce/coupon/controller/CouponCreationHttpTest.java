@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -74,6 +75,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
                         List.of(1L)));
     }
 
+    @DisplayName("정책상 최대 수량으로 쿠폰을 생성하고 인증된 판매자와 대상 상품을 저장한다")
     @Test
     void createsAtPolicyMaximumAndStoresAuthenticatedSellerAndTargets() throws Exception {
         mvc.perform(
@@ -90,6 +92,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
                 .isEqualTo(1L);
     }
 
+    @DisplayName("타인·소유자 없는 상품을 거절하고 쿠폰을 부분 저장하지 않는다")
     @Test
     void rejectsOtherAndUnassignedTargetsWithoutPersistingPartialCoupon() throws Exception {
         for (long id : List.of(2L, 3L)) {
@@ -108,6 +111,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
                 .isZero();
     }
 
+    @DisplayName("최대 수량 초과와 판매자가 아닌 사용자의 쿠폰 생성을 거절한다")
     @Test
     void rejectsExcessQuantityAndNonSeller() throws Exception {
         var body = request();
@@ -131,6 +135,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @DisplayName("DB 정밀도에서 사라지는 유효 기간은 거절하고 저장된 시각 정밀도로 응답한다")
     @Test
     void rejectsDurationCollapsedAtDatabasePrecisionAndReturnsStoredPrecision() throws Exception {
         var body = request();

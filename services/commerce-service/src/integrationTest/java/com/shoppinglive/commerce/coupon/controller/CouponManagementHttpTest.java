@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -46,6 +47,7 @@ class CouponManagementHttpTest extends CommerceSecurityTestSupport {
         shopping.clear();
     }
 
+    @DisplayName("쿠폰 관리 HTTP 요청은 소유자·버전·역할을 검증한다")
     @Test
     void managementHttpValidatesOwnerVersionAndRole() throws Exception {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);

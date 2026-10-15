@@ -8,14 +8,16 @@ import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 class ServiceRestClientFactoryTest {
+    @DisplayName("서비스 토큰과 요청 ID를 전달하고 원본 RestClient 빌더를 변경하지 않는다")
     @Test
-    void 서비스_토큰과_요청_ID를_전달하고_원본_builder는_변경하지_않는다() throws Exception {
+    void forwardsServiceTokenAndRequestIdWithoutMutatingOriginalBuilder() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var token = new AtomicReference<String>();
         var requestId = new AtomicReference<String>();
@@ -51,8 +53,9 @@ class ServiceRestClientFactoryTest {
         }
     }
 
+    @DisplayName("응답이 지연되면 설정한 읽기 제한 시간에 실패한다")
     @Test
-    void 응답이_지연되면_지정한_read_timeout으로_실패한다() throws Exception {
+    void failsDelayedResponseAtConfiguredReadTimeout() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var arrived = new CountDownLatch(1);
         var release = new CountDownLatch(1);

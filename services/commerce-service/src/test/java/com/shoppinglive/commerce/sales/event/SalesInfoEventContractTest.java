@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Instant;
 import java.util.Arrays;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class SalesInfoEventContractTest {
@@ -16,6 +17,7 @@ class SalesInfoEventContractTest {
                     .findAndRegisterModules()
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+    @DisplayName("실제 직렬화한 판매정보 스냅샷을 YAML 검증 표본으로 내보낸다")
     @Test
     void exportsActualSerializedSnapshotsForYamlValidation() throws Exception {
         var directory = java.nio.file.Path.of("build/contract-samples");
@@ -38,8 +40,9 @@ class SalesInfoEventContractTest {
         }
     }
 
+    @DisplayName("공통 봉투로 전체 판매정보를 직렬화하고 복원한다")
     @Test
-    void 공통_봉투로_전체_판매정보를_직렬화하고_복원한다() throws Exception {
+    void serializesAndRestoresFullSalesSnapshotInCommonEnvelope() throws Exception {
         var event =
                 SalesInfoEventContract.create(
                         SalesInfoEventType.SalesRegistered,
@@ -64,8 +67,9 @@ class SalesInfoEventContractTest {
                 .isEqualTo(event);
     }
 
+    @DisplayName("기존 이벤트명·토픽·판매 ID 키를 유지한다")
     @Test
-    void 기존_이벤트명과_토픽과_판매_ID_기반_키를_유지한다() {
+    void preservesEventNamesTopicAndSalesIdKey() {
         assertThat(Arrays.stream(SalesInfoEventType.values()).map(Enum::name))
                 .containsExactly(
                         "SalesRegistered",
@@ -77,8 +81,9 @@ class SalesInfoEventContractTest {
         assertThat(SalesInfoEventContract.messageKey(snapshot())).isEqualTo("9001");
     }
 
+    @DisplayName("잘못된 판매 스냅샷과 이벤트명을 거절한다")
     @Test
-    void 잘못된_스냅샷과_이벤트명을_거절한다() {
+    void rejectsInvalidSnapshotAndEventType() {
         assertThatThrownBy(() -> SalesInfoEventContract.create(null, Instant.now(), snapshot()))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(

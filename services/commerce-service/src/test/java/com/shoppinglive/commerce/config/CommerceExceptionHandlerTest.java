@@ -21,8 +21,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class CommerceExceptionHandlerTest {
     @Test
-    @DisplayName("낙관적락과 상태CAS 충돌은 모두 409로 응답한다")
-    void 낙관적락과_상태CAS_충돌은_모두_409로_응답한다() throws Exception {
+    @DisplayName("낙관적 잠금과 상태 CAS 충돌은 모두 409로 응답한다")
+    void mapsOptimisticAndConditionalStateConflictsTo409() throws Exception {
         SalesService service = mock(SalesService.class);
         when(service.changePrice(1L, 100L))
                 .thenThrow(new ObjectOptimisticLockingFailureException("Sales", 1L));

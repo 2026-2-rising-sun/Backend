@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
@@ -31,6 +32,7 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired ApplicationContext context;
 
+    @DisplayName("모든 관리자 메서드는 변경 전에 검증된 관리자 권한을 요구한다")
     @Test
     void everyAdminMethodRequiresVerifiedAdministratorBeforeMutation() throws Exception {
         long before = repository.count();
@@ -61,6 +63,7 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                 .andExpect(status().isOk());
     }
 
+    @DisplayName("세션 폐기·검증 장애가 익명 방송 조회를 막지 않는다")
     @Test
     void sessionRevocationAndAuthorityOutageDoNotDisableAnonymousBroadcasts() throws Exception {
         String token = adminBearer();
@@ -78,6 +81,7 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
         mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
     }
 
+    @DisplayName("공개 방송 조회와 최소 probe는 익명 접근을 허용한다")
     @Test
     void anonymousPublicQueriesAndMinimalProbesRemainAvailable() throws Exception {
         var broadcast =
@@ -110,6 +114,7 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                 .andExpect(status().isForbidden());
     }
 
+    @DisplayName("잘못된 JWT·헤더·서비스 키로 관리자 권한을 얻을 수 없다")
     @Test
     void invalidJwtHeadersAndServiceKeysCannotGrantAdmin() throws Exception {
         for (String token :
@@ -144,6 +149,7 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @DisplayName("readiness 장애는 인증 없이 503으로 응답한다")
     @Test
     void readinessFailureIs503AndDoesNotRequireAuthentication() throws Exception {
         try {

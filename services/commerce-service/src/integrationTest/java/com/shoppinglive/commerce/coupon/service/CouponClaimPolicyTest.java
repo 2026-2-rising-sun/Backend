@@ -8,6 +8,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -44,6 +45,7 @@ class CouponClaimPolicyTest {
         return ds;
     }
 
+    @DisplayName("시작 시각은 포함하고 종료 시각은 제외하며 같은 수령을 재발급하지 않는다")
     @Test
     void startIsInclusiveEndIsExclusiveAndLifetimeReplayDoesNotReissue() {
         var ds = database();
@@ -79,6 +81,7 @@ class CouponClaimPolicyTest {
                 .isEqualTo(1);
     }
 
+    @DisplayName("쿠폰 수령 저장에 실패하면 발급 수량 증가도 롤백한다")
     @Test
     void failedClaimInsertRollsBackIssuanceCounter() {
         var ds = database();

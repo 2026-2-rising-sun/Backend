@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/** Uses the production decoder and filters with a temporary RSA key; no mock authentication. */
+/** 임시 RSA 키와 실제 운영 검증기·필터를 사용해 인증을 검증한다. */
 @Import(CommerceSecurityTestSupport.SessionTestConfiguration.class)
 public abstract class CommerceSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
@@ -30,8 +30,7 @@ public abstract class CommerceSecurityTestSupport {
 
     @AfterEach
     void removeOrphanPurchaseFixtures() {
-        // Subclass cleanup removes orders/payments first. Group keys are durable in production,
-        // so deleting only orders otherwise leaks active/replay state between repeated tests.
+        // 하위 테스트가 주문·결제를 먼저 지운 뒤 묶음 키를 정리해 활성·재요청 상태가 다음 테스트에 남지 않게 한다.
         if (fixtureJdbc != null && shouldCleanPurchaseFixtures()) {
             fixtureJdbc.update(
                     """

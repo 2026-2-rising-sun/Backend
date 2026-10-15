@@ -38,7 +38,7 @@ class SalesInfoProducerConfiguration {
 
     private static <K, V> void configure(
             DefaultKafkaProducerFactory<K, V> factory, ObjectMapper mapper) {
-        // Use Boot's ISO-8601 Instant representation and omit service-specific Java type headers.
+        // Boot의 ISO-8601 시각 표현을 사용하고 서비스 전용 Java 타입 헤더는 제외한다.
         factory.setValueSerializer(new JsonSerializer<V>(mapper).noTypeInfo());
     }
 }

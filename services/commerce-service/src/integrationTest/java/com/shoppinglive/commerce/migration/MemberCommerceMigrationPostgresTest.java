@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -59,6 +60,7 @@ class MemberCommerceMigrationPostgresTest {
         return config.load();
     }
 
+    @DisplayName("새 DB는 회원을 필수로 요구하고 회원별로 멱등 키를 구분한다")
     @Test
     void newDatabaseRequiresMemberAndScopesIdempotency() throws Exception {
         migration(null).migrate();
@@ -83,6 +85,7 @@ class MemberCommerceMigrationPostgresTest {
         assertThat(count("SELECT count(*) FROM orders")).isEqualTo(2);
     }
 
+    @DisplayName("결제 묶음 마이그레이션은 기존 주문과 최근 결제 시도를 연결한다")
     @Test
     void paymentGroupMigrationBackfillsLegacyOrderAndLatestAttempt() throws Exception {
         migration("3").migrate();
@@ -114,6 +117,7 @@ class MemberCommerceMigrationPostgresTest {
         assertThat(count("SELECT count(*) FROM member_purchase_guard")).isEqualTo(1);
     }
 
+    @DisplayName("기존 활성 주문이 여러 개면 주문·예약을 변경하지 않고 마이그레이션을 중단한다")
     @Test
     void multipleLegacyActiveOrdersFailClosedWithoutChangingOrdersOrReservations()
             throws Exception {
@@ -137,6 +141,7 @@ class MemberCommerceMigrationPostgresTest {
                 .isZero();
     }
 
+    @DisplayName("할인 스냅샷 마이그레이션은 기존 주문·묶음의 원금과 실부담액을 채운다")
     @Test
     void discountSnapshotMigrationBackfillsGrossAndPayableAmountsForLegacyOrdersAndGroups()
             throws Exception {
@@ -161,6 +166,7 @@ class MemberCommerceMigrationPostgresTest {
                 .isInstanceOf(java.sql.SQLException.class);
     }
 
+    @DisplayName("미확정 결제 마이그레이션은 기존 상태를 보존하고 미확정 결과를 허용한다")
     @Test
     void unknownPaymentMigrationPreservesLegacyStatusesAndPermitsUnconfirmedResult()
             throws Exception {
@@ -205,6 +211,7 @@ class MemberCommerceMigrationPostgresTest {
                 .isEqualTo(1);
     }
 
+    @DisplayName("복구 시나리오 마이그레이션은 기존 시도를 보존하고 전송 장애 시나리오를 허용한다")
     @Test
     void recoveryScenariosMigrationPreservesExistingAttemptsAndAllowsTransportFailureFixtures()
             throws Exception {

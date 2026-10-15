@@ -1,9 +1,9 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.operations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.shoppinglive.member.operations.LocalTestAccounts;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +16,7 @@ class LocalTestAccountsConfigurationTest {
                     .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
                     .withBean(PasswordEncoder.class, () -> mock(PasswordEncoder.class));
 
+    @DisplayName("명시적인 local 설정이 있을 때만 테스트 계정을 활성화한다")
     @Test
     void onlyExplicitLocalConfigurationEnablesFixtures() {
         runner.withPropertyValues(

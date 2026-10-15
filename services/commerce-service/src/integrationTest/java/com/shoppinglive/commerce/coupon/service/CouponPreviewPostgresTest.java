@@ -11,6 +11,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -23,6 +24,7 @@ class CouponPreviewPostgresTest {
     private static final String COUPON = "coupon-preview";
     private static final String MEMBER = "member";
 
+    @DisplayName("PostgreSQL에서 본인 유효 쿠폰과 대상 상품을 검증하되 예약하지 않는다")
     @Test
     void validatesOwnedActiveCouponAndTargetAgainstPostgresWithoutReservingIt() {
         String schema = "coupon_preview_" + UUID.randomUUID().toString().replace("-", "");

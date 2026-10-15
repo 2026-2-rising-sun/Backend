@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -76,6 +77,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                 .order();
     }
 
+    @DisplayName("세션 폐기·검증 장애 시 거래를 차단하고 서비스 판매 조회는 독립적으로 유지한다")
     @Test
     void revokedOrUnavailableSessionsCannotTradeWhileServiceSalesRemainIndependent()
             throws Exception {
@@ -106,6 +108,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
     }
 
+    @DisplayName("익명 거래와 기존 비밀번호 우회 경로를 허용하지 않는다")
     @Test
     void anonymousCannotUseAnyTransactionOrOldPasswordFallback() throws Exception {
         for (String path :
@@ -133,6 +136,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
     }
 
+    @DisplayName("잘못된 형식·만료·다른 서명의 JWT는 실제 검증기로 거절한다")
     @Test
     void malformedExpiredAndForeignSignatureJwtAreRejectedByActualDecoder() throws Exception {
         String expired =
@@ -148,6 +152,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         }
     }
 
+    @DisplayName("다른 사용자와 관리자는 타인 주문을 조회·취소·결제·목록 조회할 수 없다")
     @Test
     void otherUserAndAdminCannotReadCancelPayOrListAnotherMembersOrder() throws Exception {
         Order order = order(MEMBER_A);
@@ -178,6 +183,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
     }
 
+    @DisplayName("결제 본문으로 시나리오를 선택하거나 일반 사용자가 개발 제어 API에 접근할 수 없다")
     @Test
     void paymentBodyCannotChooseScenarioAndUserCannotAccessDevControl() throws Exception {
         var order = order(MEMBER_A);
@@ -198,6 +204,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
+    @DisplayName("장바구니·주문·결제·이력에 같은 회원 소유권과 상위 결제 소유권을 유지한다")
     @Test
     void cartOrderPaymentAndHistoryUseSameMemberAndPreserveParentPaymentOwnership()
             throws Exception {
@@ -280,6 +287,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(7);
     }
 
+    @DisplayName("일반 사용자는 판매를 관리할 수 없고 관리자는 가능하며 서비스가 회원을 대신할 수 없다")
     @Test
     void userCannotManageSalesWhileAdminCanAndCallerCannotActAsMember() throws Exception {
         mvc.perform(
@@ -310,6 +318,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @DisplayName("판매 일괄 조회는 허용된 서비스만 접근하고 health는 probe만 공개한다")
     @Test
     void bulkSalesRequiresAllowedCallerAndHealthOnlyExposesProbes() throws Exception {
         mvc.perform(get("/v1/sales?productIds=1").header("Authorization", adminBearer()))

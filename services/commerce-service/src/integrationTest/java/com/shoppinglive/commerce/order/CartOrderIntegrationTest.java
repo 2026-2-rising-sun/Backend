@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -70,6 +71,7 @@ class CartOrderIntegrationTest
         return new CartOrderCommand("회원", "01012345678", amount);
     }
 
+    @DisplayName("장바구니는 재고를 예약하지 않고 결제 성공 시 선택 항목만 멱등하게 삭제한다")
     @Test
     void cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay() {
         var selected = cart.add(MEMBER_A, 1L, 2);
@@ -108,6 +110,7 @@ class CartOrderIntegrationTest
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("다른 회원의 장바구니 항목은 조회·수정·삭제·주문할 수 없다")
     @Test
     void anotherMemberCannotReadChangeDeleteOrOrderSelectedItem() {
         var selected = cart.add(MEMBER_A, 1L, 2);
@@ -126,6 +129,7 @@ class CartOrderIntegrationTest
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isZero();
     }
 
+    @DisplayName("재고가 부족하면 주문을 롤백하고 장바구니를 유지한다")
     @Test
     void insufficientStockRollsBackOrderAndPreservesCart() {
         var selected = cart.add(MEMBER_A, 1L, 11);
@@ -139,6 +143,7 @@ class CartOrderIntegrationTest
         assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
     }
 
+    @DisplayName("주문 시 최신 가격과 판매 상태를 다시 확인하고 장바구니 항목을 유지한다")
     @Test
     void latestPriceAndSalesStatusAreRecheckedWithoutRemovingItem() {
         var selected = cart.add(MEMBER_A, 1L, 1);
@@ -158,6 +163,7 @@ class CartOrderIntegrationTest
         assertThat(orders.count()).isZero();
     }
 
+    @DisplayName("같은 멱등 키도 회원이 다르면 독립적으로 사용한다")
     @Test
     void sameIdempotencyKeyIsIndependentForDifferentMembers() {
         var a =
@@ -171,6 +177,7 @@ class CartOrderIntegrationTest
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
     }
 
+    @DisplayName("장바구니 주문을 동시에 재전송해도 주문과 재고 예약은 한 번만 생성한다")
     @Test
     void concurrentCartReplayCreatesOneOrderAndReservesOnce() throws Exception {
         var item = cart.add(MEMBER_A, 1L, 2);

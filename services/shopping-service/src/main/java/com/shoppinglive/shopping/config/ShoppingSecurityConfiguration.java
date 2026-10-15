@@ -106,8 +106,7 @@ public class ShoppingSecurityConfiguration {
 
     private HttpSecurity stateless(HttpSecurity http, JsonSecurityErrorHandler errors)
             throws Exception {
-        // Only explicit Bearer/service headers are accepted; this service never authenticates
-        // cookies.
+        // 명시적인 Bearer·서비스 헤더만 허용하고 쿠키로 인증하지 않는다.
         return http.csrf(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)

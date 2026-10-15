@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -61,8 +62,9 @@ class SalesStockConcurrencyTest
      *
      * <p>{@link RepeatedTest} 3 회 반복으로 재현 가능성 확인.
      */
+    @DisplayName("재고 5개를 동시에 10번 차감하면 최대 5번 성공한다")
     @RepeatedTest(3)
-    void 재고_5_동시_차감_10건_요청시_성공은_최대_5건() throws Exception {
+    void allowsAtMostFiveConcurrentDecrementsForFiveItems() throws Exception {
         int threads = 10;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         CountDownLatch startGate = new CountDownLatch(1);

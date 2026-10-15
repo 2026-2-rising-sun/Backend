@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,6 +51,7 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
         sales.deleteAll();
     }
 
+    @DisplayName("경로 중간의 ID 누락을 인증 실패로 처리하지 않는다")
     @Test
     void missingMiddleIdDoesNotBecomeAnAuthenticationFailure() throws Exception {
         for (String token : new String[] {null, adminBearer(), "Bearer invalid"}) {
@@ -59,6 +61,7 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
         unchanged();
     }
 
+    @DisplayName("중복 슬래시를 정상 관리자 변경 경로로 정규화하지 않는다")
     @Test
     void duplicateSlashesCannotBeNormalizedIntoAValidAdministratorMutation() throws Exception {
         expect(
@@ -72,12 +75,14 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
         unchanged();
     }
 
+    @DisplayName("인코딩된 퍼센트는 보안 방화벽에서 계속 거절한다")
     @Test
     void encodedPercentRemainsRejectedByTheSecurityFirewall() throws Exception {
         expect(request("PATCH", "/v1/sales/%252F/price", adminBearer()), 400, "INVALID_REQUEST");
         unchanged();
     }
 
+    @DisplayName("인코딩된 슬래시는 애플리케이션 진입 전에 컨테이너에서 거절한다")
     @ParameterizedTest
     @ValueSource(strings = {"%2F", "%2f"})
     void containerRejectsEncodedSlashesBeforeTheApplication(String slash) throws Exception {
@@ -87,6 +92,7 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
         unchanged();
     }
 
+    @DisplayName("정상 경로의 인증·권한과 관리자 성공 응답을 유지한다")
     @Test
     void normalRoutesKeepAuthenticationAuthorizationAndAdministratorSuccess() throws Exception {
         String path = "/v1/sales/" + saleId + "/stock";

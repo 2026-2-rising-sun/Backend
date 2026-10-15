@@ -14,6 +14,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -63,6 +64,7 @@ class MemberCouponHttpTest extends CommerceSecurityTestSupport {
         jdbc.update("DELETE FROM coupon_definition WHERE id=?", coupon);
     }
 
+    @DisplayName("쿠폰 수령은 멱등하며 수령 내역은 본인에게만 노출한다")
     @Test
     void claimIsIdempotentAndReceiptIsOnlyVisibleToOwningMember() throws Exception {
         var first =
@@ -94,6 +96,7 @@ class MemberCouponHttpTest extends CommerceSecurityTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("수령 가능 쿠폰 조회와 수령은 인증된 USER 또는 SELLER만 허용한다")
     @Test
     void availableListAndClaimRequireAuthenticatedUserOrSeller() throws Exception {
         mvc.perform(get("/v1/coupons").header("Authorization", bearer(MEMBER_A)))
@@ -112,6 +115,7 @@ class MemberCouponHttpTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isCreated());
     }
 
+    @DisplayName("잘못된 페이지와 존재하지 않는 쿠폰을 거절한다")
     @Test
     void rejectsInvalidPagingAndMissingCoupon() throws Exception {
         mvc.perform(get("/v1/me/coupons?page=-1").header("Authorization", bearer(MEMBER_A)))

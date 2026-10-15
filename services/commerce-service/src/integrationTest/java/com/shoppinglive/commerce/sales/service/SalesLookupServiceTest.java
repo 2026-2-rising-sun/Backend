@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,8 +65,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
         salesStockRepository.save(new SalesStock(sales.getId(), available, reserved));
     }
 
+    @DisplayName("요청한 상품의 가격·상태·재고를 한 번에 반환한다")
     @Test
-    void 요청한_상품들의_가격_상태_재고를_한_번에_돌려준다() {
+    void returnsRequestedPricesStatusesAndStockInOneLookup() {
         List<SalesLookup> found =
                 salesLookupService.findByProductIds(
                         List.of(ON_SALE_PRODUCT, SOLD_OUT_PRODUCT, READY_PRODUCT));
@@ -76,8 +78,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
                 .containsExactlyInAnyOrder(ON_SALE_PRODUCT, SOLD_OUT_PRODUCT, READY_PRODUCT);
     }
 
+    @DisplayName("판매 조회 필드는 판매정보와 재고의 값을 그대로 반환한다")
     @Test
-    void 각_필드는_판매정보와_재고에서_그대로_온다() {
+    void copiesFieldsFromSalesInformationAndStock() {
         SalesLookup lookup = onlyOne(ON_SALE_PRODUCT);
 
         assertThat(lookup.price()).isEqualTo(15_000L);
@@ -90,8 +93,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
      * {@code available} 은 결제 대기로 잡힌 {@code reserved} 를 뺀 수량이다. 이 상품은 총 9개 중 2개가 결제 대기라 지금 살 수 있는 건
      * 7개다. {@code reserved} 를 더해서 9를 내보내면 부르는 쪽 화면에 살 수 없는 재고까지 있는 것처럼 보인다.
      */
+    @DisplayName("available은 결제 대기 예약을 제외한 수량을 반환한다")
     @Test
-    void available_은_결제_대기분을_뺀_수량이다() {
+    void excludesPaymentPendingReservationsFromAvailableStock() {
         assertThat(onlyOne(ON_SALE_PRODUCT).available()).isEqualTo(7);
     }
 
@@ -99,8 +103,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
      * 미등록 상품은 배열에서 빠진다. 404 로 전체를 실패시키면 상품 50개 중 하나가 미등록일 때 목록 화면 전체가 못 뜬다. 빈 원소로 채우면 부르는 쪽이 "조회
      * 실패" 와 구분할 수 없다.
      */
+    @DisplayName("판매정보가 없는 상품은 조회 결과에서 제외한다")
     @Test
-    void 판매정보가_없는_상품은_결과에서_빠진다() {
+    void omitsProductsWithoutSalesInformation() {
         List<SalesLookup> found =
                 salesLookupService.findByProductIds(List.of(ON_SALE_PRODUCT, UNREGISTERED_PRODUCT));
 
@@ -108,8 +113,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
         assertThat(found.get(0).productId()).isEqualTo(ON_SALE_PRODUCT);
     }
 
+    @DisplayName("모든 판매정보가 없으면 빈 배열을 반환한다")
     @Test
-    void 전부_미등록이면_빈_배열이다() {
+    void returnsEmptyArrayWhenAllSalesAreMissing() {
         assertThat(salesLookupService.findByProductIds(List.of(UNREGISTERED_PRODUCT))).isEmpty();
     }
 
@@ -117,8 +123,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
      * 방송 화면이 같은 상품을 여러 슬롯에 걸 수 있어 중복 요청을 거절하지 않는다. 대신 결과에는 한 번만 담아, 부르는 쪽이 "상품당 판매정보 1개" 계약을 그대로 믿을
      * 수 있게 한다.
      */
+    @DisplayName("같은 상품을 여러 번 요청해도 조회 결과는 한 건이다")
     @Test
-    void 같은_상품을_여러_번_요청해도_결과는_한_건이다() {
+    void returnsOneEntryForRepeatedProductId() {
         List<SalesLookup> found =
                 salesLookupService.findByProductIds(
                         List.of(ON_SALE_PRODUCT, ON_SALE_PRODUCT, ON_SALE_PRODUCT));
@@ -126,8 +133,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
         assertThat(found).hasSize(1);
     }
 
+    @DisplayName("판매정보 조회는 재고를 변경하지 않는다")
     @Test
-    void 조회는_재고를_건드리지_않는다() {
+    void doesNotChangeStockDuringLookup() {
         Long salesId = onlyOne(ON_SALE_PRODUCT).salesId();
 
         salesLookupService.findByProductIds(List.of(ON_SALE_PRODUCT));
@@ -138,8 +146,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
         assertThat(stock.getReserved()).isEqualTo(2);
     }
 
+    @DisplayName("상품 ID는 상한인 100개까지 허용한다")
     @Test
-    void 상한인_100개까지는_받는다() {
+    void acceptsMaximumOfOneHundredProductIds() {
         List<Long> productIds = new ArrayList<>();
         productIds.add(ON_SALE_PRODUCT);
         for (long id = 1L; productIds.size() < SalesLookupService.MAX_PRODUCT_IDS; id++) {
@@ -149,8 +158,9 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
         assertThat(salesLookupService.findByProductIds(productIds)).hasSize(1);
     }
 
+    @DisplayName("조회 상품 개수가 상한을 넘으면 400으로 거절한다")
     @Test
-    void 상한을_넘으면_400이다() {
+    void rejectsProductIdCountAboveLimit() {
         List<Long> tooMany = new ArrayList<>();
         for (long id = 1L; id <= SalesLookupService.MAX_PRODUCT_IDS + 1; id++) {
             tooMany.add(id);
@@ -160,19 +170,22 @@ class SalesLookupServiceTest extends com.shoppinglive.commerce.support.CommerceS
     }
 
     /** 조회할 상품이 없는 건 잘못된 요청이 아니라 "물어본 게 없는" 요청이다. 미등록 상품을 물었을 때도 빈 배열이 나가므로 같은 모양으로 맞춘다. */
+    @DisplayName("빈 상품 ID 목록을 조회하면 빈 목록을 반환한다")
     @Test
-    void 비어_있으면_빈_목록이다() {
+    void returnsEmptyListForEmptyInput() {
         assertThat(salesLookupService.findByProductIds(List.of())).isEmpty();
     }
 
     /** 컬렉션 자체가 {@code null} 인 건 부르는 코드의 버그라 빈 결과로 덮지 않는다. */
+    @DisplayName("상품 ID 목록이 null이면 400으로 거절한다")
     @Test
-    void null_이면_400이다() {
+    void rejectsNullInput() {
         assertThatInvalidRequest(() -> salesLookupService.findByProductIds(null));
     }
 
+    @DisplayName("상품 ID 목록에 null이 있으면 400으로 거절한다")
     @Test
-    void 원소에_null_이_섞이면_400이다() {
+    void rejectsNullElementInProductIds() {
         assertThatInvalidRequest(
                 () -> salesLookupService.findByProductIds(Collections.singletonList(null)));
     }

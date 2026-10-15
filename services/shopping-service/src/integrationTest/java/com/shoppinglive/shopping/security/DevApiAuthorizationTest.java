@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.shoppinglive.shopping.product.entity.ProductImage;
 import com.shoppinglive.shopping.product.repository.ProductImageRepository;
 import com.shoppinglive.shopping.storage.ImageFormat;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,6 +26,7 @@ class DevApiAuthorizationTest extends ShoppingSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired ProductImageRepository images;
 
+    @DisplayName("개발 이미지 초기화는 local·test에서 활성화해도 삭제 전 관리자 인증을 요구한다")
     @Test
     void enabledLocalTestResetStillRequiresAdministratorBeforeDeleting() throws Exception {
         images.saveAndFlush(

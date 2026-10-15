@@ -65,8 +65,8 @@ class OrderCheckoutServiceTest {
     // ----- 정상 주문서 -----
 
     @Test
-    @DisplayName("상품명과 단가 총액을 조합해 돌려준다")
-    void preview_상품명과_단가_총액을_조합해_돌려준다() {
+    @DisplayName("주문서 조회는 상품명·단가·총액을 조합해 반환한다")
+    void combinesProductNameUnitPriceAndTotalInPreview() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         productExists();
 
@@ -88,8 +88,8 @@ class OrderCheckoutServiceTest {
      * 나중에 새 변경 쿼리가 생겼을 때 검증이 조용히 비게 된다.
      */
     @Test
-    @DisplayName("조회만으로는 재고를 건드리지 않는다")
-    void preview_조회만으로는_재고를_건드리지_않는다() {
+    @DisplayName("주문서 조회는 재고를 변경하지 않는다")
+    void doesNotChangeStockDuringPreview() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         productExists();
 
@@ -99,8 +99,8 @@ class OrderCheckoutServiceTest {
     }
 
     @Test
-    @DisplayName("재고와 정확히 같은 수량도 주문 가능이다")
-    void preview_재고와_정확히_같은_수량도_주문_가능이다() {
+    @DisplayName("재고와 같은 수량도 주문 가능한 견적으로 반환한다")
+    void allowsPreviewQuantityEqualToStock() {
         salesExists(15_000L, 3, SalesStatus.ON_SALE);
         productExists();
 
@@ -110,8 +110,8 @@ class OrderCheckoutServiceTest {
     // ----- 주문 불가 사유 -----
 
     @Test
-    @DisplayName("재고보다 많은 수량이면 EXCEEDS STOCK")
-    void preview_재고보다_많은_수량이면_EXCEEDS_STOCK() {
+    @DisplayName("재고보다 많은 수량은 EXCEEDS_STOCK 사유를 반환한다")
+    void reportsExceedsStockForExcessPreviewQuantity() {
         salesExists(15_000L, 3, SalesStatus.ON_SALE);
         productExists();
 
@@ -123,8 +123,8 @@ class OrderCheckoutServiceTest {
     }
 
     @Test
-    @DisplayName("품절이면 SOLD OUT")
-    void preview_품절이면_SOLD_OUT() {
+    @DisplayName("품절 상태의 견적은 SOLD_OUT 사유를 반환한다")
+    void reportsSoldOutForSoldOutSale() {
         salesExists(15_000L, 0, SalesStatus.SOLD_OUT);
         productExists();
 
@@ -134,8 +134,8 @@ class OrderCheckoutServiceTest {
 
     /** 재고가 0 이 됐지만 아직 SOLD_OUT 으로 전이되기 전의 찰나. 사용자 입장에선 품절이므로 "재고 부족" 이 아니라 품절로 안내한다. */
     @Test
-    @DisplayName("판매중인데 재고가 0이면 SOLD OUT")
-    void preview_판매중인데_재고가_0이면_SOLD_OUT() {
+    @DisplayName("판매중이어도 재고가 0이면 SOLD_OUT 사유를 반환한다")
+    void reportsSoldOutWhenActiveSaleHasZeroStock() {
         salesExists(15_000L, 0, SalesStatus.ON_SALE);
         productExists();
 
@@ -145,8 +145,8 @@ class OrderCheckoutServiceTest {
 
     /** 비공개 상품에 "재고 부족" 이라고 안내하면 곧 재입고될 것처럼 읽힌다. 상태를 먼저 본다. */
     @Test
-    @DisplayName("비공개나 판매준비면 NOT ON SALE")
-    void preview_비공개나_판매준비면_NOT_ON_SALE() {
+    @DisplayName("비공개·판매준비 상품의 견적은 NOT_ON_SALE 사유를 반환한다")
+    void reportsNotOnSaleForPrivateAndReadySales() {
         salesExists(15_000L, 10, SalesStatus.PRIVATE);
         productExists();
 
@@ -156,8 +156,8 @@ class OrderCheckoutServiceTest {
 
     /** 살 수 없는 상태여도 404 가 아니라 200 + 사유다. 구매자는 방금까지 상품 페이지를 보고 있었으므로 "왜 못 사는지" 를 알아야 한다. */
     @Test
-    @DisplayName("주문 불가여도 예외가 아니라 사유를 담아 돌려준다")
-    void preview_주문_불가여도_예외가_아니라_사유를_담아_돌려준다() {
+    @DisplayName("주문할 수 없어도 예외 대신 견적에 사유를 담아 반환한다")
+    void returnsReasonInsteadOfThrowingForUnorderableProduct() {
         salesExists(15_000L, 0, SalesStatus.SOLD_OUT);
         productExists();
 
@@ -170,8 +170,8 @@ class OrderCheckoutServiceTest {
     // ----- 조회 실패 -----
 
     @Test
-    @DisplayName("판매정보가 없으면 404")
-    void preview_판매정보가_없으면_404() {
+    @DisplayName("판매정보가 없으면 주문서 조회는 404로 응답한다")
+    void returns404WhenPreviewSalesAreMissing() {
         given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 1))
@@ -181,8 +181,8 @@ class OrderCheckoutServiceTest {
     }
 
     @Test
-    @DisplayName("Shopping에 상품이 없으면 404")
-    void preview_Shopping에_상품이_없으면_404() {
+    @DisplayName("Shopping에 상품이 없으면 주문서 조회는 404로 응답한다")
+    void returns404WhenShoppingProductIsMissing() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
 
@@ -192,8 +192,8 @@ class OrderCheckoutServiceTest {
 
     /** 상품명을 확인하지 못한 채 주문서를 그리면 무엇을 사는지 모르는 화면이 된다. 장애를 "상품 없음" 으로 단정하지도 않는다. */
     @Test
-    @DisplayName("Shopping 장애는 404로 바꾸지 않고 전파한다")
-    void preview_Shopping_장애는_404로_바꾸지_않고_전파한다() {
+    @DisplayName("Shopping 장애를 404로 바꾸지 않고 전파한다")
+    void propagatesShoppingFailureWithoutMappingItTo404() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         given(shoppingClient.findProduct(PRODUCT_ID))
                 .willThrow(new ShoppingUnavailableException("shopping timeout"));
@@ -206,8 +206,8 @@ class OrderCheckoutServiceTest {
     // ----- 입력 검증 -----
 
     @Test
-    @DisplayName("수량이 0이하면 400이고 조회도 하지 않는다")
-    void preview_수량이_0이하면_400이고_조회도_하지_않는다() {
+    @DisplayName("수량이 0 이하면 400으로 거절하고 조회하지 않는다")
+    void rejectsNonPositiveQuantityBeforeLookup() {
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 0))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())
@@ -218,8 +218,8 @@ class OrderCheckoutServiceTest {
     }
 
     @Test
-    @DisplayName("productId가 null이면 400")
-    void preview_productId가_null이면_400() {
+    @DisplayName("상품 ID가 null이면 주문서 조회는 400으로 거절한다")
+    void returns400ForNullPreviewProductId() {
         assertThatThrownBy(() -> orderCheckoutService.preview(null, 1))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())

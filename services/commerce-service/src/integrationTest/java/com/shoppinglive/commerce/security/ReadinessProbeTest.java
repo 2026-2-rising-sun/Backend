@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +31,7 @@ class ReadinessProbeTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired DataSource dataSource;
 
+    @DisplayName("DB 장애는 세부 정보를 노출하지 않고 readiness만 실패시킨다")
     @Test
     void unavailableDataSourceFailsReadinessButNotLivenessWithoutExposingDetails()
             throws Exception {

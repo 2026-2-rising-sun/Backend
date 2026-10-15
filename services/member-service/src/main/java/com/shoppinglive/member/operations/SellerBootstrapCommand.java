@@ -26,8 +26,7 @@ public final class SellerBootstrapCommand {
         String username = required(environment, "MEMBER_BOOTSTRAP_DB_USER");
         String databasePassword = required(environment, "MEMBER_BOOTSTRAP_DB_PASSWORD");
         if (!url.startsWith("jdbc:postgresql:") || !schema.matches("[a-z_][a-z0-9_]{0,62}")) {
-            throw new IllegalArgumentException(
-                    "Seller bootstrap requires an explicit PostgreSQL URL and schema");
+            throw new IllegalArgumentException("판매자 생성에는 명시적인 PostgreSQL URL과 스키마가 필요합니다.");
         }
         SignupRequest request =
                 new SignupRequest(
@@ -37,8 +36,7 @@ public final class SellerBootstrapCommand {
         try (var validation = Validation.buildDefaultValidatorFactory()) {
             if (!validation.getValidator().validate(request).isEmpty()
                     || request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-                throw new IllegalArgumentException(
-                        "Invalid seller email, display name or password");
+                throw new IllegalArgumentException("판매자 이메일·표시 이름·비밀번호가 올바르지 않습니다.");
             }
         }
         String email =
@@ -63,15 +61,14 @@ public final class SellerBootstrapCommand {
             return id;
         } catch (SQLException exception) {
             // URL/SQL 오류가 자격증명을 포함할 수 있어 원문 예외와 환경 값을 출력하지 않는다.
-            throw new IllegalStateException(
-                    "Seller bootstrap failed; verify database access, migration and duplicate email");
+            throw new IllegalStateException("판매자를 생성하지 못했습니다. DB 연결·마이그레이션·이메일 중복을 확인해 주세요.");
         }
     }
 
     private String required(Map<String, String> environment, String key) {
         String value = environment.get(key);
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Missing required environment: " + key);
+            throw new IllegalArgumentException("필수 환경변수가 없습니다: " + key);
         }
         return value;
     }

@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class HttpAccessSessionVerifierTest {
@@ -23,6 +24,7 @@ class HttpAccessSessionVerifierTest {
     private static final UUID SESSION = UUID.randomUUID();
     private final ObjectMapper mapper = new ObjectMapper();
 
+    @DisplayName("매 요청마다 캐시 없이 호출자 인증 정보와 회원·세션 식별자만 전달한다")
     @Test
     void sendsOnlyCallerCredentialAndExactIdentityOnEveryCallWithoutCaching() throws Exception {
         var calls = new AtomicInteger();
@@ -56,6 +58,7 @@ class HttpAccessSessionVerifierTest {
         }
     }
 
+    @DisplayName("200 이외 응답·리다이렉트·잘못된 봉투는 재시도 없이 거절한다")
     @Test
     void rejectsNon200RedirectsAndMalformedEnvelopesWithoutRetry() throws Exception {
         var status = new AtomicInteger(200);
@@ -115,6 +118,7 @@ class HttpAccessSessionVerifierTest {
         }
     }
 
+    @DisplayName("읽기 시간 초과와 연결 실패는 우회 없이 서비스 장애로 처리한다")
     @Test
     void actualReadTimeoutAndConnectionFailureAreUnavailableWithoutAllowFallback()
             throws Exception {

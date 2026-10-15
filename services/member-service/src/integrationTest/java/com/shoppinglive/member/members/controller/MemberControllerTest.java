@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.members.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
@@ -8,7 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.shoppinglive.member.security.MemberAuthTestSupport;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.HealthContributor;
@@ -16,12 +18,13 @@ import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
-class MemberServiceApplicationTests extends MemberAuthTestSupport {
+class MemberControllerTest extends MemberAuthTestSupport {
     @MockitoSpyBean(name = "dbHealthContributor")
     HealthContributor databaseHealth;
 
+    @DisplayName("회원 UUID와 상속한 감사 시각을 저장하고 다시 조회한다")
     @Test
-    void 회원_UUID와_상속한_시간을_저장하고_재조회한다() {
+    void persistsAndReloadsMemberUuidAndInheritedAuditTimes() {
         var member =
                 com.shoppinglive.member.members.entity.Member.register(
                         "audit@example.com", "hash", "before");
@@ -32,6 +35,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         assertThat(loaded.getUpdatedAt()).isNotNull();
     }
 
+    @DisplayName("가입 시 이메일을 정규화하고 비밀번호 해시와 USER 역할만 저장한다")
     @Test
     void signupNormalizesEmailStoresOnlyPasswordHashAndAssignsUser() throws Exception {
         mvc.perform(
@@ -55,6 +59,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         assertThat(members.count()).isEqualTo(1);
     }
 
+    @DisplayName("회원가입 요청의 역할·회원 식별자 주입을 거절한다")
     @Test
     void signupRejectsRoleAndIdentityInjection() throws Exception {
         for (String field : new String[] {"roles", "memberId"}) {
@@ -78,6 +83,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         assertThat(members.count()).isZero();
     }
 
+    @DisplayName("잘못된 비밀번호와 BCrypt UTF-8 최대 길이 초과를 거절한다")
     @Test
     void rejectsInvalidAndBcryptOverlongUtf8Password() throws Exception {
         for (String password : new String[] {"short", "가".repeat(25)}) {
@@ -99,6 +105,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         assertThat(members.count()).isZero();
     }
 
+    @DisplayName("회원 조회는 검증된 토큰의 회원을 사용하고 표시 이름만 수정할 수 있다")
     @Test
     void profileUsesVerifiedSubjectAndAllowsOnlyDisplayName() throws Exception {
         mvc.perform(
@@ -150,6 +157,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
         assertThat(members.findById(b.getId()).orElseThrow().getDisplayName()).isEqualTo("member");
     }
 
+    @DisplayName("인프라 probe는 유지하되 회원·다른 actuator 경로는 보호한다")
     @Test
     void preservesInfrastructureProbesButProtectsProfileAndOtherActuatorEndpoints()
             throws Exception {
@@ -163,6 +171,7 @@ class MemberServiceApplicationTests extends MemberAuthTestSupport {
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
     }
 
+    @DisplayName("DB 장애 시 세부 정보 없이 readiness만 실패하고 liveness는 유지한다")
     @Test
     void databaseHealthFailureMakesReadinessUnavailableWithoutLeakingDetailsOrFailingLiveness()
             throws Exception {

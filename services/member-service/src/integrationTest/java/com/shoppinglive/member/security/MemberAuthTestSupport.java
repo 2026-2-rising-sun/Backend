@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.security.test.JwtTestTokens;
@@ -34,7 +34,7 @@ public abstract class MemberAuthTestSupport {
             "member_test_" + UUID.randomUUID().toString().replace("-", "");
 
     @BeforeEach
-    void resetMembers() {
+    protected void resetMembers() {
         jdbc.update("DELETE FROM refresh_tokens");
         jdbc.update("DELETE FROM refresh_families");
         members.deleteAll();
@@ -46,7 +46,7 @@ public abstract class MemberAuthTestSupport {
     }
 
     @DynamicPropertySource
-    static void securityProperties(DynamicPropertyRegistry properties) {
+    protected static void securityProperties(DynamicPropertyRegistry properties) {
         properties.add("shoppinglive.security.jwt.issuer", () -> JwtTestTokens.ISSUER);
         properties.add("shoppinglive.security.jwt.audience", () -> JwtTestTokens.AUDIENCE);
         properties.add(

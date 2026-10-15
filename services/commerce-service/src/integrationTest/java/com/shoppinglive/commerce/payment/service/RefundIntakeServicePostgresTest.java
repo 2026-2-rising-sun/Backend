@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -30,6 +31,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
     @MockitoSpyBean InMemoryShoppingClientStub shoppingSpy;
 
+    @DisplayName("선택한 장바구니 항목의 주문 전액을 환불하고 재요청은 기존 결과를 반환한다")
     @Test
     void selectedCartItemRefundUsesItsFullOrderAmountAndIdempotentReplay() {
         var group = createAndPay();
@@ -62,6 +64,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .containsOnly(OrderStatus.PAID);
     }
 
+    @DisplayName("서비스의 빈 ID 목록은 전체 환불이며 알 수 없거나 중복된 ID는 거절한다")
     @Test
     void emptyCartIdListMeansWholeGroupAndUnknownOrDuplicateIdsAreRejected() {
         var group = createAndPay();
@@ -88,6 +91,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("멱등 키가 달라도 대상 주문이 겹치는 환불은 거절한다")
     @Test
     void overlappingTargetsAreRejectedAcrossDifferentIdempotencyKeys() {
         var group = createAndPay();
@@ -105,6 +109,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
     }
 
+    @DisplayName("확정 실패한 환불 대상은 환불 기한 안에 다시 요청할 수 있다")
     @Test
     void confirmedFailedRefundTargetCanBeRequestedAgainWithinRefundWindow() {
         var group = createAndPay();
@@ -126,6 +131,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
         assertThat(retry.refund().targets().getFirst().cartItemId()).isEqualTo(a.getId());
     }
 
+    @DisplayName("환불 접수는 결제 후 168시간 미만일 때만 허용한다")
     @Test
     void refundWindowIsStrictlyLessThan168Hours() {
         var group = createAndPay();
@@ -147,6 +153,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("판매자가 없는 기존 상품도 환불할 수 있다")
     @Test
     void legacyProductWithoutSellerCanStillBeRefunded() {
         var group = createAndPay();
@@ -169,6 +176,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .isNull();
     }
 
+    @DisplayName("같은 회원 키로 여러 묶음에 동시 요청하면 유일성 오류 대신 충돌을 반환한다")
     @Test
     void concurrentSameMemberKeyAcrossGroupsReturnsConflictInsteadOfUniqueViolation()
             throws Exception {

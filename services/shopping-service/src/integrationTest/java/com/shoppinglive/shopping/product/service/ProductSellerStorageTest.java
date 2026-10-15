@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -58,6 +59,7 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
         images.deleteAll();
     }
 
+    @DisplayName("상품 등록은 인증된 판매자를 저장하고 소유자를 반환한다")
     @Test
     void registrationStoresAuthenticatedSellerAndReturnsOwner() throws Exception {
         JsonNode result = register("owner-key");
@@ -67,6 +69,7 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
         assertThat(result.path("sellerId").asText()).isEqualTo(JwtTestTokens.SELLER);
     }
 
+    @DisplayName("다른 판매자는 본인 소유가 아닌 상품을 재등록·수정할 수 없다")
     @Test
     void anotherSellerCannotReplayOrModifyOwnedProduct() throws Exception {
         JsonNode result = register("shared-key");
@@ -102,6 +105,7 @@ class ProductSellerStorageTest extends ShoppingSecuritySupport {
         assertThat(products.findAll().getFirst().getName()).isEqualTo("owned");
     }
 
+    @DisplayName("기존 소유자 없는 상품은 소유자를 만들지 않고 조회를 허용한다")
     @Test
     void existingUnassignedProductStaysReadableWithoutInventingOwner() throws Exception {
         Product legacy =

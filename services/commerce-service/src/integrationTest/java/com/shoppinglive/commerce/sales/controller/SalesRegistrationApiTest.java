@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -82,8 +83,9 @@ class SalesRegistrationApiTest
                         .content(json));
     }
 
+    @DisplayName("판매 등록에 성공하면 201과 READY 상태를 반환한다")
     @Test
-    void 등록_성공시_201과_판매준비_상태를_돌려준다() throws Exception {
+    void returns201AndReadyStatusAfterRegistration() throws Exception {
         register(body(REGISTERED_PRODUCT_ID, 15_000, 10))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.productId").value(REGISTERED_PRODUCT_ID))
@@ -92,16 +94,18 @@ class SalesRegistrationApiTest
                 .andExpect(jsonPath("$.id").isNumber());
     }
 
+    @DisplayName("없는 상품을 판매 등록하면 404로 응답한다")
     @Test
-    void 없는_상품이면_404() throws Exception {
+    void returns404ForMissingProduct() throws Exception {
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 
+    @DisplayName("이미 판매정보가 있는 상품을 등록하면 409로 응답한다")
     @Test
-    void 이미_판매정보가_있는_상품이면_409() throws Exception {
+    void returns409ForAlreadyRegisteredProduct() throws Exception {
         register(body(REGISTERED_PRODUCT_ID, 15_000, 10)).andExpect(status().isCreated());
 
         register(body(REGISTERED_PRODUCT_ID, 20_000, 5))
@@ -109,27 +113,31 @@ class SalesRegistrationApiTest
                 .andExpect(jsonPath("$.error.code").value("CONFLICT"));
     }
 
+    @DisplayName("판매 등록 가격이 0 이하면 400으로 응답한다")
     @Test
-    void 가격이_0이하면_400() throws Exception {
+    void returns400ForNonPositivePrice() throws Exception {
         register(body(REGISTERED_PRODUCT_ID, 0, 10)).andExpect(status().isBadRequest());
         register(body(REGISTERED_PRODUCT_ID, -1, 10)).andExpect(status().isBadRequest());
     }
 
+    @DisplayName("판매 등록 재고가 음수면 400으로 응답한다")
     @Test
-    void 재고가_음수면_400() throws Exception {
+    void returns400ForNegativeInitialStock() throws Exception {
         register(body(REGISTERED_PRODUCT_ID, 15_000, -1)).andExpect(status().isBadRequest());
     }
 
+    @DisplayName("판매 등록 필수값이 없으면 400으로 응답한다")
     @Test
-    void 필수값이_빠지면_400() throws Exception {
+    void returns400ForMissingRequiredFields() throws Exception {
         register(body(null, 15_000, 10)).andExpect(status().isBadRequest());
         register(body(REGISTERED_PRODUCT_ID, null, 10)).andExpect(status().isBadRequest());
         register(body(REGISTERED_PRODUCT_ID, 15_000, null)).andExpect(status().isBadRequest());
     }
 
     /** 등록 실패가 판매정보를 남기면 같은 상품을 다시 등록할 때 409 가 나서 영영 막힌다. */
+    @DisplayName("없는 상품의 등록이 실패해도 같은 상품의 다음 등록을 막지 않는다")
     @Test
-    void 없는_상품_등록_실패_후_같은_상품을_등록해도_막히지_않는다() throws Exception {
+    void allowsRetryAfterMissingProductRegistrationFails() throws Exception {
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10)).andExpect(status().isNotFound());
 
         shoppingClientStub.register(new ProductSnapshot(UNKNOWN_PRODUCT_ID, "뒤늦게 생긴 상품", null));

@@ -27,6 +27,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,7 @@ class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
     @Qualifier("salesInfoKafkaTemplate")
     KafkaTemplate<String, EventEnvelope<SalesInfoSnapshot>> salesKafka;
 
+    @DisplayName("실제 Kafka에서 별도 직렬화기를 사용한 Outbox JSON과 도메인 JSON을 수신한다")
     @Test
     void realKafkaReceivesRawOutboxJsonAndDomainJsonFromSeparateSerializers() throws Exception {
         String broker = System.getenv("COMMERCE_TEST_KAFKA_SERVERS");

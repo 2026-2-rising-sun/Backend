@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -88,8 +89,9 @@ class PaymentFlowIntegrationTest
         devRegistry.clear(orderNumber);
     }
 
+    @DisplayName("INSTANT_SUCCESS 결제를 시작하면 PAID로 확정하고 예약 재고를 소진한다")
     @Test
-    void INSTANT_SUCCESS_결제_시작_후_짧게_기다리면_PAID_로_확정_재고_소진() {
+    void confirmsInstantSuccessAndConsumesReservedStock() {
         startPaymentWithScenario(
                 orderNumber,
                 "11111111-1111-4111-8111-111111111111",
@@ -108,8 +110,9 @@ class PaymentFlowIntegrationTest
                         });
     }
 
+    @DisplayName("INSTANT_FAIL 결제는 FAILED로 확정하고 예약 재고를 복구한다")
     @Test
-    void INSTANT_FAIL_이면_FAILED_확정_재고_복구() {
+    void confirmsInstantFailureAndRestoresReservedStock() {
         startPaymentWithScenario(
                 orderNumber, "11111111-1111-4111-8111-111111111111", PaymentScenario.INSTANT_FAIL);
 
@@ -126,8 +129,9 @@ class PaymentFlowIntegrationTest
                         });
     }
 
+    @DisplayName("DELAYED_SUCCESS 결제는 지연 후 PAID로 확정한다")
     @Test
-    void DELAYED_SUCCESS_는_짧게_기다린_후에_PAID_로_확정() {
+    void confirmsDelayedSuccessAfterDelay() {
         PaymentAttempt attempt =
                 startPaymentWithScenario(
                         orderNumber,
@@ -146,8 +150,9 @@ class PaymentFlowIntegrationTest
                         });
     }
 
+    @DisplayName("본문에 시나리오가 없어도 개발 레지스트리에 지정한 시나리오를 적용한다")
     @Test
-    void dev_registry_사전지정_시나리오_body_scenario_없어도_적용() {
+    void usesPreconfiguredScenarioWithoutScenarioInBody() {
         devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
 
         startPaymentWithScenario(orderNumber, "11111111-1111-4111-8111-111111111111", null);
@@ -161,8 +166,9 @@ class PaymentFlowIntegrationTest
                         });
     }
 
+    @DisplayName("테스트 레지스트리의 시나리오를 바꾸면 변경된 값을 사용한다")
     @Test
-    void 테스트용_registry를_변경한_경우_변경값을_사용() {
+    void usesUpdatedTestRegistryScenario() {
         devRegistry.set(orderNumber, PaymentScenario.INSTANT_FAIL);
 
         startPaymentWithScenario(

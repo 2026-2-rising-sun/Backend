@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -115,8 +116,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
         shoppingClientStub.clear();
     }
 
+    @DisplayName("단건 주문서는 본인 쿠폰의 할인액을 계산하고 예약하지 않는다")
     @Test
-    void 단건주문서에_보유쿠폰_할인을_계산하고_예약하지_않는다() throws Exception {
+    void previewsOwnedCouponDiscountWithoutReservation() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=2&couponId=" + COUPON_ID)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.couponId").value(COUPON_ID))
@@ -131,8 +133,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 .isEqualTo("AVAILABLE");
     }
 
+    @DisplayName("단건 주문은 미리보기와 같은 할인액을 저장하고 쿠폰을 예약한다")
     @Test
-    void 단건주문생성은_미리보기와_같은_할인을_저장하고_쿠폰을_예약한다() throws Exception {
+    void storesPreviewedDiscountAndReservesCouponForSingleOrder() throws Exception {
         String body =
                 """
             {"productId":%d,"quantity":2,"buyerName":"구매자","buyerPhone":"010-1234-5678",
@@ -189,8 +192,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(orders.count()).isEqualTo(1);
     }
 
+    @DisplayName("대상이 아닌 쿠폰으로 단건 주문을 요청하면 주문·재고·쿠폰을 변경하지 않는다")
     @Test
-    void 단건주문에_대상아닌_쿠폰을_보내면_주문재고쿠폰을_변경하지_않는다() throws Exception {
+    void rejectsIneligibleCouponWithoutChangingOrderStockOrCoupon() throws Exception {
         jdbc.update(
                 "UPDATE coupon_target SET product_id=? WHERE coupon_id=?",
                 PRODUCT_ID + 1,
@@ -225,8 +229,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 .containsExactly(0);
     }
 
+    @DisplayName("구매할 수 없는 상품에는 쿠폰을 적용할 수 없다")
     @Test
-    void 구매불가_상품에는_쿠폰을_적용할_수_없다() throws Exception {
+    void rejectsCouponForUnorderableProduct() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=6&couponId=" + COUPON_ID)
                 .andExpect(status().isConflict());
     }
@@ -236,8 +241,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 get("/v1/orders/checkout" + query).header("Authorization", bearer(MEMBER_A)));
     }
 
+    @DisplayName("주문 가능한 상품은 200과 총액을 반환한다")
     @Test
-    void 주문_가능하면_200과_총액을_돌려준다() throws Exception {
+    void returns200AndTotalForOrderableProduct() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=2")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.productName").value("테스트 상품"))
@@ -247,8 +253,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 .andExpect(jsonPath("$.reason").doesNotExist());
     }
 
+    @DisplayName("재고보다 많은 수량을 조회하면 200과 주문 불가 사유를 반환한다")
     @Test
-    void 재고보다_많으면_200이면서_사유를_준다() throws Exception {
+    void returns200WithReasonWhenQuantityExceedsStock() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=6")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orderable").value(false))
@@ -260,8 +267,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
      * 주문 1 완료 기준: "주문서 확인 중에는 재고가 줄지 않고, 실제 주문 생성 때만 재고를 확보한다". 주문서를 여러 번 열어봐도 DB 재고가 그대로여야 한다. 그렇지
      * 않으면 결제까지 가지 않고 이탈한 사람들 때문에 팔 수 있는 물건이 묶인다.
      */
+    @DisplayName("주문서를 반복 조회해도 재고가 줄지 않는다")
     @Test
-    void 주문서를_여러번_열어도_재고가_줄지_않는다() throws Exception {
+    void keepsStockUnchangedAcrossRepeatedCheckoutViews() throws Exception {
         Long salesId = salesRepository.findByProductId(PRODUCT_ID).orElseThrow().getId();
 
         for (int i = 0; i < 3; i++) {
@@ -273,15 +281,17 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(stock.getReserved()).isZero();
     }
 
+    @DisplayName("판매정보가 없는 상품의 주문서는 404로 응답한다")
     @Test
-    void 판매정보가_없는_상품이면_404() throws Exception {
+    void returns404WhenSalesInformationIsMissing() throws Exception {
         checkout("?productId=999999&quantity=1")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
     }
 
+    @DisplayName("잘못된 주문 수량은 400으로 응답한다")
     @Test
-    void 수량이_잘못되면_400() throws Exception {
+    void returns400ForInvalidQuantity() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=0").andExpect(status().isBadRequest());
         checkout("?productId=" + PRODUCT_ID + "&quantity=-1").andExpect(status().isBadRequest());
         checkout("?productId=" + PRODUCT_ID + "&quantity=1.5").andExpect(status().isBadRequest());
@@ -293,13 +303,15 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
      * {@code productId} 를 {@code Long} 으로 받으면 숫자가 아닌 값은 타입 변환 실패가 된다. 공통 예외 핸들러에 맡기면 500 이 되므로 전용
      * 매핑으로 400 을 보장한다.
      */
+    @DisplayName("숫자가 아닌 상품 ID는 400으로 응답한다")
     @Test
-    void productId가_숫자가_아니면_400() throws Exception {
+    void returns400ForNonNumericProductId() throws Exception {
         checkout("?productId=abc&quantity=1").andExpect(status().isBadRequest());
     }
 
+    @DisplayName("상품 ID가 없으면 400으로 응답한다")
     @Test
-    void productId가_없으면_400() throws Exception {
+    void returns400ForMissingProductId() throws Exception {
         checkout("?quantity=1").andExpect(status().isBadRequest());
     }
 
@@ -307,8 +319,9 @@ class OrderCheckoutApiTest extends com.shoppinglive.commerce.support.CommerceSec
      * {@code /v1/orders/checkout} 은 {@code /v1/orders/&#123;orderNumber&#125;} 와 경로가 겹칠 수 있다. 리터럴이
      * 먼저 매칭되는 것이 Spring 의 규칙이지만, 주문 조회 컨트롤러로 잘못 흘러가면 비밀번호 헤더가 없다는 이유로 엉뚱한 응답이 나가므로 회귀를 막아둔다.
      */
+    @DisplayName("checkout 경로를 주문번호 조회로 처리하지 않는다")
     @Test
-    void checkout_경로가_주문번호_조회로_새지_않는다() throws Exception {
+    void keepsCheckoutPathSeparateFromOrderNumberLookup() throws Exception {
         checkout("?productId=" + PRODUCT_ID + "&quantity=1")
                 .andExpect(status().isOk())
                 .andExpect(handler().handlerType(OrderCheckoutController.class));

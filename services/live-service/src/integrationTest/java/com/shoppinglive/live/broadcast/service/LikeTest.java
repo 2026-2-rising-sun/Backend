@@ -8,6 +8,7 @@ import com.shoppinglive.live.broadcast.dto.BroadcastInput;
 import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,6 +58,7 @@ class LikeTest extends LiveSecuritySupport {
                 .content("{\"liked\":" + liked + "}");
     }
 
+    @DisplayName("좋아요 재시도·취소는 과거 재요청이 있어도 최신 상태를 유지한다")
     @Test
     void retryAndCancelPreserveLatestStateEvenWithAnOldReplay() throws Exception {
         final long id = broadcast("LIVE");
@@ -103,6 +105,7 @@ class LikeTest extends LiveSecuritySupport {
         mvc.perform(change(id, first, false)).andExpect(status().isConflict());
     }
 
+    @DisplayName("종료된 방송은 기존 요청 재전송만 허용하고 새 좋아요는 거절한다")
     @Test
     void endedReplayIsAllowedButNewRequestsAreRejected() throws Exception {
         final long id = broadcast("LIVE");
@@ -121,6 +124,7 @@ class LikeTest extends LiveSecuritySupport {
                 .andExpect(status().isNotFound());
     }
 
+    @DisplayName("좋아요 검증·보안 오류는 기존 공통 오류 형식으로 응답한다")
     @Test
     void validationAndSecurityUseTheExistingErrorEnvelope() throws Exception {
         final long id = broadcast("LIVE");
@@ -154,6 +158,7 @@ class LikeTest extends LiveSecuritySupport {
                 .andExpect(status().isServiceUnavailable());
     }
 
+    @DisplayName("Redis가 없어도 과거 좋아요 스냅샷을 무시한다")
     @Test
     void legacySnapshotsAreIgnoredEvenWithoutRedis() throws Exception {
         final long id = broadcast("LIVE");

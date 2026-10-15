@@ -1,17 +1,16 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.auth.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.common.security.JwtVerificationProperties;
 import com.shoppinglive.common.security.test.JwtTestTokens;
-import com.shoppinglive.member.auth.config.MemberAuthConfiguration;
-import com.shoppinglive.member.auth.config.MemberTokenProperties;
 import com.shoppinglive.member.auth.service.MemberTokenIssuer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -20,6 +19,7 @@ import org.springframework.core.io.FileSystemResource;
 class MemberTokenConfigurationTest {
     @TempDir Path directory;
 
+    @DisplayName("토큰 수명은 명시적인 양수의 정수 초 단위만 허용한다")
     @Test
     void requiresExplicitPositiveWholeSecondTokenLifetimes() {
         var file = new FileSystemResource(directory.resolve("private.pem"));
@@ -47,6 +47,7 @@ class MemberTokenConfigurationTest {
                 .run(context -> assertThat(context).hasFailed());
     }
 
+    @DisplayName("알 수 없는 키 ID와 불일치하는 개인 키는 발급 전에 거절한다")
     @Test
     void refusesUnknownKeyIdAndMismatchedPrivateKeyBeforeIssuing() throws Exception {
         var keys = new JwtTestTokens();

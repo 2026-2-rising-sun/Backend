@@ -27,6 +27,7 @@ import java.util.Set;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
@@ -86,6 +87,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
         storage.delete("auth.png");
     }
 
+    @DisplayName("공개 상품 조회와 최소 probe는 익명 접근을 허용한다")
     @Test
     void publicReadsAndMinimalProbesRemainAnonymous() throws Exception {
         for (String path :
@@ -106,6 +108,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
         }
     }
 
+    @DisplayName("세션 폐기·검증 장애는 보호 경로만 차단하고 공개·내부 조회를 유지한다")
     @Test
     void sessionRevocationAndAuthorityOutageFailClosedWithoutBlockingPublicOrInternalReads()
             throws Exception {
@@ -128,6 +131,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk());
     }
 
+    @DisplayName("모든 관리자 메서드는 부수 효과 전에 익명·일반 사용자를 거절한다")
     @Test
     void allAdminMethodsDenyAnonymousAndUserBeforeSideEffects() throws Exception {
         for (String route :
@@ -153,6 +157,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk());
     }
 
+    @DisplayName("잘못된 토큰이나 클레임 헤더로 관리자 권한을 얻을 수 없다")
     @Test
     void invalidTokensAndClaimHeadersCannotCreateAdministrator() throws Exception {
         var claims = TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"));
@@ -181,6 +186,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isUnauthorized());
     }
 
+    @DisplayName("서비스와 사용자 인증 정보는 서로 대신 사용할 수 없다")
     @Test
     void serviceIdentityAndUserIdentityCannotSubstituteForOneAnother() throws Exception {
         for (String key : List.of(COMMERCE_KEY, LIVE_KEY)) {
@@ -211,6 +217,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isForbidden());
     }
 
+    @DisplayName("익명 probe는 장애를 보고하되 내부 세부 정보를 노출하지 않는다")
     @Test
     void anonymousProbesReportFailuresWithoutLeakingHealthDetails() throws Exception {
         try {

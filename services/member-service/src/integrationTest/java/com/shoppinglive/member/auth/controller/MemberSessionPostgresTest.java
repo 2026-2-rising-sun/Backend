@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,12 +14,14 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** 모든 세션 HTTP·롤백 테스트를 PostgreSQL에서 재사용하고 실제 행 잠금 경쟁을 검증한다. */
 @Tag("postgres")
 class MemberSessionPostgresTest extends MemberSessionTest {
+    @DisplayName("동시 토큰 갱신은 하나만 성공하지만 토큰 재사용은 성공한 접근 세션도 폐기한다")
     @Test
     void concurrentRefreshHasOneWinnerButReuseRevokesEvenTheWinningAccess() throws Exception {
         var initial = account("race@example.com");
@@ -42,6 +44,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
                 .isEqualTo(1);
     }
 
+    @DisplayName("갱신과 일반 로그아웃은 순차 처리하고 발급된 접근 토큰은 폐기하지 않는다")
     @Test
     void refreshAndOrdinaryLogoutSerializeWithoutRevokingIssuedAccess() throws Exception {
         var initial = account("race@example.com");
@@ -70,6 +73,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
                 .isNull();
     }
 
+    @DisplayName("갱신과 탈퇴가 동시에 실행되어도 활성 세션 가족을 남기지 않는다")
     @Test
     void refreshAndWithdrawalSerializeWithoutLeavingAnActiveFamily() throws Exception {
         var initial = account("race@example.com");
@@ -98,6 +102,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
                 .isZero();
     }
 
+    @DisplayName("갱신과 세션 폐기가 동시에 실행되어도 활성 세션 가족을 남기지 않는다")
     @Test
     void refreshAndAdminRevocationCannotLeaveAnActiveFamily() throws Exception {
         var initial = account("race@example.com");
@@ -123,6 +128,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
         profile(loginService.login("race@example.com", "password123")).andExpect(status().isOk());
     }
 
+    @DisplayName("V3 마이그레이션은 데이터를 보존하고 sid 도입 전 세션 가족을 무효화한다")
     @Test
     @Tag("migration")
     void v3MigrationPreservesDataButInvalidatesPreSidFamilies() throws Exception {
@@ -174,6 +180,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
         }
     }
 
+    @DisplayName("V4 마이그레이션은 ADMIN 역할만 변경하고 해당 회원의 기존 세션만 폐기한다")
     @Test
     @Tag("migration")
     void v4MigrationRenamesOnlyAdminAndRevokesOnlyTheirExistingFamilies() throws Exception {

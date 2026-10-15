@@ -5,11 +5,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.DriverManager;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 class ProductSellerMigrationTest {
+    @DisplayName("마이그레이션은 기존 상품을 보존하고 판매자를 임의로 지정하지 않는다")
     @Test
     void migrationRetainsExistingProductsWithoutAssigningSeller() throws Exception {
         verify(
@@ -20,6 +22,7 @@ class ProductSellerMigrationTest {
                 "");
     }
 
+    @DisplayName("PostgreSQL 마이그레이션은 기존 상품을 보존하고 판매자를 임의로 지정하지 않는다")
     @Test
     @Tag("postgres")
     @Tag("migration")

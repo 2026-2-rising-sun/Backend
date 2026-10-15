@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -37,6 +38,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
     @MockitoBean RefundMockEngine mockEngine;
     @MockitoSpyBean DurableMockRefundGateway gateway;
 
+    @DisplayName("메모리 콜백이 없어도 저장된 대기 환불을 복구한다")
     @Test
     void persistedPendingRequestIsRecoveredWhenItsInMemoryCallbackIsMissing() {
         var group = createAndPay();
@@ -53,6 +55,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         assertThat(reconciler.reconcileDue()).isZero();
     }
 
+    @DisplayName("복구 작업자 두 명이 같은 환불을 처리해도 한 번만 반영한다")
     @Test
     void twoReconciliationWorkersApplyTheSameRequestOnlyOnce() throws Exception {
         var group = createAndPay();
@@ -93,6 +96,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("7일이 지나도 만료된 임대와 저장된 게이트웨이 결과를 복구한다")
     @Test
     void expiredProcessingLeaseAndCommittedGatewayResultAreRecoveredAfterSevenDays() {
         var group = createAndPay();
@@ -123,6 +127,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
+    @DisplayName("한도가 소진된 미확정 환불은 1분마다 조회만 하며 자동 실패 처리하지 않는다")
     @Test
     void exhaustedUnknownOnlyQueriesEachPersistedMinuteAndNeverAutomaticallyFails() {
         var group = createAndPay();
@@ -158,6 +163,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isTrue();
     }
 
+    @DisplayName("한도 소진 후 늦은 결과를 조회하면 추가 환불 없이 반영한다")
     @Test
     void lateResultAfterExhaustionIsAppliedByTheScannerWithoutSendingAnotherRefund() {
         var group = createAndPay();
@@ -187,6 +193,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(3);
     }
 
+    @DisplayName("한 요청의 반영 실패가 다른 요청의 복구를 막지 않는다")
     @Test
     void oneApplicationFailureDoesNotPreventAnotherRequestFromRecovering() {
         var group = createAndPay();
@@ -216,6 +223,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
+    @DisplayName("한도 소진 후 조회 실패에도 1분 주기를 유지하고 즉시 반복하지 않는다")
     @Test
     void exhaustedLookupFailureKeepsTheOneMinuteScheduleAndDoesNotSpin() {
         var group = createAndPay();
@@ -246,6 +254,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.UNKNOWN);
     }
 
+    @DisplayName("마지막 실행 재시도 후 반영에 실패해도 1분 뒤 결과 조회만 예약한다")
     @Test
     void applicationFailureAfterTheLastExecutionRetryAlsoSchedulesResultOnlyAfterOneMinute() {
         var group = createAndPay();

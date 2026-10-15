@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.commerce.payment.service.RefundTestSupport;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -23,6 +24,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
     @Autowired com.shoppinglive.commerce.payment.service.RefundExecutionService executions;
     @Autowired com.shoppinglive.commerce.payment.service.DurableMockRefundGateway refundGateway;
 
+    @DisplayName("회원과 판매자는 각자에게 속한 환불 정보만 조회한다")
     @Test
     void memberAndSellersSeeOnlyTheirOwnRefundProjection() throws Exception {
         var group = createAndPay();
@@ -70,6 +72,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
                 .andExpect(jsonPath("$.data[0].targets[0].cartItemId").value(b.getId()));
     }
 
+    @DisplayName("본인 미확정 환불을 조회하되 키·작업 임대·다른 판매자 금액은 노출하지 않는다")
     @Test
     void ownUnknownRecoveryIsVisibleWithoutLeakingKeysLeasesOrAnotherSellersMoney()
             throws Exception {

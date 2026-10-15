@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -57,6 +58,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
         images.deleteAll();
     }
 
+    @DisplayName("내부 단건·일괄 상품 조회는 판매자 소유자를 반환한다")
     @Test
     void internalSingleAndBulkLookupExposeOwner() throws Exception {
         JsonNode result = register("owner-key");
@@ -74,6 +76,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(jsonPath("$.data[0].sellerId").value(JwtTestTokens.SELLER));
     }
 
+    @DisplayName("본인 상품 목록은 타인·소유자 없는 상품을 제외하고 기존 조회는 유지한다")
     @Test
     void sellerListExcludesOtherAndUnassignedProductsAndRetainsLegacyLookup() throws Exception {
         register("owned-key");
@@ -93,6 +96,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
         assertThat(products.findById(legacy.getId()).orElseThrow().getSellerId()).isNull();
     }
 
+    @DisplayName("본인 상품 목록은 판매자 권한과 유효한 페이지를 요구한다")
     @Test
     void ownListRequiresSellerAndValidPagination() throws Exception {
         mvc.perform(get("/v1/seller/products")).andExpect(status().isUnauthorized());
@@ -105,6 +109,7 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("offset 범위 초과를 거절하고 최대 지원 offset은 허용한다")
     @Test
     void rejectsOffsetOverflowAndAcceptsLargestSupportedOffset() throws Exception {
         mvc.perform(

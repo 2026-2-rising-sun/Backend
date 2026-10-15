@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -62,6 +63,7 @@ class DurableMockGatewayPostgresTest {
         }
     }
 
+    @DisplayName("승인 응답이 유실되고 호출자가 롤백해도 새 게이트웨이는 기존 결과 하나를 조회한다")
     @Test
     void lostSuccessResponseSurvivesCallerRollbackAndNewGatewayReadsOneOriginalResult() {
         assertThatThrownBy(
@@ -88,6 +90,7 @@ class DurableMockGatewayPostgresTest {
         assertThat(resultCount()).isEqualTo(1);
     }
 
+    @DisplayName("실패 응답이 유실되면 확정 실패를 조회할 때까지 전송 결과를 미확정으로 유지한다")
     @Test
     void lostFailureResponseIsAnUnknownDeliveryUntilLookupReturnsAuthoritativeFailure() {
         assertThatThrownBy(() -> gateway.authorize(12L, PaymentScenario.FAILURE_RESPONSE_LOST))
@@ -99,6 +102,7 @@ class DurableMockGatewayPostgresTest {
         assertThat(resultCount()).isEqualTo(1);
     }
 
+    @DisplayName("결과 저장 전 장애와 반복 조회는 실패 결과나 승인을 새로 생성하지 않는다")
     @Test
     void unavailableBeforeResultAndRepeatedQueriesDoNotCreateFailureOrAuthorization() {
         assertThatThrownBy(() -> gateway.authorize(13L, PaymentScenario.UNAVAILABLE_BEFORE_RESULT))
@@ -119,6 +123,7 @@ class DurableMockGatewayPostgresTest {
         assertThat(resultCount()).isEqualTo(1);
     }
 
+    @DisplayName("같은 요청의 동시 응답 유실에도 게이트웨이 결과를 여러 개 생성하지 않는다")
     @Test
     void sameRequestConcurrentResponsesCanBeLostOnceWithoutCreatingMultipleResults()
             throws Exception {
