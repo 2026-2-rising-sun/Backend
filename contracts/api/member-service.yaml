@@ -4,10 +4,10 @@ info:
   version: "0.3.0"
   license: { name: UNLICENSED }
   description: |-
-    회원가입·로그인·프로필과 승인된 세션 수명·철회 정책 계약이다. 성공과 오류는 ApiResponse 봉투를 사용한다.
+    회원가입·로그인·프로필·세션 관리 API. JSON 성공·오류 응답은 ApiResponse 봉투이며 204는 본문이 없다.
     Access 수명은 15분, refresh family는 최초 로그인부터 절대 30일이며 rotation으로 연장되지 않는다.
     일반 로그아웃은 refresh만 폐기하여 기존 access의 남은 수명을 허용한다. refresh 재사용·판매자 본인 세션 폐기·탈퇴는 이후 신규 인증 검사부터 access도 차단한다.
-    이미 인증 검사를 통과한 요청을 소급 취소하지 않는다. 쿠키를 쓰지 않으며 소셜 로그인은 별도 미구현 범위다.
+    이미 인증 검사를 통과한 요청을 소급 취소하지 않는다. 쿠키를 사용하지 않는다.
 security: [{ BearerAuth: [] }]
 servers:
   - url: http://localhost:8081
@@ -285,7 +285,7 @@ components:
       type: apiKey
       in: header
       name: X-Service-Token
-      description: Shopping/Commerce/Live 방향별 opaque caller 자격증명. 사용자·SELLER JWT와 대체할 수 없다.
+      description: Shopping/Commerce/Live/Notification 방향별 opaque caller 자격증명. 사용자·SELLER JWT와 대체할 수 없다.
   responses:
     AuthUnavailable:
       description: "JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음."
@@ -295,7 +295,7 @@ components:
           examples:
             authUnavailable: { value: { success: false, data: null, error: { code: SERVICE_UNAVAILABLE, message: "인증 상태를 확인할 수 없습니다.", requestId: request-001 } } }
     BadRequest:
-      description: "요청 값·형식 또는 금액 범위 오류"
+      description: "요청 값·형식 오류"
       content:
         application/json:
           schema: {"$ref": "#/components/schemas/ErrorEnvelope"}

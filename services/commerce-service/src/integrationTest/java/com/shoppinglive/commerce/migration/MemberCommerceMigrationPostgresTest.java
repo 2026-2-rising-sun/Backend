@@ -9,10 +9,13 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 /** 각 테스트는 폐기 가능한 전용 스키마를 사용하며 기존 애플리케이션의 스키마나 DB를 정리하지 않는다. */
+@Tag("postgres")
+@Tag("migration")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class MemberCommerceMigrationPostgresTest {
     private final String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");

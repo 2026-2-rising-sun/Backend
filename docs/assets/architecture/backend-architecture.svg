@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1020" viewBox="0 0 1440 1020" role="img" aria-labelledby="title desc">
+<title id="title">ShoppingLive · Backend Architecture</title><desc id="desc">서비스별 책임과 데이터 소유권을 나눈 Java / Spring Boot 백엔드</desc>
+<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#64748b"/></marker><marker id="event" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#b45309"/></marker></defs>
+<style>text{font-family:"Apple SD Gothic Neo","Noto Sans KR",sans-serif;fill:#172b45} .muted{fill:#52657e} .title{font-weight:700} .mono{font-family:Menlo,monospace}</style>
+<rect width="1440" height="1020" fill="#f7f9fc"/>
+<rect x="0" y="0" width="1440" height="8" fill="#2563eb"/>
+<text x="48" y="70" font-size="38" class="title">ShoppingLive · Backend Architecture</text>
+<text x="48" y="111" font-size="21" class="muted">서비스별 책임과 데이터 소유권을 나눈 Java / Spring Boot 백엔드</text>
+<rect x="540" y="150" width="360" height="66" rx="16" fill="#172b45" stroke="#172b45" stroke-width="1.5"/>
+<text x="720" y="192" font-size="25" text-anchor="middle" style="fill:#ffffff" class="title">Frontend · 사용자 / 판매자</text>
+<path d="M720 216 V250 H176 V296" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="176.0,296.0 171.0,284.0 181.0,284.0" fill="#64748b"/>
+<path d="M720 250 H448 V296" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="448.0,296.0 443.0,284.0 453.0,284.0" fill="#64748b"/>
+<path d="M720 250 V296" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="720.0,296.0 715.0,284.0 725.0,284.0" fill="#64748b"/>
+<path d="M720 250 H992 V296" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="992.0,296.0 987.0,284.0 997.0,284.0" fill="#64748b"/>
+<path d="M992 250 H1264 V296" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="1264.0,296.0 1259.0,284.0 1269.0,284.0" fill="#64748b"/>
+<text x="920" y="203" font-size="20" text-anchor="start">HTTP API · JWT</text>
+<rect x="48" y="298" width="256" height="160" rx="16" fill="#eaf8f5" stroke="#0f766e" stroke-width="1.5"/>
+<text x="66" y="336" font-size="28" text-anchor="start" style="fill:#0f766e" class="title">Member</text>
+<text x="66" y="377" font-size="19" text-anchor="start">회원 · 인증 · 세션</text>
+<text x="66" y="434" font-size="17" text-anchor="start" style="fill:#0f766e">member-service</text>
+<path d="M176 458 V522" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="176.0,522.0 171.0,510.0 181.0,510.0" fill="#64748b"/>
+<rect x="48" y="526" width="256" height="132" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="66" y="561" font-size="18" text-anchor="start" class="title">PostgreSQL · member</text>
+<text x="66" y="597" font-size="18" text-anchor="start">회원 / 세션 / Refresh</text>
+<rect x="320" y="298" width="256" height="160" rx="16" fill="#eef4ff" stroke="#2563eb" stroke-width="1.5"/>
+<text x="338" y="336" font-size="28" text-anchor="start" style="fill:#2563eb" class="title">Shopping</text>
+<text x="338" y="377" font-size="19" text-anchor="start">상품 · 이미지 · 판매정보 사본</text>
+<text x="338" y="434" font-size="17" text-anchor="start" style="fill:#2563eb">shopping-service</text>
+<path d="M448 458 V522" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="448.0,522.0 443.0,510.0 453.0,510.0" fill="#64748b"/>
+<rect x="320" y="526" width="256" height="132" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="338" y="561" font-size="18" text-anchor="start" class="title">PostgreSQL · shopping</text>
+<text x="338" y="597" font-size="18" text-anchor="start">상품 / 이미지 / product_sales</text>
+<rect x="592" y="298" width="256" height="160" rx="16" fill="#fff4e9" stroke="#c05b12" stroke-width="1.5"/>
+<text x="610" y="336" font-size="28" text-anchor="start" style="fill:#c05b12" class="title">Commerce</text>
+<text x="610" y="377" font-size="19" text-anchor="start">판매 · 재고 · 주문</text>
+<text x="610" y="406" font-size="19" text-anchor="start">쿠폰 · 결제 · 환불</text>
+<text x="610" y="434" font-size="17" text-anchor="start" style="fill:#c05b12">commerce-service</text>
+<path d="M720 458 V522" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="720.0,522.0 715.0,510.0 725.0,510.0" fill="#64748b"/>
+<rect x="592" y="526" width="256" height="132" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="610" y="561" font-size="18" text-anchor="start" class="title">PostgreSQL · commerce</text>
+<text x="610" y="597" font-size="18" text-anchor="start">판매 / 재고 / 주문 / 쿠폰</text>
+<text x="610" y="624" font-size="18" text-anchor="start">결제 / 환불 / Outbox</text>
+<rect x="864" y="298" width="256" height="160" rx="16" fill="#f4efff" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="882" y="336" font-size="28" text-anchor="start" style="fill:#7c3aed" class="title">Live</text>
+<text x="882" y="377" font-size="19" text-anchor="start">방송 · 프로모션</text>
+<text x="882" y="406" font-size="19" text-anchor="start">채팅 · 좋아요 · SSE</text>
+<text x="882" y="434" font-size="17" text-anchor="start" style="fill:#7c3aed">live-service</text>
+<path d="M992 458 V522" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="992.0,522.0 987.0,510.0 997.0,510.0" fill="#64748b"/>
+<rect x="864" y="526" width="256" height="132" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="882" y="561" font-size="18" text-anchor="start" class="title">PostgreSQL · live</text>
+<text x="882" y="597" font-size="18" text-anchor="start">방송 / 프로모션 / 채팅</text>
+<text x="882" y="624" font-size="18" text-anchor="start">좋아요 / Outbox</text>
+<rect x="1136" y="298" width="256" height="160" rx="16" fill="#fff0f6" stroke="#be185d" stroke-width="1.5"/>
+<text x="1154" y="336" font-size="28" text-anchor="start" style="fill:#be185d" class="title">Notification</text>
+<text x="1154" y="377" font-size="19" text-anchor="start">내 알림 목록 · 읽음 처리</text>
+<text x="1154" y="434" font-size="17" text-anchor="start" style="fill:#be185d">notification-service</text>
+<path d="M1264 458 V522" fill="none" stroke="#64748b" stroke-width="2.3" stroke-linejoin="round"/>
+<polygon points="1264.0,522.0 1259.0,510.0 1269.0,510.0" fill="#64748b"/>
+<rect x="1136" y="526" width="256" height="132" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="1154" y="561" font-size="18" text-anchor="start" class="title">PostgreSQL · notification</text>
+<text x="1154" y="597" font-size="18" text-anchor="start">알림함 / 읽음 상태</text>
+<text x="48" y="704" font-size="20" text-anchor="start" style="fill:#52657e" class="title">SHARED INFRASTRUCTURE</text>
+<rect x="48" y="730" width="644" height="138" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="72" y="770" font-size="28" text-anchor="start" class="title">Apache Kafka</text>
+<text x="72" y="808" font-size="21" text-anchor="start">Commerce 판매정보 → Shopping 사본 갱신</text>
+<text x="72" y="841" font-size="21" text-anchor="start">Commerce 쿠폰 · Live 방송/프로모션 이벤트 발행</text>
+<rect x="716" y="730" width="676" height="138" rx="16" fill="#fff" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="740" y="770" font-size="28" text-anchor="start" class="title">Redis Pub/Sub</text>
+<text x="740" y="808" font-size="21" text-anchor="start">Live 인스턴스 사이의 채팅 · 방송 이벤트 중계</text>
+<text x="740" y="841" font-size="21" text-anchor="start">각 인스턴스에서 연결된 시청자에게 SSE 전달</text>
+<rect x="48" y="900" width="1344" height="72" rx="16" fill="#eaf0f8" stroke="#dbe3ed" stroke-width="1.5"/>
+<text x="72" y="944" font-size="24" text-anchor="start" style="fill:#2563eb" class="title">common-module</text>
+<text x="340" y="944" font-size="23" text-anchor="start">공통 응답 · 예외 · JWT 검증 · 요청 추적 · JPA 감사 · Outbox</text>
+</svg>

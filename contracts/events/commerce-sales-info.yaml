@@ -12,9 +12,10 @@ channels:
       Kafka key는 payload.salesId의 10진수 문자열이며 aggregateId와 같아야 한다.
       같은 판매정보의 이벤트는 동일한 Kafka key를 사용한다.
 
-      snapshotVersion은 판매정보별 전체 스냅샷의 변경 버전이다.
-      소비자는 마지막으로 반영한 값보다 큰 버전만 반영하는 것을 계약으로 한다.
-      occurredAt과 eventId로 순서를 판단하지 않는다.
+      등록 시 snapshotVersion은 1이다. 한 트랜잭션에서 가격·판매 가능 재고·상태의 최종값이 바뀌면 버전이 한 번 증가한다.
+      여러 값이 함께 바뀌면 해당 이벤트들이 같은 버전과 최종 스냅샷을 공유한다. 값이 그대로인 요청에는 이벤트가 없다.
+      소비자는 마지막으로 반영한 값보다 큰 버전만 반영하며 occurredAt·eventId로 순서를 판단하지 않는다.
+      DB 커밋 후 직접 발행하며 전송 실패 시 애플리케이션이 재발행하지 않아 유실될 수 있다.
     messages:
       SalesRegistered:
         $ref: '#/components/messages/SalesRegistered'
@@ -28,7 +29,7 @@ operations:
   publishSalesInfo:
     action: send
     title: 판매정보 스냅샷 발행 계약
-    description: 판매정보 변경 시 해당 시점의 전체 스냅샷을 발행한다.
+    description: 트랜잭션의 최종 판매정보 스냅샷을 커밋 후 발행한다.
     channel:
       $ref: '#/channels/salesInfo'
     messages:
@@ -98,13 +99,13 @@ components:
             schemaVersion: 1
             source: commerce-service
             aggregateId: '9001'
-            occurredAt: '2026-10-14T09:00:00Z'
+            occurredAt: '2026-10-14T09:01:00Z'
             payload:
               salesId: 9001
               productId: 501
               snapshotVersion: 2
-              price: 25000
-              status: ON_SALE
+              price: 27000
+              status: READY
               available: 20
               currency: KRW
     InventoryChanged:
@@ -129,14 +130,14 @@ components:
             schemaVersion: 1
             source: commerce-service
             aggregateId: '9001'
-            occurredAt: '2026-10-14T09:00:00Z'
+            occurredAt: '2026-10-14T09:02:00Z'
             payload:
               salesId: 9001
               productId: 501
               snapshotVersion: 3
-              price: 25000
-              status: ON_SALE
-              available: 20
+              price: 27000
+              status: READY
+              available: 15
               currency: KRW
     SalesStatusChanged:
       name: SalesStatusChanged
@@ -160,14 +161,14 @@ components:
             schemaVersion: 1
             source: commerce-service
             aggregateId: '9001'
-            occurredAt: '2026-10-14T09:00:00Z'
+            occurredAt: '2026-10-14T09:03:00Z'
             payload:
               salesId: 9001
               productId: 501
               snapshotVersion: 4
-              price: 25000
+              price: 27000
               status: ON_SALE
-              available: 20
+              available: 15
               currency: KRW
   schemas:
     EventEnvelope:
@@ -255,7 +256,7 @@ components:
           format: int64
           minimum: 1
           maximum: 9223372036854775807
-          description: 판매정보별 증가 버전. 재고를 포함해 전체 스냅샷의 어느 필드든 변경되면 증가한다는 계약이다.
+          description: 판매정보별 변경 버전. 같은 트랜잭션에서 생성된 여러 종류의 이벤트는 같은 버전을 사용할 수 있다.
         price:
           type: integer
           format: int64

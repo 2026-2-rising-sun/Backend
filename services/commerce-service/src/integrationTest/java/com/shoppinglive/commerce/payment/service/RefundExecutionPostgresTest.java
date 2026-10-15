@@ -8,12 +8,14 @@ import com.shoppinglive.commerce.payment.entity.PaymentStatus;
 import com.shoppinglive.commerce.payment.entity.RefundStatus;
 import com.shoppinglive.common.core.BusinessException;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class RefundExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;

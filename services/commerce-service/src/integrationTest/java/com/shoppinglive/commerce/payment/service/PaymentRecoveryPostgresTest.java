@@ -31,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.*;
 
 @SpringBootTest
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     @Autowired PaymentService service;

@@ -7,8 +7,6 @@ import com.shoppinglive.common.security.AuthenticatedUser;
 import com.shoppinglive.shopping.product.dto.SellerProductDetail;
 import com.shoppinglive.shopping.product.dto.SellerProductPage;
 import com.shoppinglive.shopping.product.service.SellerProductQueryService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,8 +31,6 @@ public class SellerProductQueryController {
     }
 
     /** 최신 등록순. page 는 0부터, size 는 1~100. */
-    @Operation(summary = "판매자 상품 목록")
-    @SecurityRequirement(name = "BearerAuth")
     @GetMapping
     public ApiResponse<SellerProductPage> list(
             @AuthenticationPrincipal AuthenticatedUser seller,
@@ -49,16 +45,12 @@ public class SellerProductQueryController {
     }
 
     /** 상세 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
-    @Operation(summary = "누락된 ID 요청 거절")
-    @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/")
     public ApiResponse<Void> missingProductId() {
         throw new BusinessException(ErrorCode.INVALID_REQUEST, "productId 는 필수입니다.");
     }
 
     /** 없거나 본인 상품이 아니면 404 NOT_FOUND. 응답의 version 을 기본정보 수정 요청에 그대로 보낸다. */
-    @Operation(summary = "판매자 상품 상세")
-    @SecurityRequirement(name = "BearerAuth")
     @GetMapping("/{productId}")
     public ApiResponse<SellerProductDetail> get(
             @AuthenticationPrincipal AuthenticatedUser seller, @PathVariable Long productId) {

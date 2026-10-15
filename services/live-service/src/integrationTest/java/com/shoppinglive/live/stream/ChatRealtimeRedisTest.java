@@ -23,6 +23,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +38,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * 실제 Redis 와 실제 HTTP 로 채팅 실시간 전달을 검증한다. 기동: docker run -d --name live-redis-test -p 56379:6379
- * redis:7-alpine 실행: LIVE_REDIS_TEST=1 ./gradlew :services:live-service:integrationTest --tests
+ * redis:7-alpine 실행: LIVE_REDIS_TEST=1 ./gradlew :services:live-service:redisTest --tests
  * '*ChatRealtimeRedisTest'
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Tag("redis")
 @EnabledIfEnvironmentVariable(named = "LIVE_REDIS_TEST", matches = "1")
 @DisplayName("채팅 실시간 전달 (실제 Redis)")
 class ChatRealtimeRedisTest extends LiveSecuritySupport {

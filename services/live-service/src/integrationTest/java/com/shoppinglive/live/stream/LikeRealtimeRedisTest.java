@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +28,10 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /**
  * PostgreSQL/H2의 좋아요 합계 SSE와 실제 Redis 방송 종료 relay를 HTTP로 검증한다. 실행: LIVE_REDIS_TEST=1 ./gradlew
- * :services:live-service:integrationTest --tests '*LikeRealtimeRedisTest'
+ * :services:live-service:redisTest --tests '*LikeRealtimeRedisTest'
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Tag("redis")
 @EnabledIfEnvironmentVariable(named = "LIVE_REDIS_TEST", matches = "1")
 @DisplayName("좋아요 취소 SSE와 방송 종료 (실제 Redis relay)")
 class LikeRealtimeRedisTest extends LiveSecuritySupport {

@@ -12,6 +12,7 @@ import com.shoppinglive.commerce.payment.entity.RefundStatus;
 import com.shoppinglive.commerce.payment.exception.MockRefundResultUnknownException;
 import java.time.Duration;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest
+@Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
 class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;

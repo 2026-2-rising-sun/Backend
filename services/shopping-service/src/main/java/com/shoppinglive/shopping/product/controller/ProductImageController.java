@@ -9,8 +9,6 @@ import com.shoppinglive.shopping.storage.ImageFile;
 import com.shoppinglive.shopping.storage.ImageStorageException;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
 import com.shoppinglive.shopping.storage.UploadedImage;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.io.IOException;
 import java.time.Duration;
 import org.springframework.core.io.Resource;
@@ -41,10 +39,6 @@ public class ProductImageController {
         this.imageUrlResolver = imageUrlResolver;
     }
 
-    @Operation(
-            summary = "상품 이미지 업로드",
-            description = "JPEG 또는 PNG 파일을 받고 최대 5MB, 가로와 세로는 각각 최대 8000px이다.")
-    @SecurityRequirement(name = "BearerAuth")
     @PostMapping(path = "/v1/seller/product-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ProductImageUploadResponse>> upload(
             @RequestPart("file") MultipartFile file) {
@@ -62,7 +56,6 @@ public class ProductImageController {
      * 경로 문자열이 아닌 숫자 id 로만 찾으므로 폴더 탐색·목록 노출이 불가능하다. 이미지를 바꾸면 항상 새 id(새 URL)가 생기고 같은 id 의 내용은 바뀌지
      * 않으므로 1년 immutable 캐시가 안전하다. nosniff 로 브라우저가 내용을 보고 다른 형식(HTML 등)으로 해석하지 못하게 한다.
      */
-    @Operation(summary = "공개 이미지 파일 조회")
     @GetMapping("/v1/product-images/{imageId}")
     public ResponseEntity<Resource> get(@PathVariable Long imageId) {
         ImageFile file = productImageService.getFile(imageId);
