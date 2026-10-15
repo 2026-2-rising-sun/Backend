@@ -13,14 +13,24 @@
 - 이슈·커밋·PR 작성 전 해당 템플릿을 읽는다. 문제·결과·중요한 판단·실제 검증을 간략하게 적는다.
 - 완료 보고에 변경 내용, 검증 결과, 스킵·미실행·미확인 사항, API·이벤트 계약 변경 여부를 명시한다.
 
-## 작업별 필수 참조
+## 필요한 문서만 읽기
 
-모든 작업은 [작업 절차](harness/workflow.md)를 기본으로 삼는다. 같은 작업에서 이미 읽은 문서는 변경되지 않았다면 다시 읽지 않아도 된다.
+- 이 문서에서 작업을 분류하고 아래 표의 해당 규칙만 읽는다. 여러 유형에 해당하면 필요한 규칙을 함께 적용한다. 링크가 있다는 이유로 연결 문서 전체를 따라 읽지 않는다. `harness/README.md`는 목록이 필요할 때만 연다.
+- 이미 읽은 내용이 현재 맥락에 있고 변경되지 않았다면 재사용한다. 문서 변경·작업 범위 확대·맥락 누락이 있을 때 해당 부분을 다시 확인한다.
+- 작업 절차와 도구 안내는 현재 단계에 해당하는 절을 읽는다. 템플릿은 작성할 종류 하나만 선택한다. 적용되는 상위·하위 작업 지침과 필수 계약·검증 절차는 생략하지 않는다.
+- 소스는 `rg --files`, `rg`로 관련 파일·심볼을 찾고 필요한 부분부터 읽는다. 호출·의존 관계나 실패 근거에 따라 범위를 넓힌다. 무관한 디렉터리와 긴 로그 전체를 읽지 않되, 판단에 필요한 주변 문맥과 오류 원인은 확인한다.
 
-| 작업 | 추가로 읽을 문서 |
+## 작업별 참조
+
+| 작업 | 읽을 문서와 범위 |
 |---|---|
-| 코드 수정·리팩토링 | [코드](harness/rules/code.md), [테스트](harness/rules/tests.md), [도구](harness/tooling.md) |
-| API·이벤트 변경 | 위 문서와 [계약](harness/rules/contracts.md) |
-| 브랜치·이슈·커밋·PR | [협업](harness/rules/collaboration.md), 작성 대상의 [템플릿](harness/README.md#템플릿) |
+| Git 동기화·작업 진행 | [작업 절차](harness/workflow.md)의 해당 단계 |
+| 코드 수정·리팩토링 | [코드](harness/rules/code.md) |
+| 테스트 작성·수정·검증 범위 결정 | [테스트](harness/rules/tests.md) |
+| 포맷·빌드·검사 실행 | [도구](harness/tooling.md)의 해당 명령·환경·제약 |
+| API·이벤트 관련 변경 | [계약](harness/rules/contracts.md)의 해당 계약 절차와 실제 변경 유형의 규칙 |
+| 브랜치·이슈·커밋·PR | [협업](harness/rules/collaboration.md)의 이름·작성·변경 단위 등 해당 절 |
+| 이슈 작성 | [기능](harness/templates/issue-feature.md)·[버그](harness/templates/issue-bug.md)·[리팩토링](harness/templates/issue-refactor.md) 중 해당 템플릿 |
+| PR·커밋 작성 | [PR](harness/templates/pull-request.md)·[커밋](harness/templates/commit-message.md) 중 해당 템플릿 |
 | 문서 작성·정리 | [문서](harness/rules/documentation.md) |
-| 리뷰 | 변경 대상의 규칙과 작업 절차의 리뷰 기준 |
+| 리뷰 | 변경 대상의 규칙과 [작업 절차](harness/workflow.md)의 리뷰 단계 |

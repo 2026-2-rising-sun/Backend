@@ -1,14 +1,15 @@
-# 도구와 검증
+# 도구 실행 참고
 
-저장소 루트에서 Gradle Wrapper와 Java 21을 사용한다. 실제 설정의 원본은 [build.gradle.kts](../build.gradle.kts), [.editorconfig](../.editorconfig), 각 서비스의 테스트 설정이다. 설정 변경 시 이 안내도 갱신한다. 태그 부착 원칙은 [테스트](rules/tests.md)를 따른다.
+명령이나 실행 조건이 필요할 때 해당 절만 참고한다. 아래 명령을 매 작업마다 전부 실행할 필요는 없다. 검증 범위는 변경 영향과 [테스트](rules/tests.md)·[계약](rules/contracts.md) 기준에 따라 선택한다.
+
+현재 저장소는 Gradle Wrapper와 Java 21을 사용한다. 설정 원본은 [build.gradle.kts](../build.gradle.kts), [.editorconfig](../.editorconfig), 각 서비스의 테스트 설정이다. 안내와 다르면 실제 설정을 확인하고 관련 설명을 갱신한다.
 
 ## 포맷과 빌드
 
-- EditorConfig: UTF-8·LF·파일 끝 개행·끝 공백 제거. Java·Kotlin·Python은 공백 4칸, YAML·JSON·JS는 2칸.
-- Spotless: Java는 Google Java Format 1.28.0의 AOSP 스타일과 미사용 import 정리, Gradle Kotlin은 ktfmt 0.54의 Kotlin 스타일.
+- EditorConfig와 Spotless 설정을 따른다. Java는 Google Java Format의 AOSP 스타일과 미사용 import 정리, Gradle Kotlin은 ktfmt를 사용한다. 세부 값과 버전은 설정 파일에서 확인한다.
 - 별도 Java 린트(Checkstyle·PMD·SpotBugs)는 현재 구성되어 있지 않다. Spotless 통과를 버그 탐지나 설계 품질 검증으로 설명하지 않는다.
 
-아래는 Member 예시다. 대상 서비스에 맞춰 모듈 경로를 바꾼다. 공통 모듈은 `:common-module`을 사용한다.
+아래는 Member에서 선택해 사용할 수 있는 명령이다. 대상 서비스에 맞춰 모듈 경로를 바꾸고, 공통 모듈은 `:common-module`을 사용한다.
 
 ```bash
 java -version
@@ -68,7 +69,7 @@ Shopping의 `SalesInfoEventKafkaTest`는 EmbeddedKafka를 사용하고 일반 `i
 
 ## API·이벤트 계약 검사
 
-Python 가상환경을 사용한다. 아래 환경 생성·설치는 최초 준비 시 실행하고, 이후에는 준비된 환경을 재사용한다.
+아래는 Python 가상환경에서 실행하는 예시다. 환경 생성·설치는 최초 준비 시에만 필요하며, 의존성이 설치된 기존 환경이 있으면 재사용한다.
 
 ```bash
 python3 -m venv .venv-api
@@ -88,14 +89,8 @@ API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한�
 
 표본은 서비스별 `build/contract-samples`에 생성된다. 오래된 표본만 검사한 결과를 현재 구현의 검증으로 보고하지 않는다. 직렬화 표본 통과도 실제 생산자→브로커→소비자 전달·DB 반영 증거와 구분한다.
 
-## 변경별 검증 선택
+## 검증 범위 판단
 
-| 변경 | 기본 확인 |
-|---|---|
-| 하네스·템플릿 | 링크·규칙·예시 정합성, 기존 지침 보존, diff |
-| Java 구현 | 대상 모듈 포맷·컴파일·관련 테스트 |
-| 패키지·공통 모듈 | 참조·소비 모듈 영향, 이동 전후 테스트 대응, 관련 빌드 |
-| API·이벤트 | 구현과 명세 대조, 기존 계약 검사, 관련 테스트 |
-| DB·Redis | 변경한 동작을 보호하는 실제 외부 환경 테스트 |
+문서 변경은 링크와 내용 정합성, 코드 변경은 영향을 받는 모듈과 동작을 중심으로 확인한다. 공통 코드·계약·외부 저장소 변경은 실제 소비자와 실행 환경에 따라 범위를 넓힌다. 필수 계약 검사는 [계약 규칙](rules/contracts.md)을 따른다.
 
-기존 [CI 선택 로직](../.github/scripts/ci/classify_changes.py)은 변경 파일·태그에 따라 검사 범위를 정한다. 해당 실행 결과가 전체 테스트를 의미한다고 가정하지 않는다. 이미 통과한 검사는 변경·실패·미해결 우려가 없으면 반복 확대하지 않는다.
+기존 [CI 선택 로직](../.github/scripts/ci/classify_changes.py)의 결과를 전체 테스트 성공으로 확대하지 않는다. 이미 통과한 검사는 변경·실패·미해결 우려가 없으면 반복하지 않는다.
