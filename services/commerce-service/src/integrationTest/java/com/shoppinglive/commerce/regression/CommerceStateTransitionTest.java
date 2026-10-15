@@ -28,6 +28,7 @@ import com.shoppinglive.commerce.sales.service.SalesService;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -124,9 +125,10 @@ class CommerceStateTransitionTest
         }
     }
 
+    @DisplayName("마지막 예약 재고를 복구하면 다시 주문할 수 있다")
     @ParameterizedTest
     @ValueSource(strings = {"cancel", "expire", "fail"})
-    void 마지막_재고_복원후_다시_주문할_수_있다(String path) {
+    void allowsNewOrderAfterRestoringLastReservedItem(String path) {
         Order order = create();
         assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
                 .isEqualTo(SalesStatus.SOLD_OUT);
@@ -137,9 +139,10 @@ class CommerceStateTransitionTest
         assertThat(create().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
+    @DisplayName("재고를 복구해도 관리자가 지정한 비공개 상태를 유지한다")
     @ParameterizedTest
     @ValueSource(strings = {"cancel", "expire", "fail"})
-    void 재고를_복원해도_관리자_비공개는_보존한다(String path) {
+    void preservesPrivateStatusWhenRestoringStock(String path) {
         Order order = create();
         sales.changeStatus(salesId, SalesStatus.PRIVATE);
         release(order, path);
@@ -148,8 +151,9 @@ class CommerceStateTransitionTest
                 .isEqualTo(SalesStatus.PRIVATE);
     }
 
+    @DisplayName("실제 스케줄 진입점에서 재고 복구에 실패하면 주문 만료도 롤백한다")
     @Test
-    void 실제_스케줄_진입점에서_복원_실패하면_만료도_롤백한다() {
+    void rollsBackExpirationWhenScheduledStockRestoreFails() {
         Order order = create();
         jdbc.update(
                 "UPDATE payment_group SET expires_at = ? WHERE id = ?",
@@ -166,11 +170,12 @@ class CommerceStateTransitionTest
         assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isZero();
     }
 
+    @DisplayName("결제의 재고 처리에 실패하면 결제·주문 확정도 롤백한다")
     @ParameterizedTest
     @EnumSource(
             value = PaymentScenario.class,
             names = {"INSTANT_SUCCESS", "INSTANT_FAIL"})
-    void 결제_재고처리_실패시_결제와_주문_확정도_롤백한다(PaymentScenario scenario) {
+    void rollsBackPaymentAndOrderConfirmationWhenStockUpdateFails(PaymentScenario scenario) {
         Order order = create();
         transaction.executeWithoutResult(
                 tx ->
@@ -187,11 +192,12 @@ class CommerceStateTransitionTest
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
     }
 
+    @DisplayName("재고가 0이면 ON_SALE로 변경하지 않는다")
     @ParameterizedTest
     @EnumSource(
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
-    void 재고0이면_ON_SALE로_변경되지_않는다(SalesStatus current) throws Exception {
+    void rejectsOnSaleTransitionWhenStockIsZero(SalesStatus current) throws Exception {
         jdbc.update("UPDATE sales_info SET status = ? WHERE id = ?", current.name(), salesId);
         jdbc.update("UPDATE sales_stock SET available = 0 WHERE sales_info_id = ?", salesId);
         var result =
@@ -209,8 +215,9 @@ class CommerceStateTransitionTest
         }
     }
 
+    @DisplayName("관리자가 재고를 보충하면 품절만 해제하고 다른 상태는 유지한다")
     @Test
-    void 관리자_재고_보충은_품절만_해제한다() {
+    void reopensOnlySoldOutSalesAfterStockReplenishment() {
         create();
         sales.adjustAvailable(salesId, 1);
         assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
@@ -221,8 +228,9 @@ class CommerceStateTransitionTest
                 .isEqualTo(SalesStatus.PRIVATE);
     }
 
+    @DisplayName("업무 거절은 500 대신 해당하는 400·404·409로 응답한다")
     @Test
-    void 비즈니스_거절은_500이_아닌_400_404_409이다() throws Exception {
+    void mapsBusinessRejectionsTo400404Or409InsteadOf500() throws Exception {
         mvc.perform(
                         patch("/v1/sales/{id}/status", salesId)
                                 .header("Authorization", adminBearer())

@@ -51,6 +51,7 @@ class SalesClientConfigurationIntegrationTest extends ShoppingSecuritySupport {
                         });
     }
 
+    @DisplayName("인증 토큰이 없으면 기동에 실패하고 설정한 토큰은 Commerce로 전달한다")
     @Test
     void missingCredentialPreventsStartupAndConfiguredCredentialReachesCommerce() throws Exception {
         salesContext()
@@ -89,6 +90,22 @@ class SalesClientConfigurationIntegrationTest extends ShoppingSecuritySupport {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    @DisplayName("shopping.sales.source 가 http 나 replica 가 아니면 기동이 실패한다")
+    void unknownSalesSourcePreventsStartup() {
+        salesContext()
+                .withPropertyValues(
+                        "shopping.sales-client.base-url=http://localhost:8083",
+                        "shopping.sales-client.service-token=test-shopping-commerce-credential-00000001",
+                        "shopping.sales.source=replcia")
+                .run(
+                        context ->
+                                assertThat(context.getStartupFailure())
+                                        .hasRootCauseInstanceOf(IllegalStateException.class)
+                                        .hasStackTraceContaining(
+                                                "shopping.sales.source는 http 또는 replica여야 합니다"));
     }
 
     private static ApplicationContextRunner salesContext() {

@@ -4,17 +4,20 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class QuantityParserTest {
+    @DisplayName("수량의 최솟값과 최댓값을 허용한다")
     @Test
-    void 수량의_양끝값을_허용한다() {
+    void acceptsQuantityBoundaries() {
         assertThat(QuantityParser.parse("1")).isEqualTo(1);
         assertThat(QuantityParser.parse("999999999")).isEqualTo(999999999);
     }
 
+    @DisplayName("수량 누락과 잘못된 문자열은 기존 입력 오류로 거절한다")
     @Test
-    void 누락과_잘못된_문자열은_기존_오류로_거절한다() {
+    void rejectsMissingAndMalformedQuantityWithExistingError() {
         for (String value :
                 new String[] {
                     null, "", "0", "01", "-1", "+1", "1.0", " 1", "1 ", "abc", "1000000000"

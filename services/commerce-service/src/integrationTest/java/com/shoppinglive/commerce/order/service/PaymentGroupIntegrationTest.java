@@ -41,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -180,6 +181,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 10, 0);
     }
 
+    @DisplayName("두 상품의 견적 25000원으로 주문 두 건과 예약된 결제 묶음 하나를 생성한다")
     @Test
     void twoProductsCreateTwoOrdersWith25000QuoteAndOneReservedGroup() {
         var quote = service.preview(MEMBER_A, selected());
@@ -201,6 +203,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 1);
     }
 
+    @DisplayName("쿠폰 할인 스냅샷을 저장하고 재요청에도 한 번만 예약한다")
     @Test
     void couponIsReservedWithDiscountSnapshotsAndIdempotentReplay() {
         issueCoupon();
@@ -249,6 +252,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(couponStatus()).isEqualTo("USED");
     }
 
+    @DisplayName("전액 할인 묶음은 게이트웨이 없이 확정하고 쿠폰·재고·장바구니를 한 번만 반영한다")
     @Test
     void fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce() {
         issueCoupon();
@@ -291,6 +295,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(payments.count()).isEqualTo(1);
     }
 
+    @DisplayName("0원 결제를 동시에 시작해도 완료된 결제 시도 하나를 반환한다")
     @Test
     void concurrentZeroPaymentStartsReturnOneCompletedAttempt() throws Exception {
         issueCoupon();
@@ -348,6 +353,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
+    @DisplayName("0원 결제는 HTTP 200으로 완료 상태를 응답한다")
     @Test
     void zeroPaymentHttpResponseSignalsCompletionWithOk() throws Exception {
         issueCoupon();
@@ -378,6 +384,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
+    @DisplayName("취소·만료·확정 결제 실패 시 쿠폰 예약을 해제한다")
     @Test
     void couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure() {
         issueCoupon();
@@ -431,6 +438,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
+    @DisplayName("단건 주문은 쿠폰 할인 스냅샷을 저장하고 결제 성공 후 쿠폰을 사용 처리한다")
     @Test
     void singleOrderCouponIsReservedSnapshottedAndConsumedAfterPaymentSuccess() {
         issueCoupon();
@@ -453,6 +461,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesA, 9, 0);
     }
 
+    @DisplayName("단건 주문 취소·만료·확정 결제 실패 시 쿠폰 예약을 해제한다")
     @Test
     void singleOrderCouponReservationIsReleasedByCancellationExpiryAndDefinitiveFailure() {
         issueCoupon();
@@ -477,6 +486,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesA, 10, 0);
     }
 
+    @DisplayName("전액 할인 단건 주문은 게이트웨이 없이 확정하고 쿠폰을 사용 처리한다")
     @Test
     void singleOrderFullyDiscountedCouponCompletesWithoutGatewayAndConsumesCoupon() {
         issueCoupon();
@@ -495,6 +505,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
+    @DisplayName("단건 주문의 결제 결과가 미확정이면 쿠폰 예약을 유지한다")
     @Test
     void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
         issueCoupon();
@@ -516,6 +527,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                 key);
     }
 
+    @DisplayName("후속 재고 예약에 실패하면 쿠폰 예약도 롤백한다")
     @Test
     void couponReservationRollsBackWhenLaterStockReservationFails() {
         issueCoupon();
@@ -535,6 +547,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         untouched();
     }
 
+    @DisplayName("주문 재전송은 한 번만 예약하고 활성 묶음이 있으면 새 묶음·단건 주문을 거절한다")
     @Test
     void createReplayReservesOnceAndActiveGroupBlocksNewGroupAndSingleOrder() {
         var first = create("same");
@@ -567,6 +580,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 1);
     }
 
+    @DisplayName("활성 단건 주문은 새 묶음을 막고 기존 하위 주문 경로로 묶음을 일부 결제·취소할 수 없다")
     @Test
     void activeSingleOrderBlocksGroupAndLegacyChildActionsCannotPartiallyPayOrCancelGroup() {
         var single =
@@ -588,6 +602,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 1);
     }
 
+    @DisplayName("소유권·중복 선택·버전·가격·재고 검증에 실패하면 구매를 부분 저장하지 않는다")
     @Test
     void ownershipDuplicateSelectionStaleVersionPriceAndInsufficientStockLeaveNoPartialPurchase() {
         assertThatThrownBy(() -> service.preview(MEMBER_B, selected()))
@@ -634,6 +649,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         untouched();
     }
 
+    @DisplayName("두 번째 재고 예약에 실패하면 첫 상품 예약과 전체 주문을 롤백한다")
     @Test
     void secondConditionalReservationFailureRollsBackAlreadyReservedFirstProductAndOrders() {
         // 주문서 조회 이후 재고가 줄어든 상황을 만들어 첫 항목의 실제 예약 이후 실패하도록 한다.
@@ -642,6 +658,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         untouched();
     }
 
+    @DisplayName("묶음 취소는 모든 상품 재고를 한 번만 복구하고 장바구니를 유지한다")
     @Test
     void cancelRestoresEveryProductExactlyOnceAndKeepsAllCartItems() {
         var group = create("cancel").group();
@@ -659,6 +676,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 10, 0);
     }
 
+    @DisplayName("만료는 예약 재고를 한 번만 복구하고 결제 확인 중인 묶음은 만료시키지 않는다")
     @Test
     void expiryRestoresAllReservedStockOnceAndDoesNotExpireConfirmingGroups() {
         var group = create("expiry").group();
@@ -688,6 +706,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 1);
     }
 
+    @DisplayName("결제 성공은 재고를 소진하고 수정되지 않은 선택 장바구니 항목만 삭제한다")
     @Test
     void onePaymentSuccessConsumesStockAndDeletesOnlyUneditedSelectedCartRows() {
         var group = create("success").group();
@@ -788,6 +807,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                 .isEqualTo(1);
     }
 
+    @DisplayName("결제 실패는 전체 재고를 복구하고 장바구니를 유지하며 새 묶음을 허용한다")
     @Test
     void failedPaymentReturnsAllStockLeavesCartAndAllowsNewGroup() {
         var group = create("failure").group();
@@ -808,6 +828,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(create("new-group").created()).isTrue();
     }
 
+    @DisplayName("승인 후 로컬 반영이 롤백되어도 재시도는 저장된 승인 하나를 사용한다")
     @Test
     void gatewayApprovalSurvivesLocalApplyRollbackAndRetryUsesOneRecordedApproval() {
         var group = create("fault").group();
@@ -868,6 +889,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 0);
     }
 
+    @DisplayName("같은 키로 동시에 요청해도 결제 묶음과 재고 예약은 한 번만 생성한다")
     @Test
     void concurrentSameKeyCreatesOneGroupAndReservesOnce() throws Exception {
         var failures = new ConcurrentLinkedQueue<Throwable>();
@@ -900,6 +922,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         stock(salesB, 9, 1);
     }
 
+    @DisplayName("단건·묶음 동시 주문은 같은 DB 구매 잠금을 공유한다")
     @Test
     void concurrentSingleAndGroupCreationShareOneDatabasePurchaseGuard() throws Exception {
         var failures = new ConcurrentLinkedQueue<Throwable>();
@@ -962,6 +985,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         }
     }
 
+    @DisplayName("결제 시작과 취소가 동시에 실행되면 상태 전이 하나만 커밋된다")
     @Test
     void concurrentStartAndCancelCommitExactlyOneTransition() throws Exception {
         var group = create("start-cancel").group();
@@ -1040,6 +1064,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         }
     }
 
+    @DisplayName("결과를 동시에 반영해도 승인과 전체 상품 재고 소진은 한 번만 처리한다")
     @Test
     void concurrentResolveRecordsOneApprovalAndConsumesEveryProductOnce() throws Exception {
         var group = create("resolve-race").group();

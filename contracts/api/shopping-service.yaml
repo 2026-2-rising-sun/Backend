@@ -5,11 +5,11 @@ info:
   license: { name: UNLICENSED }
   description: |-
     Shopping은 상품 기본정보와 이미지 메타데이터를 소유한다.
-    가격·재고·판매 상태는 Commerce 소유다. 기본적으로 Commerce에서 조회하며 shopping.sales.source=replica에서는 이벤트로 갱신한 사본을 사용하므로 최신 상태와 차이가 있을 수 있다.
-    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 관리 API에는 SELLER이 필요하다.
+    가격·재고·판매 상태는 Commerce 소유이며 공개와 판매자 조회에서 조회 시점에 결합한다. 기본적으로 Commerce에서 조회하며 shopping.sales.source=replica에서는 이벤트로 갱신한 사본을 사용하므로 최신 상태와 차이가 있을 수 있다.
+    JSON 성공 응답은 ApiResponse 봉투를 사용한다. 서비스가 JWT를 직접 검증하며 판매자 API에는 SELLER가 필요하다.
     공개 상품·이미지·구매 진입 확인은 비회원 허용. 내부 경로는 Commerce/Live 서비스 토큰 전용이다.
     상품 관리는 SELLER 권한을 요구한다. 새 상품은 등록한 판매자의 회원 ID를 저장하며 다른 판매자의 수정·멱등 재조회를 거절한다.
-    기존 상품은 sellerId=null을 유지하며 기존 관리 조회·수정 계약을 보존한다. 판매자 ID는 등록/수정 요청에서 받지 않는다.
+    판매자 목록·상세는 본인 상품만 반환한다. 소유자가 없는 기존 상품(sellerId=null)은 조회되지 않으며 수정 규칙은 기존과 같다. 판매자 ID는 등록/수정 요청에서 받지 않는다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 공개 무토큰 및 서비스 caller 전용 요청은 Member 상태 확인과 독립이다.
 security: [{ BearerAuth: [] }]
@@ -19,7 +19,7 @@ servers:
   - url: http://dev-shopping-service:8080
     description: Shopping 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
 tags:
-  - name: Admin Product
+  - name: Seller Product
     description: 판매자 상품 등록, 수정, 조회
   - name: Public Product
     description: 공개 상품 목록, 상세, 구매 진입 확인
@@ -28,10 +28,10 @@ tags:
   - name: Internal Product
     description: Live와 Commerce가 호출하는 기본정보 스냅샷
 paths:
-  /v1/admin/products:
+  /v1/seller/products:
     post:
       x-required-roles: [SELLER]
-      tags: [Admin Product]
+      tags: [Seller Product]
       summary: 상품 기본정보 등록
       operationId: registerProduct
       parameters:
@@ -57,9 +57,9 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
     get:
       x-required-roles: [SELLER]
-      tags: [Admin Product]
+      tags: [Seller Product]
       summary: 판매자 상품 목록
-      operationId: listAdminProducts
+      operationId: listSellerProducts
       parameters:
         - name: page
           in: query
@@ -71,10 +71,10 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '200':
-          description: 판매정보 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
+          description: 인증된 판매자의 상품만 최신 등록순으로 반환한다. 판매정보 조회 실패 시에도 기본정보를 반환하며 salesStatus는 UNKNOWN이다.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AdminProductPageEnvelope' }
+              schema: { $ref: '#/components/schemas/SellerProductPageEnvelope' }
               examples:
                 normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, createdAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }], page: 0, size: 20, totalElements: 1, totalPages: 1 }, error: null } }
                 empty: { value: { success: true, data: { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 }, error: null } }
@@ -82,14 +82,14 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
-  /v1/admin/products/{productId}:
+  /v1/seller/products/{productId}:
     parameters:
       - $ref: '#/components/parameters/ProductId'
     get:
       x-required-roles: [SELLER]
-      tags: [Admin Product]
+      tags: [Seller Product]
       summary: 판매자 상품 상세
-      operationId: getAdminProduct
+      operationId: getSellerProduct
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -97,17 +97,21 @@ paths:
           description: 판매정보 조회 실패 시 salesStatus는 UNKNOWN이다.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AdminProductDetailEnvelope' }
+              schema: { $ref: '#/components/schemas/SellerProductDetailEnvelope' }
               examples:
                 normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }, error: null } }
                 notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null }, error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '404':
+          description: 상품이 없거나 본인 상품이 아니다. 다른 판매자 상품의 존재 여부를 드러내지 않는다.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     patch:
       x-required-roles: [SELLER]
-      tags: [Admin Product]
+      tags: [Seller Product]
       summary: 상품 기본정보 부분 수정
       operationId: updateProduct
       requestBody:
@@ -130,31 +134,6 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
-  /v1/seller/products:
-    get:
-      x-required-roles: [SELLER]
-      tags: [Admin Product]
-      summary: 본인 소유 상품 목록
-      description: 인증된 판매자의 상품만 최신 등록순으로 조회한다. 기존 소유자 미지정 상품과 다른 판매자의 상품은 제외한다. 판매정보 조회와 독립이다. page와 size는 정수이며 page × size가 2147483647을 초과하면 400으로 거절한다.
-      operationId: listOwnedProducts
-      parameters:
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 0, default: 0 }
-        - name: size
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-      responses:
-        '200':
-          description: 본인 상품 페이지
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/SellerProductPageEnvelope' }
-              example: { success: true, data: { items: [{ id: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, sellerId: '00000000-0000-0000-0000-000000000003' }], page: 0, size: 20, totalElements: 1, totalPages: 1 }, error: null }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '503': { $ref: '#/components/responses/AuthUnavailable' }
   /v1/products:
     get:
       security: []
@@ -254,7 +233,7 @@ paths:
               examples:
                 normal: { value: { success: true, data: [ { couponId: coupon-opaque-id, name: 상품 할인 쿠폰, fixedDiscount: 1000, startsAt: '2026-10-15T09:00:00Z', endsAt: '2026-10-16T09:00:00Z', expiresAt: '2026-10-17T09:00:00Z', soldOut: false } ], error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
-  /v1/admin/product-images:
+  /v1/seller/product-images:
     post:
       x-required-roles: [SELLER]
       tags: [Product Image]
@@ -377,13 +356,13 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         "503":
           $ref: "#/components/responses/AuthUnavailable"
-  /v1/admin/products/:
+  /v1/seller/products/:
     get:
-      operationId: missingAdminProductIdOnGet
+      operationId: missingSellerProductIdOnGet
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Product
+      - Seller Product
       x-required-roles:
       - SELLER
       responses:
@@ -396,11 +375,11 @@ paths:
         '503':
           $ref: '#/components/responses/AuthUnavailable'
     patch:
-      operationId: missingAdminProductIdOnPatch
+      operationId: missingSellerProductIdOnPatch
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Product
+      - Seller Product
       x-required-roles:
       - SELLER
       responses:
@@ -589,19 +568,6 @@ components:
           type: [string, "null"]
           maxLength: 36
           description: 등록 판매자 회원 ID. 기존 상품은 null이며 이전 소비자 계약과 호환되는 추가 필드.
-    SellerProductPage:
-      type: object
-      required: [items, page, size, totalElements, totalPages]
-      properties:
-        items: { type: array, items: { $ref: '#/components/schemas/ProductSnapshot' } }
-        page: { type: integer, minimum: 0 }
-        size: { type: integer, minimum: 1, maximum: 100 }
-        totalElements: { type: integer, format: int64, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-    SellerProductPageEnvelope:
-      type: object
-      required: [success, data, error]
-      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/SellerProductPage' }, error: { type: 'null' } }
     PublicProductItem:
       type: object
       required: [productId, name, mainImageUrl, price, salesStatus, purchasable]
@@ -668,16 +634,16 @@ components:
         sizeBytes: { type: integer, format: int64 }
         width: { type: integer }
         height: { type: integer }
-    AdminProductPage:
+    SellerProductPage:
       type: object
       required: [items, page, size, totalElements, totalPages]
       properties:
-        items: { type: array, items: { $ref: '#/components/schemas/AdminProductSummary' } }
+        items: { type: array, items: { $ref: '#/components/schemas/SellerProductSummary' } }
         page: { type: integer, minimum: 0 }
         size: { type: integer, minimum: 1, maximum: 100 }
         totalElements: { type: integer, format: int64, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
-    AdminProductSummary:
+    SellerProductSummary:
       type: object
       required: [productId, name, mainImageUrl, createdAt, salesStatus, price, available]
       properties:
@@ -685,14 +651,14 @@ components:
         name: { type: string }
         mainImageUrl: { type: string, format: uri-reference }
         createdAt: { type: string, format: date-time }
-        salesStatus: { $ref: '#/components/schemas/AdminSalesStatus' }
+        salesStatus: { $ref: '#/components/schemas/SellerSalesStatus' }
         price: { type: ['integer', 'null'], format: int64, minimum: 0 }
         available: { type: ['integer', 'null'], minimum: 0 }
-    AdminSalesStatus:
+    SellerSalesStatus:
       type: string
       enum: [NOT_REGISTERED, READY, ON_SALE, SOLD_OUT, PRIVATE, UNKNOWN]
       description: NOT_REGISTERED는 판매정보 미등록, UNKNOWN은 조회 실패다. 둘 다 price와 available이 null이다.
-    AdminProductDetail:
+    SellerProductDetail:
       type: object
       required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, updatedAt, salesStatus, price, available]
       properties:
@@ -704,7 +670,7 @@ components:
         version: { type: integer, format: int64, minimum: 0 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-        salesStatus: { $ref: '#/components/schemas/AdminSalesStatus' }
+        salesStatus: { $ref: '#/components/schemas/SellerSalesStatus' }
         price: { type: ['integer', 'null'], format: int64, minimum: 0 }
         available: { type: ['integer', 'null'], minimum: 0 }
     ApiError:
@@ -744,11 +710,11 @@ components:
       type: object
       required: [success, data, error]
       properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/ImageUpload' }, error: { type: 'null' } }
-    AdminProductPageEnvelope:
+    SellerProductPageEnvelope:
       type: object
       required: [success, data, error]
-      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/AdminProductPage' }, error: { type: 'null' } }
-    AdminProductDetailEnvelope:
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/SellerProductPage' }, error: { type: 'null' } }
+    SellerProductDetailEnvelope:
       type: object
       required: [success, data, error]
-      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/AdminProductDetail' }, error: { type: 'null' } }
+      properties: { success: { type: boolean, const: true }, data: { $ref: '#/components/schemas/SellerProductDetail' }, error: { type: 'null' } }

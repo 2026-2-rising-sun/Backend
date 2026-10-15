@@ -181,7 +181,6 @@ class ProductClientsTest {
     @DisplayName("dev 프로파일의 http 모드는 두 client 를 모두 실제 HTTP 구현으로 만든다")
     @Test
     void httpModeBuildsHttpClientsOnDevProfile() {
-        // given
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties http =
                 new ProductClientsConfiguration.Properties(
@@ -193,7 +192,6 @@ class ProductClientsTest {
         final MockEnvironment dev = new MockEnvironment();
         dev.setActiveProfiles("dev");
 
-        // when & then
         assertThat(configuration.productClient(http, RestClient.builder(), dev))
                 .isInstanceOf(HttpProductClient.class);
         assertThat(configuration.salesClient(http, RestClient.builder(), dev))

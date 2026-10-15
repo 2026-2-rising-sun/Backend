@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.shoppinglive.commerce.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,6 +23,7 @@ class DevScenarioIsolationTest extends CommerceSecurityTestSupport {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
 
+    @DisplayName("dev 환경은 플래그와 관리자 토큰이 있어도 결제 시나리오를 활성화할 수 없다")
     @Test
     void externalDevCannotEnableScenarioEvenWithFlagAndAdminToken() throws Exception {
         assertThat(context.getBeansOfType(DevPaymentScenarioRegistry.class)).isEmpty();

@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-/** Direct publication after DB commit; durable delivery belongs to the separate Outbox work. */
+/** DB 커밋 후 직접 발행한다. 발행 내구성은 별도 Outbox 작업에서 다룬다. */
 @Component
 public class SalesInfoEventProducer {
     private static final Logger log = LoggerFactory.getLogger(SalesInfoEventProducer.class);
@@ -40,8 +40,7 @@ public class SalesInfoEventProducer {
                                             SalesInfoEventContract.TOPIC_NAME);
                             });
         } catch (RuntimeException failure) {
-            // Commit already succeeded. Do not turn a transport failure into a failed order
-            // response.
+            // 이미 커밋된 주문을 전송 실패 때문에 실패 응답으로 바꾸지 않는다.
             failed(event, failure);
         }
     }

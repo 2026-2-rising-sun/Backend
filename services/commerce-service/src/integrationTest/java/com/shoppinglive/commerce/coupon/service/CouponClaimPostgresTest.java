@@ -13,6 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -115,6 +116,7 @@ class CouponClaimPostgresTest {
         }
     }
 
+    @DisplayName("20명이 마지막 쿠폰을 동시에 수령하면 한 명만 성공한다")
     @Test
     void finalCouponHasExactlyOneWinnerAcrossTwentyMembers() {
         verify(
@@ -134,6 +136,7 @@ class CouponClaimPostgresTest {
                 });
     }
 
+    @DisplayName("같은 회원의 동시 수령은 쿠폰 한 장만 발급하고 수량을 추가 차감하지 않는다")
     @Test
     void sameMemberConcurrentClaimsReturnOneReceiptWithoutConsumingExtraQuantity() {
         verify(
@@ -151,6 +154,7 @@ class CouponClaimPostgresTest {
                 });
     }
 
+    @DisplayName("DB 오류가 나면 발급 수량을 롤백하고 재수령을 허용한다")
     @Test
     void databaseFailureRollsBackCounterAndAllowsRetry() {
         verify(

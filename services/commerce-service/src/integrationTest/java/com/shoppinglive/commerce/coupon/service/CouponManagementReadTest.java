@@ -9,6 +9,7 @@ import com.shoppinglive.common.core.BusinessException;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,7 @@ class CouponManagementReadTest extends CommerceSecurityTestSupport {
         shopping.clear();
     }
 
+    @DisplayName("판매자 쿠폰 목록·상세는 대상 상품을 유지하고 다른 판매자의 쿠폰을 제외한다")
     @Test
     void ownListAndDetailPreserveTargetsAndExcludeAnotherSeller() {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);

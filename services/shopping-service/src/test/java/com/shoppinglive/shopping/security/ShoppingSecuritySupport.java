@@ -13,10 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-/**
- * Actual signatures and the production decoder/filter; no mocked Authentication or disabled
- * filters.
- */
+/** 실제 서명과 운영 검증기·필터를 사용하며 인증 객체나 필터를 우회하지 않는다. */
 @Import(ShoppingSecuritySupport.SessionTestConfiguration.class)
 public abstract class ShoppingSecuritySupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
@@ -50,7 +47,7 @@ public abstract class ShoppingSecuritySupport {
         properties.add("shoppinglive.security.service-tokens.member", () -> OTHER_KEY);
     }
 
-    public static String adminBearer() {
+    public static String sellerBearer() {
         return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER"));
     }
 

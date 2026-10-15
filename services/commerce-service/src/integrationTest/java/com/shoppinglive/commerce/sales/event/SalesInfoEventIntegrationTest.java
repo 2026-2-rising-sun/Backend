@@ -33,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -118,6 +119,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         return UUID.randomUUID().toString();
     }
 
+    @DisplayName("트랜잭션별 최종 스냅샷 하나에서 네 종류의 이벤트를 수집한다")
     @Test
     void capturesFourTypesAndOneFinalSnapshotPerTransaction() {
         long id = register(3);
@@ -146,6 +148,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(emitted).extracting(EventEnvelope::eventId).doesNotHaveDuplicates();
     }
 
+    @DisplayName("롤백·무변경·변경 실패 시 이벤트를 발행하거나 버전을 증가시키지 않는다")
     @Test
     void rollbackNoopAndFailedMutationDoNotPublishOrAdvanceRevision() {
         long id = register(3);
@@ -165,6 +168,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
                 .isEqualTo(1000);
     }
 
+    @DisplayName("판매 등록이 롤백되면 이벤트를 발행하지 않는다")
     @Test
     void registrationRollbackDoesNotPublish() {
         tx.executeWithoutResult(
@@ -175,6 +179,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(emitted).isEmpty();
     }
 
+    @DisplayName("주문 예약·품절·취소·재요청은 실제 변경이 있을 때만 이벤트를 발행한다")
     @Test
     void orderReservationSoldOutCancellationAndReplayPublishOnlyRealChanges() {
         long id = register(1);
@@ -203,6 +208,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
                         });
     }
 
+    @DisplayName("결제 실패의 재고 복구는 이벤트에 반영하고 결제 성공은 payload를 변경하지 않는다")
     @Test
     void failedPaymentRestoresStockButSuccessfulPaymentDoesNotChangePayload() {
         for (PaymentScenario scenario :
@@ -233,6 +239,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         }
     }
 
+    @DisplayName("여러 상품 예약과 만료 시 각 판매정보의 최종 스냅샷을 수집한다")
     @Test
     void multiProductReservationAndExpiryCaptureEachSale() {
         long a = register(1), b = register(1);
@@ -283,6 +290,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
                         });
     }
 
+    @DisplayName("가격과 재고를 동시에 변경해도 일관된 스냅샷 버전이 증가한다")
     @Test
     void concurrentPriceAndStockChangesHaveConsistentMonotonicSnapshots() throws Exception {
         long id = register(10);
@@ -320,6 +328,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(version(id)).isEqualTo(3);
     }
 
+    @DisplayName("REQUIRES_NEW의 이벤트 수집은 외부 트랜잭션 롤백과 독립적이다")
     @Test
     void requiresNewCollectionIsIndependentFromOuterRollback() {
         long outerId = register(1), innerId = register(1);
@@ -338,6 +347,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(version(innerId)).isEqualTo(2);
     }
 
+    @DisplayName("트랜잭션 없는 수집을 거절하고 없는 판매정보는 기존 미존재 오류를 유지한다")
     @Test
     void trackerRejectsNonTransactionalCallsAndMissingSaleRemainsNotFound() {
         assertThatThrownBy(() -> tracker.watch(-1)).isInstanceOf(IllegalStateException.class);

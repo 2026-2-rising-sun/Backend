@@ -1,9 +1,9 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.operations;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.shoppinglive.member.operations.SellerBootstrapCommand;
+import com.shoppinglive.member.MemberServiceApplication;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -48,7 +48,7 @@ class SellerBootstrapCommandTest {
                                 "admin"));
         assertThatThrownBy(() -> command.execute(environment))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Invalid seller email, display name or password");
+                .hasMessage("판매자 이메일·표시 이름·비밀번호가 올바르지 않습니다.");
         assertThatThrownBy(
                         () ->
                                 MemberServiceApplication.main(

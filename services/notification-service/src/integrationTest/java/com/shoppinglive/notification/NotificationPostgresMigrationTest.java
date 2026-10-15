@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shoppinglive.notification.security.NotificationSecuritySupport;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class NotificationPostgresMigrationTest extends NotificationSecuritySupport {
     @Autowired DataSource dataSource;
 
+    @DisplayName("마이그레이션으로 알림 테이블을 생성하고 엔티티 매핑을 검증한다")
     @Test
     void migrationCreatesNotificationTableAndValidatesEntityMapping() throws Exception {
         try (var connection = dataSource.getConnection()) {

@@ -72,6 +72,7 @@ class PostgresMigrationTest extends LiveSecuritySupport {
                 .hasMessageContaining("broadcast_request_key_key");
     }
 
+    @DisplayName("같은 방송에 같은 상품을 중복 연결하면 유일성 제약을 위반한다")
     @Test
     void duplicateProductOnSameBroadcastViolatesUniqueConstraint() {
         insertBroadcast("bp-key", "arn:aws:ivs:channel/bp", "PREPARING");
@@ -83,6 +84,7 @@ class PostgresMigrationTest extends LiveSecuritySupport {
                 .hasMessageContaining("uk_broadcast_product");
     }
 
+    @DisplayName("같은 채널에서 두 방송을 동시에 LIVE 상태로 만들 수 없다")
     @Test
     void twoBroadcastsCannotBeLiveOnTheSameChannel() {
         final String channel = "arn:aws:ivs:ap-northeast-2:1:channel/shared";

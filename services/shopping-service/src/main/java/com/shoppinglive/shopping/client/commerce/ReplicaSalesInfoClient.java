@@ -27,7 +27,7 @@ public class ReplicaSalesInfoClient implements SalesInfoClient {
         try {
             return replica.findByProductIds(productIds);
         } catch (DataAccessException e) {
-            throw new SalesInfoUnavailableException("sales replica read failed", e);
+            throw new SalesInfoUnavailableException("판매정보 사본을 조회하지 못했습니다.", e);
         }
     }
 }

@@ -27,7 +27,7 @@ fun Test.requireExecutedExternalTests() {
             override fun afterSuite(suite: TestDescriptor, result: TestResult) {
                 if (suite.parent == null) {
                     check(result.testCount > 0 && result.skippedTestCount == 0L) {
-                        "Tagged external tests must execute without skips: $name"
+                        "외부 태그 테스트는 스킵 없이 실행되어야 합니다: $name"
                     }
                 }
             }
@@ -101,7 +101,7 @@ subprojects {
                             it.extension == "class"
                         }
                     ) {
-                        "External tests are missing for ${project.name}"
+                        "외부 테스트 클래스가 없습니다: ${project.name}"
                     }
                 }
             }

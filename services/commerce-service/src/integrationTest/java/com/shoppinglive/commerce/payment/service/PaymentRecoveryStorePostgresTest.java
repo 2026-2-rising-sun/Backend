@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -78,6 +79,7 @@ class PaymentRecoveryStorePostgresTest {
         }
     }
 
+    @DisplayName("마이그레이션은 업무 데이터를 유지하고 복구 메타데이터 제약을 적용한다")
     @Test
     @Tag("migration")
     void migrationKeepsBusinessDataAndLimitsMetadata() {
@@ -104,6 +106,7 @@ class PaymentRecoveryStorePostgresTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @DisplayName("작업자가 동시에 선점하면 한 작업자만 소유권을 얻는다")
     @Test
     void simultaneousWorkersHaveOneOwner() throws Exception {
         var start = new CountDownLatch(1);
@@ -131,6 +134,7 @@ class PaymentRecoveryStorePostgresTest {
         }
     }
 
+    @DisplayName("실행 예산은 저장소 재생성과 호출자 롤백 후에도 유지된다")
     @Test
     void budgetSurvivesRecreationAndCallerRollback() {
         var lease = store.claim(5, LEASE).orElseThrow();
@@ -167,6 +171,7 @@ class PaymentRecoveryStorePostgresTest {
         assertThat(store.claim(5, LEASE)).isEmpty();
     }
 
+    @DisplayName("다시 선점된 작업의 이전 소유자는 완료·재예약할 수 없다")
     @Test
     void expiredOwnerCannotCompleteOrRescheduleAfterReclaim() {
         var old = store.claim(5, LEASE).orElseThrow();
@@ -180,6 +185,7 @@ class PaymentRecoveryStorePostgresTest {
         assertThat(store.claim(5, LEASE)).isEmpty();
     }
 
+    @DisplayName("잠긴 후보는 다른 후보를 막지 않고 호환용 PENDING 결제는 제외한다")
     @Test
     void lockedCandidateDoesNotBlockAnotherAndCompatibilityPendingIsExcluded() throws Exception {
         var locked = new CountDownLatch(1);
@@ -219,6 +225,7 @@ class PaymentRecoveryStorePostgresTest {
         assertThat(store.claim(4, LEASE)).isEmpty();
     }
 
+    @DisplayName("업무 저장이 롤백되면 복구 완료 표시도 함께 롤백된다")
     @Test
     void completionRollsBackTogetherWithBusinessWrite() {
         var lease = store.claim(5, LEASE).orElseThrow();

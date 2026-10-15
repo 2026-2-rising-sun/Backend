@@ -11,6 +11,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -60,6 +61,7 @@ class CouponPreviewServiceTest {
                 Timestamp.from(NOW.minusSeconds(30)));
     }
 
+    @DisplayName("본인 쿠폰 한 장을 대상 상품에만 적용하고 예약하지 않는다")
     @Test
     void appliesOneOwnedCouponOnlyToTargetItemsAndDoesNotReserveIt() {
         var preview =
@@ -83,6 +85,7 @@ class CouponPreviewServiceTest {
                 .isEqualTo("AVAILABLE");
     }
 
+    @DisplayName("타인 쿠폰이나 적용할 상품이 없는 쿠폰을 거절한다")
     @Test
     void rejectsCouponNotOwnedByMemberOrWithNoEligibleProduct() {
         assertThatThrownBy(
@@ -105,6 +108,7 @@ class CouponPreviewServiceTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("예약·사용·만료된 쿠폰은 적용을 거절한다")
     @Test
     void rejectsReservedUsedAndExpiredCoupons() {
         for (String status : List.of("RESERVED", "USED")) {
@@ -136,6 +140,7 @@ class CouponPreviewServiceTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @DisplayName("행사가 종료되어도 수령한 쿠폰은 쿠폰 만료 전까지 사용할 수 있다")
     @Test
     void claimedCouponRemainsUsableAfterEventEndsUntilItsExpiry() {
         jdbc.update(
@@ -154,6 +159,7 @@ class CouponPreviewServiceTest {
         assertThat(preview.payableAmount()).isEqualTo(900);
     }
 
+    @DisplayName("쿠폰 행사 시작 시각부터 사용을 허용한다")
     @Test
     void eventStartIsInclusive() {
         jdbc.update(
@@ -169,6 +175,7 @@ class CouponPreviewServiceTest {
                 .isEqualTo(100);
     }
 
+    @DisplayName("할인 나머지가 같으면 고정된 장바구니 항목 ID 순서로 배분한다")
     @Test
     void allocatesEqualRemainderByStableCartItemId() {
         jdbc.update("UPDATE coupon_definition SET fixed_discount=2 WHERE id=?", COUPON);
@@ -191,6 +198,7 @@ class CouponPreviewServiceTest {
                         java.util.Map.of("cart:101", 1L, "cart:205", 1L, "cart:309", 0L));
     }
 
+    @DisplayName("할인 나머지가 같으면 장바구니 항목 ID를 숫자로 비교한다")
     @Test
     void comparesCartItemIdsNumericallyWhenRemaindersTie() {
         jdbc.update("UPDATE coupon_definition SET fixed_discount=1 WHERE id=?", COUPON);

@@ -18,7 +18,7 @@ public final class LiveBroadcastEventContract {
 
     public static String messageKey(long broadcastId) {
         if (broadcastId <= 0) {
-            throw new IllegalArgumentException("broadcastId must be positive");
+            throw new IllegalArgumentException("broadcastId는 양수여야 합니다.");
         }
         return Long.toString(broadcastId);
     }

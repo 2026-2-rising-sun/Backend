@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -103,8 +104,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         return mockMvc.perform(request);
     }
 
+    @DisplayName("주문 생성에 성공하면 201과 주문번호를 반환한다")
     @Test
-    void 주문_성공하면_201과_주문번호를_돌려준다() throws Exception {
+    void returns201AndOrderNumberForSuccessfulCreation() throws Exception {
         order(body(Map.of()), null)
                 .andExpect(status().isCreated())
                 .andExpect(
@@ -119,8 +121,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
     }
 
     /** 응답에 연락처·비밀번호 해시·멱등키 같은 민감·내부 값이 섞이면 안 된다. */
+    @DisplayName("주문 응답에 민감한 정보를 노출하지 않는다")
     @Test
-    void 응답에_민감정보가_없다() throws Exception {
+    void omitsSensitiveFieldsFromResponse() throws Exception {
         order(body(Map.of()), "key-1")
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.buyerPhone").doesNotExist())
@@ -128,8 +131,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 .andExpect(jsonPath("$.idempotencyKey").doesNotExist());
     }
 
+    @DisplayName("주문을 생성하면 재고를 예약한다")
     @Test
-    void 주문하면_재고가_배정된다() throws Exception {
+    void reservesStockWhenCreatingOrder() throws Exception {
         order(body(Map.of("quantity", 2)), null).andExpect(status().isCreated());
 
         SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
@@ -138,8 +142,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
     }
 
     /** 같은 멱등키 재전송은 새 주문을 만들지 않고 기존 주문을 돌려준다. 아무것도 만들지 않았으니 201 이 아니라 200 이다. */
+    @DisplayName("같은 멱등 키로 재요청하면 200과 기존 주문번호를 반환한다")
     @Test
-    void 같은_멱등키로_다시_보내면_200과_같은_주문번호() throws Exception {
+    void returns200AndOriginalOrderNumberForIdempotentReplay() throws Exception {
         String first =
                 order(body(Map.of()), "key-1")
                         .andExpect(status().isCreated())
@@ -167,9 +172,11 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
                 Map.of("couponId", "different-coupon"));
     }
 
+    @DisplayName("같은 키의 다른 요청은 409로 거절하고 원주문을 노출하지 않는다")
     @ParameterizedTest
     @MethodSource("conflictingRequests")
-    void 같은_키에_다른_요청은_409이고_원주문을_노출하지_않는다(Map<String, Object> changes) throws Exception {
+    void rejectsDifferentRequestForSameKeyWithoutExposingOriginalOrder(Map<String, Object> changes)
+            throws Exception {
         order(body(Map.of()), "key-1").andExpect(status().isCreated());
         order(body(changes), "key-1")
                 .andExpect(status().isConflict())
@@ -181,8 +188,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
     }
 
+    @DisplayName("활성 주문이 있으면 다른 멱등 키의 새 주문도 거절한다")
     @Test
-    void 활성_주문이_있으면_다른_멱등키도_신규_주문을_거절한다() throws Exception {
+    void rejectsNewIdempotencyKeyWhileAnOrderIsActive() throws Exception {
         order(body(Map.of("quantity", 1)), "key-1").andExpect(status().isCreated());
         order(body(Map.of("quantity", 1)), "key-2").andExpect(status().isConflict());
 
@@ -190,8 +198,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
     }
 
+    @DisplayName("재고보다 많이 주문하면 409로 응답하고 재고를 유지한다")
     @Test
-    void 재고보다_많이_주문하면_409이고_재고는_그대로() throws Exception {
+    void rejectsExcessQuantityWithoutChangingStock() throws Exception {
         order(body(Map.of("quantity", 6)), null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("CONFLICT"));
@@ -202,8 +211,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(orderRepository.findAll()).isEmpty();
     }
 
+    @DisplayName("판매중이 아닌 상품의 주문은 409로 응답한다")
     @Test
-    void 판매중이_아니면_409() throws Exception {
+    void returns409WhenSaleIsNotActive() throws Exception {
         // @Modifying 쿼리는 트랜잭션 안에서만 실행된다.
         transactionTemplate.executeWithoutResult(
                 status -> salesRepository.transitionStatus(salesId, "ON_SALE", "PRIVATE"));
@@ -212,27 +222,31 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         assertThat(orderRepository.findAll()).isEmpty();
     }
 
+    @DisplayName("판매정보가 없는 상품의 주문은 404로 응답한다")
     @Test
-    void 판매정보가_없는_상품이면_404() throws Exception {
+    void returns404WhenSalesInformationIsMissing() throws Exception {
         order(body(Map.of("productId", 999_999L)), null).andExpect(status().isNotFound());
     }
 
     /** 사용자가 본 금액과 현재 금액이 다르면 주문을 만들지 않고 409 로 알린다. 주문서를 열어둔 사이 관리자가 가격을 바꾼 상황이다. */
+    @DisplayName("확인 금액이 현재 금액과 다르면 409로 응답하고 주문을 생성하지 않는다")
     @Test
-    void 확인_금액이_현재_금액과_다르면_409이고_주문을_만들지_않는다() throws Exception {
+    void rejectsPriceMismatchWithoutCreatingOrder() throws Exception {
         order(body(Map.of("expectedTotalAmount", 25_000L)), null).andExpect(status().isConflict());
 
         assertThat(orderRepository.findAll()).isEmpty();
         assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isZero();
     }
 
+    @DisplayName("확인 금액이 현재 금액과 같으면 주문을 생성한다")
     @Test
-    void 확인_금액이_맞으면_주문된다() throws Exception {
+    void createsOrderWhenExpectedAmountMatchesCurrentPrice() throws Exception {
         order(body(Map.of("expectedTotalAmount", 30_000L)), null).andExpect(status().isCreated());
     }
 
+    @DisplayName("필수값 누락과 잘못된 형식은 400으로 응답한다")
     @Test
-    void 필수값이_빠지거나_형식이_틀리면_400() throws Exception {
+    void returns400ForMissingOrMalformedRequiredFields() throws Exception {
         Map<String, Object> noName = new HashMap<>();
         noName.put("buyerName", " ");
         order(body(noName), null).andExpect(status().isBadRequest());
@@ -244,8 +258,9 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
     }
 
     /** 재고를 정확히 소진시키면 공개 목록에서 "판매 중" 으로 남지 않도록 품절로 바뀌어야 한다. */
+    @DisplayName("주문으로 재고를 모두 예약하면 품절로 변경한다")
     @Test
-    void 재고를_다_쓰면_품절로_바뀐다() throws Exception {
+    void marksSaleSoldOutWhenStockIsExhausted() throws Exception {
         order(body(Map.of("quantity", 5)), null).andExpect(status().isCreated());
 
         assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())

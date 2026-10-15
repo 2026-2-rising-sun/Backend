@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 상품 이미지 API. 업로드는 상품 등록·수정 화면에서만 쓰므로 관리용 경로(/v1/admin/**)에 두어 SELLER 인증으로 보호한다. 조회는 공개 목록·상세·방송
+ * 상품 이미지 API. 업로드는 상품 등록·수정 화면에서만 쓰므로 판매자 경로(/v1/seller/**)에 두어 SELLER 인증으로 보호한다. 조회는 공개 목록·상세·방송
  * 화면이 쓰므로 공개 경로에 둔다.
  */
 @RestController
@@ -39,7 +39,7 @@ public class ProductImageController {
         this.imageUrlResolver = imageUrlResolver;
     }
 
-    @PostMapping(path = "/v1/admin/product-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(path = "/v1/seller/product-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ProductImageUploadResponse>> upload(
             @RequestPart("file") MultipartFile file) {
         UploadedImage uploaded =

@@ -19,8 +19,7 @@ public class LiveSecurityConfiguration {
             MemberJwtAuthenticationConverter converter,
             JsonSecurityErrorHandler errors)
             throws Exception {
-        // Bearer headers only; Member owns JSON refresh tokens, and no authentication cookies are
-        // used.
+        // Bearer 헤더로만 인증한다. 갱신 토큰은 Member의 JSON 요청으로 처리하고 인증 쿠키는 사용하지 않는다.
         return http.csrf(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)

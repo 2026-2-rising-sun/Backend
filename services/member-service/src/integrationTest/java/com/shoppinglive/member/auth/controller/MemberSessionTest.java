@@ -1,4 +1,4 @@
-package com.shoppinglive.member;
+package com.shoppinglive.member.auth.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -14,10 +14,12 @@ import com.shoppinglive.member.auth.service.MemberLoginService;
 import com.shoppinglive.member.auth.service.MemberSessionService;
 import com.shoppinglive.member.auth.service.MemberTokenIssuer;
 import com.shoppinglive.member.members.service.MemberService;
+import com.shoppinglive.member.security.MemberAuthTestSupport;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -33,6 +35,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
     @MockitoSpyBean MemberTokenIssuer issuer;
     @MockitoSpyBean RefreshSessionRepository sessions;
 
+    @DisplayName("토큰 교체는 최초 만료 시각을 유지하고 해시만 저장한다")
     @Test
     void rotationKeepsAbsoluteExpiryAndStoresOnlyHashes() throws Exception {
         var initial = account("a@example.com");
@@ -56,6 +59,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(next).andExpect(status().isOk());
     }
 
+    @DisplayName("기존 토큰 재사용은 보안 폐기를 커밋하지만 위조 토큰은 세션을 폐기하지 않는다")
     @Test
     void knownTokenReuseCommitsSecurityRevocationButForgedTokenDoesNot() throws Exception {
         var initial = account("a@example.com");
@@ -76,6 +80,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(independent).andExpect(status().isOk());
     }
 
+    @DisplayName("일반 로그아웃은 멱등하며 해당 갱신 세션 가족만 비활성화한다")
     @Test
     void ordinaryLogoutIsIdempotentAndOnlyDisablesItsRefreshFamily() throws Exception {
         var initial = account("a@example.com");
@@ -97,6 +102,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
                 .isNull();
     }
 
+    @DisplayName("만료 직전 발급된 접근 토큰은 갱신 토큰 만료로 폐기하지 않는다")
     @Test
     void refreshExpiryDoesNotRevokeAccessIssuedNearTheAbsoluteBoundary() throws Exception {
         var token = account("a@example.com");
@@ -109,6 +115,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(token).andExpect(status().isOk());
     }
 
+    @DisplayName("탈퇴는 비밀번호를 확인하고 모든 세션을 폐기하며 이메일을 재사용하지 않는다")
     @Test
     void withdrawalRequiresPasswordThenRevokesEveryFamilyAndKeepsEmailReserved() throws Exception {
         var token = account("a@example.com");
@@ -136,6 +143,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
                 .isZero();
     }
 
+    @DisplayName("판매자는 본인 세션만 폐기할 수 있고 이후 새 로그인을 허용한다")
     @Test
     void sellerCanRevokeOnlyOwnSessionsAndNewLoginRemainsPossible() throws Exception {
         var target = account("a@example.com");
@@ -161,6 +169,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(loginService.login("seller@example.com", "password123")).andExpect(status().isOk());
     }
 
+    @DisplayName("내부 세션 확인은 별도 허용 서비스만 접근하고 회원·세션 가족을 대조한다")
     @Test
     void internalStatusChecksRequireSeparateAllowedCallerAndMatchMemberToFamily() throws Exception {
         var token = account("a@example.com");
@@ -197,6 +206,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
                 .andExpect(jsonPath("$.data.active").value(false));
     }
 
+    @DisplayName("상태 저장소 장애는 인증을 우회하지 않고 사용자·서비스에 503으로 응답한다")
     @Test
     void stateStorageFailureReturns503ForUserAndCallerWithoutBypassingAuthentication()
             throws Exception {
@@ -214,6 +224,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
     }
 
+    @DisplayName("갱신 서명·저장 실패는 기존 토큰 사용 처리를 롤백하고 토큰을 노출하지 않는다")
     @Test
     void refreshSigningAndStorageFailuresRollBackConsumptionAndDoNotExposeTokens()
             throws Exception {
@@ -241,6 +252,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(rotated(token.refreshToken())).andExpect(status().isOk());
     }
 
+    @DisplayName("탈퇴 저장에 실패하면 회원·전체 세션 변경을 롤백한다")
     @Test
     void withdrawalStorageFailureRollsBackMemberAndAllSessionChanges() throws Exception {
         var token = account("a@example.com");
@@ -262,6 +274,7 @@ class MemberSessionTest extends MemberAuthTestSupport {
         profile(token).andExpect(status().isOk());
     }
 
+    @DisplayName("잘못된 입력과 식별자 주입은 세션 변경 없이 거절한다")
     @Test
     void rejectsInvalidInputAndIdentityInjectionWithoutChangingSessions() throws Exception {
         var token = account("a@example.com");

@@ -27,10 +27,8 @@ class ReplicaSalesInfoClientTest {
         SalesInfo stored = new SalesInfo(1L, 10L, 1_000L, SalesStatus.ON_SALE, 3);
         when(repository.findByProductIds(anyCollection())).thenReturn(Map.of(1L, stored));
 
-        // when
         Map<Long, SalesInfo> result = client.findByProductIds(List.of(1L, 2L));
 
-        // then
         assertThat(result).containsExactly(Map.entry(1L, stored));
     }
 

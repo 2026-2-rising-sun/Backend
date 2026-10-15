@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -125,16 +126,18 @@ class HttpShoppingClientTest {
         executor.shutdownNow();
     }
 
+    @DisplayName("성공 응답 봉투를 상품 스냅샷으로 읽고 null 이미지를 허용한다")
     @Test
-    void 성공_봉투를_상품스냅샷으로_읽고_이미지는_null을_허용한다() {
+    void readsProductEnvelopeAndAllowsNullImage() {
         assertThat(client.findProduct(7L)).contains(new ProductSnapshot(7L, "상품", null));
         assertThat(path.get()).isEqualTo("GET /v1/internal/products/7");
         assertThat(callerToken.get()).isEqualTo("test-outbound-commerce-shopping-token-32");
         assertThat(requests).hasValue(1);
     }
 
+    @DisplayName("상품 조회 응답에서 판매자 식별자를 수신한다")
     @Test
-    void 상품_판매자_식별자를_수신한다() {
+    void readsProductSellerIdentity() {
         body =
                 """
             {"success":true,"data":{"id":7,"name":"상품","mainImageUrl":null,"sellerId":"seller-a"},"error":null}
@@ -143,8 +146,9 @@ class HttpShoppingClientTest {
                 .contains(new ProductSnapshot(7L, "상품", null, "seller-a"));
     }
 
+    @DisplayName("기존 상품의 null 판매자를 허용한다")
     @Test
-    void 기존_상품의_null_판매자를_허용한다() {
+    void allowsNullSellerForLegacyProduct() {
         body =
                 """
             {"success":true,"data":{"id":7,"name":"상품","mainImageUrl":null,"sellerId":null},"error":null}
@@ -152,8 +156,9 @@ class HttpShoppingClientTest {
         assertThat(client.findProduct(7L)).contains(new ProductSnapshot(7L, "상품", null));
     }
 
+    @DisplayName("상품 조회의 404만 미존재로 처리하고 재시도·서킷 실패에 포함하지 않는다")
     @Test
-    void 상품404만_미존재이며_재시도하거나_서킷실패로_기록하지_않는다() {
+    void treatsOnlyProduct404AsAbsentWithoutRetryOrCircuitFailure() {
         responseStatus = 404;
         assertThat(client.findProduct(7L)).isEmpty();
         assertThat(requests).hasValue(1);
@@ -165,6 +170,7 @@ class HttpShoppingClientTest {
                 .isZero();
     }
 
+    @DisplayName("상품 일괄 조회는 내부 요청 한 번으로 처리하고 반환된 상품을 모두 검증한다")
     @Test
     void batchLookupUsesOneInternalRequestAndValidatesEveryReturnedProduct() {
         body =
@@ -179,9 +185,10 @@ class HttpShoppingClientTest {
         assertThat(path.get()).contains("GET /v1/internal/products?ids=7,8");
     }
 
+    @DisplayName("서버 오류는 두 번까지만 시도하고 조회 장애를 전파한다")
     @ParameterizedTest
     @ValueSource(ints = {500, 503})
-    void 서버오류는_두번까지만_시도하고_장애로_전파한다(int statusCode) {
+    void retriesServerFailureAtMostTwiceAndPropagatesUnavailability(int statusCode) {
         responseStatus = statusCode;
         assertThatThrownBy(() -> client.findProduct(7L))
                 .isInstanceOf(ShoppingUnavailableException.class)
@@ -189,9 +196,10 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(2);
     }
 
+    @DisplayName("다른 4xx 응답은 상품 미존재로 숨기거나 재시도하지 않는다")
     @ParameterizedTest
     @ValueSource(ints = {400, 401, 403})
-    void 다른4xx를_상품없음으로_숨기거나_재시도하지_않는다(int statusCode) {
+    void rejectsOtherClientErrorsWithoutRetryOrTreatingProductAsAbsent(int statusCode) {
         responseStatus = statusCode;
         assertThatThrownBy(() -> client.findProduct(7L))
                 .isInstanceOf(ShoppingUnavailableException.class)
@@ -199,6 +207,7 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(1);
     }
 
+    @DisplayName("잘못된 응답은 재시도 없이 장애로 처리하고 빈 상품으로 대체하지 않는다")
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -214,7 +223,7 @@ class HttpShoppingClientTest {
                 "{\"success\":true,\"data\":{\"id\":7}}",
                 "{\"success\":true,\"data\":{\"id\":7,\"name\":\" \"}}"
             })
-    void 잘못된응답은_재시도없이_장애이며_빈상품이_아니다(String invalidBody) {
+    void rejectsMalformedResponseWithoutRetryOrEmptyProductFallback(String invalidBody) {
         body = invalidBody;
         assertThatThrownBy(() -> client.findProduct(7L))
                 .isInstanceOf(ShoppingUnavailableException.class)
@@ -232,8 +241,9 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(1);
     }
 
+    @DisplayName("실제 읽기 시간 초과는 두 번 시도한 뒤 조회 장애로 종료한다")
     @Test
-    void 실제_read_timeout은_두번후_장애로_종료한다() {
+    void failsAfterTwoReadTimeoutAttempts() {
         client = clientWithReadTimeout(Duration.ofMillis(150));
         delay = true;
         long start = System.nanoTime();
@@ -245,16 +255,18 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(2);
     }
 
+    @DisplayName("연결 거부는 상품 미존재 대신 조회 장애로 처리한다")
     @Test
-    void 연결거부는_상품없음이_아닌_장애다() {
+    void treatsConnectionRefusalAsUnavailableInsteadOfAbsent() {
         server.stop(0);
         assertThatThrownBy(() -> client.findProduct(7L))
                 .isInstanceOf(ShoppingUnavailableException.class)
                 .hasCauseInstanceOf(ResourceAccessException.class);
     }
 
+    @DisplayName("서킷이 열려 있으면 네트워크 호출 없이 조회 장애로 종료한다")
     @Test
-    void 열린서킷은_네트워크호출없이_장애로_종료한다() {
+    void failsOpenCircuitWithoutNetworkCall() {
         circuitBreakers
                 .circuitBreaker(HttpShoppingClient.RESILIENCE_INSTANCE)
                 .transitionToOpenState();
@@ -263,8 +275,9 @@ class HttpShoppingClientTest {
         assertThat(requests).hasValue(0);
     }
 
+    @DisplayName("실제 HTTP 장애는 판매 등록의 503으로 응답하고 저장 트랜잭션을 시작하지 않는다")
     @Test
-    void 실제_HTTP_실패는_판매등록503으로_매핑되고_저장트랜잭션을_시작하지_않는다() throws Exception {
+    void mapsHttpFailureTo503BeforeStartingRegistrationTransaction() throws Exception {
         responseStatus = 503;
         TransactionTemplate transaction = mock(TransactionTemplate.class);
         SalesStockJpaRepository stock = mock(SalesStockJpaRepository.class);

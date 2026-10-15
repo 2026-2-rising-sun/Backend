@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -16,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
 
+    @DisplayName("알 수 없는 환불 필드는 묶음 전체 요청으로 해석하지 않고 거절한다")
     @Test
     void rejectsUnknownFieldsInsteadOfTreatingThemAsWholeGroupRequest() throws Exception {
         mvc.perform(
@@ -27,6 +29,7 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("환불 본문이 있으면 누락되거나 null인 장바구니 ID 목록을 거절한다")
     @Test
     void rejectsNullOrMissingCartIdsWhenARequestBodyIsPresent() throws Exception {
         mvc.perform(
@@ -46,6 +49,7 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("빈 장바구니 ID 목록은 묶음 전체 환불로 해석하지 않고 거절한다")
     @Test
     void rejectsEmptyCartIdsInsteadOfTreatingThemAsWholeGroupRefund() throws Exception {
         mvc.perform(
@@ -57,6 +61,7 @@ class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @DisplayName("JSON null은 본문 생략으로 해석하지 않고 거절한다")
     @Test
     void rejectsJsonNullWithoutTreatingItAsAnOmittedBody() throws Exception {
         mvc.perform(

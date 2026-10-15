@@ -37,11 +37,11 @@ public record SalesInfoEventMessage(
     static SalesInfoEventMessage parse(String raw) {
         JsonNode root = readRoot(raw);
         if (!isSupportedSchemaVersion(root.get("schemaVersion"))) {
-            throw invalid("unsupported schemaVersion");
+            throw invalid("지원하지 않는 schemaVersion입니다.");
         }
         JsonNode payload = root.get("payload");
         if (payload == null || !payload.isObject()) {
-            throw invalid("payload is missing");
+            throw invalid("payload는 필수 JSON 객체입니다.");
         }
         long productId = longAtLeast(payload, "productId", 1);
         long salesId = longAtLeast(payload, "salesId", 1);
@@ -50,7 +50,7 @@ public record SalesInfoEventMessage(
         long price = longAtLeast(payload, "price", 1);
         int available = intAtLeast(payload, "available", 0);
         if (!isKrw(payload.get("currency"))) {
-            throw invalid("currency must be KRW");
+            throw invalid("currency는 KRW여야 합니다.");
         }
         SalesStatus status = toSalesStatus(textOf(payload, "status"), productId, snapshotVersion);
         return new SalesInfoEventMessage(
@@ -83,16 +83,16 @@ public record SalesInfoEventMessage(
 
     private static JsonNode readRoot(String raw) {
         if (raw == null) {
-            throw invalid("message value is empty");
+            throw invalid("메시지 값이 없습니다.");
         }
         JsonNode root;
         try {
             root = MAPPER.readTree(raw);
         } catch (JsonProcessingException e) {
-            throw invalid("broken JSON");
+            throw invalid("JSON 형식이 올바르지 않습니다.");
         }
         if (root == null || !root.isObject()) {
-            throw invalid("message must be a JSON object");
+            throw invalid("메시지는 JSON 객체여야 합니다.");
         }
         return root;
     }
@@ -127,7 +127,7 @@ public record SalesInfoEventMessage(
     private static String textOf(JsonNode node, String field) {
         JsonNode value = node.get(field);
         if (value == null || !value.isTextual() || value.textValue().isBlank()) {
-            throw invalid(field + " is missing");
+            throw invalid(field + "은 필수입니다.");
         }
         return value.textValue();
     }
@@ -138,7 +138,7 @@ public record SalesInfoEventMessage(
                 || !value.isIntegralNumber()
                 || !value.canConvertToLong()
                 || value.longValue() < min) {
-            throw invalid(field + " must be an integer >= " + min);
+            throw invalid(field + "은 다음 값 이상의 정수여야 합니다: " + min);
         }
         return value.longValue();
     }
@@ -149,7 +149,7 @@ public record SalesInfoEventMessage(
                 || !value.isIntegralNumber()
                 || !value.canConvertToInt()
                 || value.intValue() < min) {
-            throw invalid(field + " must be an integer >= " + min);
+            throw invalid(field + "은 다음 값 이상의 정수여야 합니다: " + min);
         }
         return value.intValue();
     }

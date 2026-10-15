@@ -19,11 +19,11 @@ public record LiveBroadcastEndedPayload(
         List<Long> closedPromotionIds) {
 
     public LiveBroadcastEndedPayload {
-        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId must be positive");
+        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId는 양수여야 합니다.");
         if (broadcastVersion < 0)
-            throw new IllegalArgumentException("broadcastVersion must not be negative");
-        Objects.requireNonNull(startedAt, "startedAt must not be null");
-        Objects.requireNonNull(endedAt, "endedAt must not be null");
+            throw new IllegalArgumentException("broadcastVersion은 0 이상이어야 합니다.");
+        Objects.requireNonNull(startedAt, "startedAt은 필수입니다.");
+        Objects.requireNonNull(endedAt, "endedAt은 필수입니다.");
         closedPromotionIds =
                 closedPromotionIds == null ? List.of() : List.copyOf(closedPromotionIds);
     }

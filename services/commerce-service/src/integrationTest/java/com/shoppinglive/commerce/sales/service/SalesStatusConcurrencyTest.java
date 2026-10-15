@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -65,11 +66,12 @@ class SalesStatusConcurrencyTest
      * 정상 전이한다. 이것도 옳은 동작이다 — 동시가 아니라 순차로 실행된 것뿐이다.
      *
      * <p>예전에는 성공 수가 정확히 1 이라고 단정했는데, 코어가 적은 CI 러너에서 두 스레드가 순차 실행되면서 성공 수가 2 가 되어 빌드가 깨졌다. 스케줄링에 기대는
-     * 단정이었다. 여기서는 어느 쪽으로 실행되든 성립하는 것만 확인하고, 겹쳤을 때의 보장은 {@link #겹침을_강제하면_조건부_UPDATE_는_한_쪽만_통과시킨다()}
-     * 가 결정적으로 검증한다.
+     * 단정이었다. 여기서는 어느 쪽으로 실행되든 성립하는 것만 확인하고, 겹쳤을 때의 보장은 {@link
+     * #allowsOneConditionalUpdateWhenTransitionsOverlap()} 가 결정적으로 검증한다.
      */
+    @DisplayName("READY에서 ON_SALE·PRIVATE를 동시에 요청해도 유효한 상태를 유지한다")
     @RepeatedTest(3)
-    void READY_에서_동시에_ON_SALE_과_PRIVATE_요청해도_상태가_깨지지_않는다() throws Exception {
+    void preservesValidStatusAcrossConcurrentReadyTransitions() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch startGate = new CountDownLatch(1);
         CountDownLatch doneGate = new CountDownLatch(2);
@@ -131,8 +133,9 @@ class SalesStatusConcurrencyTest
      * <p>두 트랜잭션이 모두 {@code READY} 를 읽은 것을 래치로 보장한 뒤에야 UPDATE 를 보낸다. 이렇게 겹침을 강제하면 스레드 스케줄링과 무관하게 항상
      * 한 쪽만 통과해야 한다. 서비스 계층({@code changeStatus})은 읽기와 UPDATE 사이에 끼어들 틈을 주지 않으므로 리포지토리 계층에서 직접 확인한다.
      */
+    @DisplayName("상태 변경이 겹치면 조건부 UPDATE는 한쪽만 성공한다")
     @RepeatedTest(3)
-    void 겹침을_강제하면_조건부_UPDATE_는_한_쪽만_통과시킨다() throws Exception {
+    void allowsOneConditionalUpdateWhenTransitionsOverlap() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         CountDownLatch bothRead = new CountDownLatch(2);
         CountDownLatch doneGate = new CountDownLatch(2);

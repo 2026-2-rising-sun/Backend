@@ -17,6 +17,7 @@ import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -105,8 +106,9 @@ class PaymentDelayReconcilerTest
         return paymentAttemptRepository.save(attempt);
     }
 
+    @DisplayName("지연된 INSTANT_SUCCESS 결제는 PAID로 확정한다")
     @Test
-    void 지연_초과된_PROCESSING_INSTANT_SUCCESS_는_PAID_로_확정() {
+    void confirmsOverdueSuccessfulPaymentAsPaid() {
         PaymentAttempt attempt =
                 insertProcessingAttempt(
                         PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
@@ -127,6 +129,7 @@ class PaymentDelayReconcilerTest
         assertThat(stock.getAvailable()).isEqualTo(4);
     }
 
+    @DisplayName("미확정 결제를 복구하고 늦게 도착한 미확정 결과가 확정 성공을 덮지 못한다")
     @Test
     void unknownAttemptIsRecoveredAndLateUnknownCannotOverwriteConfirmedSuccess() {
         PaymentAttempt attempt =
@@ -167,8 +170,9 @@ class PaymentDelayReconcilerTest
         assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
     }
 
+    @DisplayName("지연된 INSTANT_FAIL 결제는 FAILED로 확정하고 재고를 복구한다")
     @Test
-    void 지연_초과된_INSTANT_FAIL_는_FAILED_로_확정_재고_복구() {
+    void confirmsOverdueFailedPaymentAndRestoresStock() {
         insertProcessingAttempt(PaymentScenario.INSTANT_FAIL, Instant.now().minusSeconds(10));
 
         reconciler.reconcileOverdue();
@@ -182,8 +186,9 @@ class PaymentDelayReconcilerTest
         assertThat(stock.getAvailable()).isEqualTo(5);
     }
 
+    @DisplayName("결제 복구를 두 번 실행해도 중복 처리하지 않는다")
     @Test
-    void Reconciler_두_번_실행해도_이중_처리_없음() {
+    void doesNotProcessPaymentTwiceAcrossReconciliationRuns() {
         insertProcessingAttempt(PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
 
         reconciler.reconcileOverdue();
@@ -198,8 +203,9 @@ class PaymentDelayReconcilerTest
         assertThat(stock.getAvailable()).isEqualTo(4);
     }
 
+    @DisplayName("스캔 후 다른 콜백이 확정한 결제는 처리 수에 포함하지 않는다")
     @Test
-    void 스캔_이후_다른_콜백이_확정한_결제는_처리수에_포함하지_않는다() {
+    void excludesPaymentConfirmedAfterScanFromProcessedCount() {
         PaymentAttempt attempt =
                 insertProcessingAttempt(
                         PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
@@ -229,6 +235,7 @@ class PaymentDelayReconcilerTest
                         });
     }
 
+    @DisplayName("승인 반영에 실패한 묶음은 다음 결제를 막지 않고 반영 재시도를 허용한다")
     @Test
     void failedApprovedGroupDoesNotBlockNextPaymentAndRemainsRetryable() {
         PaymentAttempt failed = overdueGroupAttempt(orderId, "broken-group");

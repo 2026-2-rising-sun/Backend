@@ -19,12 +19,12 @@ public record LiveBroadcastStartedPayload(
         List<Long> productIds) {
 
     public LiveBroadcastStartedPayload {
-        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId must be positive");
+        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId는 양수여야 합니다.");
         if (broadcastVersion < 0)
-            throw new IllegalArgumentException("broadcastVersion must not be negative");
-        Objects.requireNonNull(title, "title must not be null");
-        Objects.requireNonNull(scheduledAt, "scheduledAt must not be null");
-        Objects.requireNonNull(startedAt, "startedAt must not be null");
-        productIds = List.copyOf(Objects.requireNonNull(productIds, "productIds must not be null"));
+            throw new IllegalArgumentException("broadcastVersion은 0 이상이어야 합니다.");
+        Objects.requireNonNull(title, "title은 필수입니다.");
+        Objects.requireNonNull(scheduledAt, "scheduledAt은 필수입니다.");
+        Objects.requireNonNull(startedAt, "startedAt은 필수입니다.");
+        productIds = List.copyOf(Objects.requireNonNull(productIds, "productIds는 필수입니다."));
     }
 }

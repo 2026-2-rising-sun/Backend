@@ -12,8 +12,7 @@ public record MemberLoginProperties(
                 || lockDuration == null
                 || lockDuration.isZero()
                 || lockDuration.isNegative()) {
-            throw new IllegalArgumentException(
-                    "Login failure limit and lock duration must be positive");
+            throw new IllegalArgumentException("로그인 실패 횟수 제한과 잠금 시간은 양수여야 합니다.");
         }
     }
 }

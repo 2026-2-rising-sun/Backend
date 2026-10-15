@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,7 @@ class OutboxRelayTest {
                     new OutboxProperties(100, Duration.ofSeconds(1)),
                     Runnable::run);
 
+    @DisplayName("대기 이벤트를 키·타입 헤더와 함께 순서대로 전송하고 발행 표시를 남긴다")
     @Test
     void sendsPendingMessagesInOrderWithKeyAndTypeHeaderThenMarksThemPublished() {
         when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))
@@ -72,6 +74,7 @@ class OutboxRelayTest {
         verify(repository).markPublished(eq(2L), any(Instant.class));
     }
 
+    @DisplayName("커밋 후 리스너를 호출하면 준비된 실행기로 대기 이벤트를 발행한다")
     @Test
     void afterCommitListenerDrainsSynchronously() {
         when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))
@@ -84,6 +87,7 @@ class OutboxRelayTest {
         verify(repository).markPublished(eq(1L), any(Instant.class));
     }
 
+    @DisplayName("전송 중 다시 호출해도 같은 이벤트를 중복 전송하지 않는다")
     @Test
     void reentrantCallDuringSendDoesNotDoubleSend() {
         // 중복 전송을 피하기 위해, fast-path drain 중 다시 relay() 가 호출되면 즉시 0 을 돌려줘야 한다.
@@ -101,6 +105,7 @@ class OutboxRelayTest {
         verify(kafka, org.mockito.Mockito.times(1)).send(any(ProducerRecord.class));
     }
 
+    @DisplayName("첫 전송에 실패하면 뒤 이벤트가 앞서지 않도록 해당 배치를 중단한다")
     @Test
     void stopsAtTheFirstFailureSoLaterEventsDoNotOvertakeIt() {
         when(repository.findByPublishedAtIsNullOrderByIdAsc(any(Pageable.class)))

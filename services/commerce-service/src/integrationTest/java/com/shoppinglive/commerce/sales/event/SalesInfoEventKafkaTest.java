@@ -29,6 +29,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +38,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Opt-in host Kafka verification; salesEventsKafkaTest requires real PostgreSQL and broker
- * addresses.
- */
+/** 격리된 외부 Kafka 브로커 주소를 지정했을 때 판매 이벤트 전달을 검증한다. */
 @SpringBootTest(
         properties = {
             "commerce.sales.events.enabled=true",
@@ -56,6 +54,7 @@ class SalesInfoEventKafkaTest extends CommerceSecurityTestSupport {
     @Autowired OrderService orders;
     @Autowired InMemoryShoppingClientStub shopping;
 
+    @DisplayName("API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다")
     @Test
     void apiChangesPublishContractJsonAndStableKeyToRealKafka() throws Exception {
         String broker = System.getenv("COMMERCE_TEST_KAFKA_SERVERS");

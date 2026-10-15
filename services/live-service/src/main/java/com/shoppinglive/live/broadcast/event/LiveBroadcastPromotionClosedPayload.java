@@ -25,18 +25,18 @@ public record LiveBroadcastPromotionClosedPayload(
         Instant closedAt) {
 
     public LiveBroadcastPromotionClosedPayload {
-        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId must be positive");
-        if (promotionId <= 0) throw new IllegalArgumentException("promotionId must be positive");
+        if (broadcastId <= 0) throw new IllegalArgumentException("broadcastId는 양수여야 합니다.");
+        if (promotionId <= 0) throw new IllegalArgumentException("promotionId는 양수여야 합니다.");
         if (promotionVersion < 0)
-            throw new IllegalArgumentException("promotionVersion must not be negative");
+            throw new IllegalArgumentException("promotionVersion은 0 이상이어야 합니다.");
         requireText(type, "type");
         requireText(reason, "reason");
-        Objects.requireNonNull(closedAt, "closedAt must not be null");
+        Objects.requireNonNull(closedAt, "closedAt은 필수입니다.");
     }
 
     private static void requireText(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank");
+            throw new IllegalArgumentException(field + "은 비어 있을 수 없습니다.");
         }
     }
 }

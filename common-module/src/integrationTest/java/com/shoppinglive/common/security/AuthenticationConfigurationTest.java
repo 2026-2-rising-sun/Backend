@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.security.test.JwtTestTokens;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -21,6 +22,7 @@ class AuthenticationConfigurationTest {
                     .withBean(ObjectMapper.class, ObjectMapper::new)
                     .withBean(AccessSessionVerifier.class, () -> (member, session) -> true);
 
+    @DisplayName("발급자·대상·로컬 공개 키 파일이 없으면 기동에 실패한다")
     @Test
     void failsStartupWithoutIssuerAudienceOrLocalKeyFile() throws Exception {
         Path keys = directory.resolve("public.jwks");
@@ -54,6 +56,7 @@ class AuthenticationConfigurationTest {
                 .run(result -> assertThat(result).hasFailed());
     }
 
+    @DisplayName("HTTP 세션 검증은 연결 설정이 필요하고 DB 검증은 HTTP 설정 없이 생성된다")
     @Test
     void httpVerifierRequiresConfigurationAndDatabaseVerifierNeedsNoHttpProperties()
             throws Exception {

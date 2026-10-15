@@ -75,7 +75,7 @@ class PromotionEventTest extends LiveSecuritySupport {
         assertThat(eventsOf(id)).isEmpty();
 
         promotions.open(id, a.getId());
-        promotions.open(id, a.getId()); // idempotent
+        promotions.open(id, a.getId()); // 같은 요청을 다시 보내도 상태가 중복 변경되지 않아야 한다.
         final List<OutboxMessage> afterOpenOpen = eventsOf(id);
         assertThat(afterOpenOpen)
                 .hasSize(1)
@@ -83,7 +83,7 @@ class PromotionEventTest extends LiveSecuritySupport {
                 .containsExactly("LiveBroadcastPromotionOpened");
 
         promotions.close(id, a.getId());
-        promotions.close(id, a.getId()); // idempotent
+        promotions.close(id, a.getId()); // 같은 요청을 다시 보내도 상태가 중복 변경되지 않아야 한다.
         final List<OutboxMessage> afterCloseClose = eventsOf(id);
         assertThat(afterCloseClose)
                 .extracting(OutboxMessage::getEventType)

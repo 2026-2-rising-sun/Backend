@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class EventEnvelopeTest {
@@ -18,8 +19,9 @@ class EventEnvelopeTest {
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private final Instant time = Instant.parse("2026-10-14T00:00:00Z");
 
+    @DisplayName("새 이벤트 ID와 메타데이터를 생성하고 제네릭 payload를 복원한다")
     @Test
-    void 새_ID와_메타데이터를_생성하고_제네릭_payload를_복원한다() throws Exception {
+    void createsMetadataAndRestoresGenericPayload() throws Exception {
         var event =
                 EventEnvelope.create(
                         "OrderPaid",
@@ -39,8 +41,9 @@ class EventEnvelopeTest {
         assertThat(received.payload().orderId()).isEqualTo("42");
     }
 
+    @DisplayName("공통 봉투는 모르는 이벤트명과 양수 버전을 허용한다")
     @Test
-    void 알수없는_이벤트명과_양수버전은_봉투에서_거절하지_않는다() throws Exception {
+    void allowsUnknownEventTypeAndPositiveSchemaVersion() throws Exception {
         var event =
                 EventEnvelope.create(
                         "FutureEvent", 2, "future-service", "42", time, Map.of("id", 42));
@@ -51,8 +54,9 @@ class EventEnvelopeTest {
         assertThat(received).isEqualTo(event);
     }
 
+    @DisplayName("필수 메타데이터가 없거나 잘못되면 이벤트 봉투 생성을 거절한다")
     @Test
-    void 잘못된_필수값을_거절한다() {
+    void rejectsInvalidRequiredMetadata() {
         String id = UUID.randomUUID().toString();
         assertThatThrownBy(
                         () ->

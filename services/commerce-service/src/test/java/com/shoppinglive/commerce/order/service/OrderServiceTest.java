@@ -46,8 +46,8 @@ class OrderServiceTest {
     // ----- findByOrderNumberAndMemberId (주문 3) -----
 
     @Test
-    @DisplayName("존재하고 회원 일치시 반환")
-    void findByOrderNumberAndMemberId_존재하고_회원_일치시_반환() {
+    @DisplayName("주문번호가 존재하고 회원이 일치하면 주문을 반환한다")
+    void returnsOrderForMatchingNumberAndMember() {
         Order order = sampleOrder();
         given(
                         orderRepository.findByOrderNumberAndMemberId(
@@ -62,8 +62,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("주문번호 없으면 OrderNotFoundException")
-    void findByOrderNumberAndMemberId_주문번호_없으면_OrderNotFoundException() {
+    @DisplayName("주문번호가 없으면 OrderNotFoundException을 던진다")
+    void rejectsMissingOrderNumberWithOrderNotFound() {
         given(
                         orderRepository.findByOrderNumberAndMemberId(
                                 "OD-NOT-EXIST", "11111111-1111-4111-8111-111111111111"))
@@ -77,8 +77,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("타인 주문도 OrderNotFoundException")
-    void findByOrderNumberAndMemberId_타인_주문도_OrderNotFoundException() {
+    @DisplayName("타인 주문은 OrderNotFoundException으로 숨긴다")
+    void hidesAnotherMembersOrderWithOrderNotFound() {
         given(
                         orderRepository.findByOrderNumberAndMemberId(
                                 "OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
@@ -93,8 +93,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("null 회원도 OrderNotFoundException")
-    void findByOrderNumberAndMemberId_null_회원도_OrderNotFoundException() {
+    @DisplayName("회원이 null이면 OrderNotFoundException을 던진다")
+    void rejectsNullMemberWithOrderNotFound() {
         given(orderRepository.findByOrderNumberAndMemberId("OD-20260920-000001", null))
                 .willReturn(Optional.empty());
 
@@ -106,8 +106,8 @@ class OrderServiceTest {
     // ----- cancelBeforePayment (주문 4) -----
 
     @Test
-    @DisplayName("성공하면 취소 UPDATE와 재고복구 UPDATE 모두 호출")
-    void cancelBeforePayment_성공하면_취소_UPDATE와_재고복구_UPDATE_모두_호출() {
+    @DisplayName("결제 전 취소가 성공하면 주문 취소와 예약 재고 복구를 수행한다")
+    void cancelsPendingOrderAndRestoresReservedStock() {
         Order order = sampleOrder();
         given(
                         orderRepository.findByOrderNumberAndMemberId(
@@ -123,8 +123,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("타인 주문이면 OrderNotFoundException")
-    void cancelBeforePayment_타인_주문이면_OrderNotFoundException() {
+    @DisplayName("타인의 주문 취소는 OrderNotFoundException으로 거절한다")
+    void rejectsCancellationByAnotherMemberWithOrderNotFound() {
         given(
                         orderRepository.findByOrderNumberAndMemberId(
                                 "OD-20260920-000001", "22222222-2222-4222-8222-222222222222"))
@@ -139,8 +139,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("상태 전이 실패시 OrderCannotBeCancelledException")
-    void cancelBeforePayment_상태_전이_실패시_OrderCannotBeCancelledException() {
+    @DisplayName("취소 상태 전이에 실패하면 OrderCannotBeCancelledException을 던진다")
+    void rejectsCancellationWhenStateTransitionFails() {
         Order order = sampleOrder();
         given(
                         orderRepository.findByOrderNumberAndMemberId(
@@ -157,8 +157,8 @@ class OrderServiceTest {
     }
 
     @Test
-    @DisplayName("재고 복구 실패시 IllegalStateException")
-    void cancelBeforePayment_재고_복구_실패시_IllegalStateException() {
+    @DisplayName("취소 시 재고 복구에 실패하면 IllegalStateException을 던진다")
+    void failsCancellationWhenStockCannotBeRestored() {
         Order order = sampleOrder();
         given(
                         orderRepository.findByOrderNumberAndMemberId(
