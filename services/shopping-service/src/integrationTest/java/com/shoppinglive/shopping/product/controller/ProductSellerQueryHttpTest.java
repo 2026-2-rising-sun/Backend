@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -120,6 +121,36 @@ class ProductSellerQueryHttpTest extends ShoppingSecuritySupport {
                                 .param("page", "2147483647")
                                 .param("size", "1"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("판매자 상세는 본인 상품만 열고, 남의 상품과 소유자 없는 상품은 존재 여부를 숨기도록 404 를 준다")
+    void sellerDetailOpensOnlyOwnProduct() throws Exception {
+        long own = register("detail-own-key").path("productId").asLong();
+        long other =
+                products.saveAndFlush(
+                                new Product(
+                                        "other",
+                                        "other",
+                                        imageId,
+                                        "detail-other-key",
+                                        JwtTestTokens.MEMBER_A))
+                        .getId();
+        long unassigned =
+                products.saveAndFlush(new Product("legacy", "legacy", imageId, "detail-legacy-key"))
+                        .getId();
+
+        mvc.perform(get("/v1/seller/products/{id}", own).header("Authorization", sellerBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("owned"));
+        // 남의 상품도 "없는 상품"과 같은 상태 코드·오류 코드여야 다른 판매자의 상품 ID 존재 여부가 드러나지 않는다.
+        for (long hidden : new long[] {other, unassigned, Long.MAX_VALUE}) {
+            mvc.perform(
+                            get("/v1/seller/products/{id}", hidden)
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+        }
     }
 
     private JsonNode register(String key) throws Exception {
