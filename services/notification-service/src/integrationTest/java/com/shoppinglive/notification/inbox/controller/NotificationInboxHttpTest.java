@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.security.test.JwtTestTokens;
 import com.shoppinglive.notification.inbox.entity.Notification;
+import com.shoppinglive.notification.inbox.entity.NotificationLinkType;
 import com.shoppinglive.notification.inbox.repository.NotificationRepository;
 import com.shoppinglive.notification.security.NotificationSecuritySupport;
 import java.time.Instant;
@@ -97,7 +98,13 @@ class NotificationInboxHttpTest extends NotificationSecuritySupport {
 
         assertThat(first.path("items")).hasSize(2);
         assertThat(first.path("hasNext").asBoolean()).isTrue();
-        assertThat(first.path("items").get(0).path("title").asText()).isEqualTo("결제가 완료되었습니다");
+
+        JsonNode newest = first.path("items").get(0);
+        assertThat(newest.path("title").asText()).isEqualTo("등록하신 방송이 시작되었습니다");
+        // 화면이 아이콘을 고르고 눌렀을 때 보낼 곳을 정하는 값들이다.
+        assertThat(newest.path("eventType").asText()).isEqualTo("LiveBroadcastStarted");
+        assertThat(newest.path("linkType").asText()).isEqualTo("BROADCAST");
+        assertThat(newest.path("linkValue").asText()).isEqualTo("42");
 
         JsonNode second = list("?size=2&cursor=" + first.path("nextCursor").asText());
 
@@ -141,9 +148,18 @@ class NotificationInboxHttpTest extends NotificationSecuritySupport {
         mvc.perform(get("/v1/notifications")).andExpect(status().isUnauthorized());
     }
 
+    /** 이벤트 ID 는 알림마다 다르다 — 같은 시각 2건을 만들려면 유일 제약을 피해야 한다. */
     private Notification save(String memberId, Instant occurredAt) {
         return notifications.saveAndFlush(
-                new Notification(memberId, "결제가 완료되었습니다", "가을 니트 외 2건 · 89,000원", occurredAt));
+                new Notification(
+                        memberId,
+                        java.util.UUID.randomUUID().toString(),
+                        "LiveBroadcastStarted",
+                        "등록하신 방송이 시작되었습니다",
+                        "가을 신상 라이브",
+                        NotificationLinkType.BROADCAST,
+                        "42",
+                        occurredAt));
     }
 
     private JsonNode list(String query) throws Exception {
