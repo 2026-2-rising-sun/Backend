@@ -74,20 +74,19 @@ public class ShoppingSecurityConfiguration {
                                     .permitAll()
                                     .requestMatchers(
                                             HttpMethod.GET,
-                                            "/v1/admin/products",
-                                            "/v1/admin/products/",
-                                            "/v1/admin/products/{id}",
-                                            "/v1/seller/products")
+                                            "/v1/seller/products",
+                                            "/v1/seller/products/",
+                                            "/v1/seller/products/{id}")
                                     .hasRole("SELLER")
                                     .requestMatchers(
                                             HttpMethod.POST,
-                                            "/v1/admin/products",
-                                            "/v1/admin/product-images")
+                                            "/v1/seller/products",
+                                            "/v1/seller/product-images")
                                     .hasRole("SELLER")
                                     .requestMatchers(
                                             HttpMethod.PATCH,
-                                            "/v1/admin/products/",
-                                            "/v1/admin/products/{id}")
+                                            "/v1/seller/products/",
+                                            "/v1/seller/products/{id}")
                                     .hasRole("SELLER");
                             if (devEnabled) {
                                 auth.requestMatchers(HttpMethod.DELETE, "/v1/dev/product-images")

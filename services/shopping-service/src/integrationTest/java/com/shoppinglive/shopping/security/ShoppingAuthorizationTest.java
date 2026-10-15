@@ -67,7 +67,12 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
         imageId = image.getId();
         productId =
                 products.saveAndFlush(
-                                new Product("Coffee", "Coffee", image.getId(), "auth-product"))
+                                new Product(
+                                        "Coffee",
+                                        "Coffee",
+                                        image.getId(),
+                                        "auth-product",
+                                        JwtTestTokens.SELLER))
                         .getId();
         when(sales.findByProductIds(anyCollection()))
                 .thenReturn(
@@ -103,7 +108,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
         mvc.perform(get("/v1/product-images/999999")).andExpect(status().isNotFound());
         for (String path :
                 List.of("/actuator/health", "/actuator/info", "/actuator/env", "/unclassified")) {
-            mvc.perform(get(path).header("Authorization", adminBearer()))
+            mvc.perform(get(path).header("Authorization", sellerBearer()))
                     .andExpect(status().isForbidden());
         }
     }
@@ -112,14 +117,14 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
     @Test
     void sessionRevocationAndAuthorityOutageFailClosedWithoutBlockingPublicOrInternalReads()
             throws Exception {
-        String token = adminBearer();
-        mvc.perform(get("/v1/admin/products").header("Authorization", token))
+        String token = sellerBearer();
+        mvc.perform(get("/v1/seller/products").header("Authorization", token))
                 .andExpect(status().isOk());
         accessSessions.revoke();
-        mvc.perform(get("/v1/admin/products").header("Authorization", token))
+        mvc.perform(get("/v1/seller/products").header("Authorization", token))
                 .andExpect(status().isUnauthorized());
         accessSessions.fail();
-        mvc.perform(get("/v1/admin/products").header("Authorization", token))
+        mvc.perform(get("/v1/seller/products").header("Authorization", token))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
@@ -133,14 +138,14 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
 
     @DisplayName("모든 관리자 메서드는 부수 효과 전에 익명·일반 사용자를 거절한다")
     @Test
-    void allAdminMethodsDenyAnonymousAndUserBeforeSideEffects() throws Exception {
+    void allSellerMethodsDenyAnonymousAndUserBeforeSideEffects() throws Exception {
         for (String route :
                 List.of(
-                        "GET /v1/admin/products",
-                        "GET /v1/admin/products/1",
-                        "POST /v1/admin/products",
-                        "PATCH /v1/admin/products/1",
-                        "POST /v1/admin/product-images")) {
+                        "GET /v1/seller/products",
+                        "GET /v1/seller/products/1",
+                        "POST /v1/seller/products",
+                        "PATCH /v1/seller/products/1",
+                        "POST /v1/seller/product-images")) {
             String[] parts = route.split(" ");
             mvc.perform(request(HttpMethod.valueOf(parts[0]), parts[1]))
                     .andExpect(status().isUnauthorized())
@@ -153,13 +158,13 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
         }
         assertThat(products.count()).isEqualTo(1);
         assertThat(images.count()).isEqualTo(1);
-        mvc.perform(get("/v1/admin/products/" + productId).header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/products/" + productId).header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
     }
 
     @DisplayName("잘못된 토큰이나 클레임 헤더로 관리자 권한을 얻을 수 없다")
     @Test
-    void invalidTokensAndClaimHeadersCannotCreateAdministrator() throws Exception {
+    void invalidTokensAndClaimHeadersCannotCreateSeller() throws Exception {
         var claims = TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"));
         for (String token :
                 List.of(
@@ -176,11 +181,11 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                                 TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"))
                                         .audience("other")
                                         .build()))) {
-            mvc.perform(get("/v1/admin/products").header("Authorization", "Bearer " + token))
+            mvc.perform(get("/v1/seller/products").header("Authorization", "Bearer " + token))
                     .andExpect(status().isUnauthorized());
         }
         mvc.perform(
-                        post("/v1/admin/products")
+                        post("/v1/seller/products")
                                 .header("X-Member-Id", JwtTestTokens.SELLER)
                                 .header("X-Roles", "SELLER"))
                 .andExpect(status().isUnauthorized());
@@ -197,12 +202,12 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                     .andExpect(status().isOk());
             mvc.perform(get("/v1/internal/products/" + productId).header("X-Service-Token", key))
                     .andExpect(status().isOk());
-            mvc.perform(get("/v1/admin/products").header("X-Service-Token", key))
+            mvc.perform(get("/v1/seller/products").header("X-Service-Token", key))
                     .andExpect(status().isUnauthorized());
             mvc.perform(post("/v1/internal/products").header("X-Service-Token", key))
                     .andExpect(status().isForbidden());
         }
-        mvc.perform(get("/v1/internal/products").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/internal/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/internal/products").header("X-Service-Token", "wrong"))
                 .andExpect(status().isUnauthorized());
@@ -211,9 +216,9 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                                 .header("X-Service-Token", OTHER_KEY)
                                 .header("X-Service-Caller", "commerce"))
                 .andExpect(status().isForbidden());
-        mvc.perform(delete("/v1/dev/product-images").header("Authorization", adminBearer()))
+        mvc.perform(delete("/v1/dev/product-images").header("Authorization", sellerBearer()))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/v1/products").header("Authorization", adminBearer()))
+        mvc.perform(post("/v1/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isForbidden());
     }
 

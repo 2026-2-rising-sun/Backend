@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.shoppinglive.common.security.test.JwtTestTokens;
 import com.shoppinglive.shopping.client.commerce.HttpSalesInfoClient;
 import com.shoppinglive.shopping.client.commerce.SalesInfo;
 import com.shoppinglive.shopping.client.commerce.SalesStatus;
@@ -99,11 +100,11 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderable").value(true))
                 .andExpect(jsonPath("$.data.unitPrice").value(PRICE));
-        mvc.perform(get("/v1/admin/products").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
                 .andExpect(jsonPath("$.data.items[0].price").value(PRICE));
-        mvc.perform(get("/v1/admin/products/{id}", id).header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.salesStatus").value("ON_SALE"))
                 .andExpect(jsonPath("$.data.available").value(4));
@@ -126,7 +127,7 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
             mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
                     .andExpect(status().isNotFound());
         }
-        mvc.perform(get("/v1/admin/products").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(
                         jsonPath(
@@ -141,14 +142,16 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
                                 "$.data.items[?(@.name=='unregistered')].price",
                                 contains(nullValue())));
         mvc.perform(
-                        get("/v1/admin/products/{id}", unregistered)
-                                .header("Authorization", adminBearer()))
+                        get("/v1/seller/products/{id}", unregistered)
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.salesStatus").value("NOT_REGISTERED"));
     }
 
     private long product(String name) {
-        return products.saveAndFlush(new Product(name, name, imageId, name + "-key")).getId();
+        return products.saveAndFlush(
+                        new Product(name, name, imageId, name + "-key", JwtTestTokens.SELLER))
+                .getId();
     }
 
     private void sales(long productId, SalesStatus status, int available) {
