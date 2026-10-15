@@ -4,15 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.shoppinglive.shopping.coupon.dto.CouponSnapshot;
 import com.shoppinglive.shopping.coupon.dto.ProductCouponResponse;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -33,9 +38,29 @@ class CouponDisplayRepositoryTest {
     }
 
     /** 운영에서는 Spring 이 {@code apply} 를 transaction 으로 감싼다. 테스트에서는 같은 효과를 직접 만든다. */
-    record Fixture(CouponDisplayRepository repository, TransactionTemplate tx) {
+    record Fixture(
+            CouponDisplayRepository repository,
+            TransactionTemplate tx,
+            NamedParameterJdbcTemplate jdbc) {
         boolean apply(CouponSnapshot snapshot) {
             return Boolean.TRUE.equals(tx.execute(status -> repository.apply(snapshot)));
+        }
+
+        /** 저장소가 처음 실행하는 쓰기 SQL 바로 뒤에 {@code hook} 을 한 번 실행하는 Fixture. 경합 순서를 고정할 때 쓴다. */
+        Fixture withHookAfterFirstStatement(Runnable hook) {
+            AtomicBoolean fired = new AtomicBoolean();
+            NamedParameterJdbcTemplate hooked =
+                    new NamedParameterJdbcTemplate(jdbc.getJdbcTemplate()) {
+                        @Override
+                        public int update(String sql, SqlParameterSource params) {
+                            int rows = super.update(sql, params);
+                            if (fired.compareAndSet(false, true)) {
+                                hook.run();
+                            }
+                            return rows;
+                        }
+                    };
+            return new Fixture(new CouponDisplayRepository(hooked), tx, hooked);
         }
     }
 
@@ -149,6 +174,64 @@ class CouponDisplayRepositoryTest {
         assertThat(f.repository().findOpenCouponIds(DURING)).containsExactly("open");
     }
 
+    @ParameterizedTest
+    @DisplayName("두 쓰기가 같은 신규 쿠폰을 동시에 저장해도 높은 version 이 남는다")
+    @MethodSource("databases")
+    void concurrentFirstWritesKeepHigherVersion(Db db) throws Exception {
+        Fixture f = open(db);
+        // 쓰기 A(version 2)가 첫 SQL 을 실행한 직후, 다른 스레드의 쓰기 B(version 1)를 끼워 넣는다.
+        // 예전 순서(UPDATE → INSERT)에서는 B 가 이 틈에 commit 해서 A 가 0건으로 끝나고 version 1 이 남았다.
+        AtomicReference<Thread> writerB = new AtomicReference<>();
+        Fixture interleaved =
+                f.withHookAfterFirstStatement(
+                        () -> {
+                            Thread b =
+                                    Thread.ofPlatform()
+                                            .start(
+                                                    () ->
+                                                            applyWithRetry(
+                                                                    f,
+                                                                    coupon(
+                                                                            "c1",
+                                                                            1,
+                                                                            "옛 이름",
+                                                                            List.of(501L),
+                                                                            false)));
+                            writerB.set(b);
+                            // B 가 A 의 commit 을 기다리며 막힐 수 있으므로 끝까지 기다리지 않는다.
+                            join(b, Duration.ofMillis(500));
+                        });
+
+        boolean appliedA = interleaved.apply(coupon("c1", 2, "새 이름", List.of(502L), true));
+        join(writerB.get(), Duration.ofSeconds(10));
+
+        assertThat(appliedA).isTrue();
+        assertThat(names(f, 501L, DURING)).isEmpty();
+        assertThat(names(f, 502L, DURING)).containsExactly("새 이름");
+        assertThat(f.repository().findActiveByProductId(502L, DURING).getFirst().soldOut())
+                .isTrue();
+    }
+
+    /** 동기화({@code CouponSync})와 같은 방식: 키 충돌이면 transaction 밖에서 한 번 더 부른다. */
+    private static void applyWithRetry(Fixture f, CouponSnapshot snapshot) {
+        try {
+            f.apply(snapshot);
+        } catch (DuplicateKeyException e) {
+            f.apply(snapshot);
+        } catch (RuntimeException e) {
+            // DB 마다 잠금 대기 방식이 달라 B 가 어떻게 실패하는지는 이 테스트가 확인할 대상이 아니다.
+        }
+    }
+
+    private static void join(Thread thread, Duration timeout) {
+        try {
+            thread.join(timeout);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static List<String> names(Fixture f, long productId, Instant now) {
         return f.repository().findActiveByProductId(productId, now).stream()
                 .map(ProductCouponResponse::name)
@@ -180,6 +263,7 @@ class CouponDisplayRepositoryTest {
         jdbc.getJdbcOperations().update("DELETE FROM coupon_display");
         return new Fixture(
                 new CouponDisplayRepository(jdbc),
-                new TransactionTemplate(new DataSourceTransactionManager(dataSource)));
+                new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
+                jdbc);
     }
 }

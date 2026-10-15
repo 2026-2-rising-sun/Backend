@@ -57,8 +57,26 @@ public class CouponDisplayRepository {
     /**
      * 더 큰 version 이면 쿠폰 값과 대상 상품 연결을 통째로 바꾼다. 같거나 작은 version 은 아무것도 바꾸지 않는다.
      *
-     * <p>같은 신규 쿠폰을 두 쓰기(이벤트와 동기화)가 동시에 넣으면 한쪽은 키 충돌({@code DuplicateKeyException})로 transaction 전체가
-     * rollback 된다. 여기서 잡지 않는다. 다시 시도하면 이미 있는 행과 version 을 비교하는 UPDATE 경로를 탄다.
+     * <p><b>왜 INSERT 를 먼저 하나.</b> 순서를 반대로(UPDATE → INSERT) 하면 아래 경합에서 높은 version 이 조용히 버려진다.
+     *
+     * <pre>
+     *   쓰기 A (version 2)                  쓰기 B (version 1)
+     *   UPDATE → 행이 없어 0건
+     *                                       INSERT version 1, commit
+     *   INSERT … WHERE NOT EXISTS → 0건
+     *   → false 로 끝남. 예외가 없어 재시도도 없고, DB 에는 version 1 이 남는다.
+     * </pre>
+     *
+     * INSERT 를 먼저 하면 경합이 생겨도 둘 중 하나로만 끝난다.
+     *
+     * <ul>
+     *   <li>다른 쓰기가 이미 commit 했다: INSERT 는 0건이고, 이어지는 UPDATE 가 commit 된 행과 version 을 비교한다.
+     *   <li>다른 쓰기가 아직 commit 전이다: INSERT 가 키 충돌({@code DuplicateKeyException})로 실패하고 transaction
+     *       전체가 rollback 된다. 호출한 쪽이 transaction 밖에서 다시 부르면 위 경우가 된다. (PostgreSQL 은 실패한 transaction
+     *       안에서 다음 SQL 을 실행할 수 없으므로, 이 메서드 안에서 잡아 재시도하지 않는다.)
+     * </ul>
+     *
+     * <p>재시도하는 곳: 동기화는 {@code CouponSync} 가 한 번 더 부르고, 이벤트는 Kafka error handler 가 같은 메시지를 다시 처리한다.
      *
      * @return 반영했으면 {@code true}
      */
@@ -66,8 +84,8 @@ public class CouponDisplayRepository {
     public boolean apply(CouponSnapshot snapshot) {
         MapSqlParameterSource params = params(snapshot);
         boolean applied =
-                jdbc.update(UPDATE_IF_NEWER, params) == 1
-                        || jdbc.update(INSERT_IF_MISSING, params) == 1;
+                jdbc.update(INSERT_IF_MISSING, params) == 1
+                        || jdbc.update(UPDATE_IF_NEWER, params) == 1;
         if (applied) {
             replaceProducts(snapshot);
         }
