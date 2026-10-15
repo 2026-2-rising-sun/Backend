@@ -7,8 +7,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.shoppinglive.notification.event.InvalidEventMessageException;
+import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import com.shoppinglive.notification.sales.entity.ProductSalesStatus;
 import com.shoppinglive.notification.sales.repository.ProductSalesStatusRepository;
+import com.shoppinglive.notification.sales.repository.RestockAlertRepository;
+import com.shoppinglive.notification.sales.service.RestockNotificationService;
 import javax.sql.DataSource;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.flywaydb.core.Flyway;
@@ -27,6 +30,7 @@ class SalesInfoEventListenerTest {
     private static final long SALES = 9001L;
     private static final String EVENT_ID = "74b623b8-90ee-4f65-919c-d9ad2ea46fb2";
 
+    private NamedParameterJdbcTemplate jdbc;
     private ProductSalesStatusRepository statuses;
     private SalesInfoEventListener listener;
 
@@ -43,10 +47,10 @@ class SalesInfoEventListenerTest {
                 .cleanDisabled(false)
                 .load()
                 .migrate();
-        NamedParameterJdbcTemplate jdbc = new NamedParameterJdbcTemplate(dataSource);
+        jdbc = new NamedParameterJdbcTemplate(dataSource);
         jdbc.getJdbcTemplate().update("DELETE FROM product_sales_status");
         statuses = new ProductSalesStatusRepository(jdbc);
-        listener = new SalesInfoEventListener(statuses);
+        listener = new SalesInfoEventListener(statuses, restockNotifications(jdbc));
     }
 
     @Test
@@ -120,9 +124,15 @@ class SalesInfoEventListenerTest {
 
         assertThatThrownBy(
                         () ->
-                                new SalesInfoEventListener(failing)
+                                new SalesInfoEventListener(failing, restockNotifications(jdbc))
                                         .consume(record(snapshot(1, "SOLD_OUT"))))
                 .isInstanceOf(DataAccessResourceFailureException.class);
+    }
+
+    private static RestockNotificationService restockNotifications(
+            NamedParameterJdbcTemplate jdbc) {
+        return new RestockNotificationService(
+                new RestockAlertRepository(jdbc), new NotificationWriteRepository(jdbc));
     }
 
     private static ConsumerRecord<String, String> record(String value) {
