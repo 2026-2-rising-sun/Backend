@@ -3,6 +3,7 @@ package com.shoppinglive.notification.broadcast.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.notification.event.InvalidEventMessageException;
 import java.time.DateTimeException;
 import java.time.Instant;
 
@@ -12,8 +13,8 @@ import java.time.Instant;
  * <p>발행 측의 공유 DTO 를 쓰지 않는 이유: 그 record 는 모르는 값 하나에도 생성자가 던져서 메시지 전체를 못 읽는다. 여기서는 필드를 직접 읽어 값마다 다르게
  * 처리한다. 특히 <b>모르는 {@code eventType} 은 오류가 아니라 무시</b> 대상이다.
  *
- * <p>검증 실패는 {@link InvalidMessageException} 으로 알리고, listener 가 그 메시지를 건너뛴다. 다시 읽어도 같은 결과라서 재시도할 이유가
- * 없다.
+ * <p>검증 실패는 {@link InvalidEventMessageException} 으로 알리고, listener 가 그 메시지를 건너뛴다. 다시 읽어도 같은 결과라서
+ * 재시도할 이유가 없다.
  */
 record LiveBroadcastEventMessage(
         String eventId, String eventType, Instant occurredAt, JsonNode payload) {
@@ -112,15 +113,7 @@ record LiveBroadcastEventMessage(
         }
     }
 
-    private static InvalidMessageException invalid(String reason) {
-        return new InvalidMessageException(reason);
-    }
-
-    /** 해석·검증 실패. listener 가 이것만 잡아 건너뛴다. */
-    static final class InvalidMessageException extends RuntimeException {
-
-        InvalidMessageException(String reason) {
-            super(reason);
-        }
+    private static InvalidEventMessageException invalid(String reason) {
+        return new InvalidEventMessageException(reason);
     }
 }
