@@ -45,7 +45,8 @@ public class LiveSecurityConfiguration {
                                                 "/v1/broadcasts/{id}/chats",
                                                 "/v1/broadcasts/{id}/events",
                                                 "/v1/broadcasts/{id}/likes",
-                                                "/v1/broadcasts/{id}/viewers")
+                                                "/v1/broadcasts/{id}/viewers",
+                                                "/v1/broadcast-thumbnails/{id}")
                                         .permitAll()
                                         .requestMatchers(
                                                 HttpMethod.POST,
@@ -71,6 +72,7 @@ public class LiveSecurityConfiguration {
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.POST,
+                                                "/v1/seller/broadcast-thumbnails",
                                                 "/v1/seller/broadcasts",
                                                 "/v1/seller/broadcasts/{id}/start",
                                                 "/v1/seller/broadcasts/{id}/end",

@@ -34,6 +34,60 @@ tags:
 - name: Broadcast Event Stream
   description: 방송 실시간 이벤트 SSE
 paths:
+  /v1/seller/broadcast-thumbnails:
+    post:
+      tags: [Seller Broadcast]
+      summary: 판매자 방송 썸네일 업로드
+      operationId: uploadBroadcastThumbnail
+      x-required-roles: [SELLER]
+      description: PNG·JPEG만 허용하며 실제 디코딩·형식·2MB·최대 4096×4096 픽셀을 검증한다. 썸네일 ID는 업로드한 판매자만 방송에 연결할 수 있다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: 업로드 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success: {type: boolean}
+                  error: {type: 'null'}
+                  data:
+                    type: object
+                    required: [thumbnailId, thumbnailUrl]
+                    properties:
+                      thumbnailId: {type: string, format: uuid}
+                      thumbnailUrl: {type: string}
+        '400': {description: 파일 누락·손상·형식·크기 초과}
+        '401': {description: 로그인 필요}
+        '403': {description: SELLER 권한 필요}
+  /v1/broadcast-thumbnails/{id}:
+    get:
+      tags: [Public Broadcast]
+      summary: 공개 방송 썸네일 조회
+      operationId: getBroadcastThumbnail
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: 원본 이미지. nosniff와 하루 공개 캐시를 적용한다.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+        '404': {description: 존재하지 않는 썸네일}
   /v1/seller/broadcasts:
     post:
       x-required-roles:
@@ -1538,6 +1592,19 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 업로드한 썸네일 UUID. 생략 시 기존 값 유지, 빈 문자열은 제거, 다른 판매자 썸네일은 403이다.
+
     BroadcastPatchInput:
       type: object
       description: '생략한 필드는 기존 값을 유지한다. 명시적 null 은 400 이다.
@@ -1561,7 +1628,20 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 썸네일 UUID. 생략 또는 기존 ID 재전송은 유지하고 빈 문자열은 제거한다. 새로 연결·교체하는 ID만 현재 판매자 소유여야 하며 타인 이미지는 403이다.
       additionalProperties: false
+
     Broadcast:
       type: object
       description: 관리 응답. 운영자가 채널·시청 URL 일치를 확인해야 하므로 IVS 필드를 포함한다.
@@ -1611,6 +1691,22 @@ components:
         updatedAt:
           type: string
           format: date-time
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 업로드한 썸네일 UUID. 생략 시 기존 값 유지, 빈 문자열은 제거, 다른 판매자 썸네일은 403이다.
+        thumbnailUrl:
+          type: [string, 'null']
+          description: 공개 썸네일 주소. 기존 방송 또는 미등록은 null이다.
+
     PublicBroadcast:
       type: object
       description: 공개 응답. 채널 ARN·등록 키·fingerprint 를 포함하지 않는다.
@@ -1654,6 +1750,18 @@ components:
         createdAt:
           type: string
           format: date-time
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailUrl:
+          type: [string, 'null']
+          description: 공개 썸네일 주소. 기존 방송 또는 미등록은 null이다.
+
     LinkProductInput:
       type: object
       required:
