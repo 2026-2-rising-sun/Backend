@@ -199,7 +199,7 @@ paths:
           $ref: "#/components/responses/InternalError"
         "503":
           $ref: "#/components/responses/AuthUnavailable"
-  /v1/admin/members/{id}/sessions/revoke:
+  /v1/seller/members/{id}/sessions/revoke:
     post:
       tags:
         - Member

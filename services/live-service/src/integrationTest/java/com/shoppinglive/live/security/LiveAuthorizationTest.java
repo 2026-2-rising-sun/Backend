@@ -32,23 +32,33 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired ApplicationContext context;
 
-    @DisplayName("모든 관리자 메서드는 변경 전에 검증된 관리자 권한을 요구한다")
+    @DisplayName("모든 판매자 메서드는 변경 전에 검증된 판매자 권한을 요구한다")
     @Test
-    void everyAdminMethodRequiresVerifiedAdministratorBeforeMutation() throws Exception {
+    void everySellerMethodRequiresVerifiedSellerBeforeMutation() throws Exception {
         long before = repository.count();
         for (String route :
                 List.of(
-                        "GET /v1/admin/broadcasts",
-                        "GET /v1/admin/broadcasts/1",
-                        "POST /v1/admin/broadcasts",
-                        "PATCH /v1/admin/broadcasts/1",
-                        "POST /v1/admin/broadcasts/1/start",
-                        "POST /v1/admin/broadcasts/1/end",
-                        "GET /v1/admin/broadcasts/1/products",
-                        "POST /v1/admin/broadcasts/1/products",
-                        "PUT /v1/admin/broadcasts/1/products/order",
-                        "DELETE /v1/admin/broadcasts/1/products/1")) {
+                        "GET /v1/seller/broadcasts",
+                        "GET /v1/seller/broadcasts/1",
+                        "POST /v1/seller/broadcasts",
+                        "PATCH /v1/seller/broadcasts/1",
+                        "POST /v1/seller/broadcasts/1/start",
+                        "POST /v1/seller/broadcasts/1/end",
+                        "GET /v1/seller/broadcasts/1/products",
+                        "POST /v1/seller/broadcasts/1/products",
+                        "PUT /v1/seller/broadcasts/1/products/order",
+                        "DELETE /v1/seller/broadcasts/1/products/1",
+                        "GET /v1/seller/broadcasts/1/promotions",
+                        "POST /v1/seller/broadcasts/1/promotions",
+                        "POST /v1/seller/broadcasts/1/promotions/1/open",
+                        "POST /v1/seller/broadcasts/1/promotions/1/close")) {
             String[] parts = route.split(" ");
+            mvc.perform(
+                            request(
+                                            HttpMethod.valueOf(parts[0]),
+                                            parts[1].replace("/seller/", "/admin/"))
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isForbidden());
             mvc.perform(request(HttpMethod.valueOf(parts[0]), parts[1]))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
@@ -59,21 +69,21 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                     .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
         }
         assertThat(repository.count()).isEqualTo(before);
-        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/broadcasts").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
     }
 
     @DisplayName("세션 폐기·검증 장애가 익명 방송 조회를 막지 않는다")
     @Test
     void sessionRevocationAndAuthorityOutageDoNotDisableAnonymousBroadcasts() throws Exception {
-        String token = adminBearer();
-        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token))
+        String token = sellerBearer();
+        mvc.perform(get("/v1/seller/broadcasts").header("Authorization", token))
                 .andExpect(status().isOk());
         accessSessions.revoke();
-        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token))
+        mvc.perform(get("/v1/seller/broadcasts").header("Authorization", token))
                 .andExpect(status().isUnauthorized());
         accessSessions.fail();
-        mvc.perform(get("/v1/admin/broadcasts").header("Authorization", token))
+        mvc.perform(get("/v1/seller/broadcasts").header("Authorization", token))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"))
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
@@ -107,16 +117,16 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                         "/actuator/info",
                         "/actuator/env",
                         "/v1/internal/anything")) {
-            mvc.perform(get(path).header("Authorization", adminBearer()))
+            mvc.perform(get(path).header("Authorization", sellerBearer()))
                     .andExpect(status().isForbidden());
         }
-        mvc.perform(post("/v1/broadcasts").header("Authorization", adminBearer()))
+        mvc.perform(post("/v1/broadcasts").header("Authorization", sellerBearer()))
                 .andExpect(status().isForbidden());
     }
 
-    @DisplayName("잘못된 JWT·헤더·서비스 키로 관리자 권한을 얻을 수 없다")
+    @DisplayName("잘못된 JWT·헤더·서비스 키로 판매자 권한을 얻을 수 없다")
     @Test
-    void invalidJwtHeadersAndServiceKeysCannotGrantAdmin() throws Exception {
+    void invalidJwtHeadersAndServiceKeysCannotGrantSeller() throws Exception {
         for (String token :
                 List.of(
                         "bad",
@@ -133,17 +143,17 @@ class LiveAuthorizationTest extends LiveSecuritySupport {
                                 TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"))
                                         .audience("other")
                                         .build()))) {
-            mvc.perform(get("/v1/admin/broadcasts").header("Authorization", "Bearer " + token))
+            mvc.perform(get("/v1/seller/broadcasts").header("Authorization", "Bearer " + token))
                     .andExpect(status().isUnauthorized());
         }
         mvc.perform(
-                        post("/v1/admin/broadcasts")
+                        post("/v1/seller/broadcasts")
                                 .header(
                                         "X-Service-Token",
                                         "test-live-service-credential-000000000001"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(
-                        post("/v1/admin/broadcasts")
+                        post("/v1/seller/broadcasts")
                                 .header("X-Member-Id", JwtTestTokens.SELLER)
                                 .header("X-Roles", "SELLER"))
                 .andExpect(status().isUnauthorized());

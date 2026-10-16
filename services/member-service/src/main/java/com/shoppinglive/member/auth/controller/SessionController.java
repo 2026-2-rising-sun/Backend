@@ -56,7 +56,7 @@ public class SessionController {
         sessions.withdraw(UUID.fromString(user.memberId()), request.password());
     }
 
-    @PostMapping("/v1/admin/members/{id}/sessions/revoke")
+    @PostMapping("/v1/seller/members/{id}/sessions/revoke")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void revoke(@PathVariable UUID id, @AuthenticationPrincipal AuthenticatedUser user) {
         if (!id.toString().equals(user.memberId())) {

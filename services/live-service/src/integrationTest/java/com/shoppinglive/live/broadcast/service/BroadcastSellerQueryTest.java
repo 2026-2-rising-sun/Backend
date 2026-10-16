@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @DisplayName("관리용 방송 목록·상세 조회 (정렬, 상태 필터, 페이지네이션)")
-class BroadcastAdminQueryTest extends LiveSecuritySupport {
+class BroadcastSellerQueryTest extends LiveSecuritySupport {
     @Autowired BroadcastService service;
     @Autowired MockMvc mvc;
 
@@ -86,14 +86,14 @@ class BroadcastAdminQueryTest extends LiveSecuritySupport {
     void httpListAndDetailReturnBroadcast() throws Exception {
         final Broadcast broadcast = register("http-detail");
         mvc.perform(
-                        get("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        get("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .param("size", "100"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
         mvc.perform(
-                        get("/v1/admin/broadcasts/{id}", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        get("/v1/seller/broadcasts/{id}", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.title").value("http-detail"))
                 .andExpect(jsonPath("$.data.status").value("PREPARING"));
@@ -103,8 +103,8 @@ class BroadcastAdminQueryTest extends LiveSecuritySupport {
     @Test
     void httpDetailOfMissingBroadcastIs404() throws Exception {
         mvc.perform(
-                        get("/v1/admin/broadcasts/{id}", 999_999L)
-                                .header("Authorization", adminBearer()))
+                        get("/v1/seller/broadcasts/{id}", 999_999L)
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isNotFound());
     }
 
@@ -112,8 +112,8 @@ class BroadcastAdminQueryTest extends LiveSecuritySupport {
     @Test
     void httpListWithInvalidStatusFilterIs400() throws Exception {
         mvc.perform(
-                        get("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        get("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .param("status", "NOPE"))
                 .andExpect(status().isBadRequest());
     }

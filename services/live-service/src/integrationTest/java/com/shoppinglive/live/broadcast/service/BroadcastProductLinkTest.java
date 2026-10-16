@@ -153,18 +153,18 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
 
         mvc.perform(
                         delete(
-                                        "/v1/admin/broadcasts/{id}/products/{linkId}",
+                                        "/v1/seller/broadcasts/{id}/products/{linkId}",
                                         owner.getId(),
                                         link.getId())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
                 .andExpect(status().isNoContent());
         mvc.perform(
                         delete(
-                                        "/v1/admin/broadcasts/{id}/products/{linkId}",
+                                        "/v1/seller/broadcasts/{id}/products/{linkId}",
                                         owner.getId(),
                                         link.getId())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(versionOf(owner.getId()))))
                 .andExpect(status().isNoContent());
 
@@ -172,10 +172,10 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
                 products.link(owner.getId(), 2L, versionOf(owner.getId()));
         mvc.perform(
                         delete(
-                                        "/v1/admin/broadcasts/{id}/products/{linkId}",
+                                        "/v1/seller/broadcasts/{id}/products/{linkId}",
                                         other.getId(),
                                         ownersLink.getId())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(versionOf(other.getId()))))
                 .andExpect(status().isNotFound());
     }
@@ -202,8 +202,8 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
     void httpLinkReturns201AndMissingBroadcastIs404() throws Exception {
         final Broadcast broadcast = register("link-http");
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/products", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/products", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"productId\":1,\"expectedVersion\":"
@@ -214,8 +214,8 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
                 .andExpect(jsonPath("$.data.salesId").value(101));
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/products", 999_999L)
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/products", 999_999L)
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"productId\":1,\"expectedVersion\":0}"))
                 .andExpect(status().isNotFound());
@@ -226,8 +226,8 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
     void httpLinkWithoutRequiredFieldsIs400() throws Exception {
         final Broadcast broadcast = register("link-bad");
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/products", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/products", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"productId\":1}"))
                 .andExpect(status().isBadRequest());
@@ -246,10 +246,10 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
 
         mvc.perform(
                         delete(
-                                        "/v1/admin/broadcasts/{id}/products/{linkId}",
+                                        "/v1/seller/broadcasts/{id}/products/{linkId}",
                                         broadcast.getId(),
                                         target.getId())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(issued)))
                 .andExpect(status().isNoContent());
 
@@ -257,10 +257,10 @@ class BroadcastProductLinkTest extends LiveSecuritySupport {
         for (int retry = 0; retry < 2; retry++) {
             mvc.perform(
                             delete(
-                                            "/v1/admin/broadcasts/{id}/products/{linkId}",
+                                            "/v1/seller/broadcasts/{id}/products/{linkId}",
                                             broadcast.getId(),
                                             target.getId())
-                                    .header("Authorization", adminBearer())
+                                    .header("Authorization", sellerBearer())
                                     .param("expectedVersion", String.valueOf(issued)))
                     .andExpect(status().isNoContent());
         }

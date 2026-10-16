@@ -153,12 +153,16 @@ class MemberSessionTest extends MemberAuthTestSupport {
         var seller2 = loginService.login("seller@example.com", "password123");
         UUID targetId = members.findByEmail("a@example.com").orElseThrow().getId();
         UUID sellerId = members.findByEmail("seller@example.com").orElseThrow().getId();
-        String route = "/v1/admin/members/" + sellerId + "/sessions/revoke";
+        String route = "/v1/seller/members/" + sellerId + "/sessions/revoke";
+        mvc.perform(
+                        post(route.replace("/seller/", "/admin/"))
+                                .header("Authorization", bearer(seller)))
+                .andExpect(status().isForbidden());
         mvc.perform(post(route)).andExpect(status().isUnauthorized());
         mvc.perform(post(route).header("Authorization", bearer(target)))
                 .andExpect(status().isForbidden());
         mvc.perform(
-                        post("/v1/admin/members/" + targetId + "/sessions/revoke")
+                        post("/v1/seller/members/" + targetId + "/sessions/revoke")
                                 .header("Authorization", bearer(seller)))
                 .andExpect(status().isForbidden());
         profile(target).andExpect(status().isOk());

@@ -57,8 +57,8 @@ class BroadcastEndTest extends LiveSecuritySupport {
     void endingAPreparingBroadcastIsRejected() throws Exception {
         final Broadcast broadcast = register("end-preparing");
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/end", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/end", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isConflict());
     }
 
@@ -66,8 +66,8 @@ class BroadcastEndTest extends LiveSecuritySupport {
     @Test
     void endingMissingBroadcastIs404() throws Exception {
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/end", 999_999L)
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/end", 999_999L)
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isNotFound());
     }
 
@@ -78,15 +78,15 @@ class BroadcastEndTest extends LiveSecuritySupport {
         forceLive(broadcast);
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/end", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/end", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ENDED"));
         final Instant first = service.get(broadcast.getId()).getEndedAt();
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/end", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/end", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
         assertThat(service.get(broadcast.getId()).getEndedAt()).isEqualTo(first);
         assertThat(service.get(broadcast.getId()).getStatus()).isEqualTo(BroadcastStatus.ENDED);
@@ -113,8 +113,8 @@ class BroadcastEndTest extends LiveSecuritySupport {
                 () -> {
                     gate.await();
                     return mvc.perform(
-                                    post("/v1/admin/broadcasts/{id}/end", broadcast.getId())
-                                            .header("Authorization", adminBearer()))
+                                    post("/v1/seller/broadcasts/{id}/end", broadcast.getId())
+                                            .header("Authorization", sellerBearer()))
                             .andReturn()
                             .getResponse()
                             .getStatus();

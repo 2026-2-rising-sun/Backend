@@ -146,7 +146,7 @@ class LikeTest extends LiveSecuritySupport {
                 .andExpect(status().isBadRequest());
         mvc.perform(
                         put("/v1/broadcasts/{id}/likes/mine", id)
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", UUID.randomUUID().toString())
                                 .contentType("application/json")
                                 .content("{\"liked\":true}"))

@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/admin/broadcasts/{broadcastId}/promotions")
+@RequestMapping("/v1/seller/broadcasts/{broadcastId}/promotions")
 public class PromotionController {
 
     private final PromotionService service;

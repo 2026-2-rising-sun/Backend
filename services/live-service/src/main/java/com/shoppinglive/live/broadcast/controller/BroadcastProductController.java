@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/admin/broadcasts/{id}/products")
+@RequestMapping("/v1/seller/broadcasts/{id}/products")
 public class BroadcastProductController {
     private final BroadcastProductService service;
 
