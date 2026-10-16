@@ -77,8 +77,8 @@ class PromotionHttpTest extends LiveSecuritySupport {
         long firstId =
                 idOf(
                         mvc.perform(
-                                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
-                                                .header("Authorization", adminBearer())
+                                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                                .header("Authorization", sellerBearer())
                                                 .header("Idempotency-Key", key)
                                                 .contentType("application/json")
                                                 .content(payload))
@@ -91,8 +91,8 @@ class PromotionHttpTest extends LiveSecuritySupport {
         long replayedId =
                 idOf(
                         mvc.perform(
-                                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
-                                                .header("Authorization", adminBearer())
+                                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                                .header("Authorization", sellerBearer())
                                                 .header("Idempotency-Key", key)
                                                 .contentType("application/json")
                                                 .content(payload))
@@ -106,8 +106,8 @@ class PromotionHttpTest extends LiveSecuritySupport {
         }
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", key)
                                 .contentType("application/json")
                                 .content(body("TIME_DEAL", "다른 제목", ",\"durationSeconds\":300")))
@@ -120,15 +120,15 @@ class PromotionHttpTest extends LiveSecuritySupport {
         long broadcast = liveBroadcast();
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", UUID.randomUUID().toString())
                                 .contentType("application/json")
                                 .content(body("lowercase", "제목", "")))
                 .andExpect(status().isBadRequest());
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
+                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
                                 .header("Authorization", userBearer())
                                 .header("Idempotency-Key", UUID.randomUUID().toString())
                                 .contentType("application/json")
@@ -144,8 +144,8 @@ class PromotionHttpTest extends LiveSecuritySupport {
         long promotionId =
                 idOf(
                         mvc.perform(
-                                        post("/v1/admin/broadcasts/{id}/promotions", broadcast)
-                                                .header("Authorization", adminBearer())
+                                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                                .header("Authorization", sellerBearer())
                                                 .header(
                                                         "Idempotency-Key",
                                                         UUID.randomUUID().toString())
@@ -163,10 +163,10 @@ class PromotionHttpTest extends LiveSecuritySupport {
 
         mvc.perform(
                         post(
-                                        "/v1/admin/broadcasts/{id}/promotions/{promotionId}/open",
+                                        "/v1/seller/broadcasts/{id}/promotions/{promotionId}/open",
                                         broadcast,
                                         promotionId)
-                                .header("Authorization", adminBearer()))
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
 
         mvc.perform(get("/v1/broadcasts/{id}/promotions", broadcast))
@@ -176,10 +176,10 @@ class PromotionHttpTest extends LiveSecuritySupport {
 
         mvc.perform(
                         post(
-                                        "/v1/admin/broadcasts/{id}/promotions/{promotionId}/close",
+                                        "/v1/seller/broadcasts/{id}/promotions/{promotionId}/close",
                                         broadcast,
                                         promotionId)
-                                .header("Authorization", adminBearer()))
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
 
         mvc.perform(get("/v1/broadcasts/{id}/promotions", broadcast))

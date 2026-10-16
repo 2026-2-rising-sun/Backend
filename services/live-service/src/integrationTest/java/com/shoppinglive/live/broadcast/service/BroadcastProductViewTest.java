@@ -80,7 +80,7 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
 
     @DisplayName("삭제된 상품은 공개 조회에서 숨기고 관리 조회에서는 missing으로 표시한다")
     @Test
-    void publicViewHidesDeletedProductsWhileAdminViewMarksThemMissing() {
+    void publicViewHidesDeletedProductsWhileSellerViewMarksThemMissing() {
         final Broadcast broadcast = register("view-missing");
         final BroadcastProduct link =
                 links.link(broadcast.getId(), 1L, versionOf(broadcast.getId()));
@@ -89,7 +89,7 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
                 .update("UPDATE broadcast_product SET product_id = 98 WHERE id = ?", link.getId());
 
         assertThat(view.forPublic(broadcast.getId())).isEmpty();
-        assertThat(view.forAdmin(broadcast.getId()))
+        assertThat(view.forSeller(broadcast.getId()))
                 .singleElement()
                 .satisfies(
                         product -> {
@@ -117,8 +117,8 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").isEmpty());
         mvc.perform(
-                        get("/v1/admin/broadcasts/{id}/products", 999_999L)
-                                .header("Authorization", adminBearer()))
+                        get("/v1/seller/broadcasts/{id}/products", 999_999L)
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isNotFound());
     }
 
@@ -132,8 +132,8 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
                 .andExpect(jsonPath("$.data[0].productId").value(1))
                 .andExpect(jsonPath("$.data[0].salesId").value(101));
         mvc.perform(
-                        get("/v1/admin/broadcasts/{id}/products", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        get("/v1/seller/broadcasts/{id}/products", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].position").value(0));
     }

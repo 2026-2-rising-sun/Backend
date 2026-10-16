@@ -73,20 +73,20 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         expect(request("GET", "/v1/broadcasts/999999999", null, null), 404, "NOT_FOUND");
         expect(request("GET", "/v1/broadcasts/", "Bearer invalid", null), 401, "UNAUTHORIZED");
         expect(request("POST", "/v1/broadcasts/", null, "{}"), 401, "UNAUTHORIZED");
-        expect(request("GET", "/v1/admin/broadcasts", null, null), 401, "UNAUTHORIZED");
-        expect(request("GET", "/v1/admin/broadcasts", userBearer(), null), 403, "FORBIDDEN");
+        expect(request("GET", "/v1/seller/broadcasts", null, null), 401, "UNAUTHORIZED");
+        expect(request("GET", "/v1/seller/broadcasts", userBearer(), null), 403, "FORBIDDEN");
     }
 
-    @DisplayName("관리자 경로는 ID 누락 검증 전에 인증을 확인한다")
+    @DisplayName("판매자 경로는 ID 누락 검증 전에 인증을 확인한다")
     @ParameterizedTest
     @ValueSource(strings = {"GET", "PATCH"})
-    void administratorMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
+    void sellerMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {
         expect(
-                request(method, "/v1/admin/broadcasts/", adminBearer(), null),
+                request(method, "/v1/seller/broadcasts/", sellerBearer(), null),
                 400,
                 "INVALID_REQUEST");
-        expect(request(method, "/v1/admin/broadcasts/", null, null), 401, "UNAUTHORIZED");
-        expect(request(method, "/v1/admin/broadcasts/", userBearer(), null), 403, "FORBIDDEN");
+        expect(request(method, "/v1/seller/broadcasts/", null, null), 401, "UNAUTHORIZED");
+        expect(request(method, "/v1/seller/broadcasts/", userBearer(), null), 403, "FORBIDDEN");
     }
 
     @DisplayName("잘못된 PATCH 요청은 저장된 필드를 변경하지 않는다")
@@ -112,16 +112,16 @@ class LiveInputHttpTest extends LiveSecuritySupport {
                 "{\"scheduledAt\":null}"
             })
     void invalidPatchCannotChangeStoredFields(String body) throws Exception {
-        expect(request("PATCH", patchPath(), adminBearer(), body), 400, "INVALID_REQUEST");
+        expect(request("PATCH", patchPath(), sellerBearer(), body), 400, "INVALID_REQUEST");
         assertUnchanged();
     }
 
     @DisplayName("PATCH에서 생략한 필드는 유지하고 유효한 문자열은 수정한다")
     @Test
     void omittedPatchFieldsRemainUnchangedAndStringsStillUpdate() throws Exception {
-        assertThat(request("PATCH", patchPath(), adminBearer(), "{}").statusCode()).isEqualTo(200);
+        assertThat(request("PATCH", patchPath(), sellerBearer(), "{}").statusCode()).isEqualTo(200);
         assertUnchanged();
-        var response = request("PATCH", patchPath(), adminBearer(), "{\"title\":\"changed\"}");
+        var response = request("PATCH", patchPath(), sellerBearer(), "{\"title\":\"changed\"}");
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(mapper.readTree(response.body()).path("data").path("title").asText())
                 .isEqualTo("changed");
@@ -141,8 +141,8 @@ class LiveInputHttpTest extends LiveSecuritySupport {
         expect(
                 request(
                         "POST",
-                        "/v1/admin/broadcasts/" + broadcast.getId() + "/products",
-                        adminBearer(),
+                        "/v1/seller/broadcasts/" + broadcast.getId() + "/products",
+                        sellerBearer(),
                         body),
                 400,
                 "INVALID_REQUEST");
@@ -153,17 +153,20 @@ class LiveInputHttpTest extends LiveSecuritySupport {
     @DisplayName("음수 버전은 변경이나 무변경 처리 전에 입력 오류로 거절한다")
     @Test
     void negativeVersionsAreInputErrorsBeforeMutationOrNoOp() throws Exception {
-        String path = "/v1/admin/broadcasts/" + broadcast.getId();
-        expect(request("PATCH", path + "?version=-1", adminBearer(), "{}"), 400, "INVALID_REQUEST");
+        String path = "/v1/seller/broadcasts/" + broadcast.getId();
         expect(
-                request("POST", path + "/start?expectedVersion=-1", adminBearer(), null),
+                request("PATCH", path + "?version=-1", sellerBearer(), "{}"),
+                400,
+                "INVALID_REQUEST");
+        expect(
+                request("POST", path + "/start?expectedVersion=-1", sellerBearer(), null),
                 400,
                 "INVALID_REQUEST");
         expect(
                 request(
                         "DELETE",
                         path + "/products/99999999?expectedVersion=-1",
-                        adminBearer(),
+                        sellerBearer(),
                         null),
                 400,
                 "INVALID_REQUEST");
@@ -171,7 +174,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
                 request(
                         "PUT",
                         path + "/products/order",
-                        adminBearer(),
+                        sellerBearer(),
                         "{\"linkIds\":[1],\"expectedVersion\":-1}"),
                 400,
                 "INVALID_REQUEST");
@@ -180,7 +183,7 @@ class LiveInputHttpTest extends LiveSecuritySupport {
     }
 
     private String patchPath() {
-        return "/v1/admin/broadcasts/" + broadcast.getId() + "?version=" + broadcast.getVersion();
+        return "/v1/seller/broadcasts/" + broadcast.getId() + "?version=" + broadcast.getVersion();
     }
 
     private void assertUnchanged() {

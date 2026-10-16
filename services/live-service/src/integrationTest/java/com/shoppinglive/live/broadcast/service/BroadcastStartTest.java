@@ -146,16 +146,16 @@ class BroadcastStartTest extends LiveSecuritySupport {
     void httpStartReturnsLiveAndRequiresVersion() throws Exception {
         final Broadcast broadcast = readyToStart("start-http", 1L);
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/start", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .param(
                                         "expectedVersion",
                                         String.valueOf(versionOf(broadcast.getId()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("LIVE"));
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/start", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -167,8 +167,8 @@ class BroadcastStartTest extends LiveSecuritySupport {
         final long issued = versionOf(broadcast.getId());
 
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/start", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(issued)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("LIVE"));
@@ -177,8 +177,8 @@ class BroadcastStartTest extends LiveSecuritySupport {
         // 시작 성공으로 version 이 올랐지만 재시도는 같은 issued 로 온다 → 멱등 성공이어야 한다.
         assertThat(versionOf(broadcast.getId())).isNotEqualTo(issued);
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts/{id}/start", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .param("expectedVersion", String.valueOf(issued)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("LIVE"));
@@ -260,8 +260,8 @@ class BroadcastStartTest extends LiveSecuritySupport {
                 """,
                             broadcast.getId());
             mvc.perform(
-                            post("/v1/admin/broadcasts/{id}/start", broadcast.getId())
-                                    .header("Authorization", adminBearer())
+                            post("/v1/seller/broadcasts/{id}/start", broadcast.getId())
+                                    .header("Authorization", sellerBearer())
                                     .param(
                                             "expectedVersion",
                                             String.valueOf(

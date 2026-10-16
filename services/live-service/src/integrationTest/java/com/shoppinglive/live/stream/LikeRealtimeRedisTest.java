@@ -172,7 +172,7 @@ class LikeRealtimeRedisTest extends LiveSecuritySupport {
         try (SseTestClient stream = new SseTestClient(port, id)) {
             ready(stream);
             assertThat(set(id, true).statusCode()).isEqualTo(200);
-            assertThat(post("/v1/admin/broadcasts/" + id + "/end", adminBearer()).statusCode())
+            assertThat(post("/v1/seller/broadcasts/" + id + "/end", sellerBearer()).statusCode())
                     .isEqualTo(200);
             assertThat(nextData(stream, "broadcast.ended").get("broadcastId").asLong())
                     .isEqualTo(id);

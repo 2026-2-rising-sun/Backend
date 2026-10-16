@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/admin/broadcasts")
+@RequestMapping("/v1/seller/broadcasts")
 public class BroadcastController {
     private final BroadcastService service;
     private final BroadcastStartService startService;

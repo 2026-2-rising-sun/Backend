@@ -56,8 +56,8 @@ class BroadcastPatchHttpTest extends LiveSecuritySupport {
 
     private ResultActions edit(final String body, final long version) throws Exception {
         return mvc.perform(
-                patch("/v1/admin/broadcasts/{id}", broadcast.getId())
-                        .header("Authorization", adminBearer())
+                patch("/v1/seller/broadcasts/{id}", broadcast.getId())
+                        .header("Authorization", sellerBearer())
                         .param("version", Long.toString(version))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body));

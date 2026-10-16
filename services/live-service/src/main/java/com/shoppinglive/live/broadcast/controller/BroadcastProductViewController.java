@@ -16,9 +16,9 @@ public class BroadcastProductViewController {
         this.service = service;
     }
 
-    @GetMapping("/v1/admin/broadcasts/{id}/products")
-    public ApiResponse<List<BroadcastProductViewResponse>> admin(@PathVariable final long id) {
-        return ApiResponse.ok(service.forAdmin(id));
+    @GetMapping("/v1/seller/broadcasts/{id}/products")
+    public ApiResponse<List<BroadcastProductViewResponse>> seller(@PathVariable final long id) {
+        return ApiResponse.ok(service.forSeller(id));
     }
 
     @GetMapping("/v1/broadcasts/{id}/products")

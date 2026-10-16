@@ -19,9 +19,9 @@ servers:
 - url: http://dev-live-service:8080
   description: Live 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
 tags:
-- name: Admin Broadcast
+- name: Seller Broadcast
   description: 관리 방송 등록·수정·조회·시작·종료
-- name: Admin Broadcast Product
+- name: Seller Broadcast Product
   description: 관리 방송 상품 연결·해제·정렬·조회
 - name: Public Broadcast
   description: 비회원 공개 방송 조회·시청 연결
@@ -34,7 +34,7 @@ tags:
 - name: Broadcast Event Stream
   description: 방송 실시간 이벤트 SSE
 paths:
-  /v1/admin/broadcasts:
+  /v1/seller/broadcasts:
     post:
       x-required-roles:
       - SELLER
@@ -48,7 +48,7 @@ paths:
         '
       operationId: registerBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -101,7 +101,7 @@ paths:
         '
       operationId: listBroadcasts
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - name: status
         in: query
@@ -125,7 +125,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}:
+  /v1/seller/broadcasts/{id}:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
     get:
@@ -134,7 +134,7 @@ paths:
       summary: 관리 방송 상세
       operationId: getBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -163,7 +163,7 @@ paths:
         '
       operationId: editBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/Version'
       requestBody:
@@ -197,7 +197,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/start:
+  /v1/seller/broadcasts/{id}/start:
     post:
       x-required-roles:
       - SELLER
@@ -214,7 +214,7 @@ paths:
         '
       operationId: startBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       - $ref: '#/components/parameters/ExpectedVersion'
@@ -248,7 +248,7 @@ paths:
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/admin/broadcasts/{id}/end:
+  /v1/seller/broadcasts/{id}/end:
     post:
       x-required-roles:
       - SELLER
@@ -260,7 +260,7 @@ paths:
         '
       operationId: endBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       responses:
@@ -286,7 +286,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/products:
+  /v1/seller/broadcasts/{id}/products:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
     post:
@@ -300,7 +300,7 @@ paths:
         '
       operationId: linkBroadcastProduct
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       requestBody:
         required: true
         content:
@@ -346,9 +346,9 @@ paths:
         정상 조회에서 사라진 연결도 linkId/position 과 `missing: true` 로 식별할 수 있다.
 
         '
-      operationId: listAdminBroadcastProducts
+      operationId: listSellerBroadcastProducts
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -366,7 +366,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/admin/broadcasts/{id}/products/order:
+  /v1/seller/broadcasts/{id}/products/order:
     put:
       x-required-roles:
       - SELLER
@@ -378,7 +378,7 @@ paths:
         '
       operationId: reorderBroadcastProducts
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       requestBody:
@@ -416,7 +416,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/products/{linkId}:
+  /v1/seller/broadcasts/{id}/products/{linkId}:
     delete:
       x-required-roles:
       - SELLER
@@ -428,7 +428,7 @@ paths:
         '
       operationId: unlinkBroadcastProduct
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       - name: linkId
@@ -964,13 +964,13 @@ paths:
           $ref: '#/components/responses/BroadcastNotLive'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/:
+  /v1/seller/broadcasts/:
     get:
-      operationId: missingAdminBroadcastIdOnGet
+      operationId: missingSellerBroadcastIdOnGet
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       x-required-roles:
       - SELLER
       responses:
@@ -983,11 +983,11 @@ paths:
         '503':
           $ref: '#/components/responses/AuthUnavailable'
     patch:
-      operationId: missingAdminBroadcastIdOnPatch
+      operationId: missingSellerBroadcastIdOnPatch
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       x-required-roles:
       - SELLER
       responses:
@@ -1014,7 +1014,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions:
+  /v1/seller/broadcasts/{broadcastId}/promotions:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     post:
@@ -1031,7 +1031,7 @@ paths:
         '
       operationId: createPromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -1077,7 +1077,7 @@ paths:
       description: 상태와 관계없이 해당 방송의 프로모션을 id 오름차순으로 반환한다. 방송이 없거나 프로모션이 없으면 빈 목록이다.
       operationId: listPromotions
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1093,7 +1093,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/open:
+  /v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/open:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     - $ref: '#/components/parameters/PromotionId'
@@ -1108,7 +1108,7 @@ paths:
         '
       operationId: openPromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
@@ -1131,7 +1131,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/close:
+  /v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/close:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     - $ref: '#/components/parameters/PromotionId'
@@ -1147,7 +1147,7 @@ paths:
         '
       operationId: closePromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':

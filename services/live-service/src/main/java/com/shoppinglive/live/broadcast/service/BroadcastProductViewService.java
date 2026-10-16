@@ -41,7 +41,7 @@ public class BroadcastProductViewService {
     }
 
     /** 관리 조회는 정상 조회에서 사라진 연결도 missing 으로 드러낸다. */
-    public List<BroadcastProductViewResponse> forAdmin(final long broadcastId) {
+    public List<BroadcastProductViewResponse> forSeller(final long broadcastId) {
         return view(broadcastId, false);
     }
 
