@@ -18,7 +18,8 @@ import java.time.Instant;
  *
  * @param occurredAt 알림 시각의 근거. 판매정보 payload 에는 시각이 없어서 봉투의 값을 쓴다
  */
-record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesStatus status) {
+record SalesInfoEventMessage(
+        String eventId, Instant occurredAt, ProductSalesStatus status, String productName) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -48,7 +49,8 @@ record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesSta
                         salesId,
                         longAtLeast(payload, "snapshotVersion", 1),
                         SalesInfoEventContract.ON_SALE.equals(rawStatus),
-                        rawStatus));
+                        rawStatus),
+                productName(payload));
     }
 
     /**
@@ -56,6 +58,13 @@ record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesSta
      *
      * <p>모르는 값이 와도 거부하지 않는다. 판매 중이 아니라고만 보면 되고, 그게 맞는 처리다. 길이만 사본 컬럼에 맞는지 본다.
      */
+    private static String productName(JsonNode payload) {
+        JsonNode name = payload.get("productName");
+        if (name == null || name.isNull()) return "";
+        if (!name.isTextual() || name.textValue().length() > 255) throw invalid("상품 이름이 올바르지 않습니다");
+        return name.textValue();
+    }
+
     private static String statusOf(JsonNode payload) {
         String status = textOf(payload, "status");
         if (status.length() > SalesInfoEventContract.STATUS_MAX_LENGTH) {

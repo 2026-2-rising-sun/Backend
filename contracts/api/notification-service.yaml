@@ -464,6 +464,9 @@ components:
           enum:
           - BROADCAST
           - PRODUCT
+          - PAYMENT_GROUP
+          - REFUND
+          - COUPON
           - null
           description: 눌렀을 때 보낼 곳의 종류. 보낼 곳이 없는 알림은 linkValue 와 함께 null 이다.
         linkValue:
@@ -471,7 +474,7 @@ components:
           - string
           - 'null'
           maxLength: 100
-          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID.
+          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID, PAYMENT_GROUP 은 PG-UUID, REFUND 는 PG-UUID/환불요청ID, COUPON 은 쿠폰 ID(쿠폰함 이동).
           example: '42'
         occurredAt:
           type: string

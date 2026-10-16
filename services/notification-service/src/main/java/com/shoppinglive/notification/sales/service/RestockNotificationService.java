@@ -13,8 +13,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>알림을 보낸 뒤 그 상품의 신청을 지운다. 재입고 알림은 한 번만 간다.
  *
- * <p>문구에 상품 이름이 없다. 판매정보 이벤트에 이름이 담겨 있지 않고, 이름을 얻으려고 Shopping 에 물어보면 Shopping 이 죽었을 때 알림을 못 만든다.
- * 누르면 상품 상세로 가므로 이름은 그 화면이 보여준다. Commerce 가 이벤트에 이름을 넣어 주면 문구만 고치면 된다.
+ * <p>판매 등록 시 저장된 상품 이름 사본을 사용하며, 이전 이벤트는 기존 문구로 표시한다.
  */
 @Service
 public class RestockNotificationService {
@@ -38,6 +37,10 @@ public class RestockNotificationService {
      * @return 이번 호출로 새로 만들어진 알림 수
      */
     public int create(String eventId, long productId, Instant occurredAt) {
+        return create(eventId, productId, occurredAt, "");
+    }
+
+    public int create(String eventId, long productId, Instant occurredAt, String productName) {
         List<String> memberIds = alerts.findMemberIds(productId);
         if (memberIds.isEmpty()) {
             return 0;
@@ -47,7 +50,9 @@ public class RestockNotificationService {
                         eventId,
                         EVENT_TYPE,
                         TITLE,
-                        BODY,
+                        productName == null || productName.isBlank()
+                                ? BODY
+                                : productName + " 상품이 재입고되었습니다",
                         NotificationLinkType.PRODUCT,
                         Long.toString(productId),
                         occurredAt);

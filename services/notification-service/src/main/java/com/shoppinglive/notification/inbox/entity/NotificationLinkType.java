@@ -13,6 +13,15 @@ public enum NotificationLinkType {
     /** 방송. 값은 방송 ID. */
     BROADCAST,
 
+    /** 결제 묶음 상세. 값은 PG-UUID. */
+    PAYMENT_GROUP,
+
+    /** 구매자 환불 상세. 값은 PG-UUID/환불요청ID. */
+    REFUND,
+
+    /** 쿠폰함. 값은 쿠폰 ID. */
+    COUPON,
+
     /** 상품 상세. 값은 상품 ID. */
     PRODUCT
 }

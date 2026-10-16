@@ -10,6 +10,7 @@ import com.shoppinglive.commerce.order.entity.Order;
 import com.shoppinglive.commerce.order.entity.OrderAmounts;
 import com.shoppinglive.commerce.order.entity.OrderStatus;
 import com.shoppinglive.commerce.order.entity.PaymentGroup;
+import com.shoppinglive.commerce.order.event.PaymentGroupEventPublisher;
 import com.shoppinglive.commerce.order.repository.CartItemRepository;
 import com.shoppinglive.commerce.order.repository.OrderJpaRepository;
 import com.shoppinglive.commerce.order.repository.PaymentGroupRepository;
@@ -94,6 +95,7 @@ public class PaymentGroupService {
     private final ObjectMapper mapper;
     private final OrderNumberGenerator numbers;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+    private final PaymentGroupEventPublisher notificationEvents;
     private final Duration expiration;
 
     public PaymentGroupService(
@@ -115,6 +117,7 @@ public class PaymentGroupService {
             OrderNumberGenerator numbers,
             CouponPreviewService couponPreview,
             CouponReservationService couponReservations,
+            PaymentGroupEventPublisher notificationEvents,
             @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration) {
         this.groups = groups;
         this.orders = orders;
@@ -135,6 +138,7 @@ public class PaymentGroupService {
         this.couponPreview = couponPreview;
         this.couponReservations = couponReservations;
         this.expiration = expiration;
+        this.notificationEvents = notificationEvents;
     }
 
     public Quote preview(String member, List<Selection> selections) {
@@ -360,6 +364,7 @@ public class PaymentGroupService {
                             sales.transitionStatus(s.getId(), "ON_SALE", "SOLD_OUT");
                         }
                     }
+                    notificationEvents.publish("PaymentGroupCreated", group.getId(), Map.of());
                     return new Creation(
                             response(groups.findById(group.getId()).orElseThrow()), true);
                 });
@@ -398,6 +403,7 @@ public class PaymentGroupService {
                                 couponId));
         order.attachGroup(group, sourceVersion);
         orders.saveAndFlush(order);
+        notificationEvents.publish("PaymentGroupCreated", group.getId(), Map.of());
         return group;
     }
 
@@ -619,6 +625,20 @@ public class PaymentGroupService {
                     if (!recovery.complete(lease, result.name())) {
                         throw new IllegalStateException("결제 결과 반영 중 실행 권한을 잃었습니다.");
                     }
+                    notificationEvents.publish(
+                            result == PaymentStatus.SUCCESS ? "PaymentSucceeded" : "PaymentFailed",
+                            g.getId(),
+                            result == PaymentStatus.SUCCESS
+                                    ? Map.of("paymentId", id, "paidAmount", g.getPayableAmount())
+                                    : Map.of(
+                                            "paymentId",
+                                            id,
+                                            "attemptedAmount",
+                                            g.getPayableAmount(),
+                                            "failureCode",
+                                            result == PaymentStatus.TIMEOUT
+                                                    ? "TIMEOUT"
+                                                    : "REJECTED"));
                     return true;
                 });
     }
@@ -652,6 +672,12 @@ public class PaymentGroupService {
         couponReservations.release(g.getMemberId(), g.getCouponId());
         g.transition(terminal);
         groups.saveAndFlush(g);
+        notificationEvents.publish(
+                terminal == OrderStatus.CANCELLED ? "OrderCancelled" : "OrderExpired",
+                g.getId(),
+                Map.of(
+                        terminal == OrderStatus.CANCELLED ? "cancelledAmount" : "expiredAmount",
+                        g.getPayableAmount()));
     }
 
     private void restore(Order child) {

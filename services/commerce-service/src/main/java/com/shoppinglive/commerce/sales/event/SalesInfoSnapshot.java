@@ -14,7 +14,19 @@ public record SalesInfoSnapshot(
         long price,
         SalesInfoStatus status,
         int available,
-        String currency) {
+        String currency,
+        String productName) {
+
+    public SalesInfoSnapshot(
+            long salesId,
+            long productId,
+            long snapshotVersion,
+            long price,
+            SalesInfoStatus status,
+            int available,
+            String currency) {
+        this(salesId, productId, snapshotVersion, price, status, available, currency, "");
+    }
 
     public SalesInfoSnapshot {
         if (salesId <= 0) {

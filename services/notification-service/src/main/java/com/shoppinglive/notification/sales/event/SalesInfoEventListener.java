@@ -44,7 +44,10 @@ public class SalesInfoEventListener {
         }
         if (isRestocked(stored, incoming)) {
             restockNotifications.create(
-                    message.eventId(), incoming.productId(), message.occurredAt());
+                    message.eventId(),
+                    incoming.productId(),
+                    message.occurredAt(),
+                    message.productName());
         }
     }
 

@@ -116,7 +116,7 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
 
     @Test
     @DisplayName("생성·전체 대상 교체·마지막 발급이 동일한 API 스냅샷을 순차 버전으로 기록한다")
-    void completeSnapshotsMatchApiAndOnlyFinalClaimPublishes() throws Exception {
+    void completeSnapshotsAndMemberIssuanceAreRecorded() throws Exception {
         var coupon = create(2);
         var first = snapshots.get(coupon.id());
         assertThat(first.snapshotVersion()).isEqualTo(1);
@@ -135,18 +135,23 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
                 List.of(702L));
         assertThat(snapshots.get(coupon.id()).productIds()).containsExactly(702L);
         claims.claim(MEMBER_A, coupon.id());
-        assertThat(events(coupon.id())).hasSize(2);
+        assertThat(events(coupon.id())).hasSize(3);
         claims.claim(MEMBER_B, coupon.id());
         assertThat(claims.claim(MEMBER_B, coupon.id()).created()).isFalse();
         assertThatThrownBy(() -> claims.claim(UUID.randomUUID().toString(), coupon.id()))
                 .isInstanceOf(BusinessException.class);
         var events = events(coupon.id());
-        assertThat(events).hasSize(3);
+        assertThat(events).hasSize(5);
         assertThat(events.stream().map(e -> e.get("eventType").asText()))
-                .containsExactly("CouponCreated", "CouponUpdated", "CouponSoldOut");
+                .containsExactly(
+                        "CouponCreated",
+                        "CouponUpdated",
+                        "CouponIssued",
+                        "CouponSoldOut",
+                        "CouponIssued");
         assertThat(events.stream().map(e -> e.at("/payload/snapshotVersion").asLong()))
-                .containsExactly(1L, 2L, 3L);
-        var last = events.getLast();
+                .containsExactly(1L, 2L, 2L, 3L, 3L);
+        var last = events.get(3);
         assertThat(last.get("source").asText()).isEqualTo("commerce-service");
         assertThat(last.get("aggregateId").asText()).isEqualTo(coupon.id());
         assertThat(last.at("/payload/soldOut").asBoolean()).isTrue();
@@ -232,9 +237,9 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
                 if (future.get(10, java.util.concurrent.TimeUnit.SECONDS)) successful++;
             assertThat(successful).isEqualTo(1);
         }
-        assertThat(events(coupon.id())).hasSize(2);
-        assertThat(events(coupon.id()).getLast().get("eventType").asText())
-                .isEqualTo("CouponSoldOut");
+        assertThat(events(coupon.id())).hasSize(3);
+        assertThat(events(coupon.id()).stream().map(event -> event.get("eventType").asText()))
+                .containsExactly("CouponCreated", "CouponSoldOut", "CouponIssued");
         assertThat(snapshots.get(coupon.id()).snapshotVersion()).isEqualTo(2);
     }
 
