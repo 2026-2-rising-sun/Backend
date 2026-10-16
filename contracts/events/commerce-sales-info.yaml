@@ -239,6 +239,10 @@ components:
       description: 판매 ID·상품 ID·변경 버전·가격·상태·재고·통화를 포함한 전체 판매정보 스냅샷
       required: [salesId, productId, snapshotVersion, price, status, available, currency]
       properties:
+        productName:
+          type: string
+          maxLength: 255
+          description: 판매 등록 시 저장한 상품명 사본. 이전 판매정보·이벤트는 빈 값 또는 생략 가능하며 일반 문구로 표시한다.
         salesId:
           type: integer
           format: int64

@@ -69,7 +69,7 @@ public class SalesInfoEventTracker {
     private SalesInfoSnapshot snapshot(long id) {
         return jdbc.queryForObject(
                 """
-            SELECT s.id,s.product_id,s.snapshot_version,s.price,s.status,t.available
+            SELECT s.id,s.product_id,s.snapshot_version,s.price,s.status,t.available,s.product_name_snapshot
             FROM sales_info s JOIN sales_stock t ON t.sales_info_id=s.id WHERE s.id=?
             """,
                 (rs, row) ->
@@ -80,7 +80,8 @@ public class SalesInfoEventTracker {
                                 rs.getLong(4),
                                 SalesInfoStatus.valueOf(rs.getString(5)),
                                 rs.getInt(6),
-                                "KRW"),
+                                "KRW",
+                                rs.getString(7)),
                 id);
     }
 

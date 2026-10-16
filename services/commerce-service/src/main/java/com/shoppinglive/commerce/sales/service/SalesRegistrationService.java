@@ -81,11 +81,11 @@ public class SalesRegistrationService {
         }
 
         // 트랜잭션 밖. 확인에 실패하면 (예외 전파) 아무것도 저장하지 않는다.
-        if (!shoppingClient.exists(productId)) {
-            throw new ProductNotFoundException(productId);
-        }
-
-        return persist(productId, price, initialStock);
+        var product =
+                shoppingClient
+                        .findProduct(productId)
+                        .orElseThrow(() -> new ProductNotFoundException(productId));
+        return persist(productId, price, initialStock, product.name());
     }
 
     /**
@@ -95,13 +95,13 @@ public class SalesRegistrationService {
      * uk_sales_info_product_id} UNIQUE 제약이 한쪽을 떨어뜨리고, 그 결과를 중복 등록과 같은 409 로 되돌린다. {@code
      * saveAndFlush} 로 INSERT 시점을 앞당겨야 제약 위반이 커밋이 아니라 이 블록 안에서 발생해 잡을 수 있다.
      */
-    private Sales persist(Long productId, Long price, Integer initialStock) {
+    private Sales persist(Long productId, Long price, Integer initialStock, String productName) {
         try {
             return transactionTemplate.execute(
                     status -> {
-                        Sales saved =
-                                salesRepository.saveAndFlush(
-                                        new Sales(productId, price, SalesStatus.READY));
+                        Sales sales = new Sales(productId, price, SalesStatus.READY);
+                        sales.snapshotProductName(productName);
+                        Sales saved = salesRepository.saveAndFlush(sales);
                         salesStockRepository.save(new SalesStock(saved.getId(), initialStock, 0));
                         events.registered(saved.getId());
                         return saved;

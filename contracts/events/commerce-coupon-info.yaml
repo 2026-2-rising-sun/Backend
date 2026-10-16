@@ -1,22 +1,33 @@
 asyncapi: 3.1.0
 info:
   title: Commerce 쿠폰 표시 이벤트 계약
-  version: 1.0.0
+  version: 1.1.0
   description: 쿠폰 생성·설정 변경·수량 소진 시 전달하는 전체 표시 스냅샷.
 defaultContentType: application/json
 channels:
   couponInfo:
     address: commerce.coupon-info.v1
-    description: |-
-      Kafka key와 aggregateId는 payload.couponId와 같은 opaque 문자열이다.
+    description: 'Kafka key와 aggregateId는 payload.couponId와 같은 opaque 문자열이다.
+
       Kafka 헤더 eventId·eventType은 봉투의 같은 필드 값을 UTF-8 문자열로 전달한다.
+
       생성은 snapshotVersion 1, 성공한 설정 변경과 마지막 발급에 의한 수량 소진은 버전을 증가시킨다.
-      일반 발급·재요청·회원 쿠폰 예약·사용·해제·환불에는 이벤트가 없다.
+
+      회원별 최초 발급 시 CouponIssued를 발행한다. 재요청·예약·사용·해제·환불에는 발급 이벤트가 없다.
+
+      CouponIssued는 표시 사본 전체와 수신자를 함께 담는다. Shopping은 동일 버전 사본을 무시하고 Notification은
+      eventId/memberId로 중복을 제거한다.
+
       변경과 같은 DB 트랜잭션의 Outbox에 기록하며 중복 전달과 순서 역전이 가능하다.
+
       소비자는 쿠폰별 기존 snapshotVersion보다 큰 버전만 원자적으로 반영하고 productIds 전체를 교체한다. 소진 상태도 보존한다.
-      occurredAt·eventId는 순서 판정에 쓰지 않는다. 기간 경계 이벤트는 없으며 startsAt <= now < endsAt로 표시 기간을 판단한다.
+
+      occurredAt·eventId는 순서 판정에 쓰지 않는다. 기간 경계 이벤트는 없으며 startsAt <= now < endsAt로
+      표시 기간을 판단한다.
+
       이벤트 구독을 먼저 시작하고 초기 적재·재동기화에 GET /v1/internal/coupon-snapshots를 사용한다.
-      페이지 간 단일 시점 스냅샷은 보장하지 않으며 API에도 같은 버전 규칙을 적용한다. 종료된 쿠폰은 단건 조회로 복구한다.
+
+      페이지 간 단일 시점 스냅샷은 보장하지 않으며 API에도 같은 버전 규칙을 적용한다. 종료된 쿠폰은 단건 조회로 복구한다.'
     messages:
       CouponCreated:
         $ref: '#/components/messages/CouponCreated'
@@ -24,6 +35,8 @@ channels:
         $ref: '#/components/messages/CouponUpdated'
       CouponSoldOut:
         $ref: '#/components/messages/CouponSoldOut'
+      CouponIssued:
+        $ref: '#/components/messages/CouponIssued'
 operations:
   publishCouponInfo:
     action: send
@@ -33,6 +46,7 @@ operations:
     - $ref: '#/channels/couponInfo/messages/CouponCreated'
     - $ref: '#/channels/couponInfo/messages/CouponUpdated'
     - $ref: '#/channels/couponInfo/messages/CouponSoldOut'
+    - $ref: '#/channels/couponInfo/messages/CouponIssued'
 components:
   messageTraits:
     couponInfo:
@@ -141,6 +155,44 @@ components:
             endsAt: '2026-10-16T09:00:00Z'
             expiresAt: '2026-10-17T09:00:00Z'
             soldOut: true
+    CouponIssued:
+      name: CouponIssued
+      title: 회원 쿠폰 발급
+      traits:
+      - $ref: '#/components/messageTraits/couponInfo'
+      payload:
+        allOf:
+        - $ref: '#/components/schemas/CouponInfoEnvelope'
+        - type: object
+          properties:
+            eventType:
+              const: CouponIssued
+            payload:
+              $ref: '#/components/schemas/CouponIssuedPayload'
+      examples:
+      - name: CouponIssued예시
+        payload:
+          eventId: 74b623b8-90ee-4f65-919c-d9ad2ea46fc1
+          eventType: CouponIssued
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: coupon-opaque-id
+          occurredAt: '2026-10-14T09:00:00Z'
+          payload:
+            couponId: coupon-opaque-id
+            snapshotVersion: 1
+            name: 상품 할인 쿠폰
+            fixedDiscount: 1000
+            productIds:
+            - 501
+            - 502
+            startsAt: '2026-10-15T09:00:00Z'
+            endsAt: '2026-10-16T09:00:00Z'
+            expiresAt: '2026-10-17T09:00:00Z'
+            soldOut: false
+            memberId: 11111111-1111-4111-8111-111111111111
+            memberCouponId: 22222222-2222-4222-8222-222222222222
+            claimedAt: '2026-10-15T09:00:00Z'
   schemas:
     CouponInfoEnvelope:
       type: object
@@ -162,6 +214,7 @@ components:
           - CouponCreated
           - CouponUpdated
           - CouponSoldOut
+          - CouponIssued
         schemaVersion:
           const: 1
         source:
@@ -224,3 +277,21 @@ components:
           description: 발급 수량 소진 여부. 사용·환불로 발급 수량을 되돌리지 않는다.
       description: 상품 표시용 전체 쿠폰 스냅샷. 회원 발급/사용 상태와 발급 잔여 수량은 포함하지 않는다. 실제 발급·사용 판정은
         Commerce가 수행한다.
+    CouponIssuedPayload:
+      allOf:
+      - $ref: '#/components/schemas/CouponDisplaySnapshot'
+      - type: object
+        required:
+        - memberId
+        - memberCouponId
+        - claimedAt
+        properties:
+          memberId:
+            type: string
+            format: uuid
+          memberCouponId:
+            type: string
+            format: uuid
+          claimedAt:
+            type: string
+            format: date-time

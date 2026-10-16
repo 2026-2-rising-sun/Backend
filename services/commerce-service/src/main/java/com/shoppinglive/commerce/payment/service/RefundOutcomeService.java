@@ -2,6 +2,7 @@ package com.shoppinglive.commerce.payment.service;
 
 import com.shoppinglive.commerce.order.entity.OrderStatus;
 import com.shoppinglive.commerce.order.entity.PaymentGroup;
+import com.shoppinglive.commerce.order.event.PaymentGroupEventPublisher;
 import com.shoppinglive.commerce.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commerce.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commerce.payment.entity.RefundStatus;
@@ -22,13 +23,18 @@ public class RefundOutcomeService {
     private final JdbcTemplate jdbc;
     private final PaymentGroupRepository groups;
     private final SalesService sales;
+    private final PaymentGroupEventPublisher notificationEvents;
     @PersistenceContext private EntityManager entityManager;
 
     public RefundOutcomeService(
-            JdbcTemplate jdbc, PaymentGroupRepository groups, SalesService sales) {
+            JdbcTemplate jdbc,
+            PaymentGroupRepository groups,
+            SalesService sales,
+            PaymentGroupEventPublisher notificationEvents) {
         this.jdbc = jdbc;
         this.groups = groups;
         this.sales = sales;
+        this.notificationEvents = notificationEvents;
     }
 
     @Transactional
@@ -162,6 +168,9 @@ public class RefundOutcomeService {
                         lease.token());
         if (updated != 1) {
             throw new IllegalStateException("환불 결과 반영 중 실행 권한의 유효 기간이 만료되었습니다.");
+        }
+        if (outcome == MockRefundOutcome.SUCCESS) {
+            notificationEvents.refunded(lease.paymentGroupId(), requestId, lease.refundAmount());
         }
         return true;
     }

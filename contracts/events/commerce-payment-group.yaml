@@ -1,0 +1,672 @@
+asyncapi: 3.1.0
+info:
+  title: Commerce 결제 묶음 알림 이벤트
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  paymentGroup:
+    address: commerce.payment-group.v1
+    description: Kafka key와 aggregateId는 payload.groupNumber와 일치한다. 상태 변경과 같은 트랜잭션의
+      Outbox에 기록하며 eventId/memberId로 중복을 제거한다. UNKNOWN·PROCESSING 상태에서는 결과 알림을 발행하지
+      않는다. 실패 사유는 저장된 확정 결과 TIMEOUT 또는 REJECTED로 제한하며 잔액 부족을 추측하지 않는다. 주문당 아닌 결제 묶음당
+      1건이다. PaymentGroupCreated는 만료 알림 계산을 위한 사실 이벤트이며 즉시 알림을 만들지 않는다.
+    messages:
+      PaymentGroupCreated:
+        $ref: '#/components/messages/PaymentGroupCreated'
+      PaymentSucceeded:
+        $ref: '#/components/messages/PaymentSucceeded'
+      PaymentFailed:
+        $ref: '#/components/messages/PaymentFailed'
+      OrderCancelled:
+        $ref: '#/components/messages/OrderCancelled'
+      OrderExpired:
+        $ref: '#/components/messages/OrderExpired'
+      RefundCompleted:
+        $ref: '#/components/messages/RefundCompleted'
+operations:
+  publishPaymentGroup:
+    action: send
+    channel:
+      $ref: '#/channels/paymentGroup'
+    messages:
+    - $ref: '#/channels/paymentGroup/messages/PaymentGroupCreated'
+    - $ref: '#/channels/paymentGroup/messages/PaymentSucceeded'
+    - $ref: '#/channels/paymentGroup/messages/PaymentFailed'
+    - $ref: '#/channels/paymentGroup/messages/OrderCancelled'
+    - $ref: '#/channels/paymentGroup/messages/OrderExpired'
+    - $ref: '#/channels/paymentGroup/messages/RefundCompleted'
+components:
+  messages:
+    PaymentGroupCreated:
+      name: PaymentGroupCreated
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: PaymentGroupCreated
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: &id001
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+      examples:
+      - name: PaymentGroupCreated예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: PaymentGroupCreated
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+    PaymentSucceeded:
+      name: PaymentSucceeded
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: PaymentSucceeded
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: *id001
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            - paymentId
+            - paidAmount
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+              paymentId:
+                type: integer
+                format: int64
+                minimum: 1
+              paidAmount:
+                type: integer
+                format: int64
+                minimum: 0
+      examples:
+      - name: PaymentSucceeded예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: PaymentSucceeded
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+            paymentId: 1
+            paidAmount: 10000
+    PaymentFailed:
+      name: PaymentFailed
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: PaymentFailed
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: *id001
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            - paymentId
+            - attemptedAmount
+            - failureCode
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+              paymentId:
+                type: integer
+                format: int64
+                minimum: 1
+              attemptedAmount:
+                type: integer
+                format: int64
+                minimum: 0
+              failureCode:
+                type: string
+                enum:
+                - TIMEOUT
+                - REJECTED
+      examples:
+      - name: PaymentFailed예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: PaymentFailed
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+            paymentId: 1
+            attemptedAmount: 10000
+            failureCode: REJECTED
+    OrderCancelled:
+      name: OrderCancelled
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: OrderCancelled
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: *id001
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            - cancelledAmount
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+              cancelledAmount:
+                type: integer
+                format: int64
+                minimum: 0
+      examples:
+      - name: OrderCancelled예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: OrderCancelled
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+            cancelledAmount: 10000
+    OrderExpired:
+      name: OrderExpired
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: OrderExpired
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: *id001
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            - expiredAmount
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+              expiredAmount:
+                type: integer
+                format: int64
+                minimum: 0
+      examples:
+      - name: OrderExpired예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: OrderExpired
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+            expiredAmount: 10000
+    RefundCompleted:
+      name: RefundCompleted
+      payload:
+        type: object
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: RefundCompleted
+          schemaVersion:
+            const: 1
+          source:
+            const: commerce-service
+          aggregateId: *id001
+          occurredAt:
+            type: string
+            format: date-time
+          payload:
+            type: object
+            required:
+            - paymentGroupId
+            - groupNumber
+            - memberId
+            - currency
+            - orderCount
+            - orders
+            - expiresAt
+            - refundRequestId
+            - refundedAmount
+            - cumulativeRefundAmount
+            properties:
+              paymentGroupId:
+                type: integer
+                format: int64
+                minimum: 1
+              groupNumber:
+                type: string
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+              memberId:
+                type: string
+                format: uuid
+              currency:
+                const: KRW
+              orderCount:
+                type: integer
+                minimum: 1
+              orders:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - orderNumber
+                  - productName
+                  - amount
+                  properties:
+                    orderNumber:
+                      type: string
+                      minLength: 1
+                    productName:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+                    amount:
+                      type: integer
+                      minimum: 0
+              expiresAt:
+                type: string
+                format: date-time
+              refundRequestId:
+                type: integer
+                format: int64
+                minimum: 1
+              refundedAmount:
+                type: integer
+                format: int64
+                minimum: 0
+              cumulativeRefundAmount:
+                type: integer
+                format: int64
+                minimum: 0
+      examples:
+      - name: RefundCompleted예시
+        payload:
+          eventId: 33333333-3333-4333-8333-333333333333
+          eventType: RefundCompleted
+          schemaVersion: 1
+          source: commerce-service
+          aggregateId: PG-11111111-1111-4111-8111-111111111111
+          occurredAt: '2026-10-17T00:00:00Z'
+          payload:
+            paymentGroupId: 1
+            groupNumber: PG-11111111-1111-4111-8111-111111111111
+            memberId: 22222222-2222-4222-8222-222222222222
+            currency: KRW
+            orderCount: 1
+            orders:
+            - orderNumber: O-1
+              productName: 가을 니트
+              amount: 10000
+            expiresAt: '2026-10-17T00:15:00Z'
+            refundRequestId: 1
+            refundedAmount: 5000
+            cumulativeRefundAmount: 5000

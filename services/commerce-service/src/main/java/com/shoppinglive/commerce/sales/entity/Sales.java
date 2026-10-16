@@ -27,6 +27,13 @@ public class Sales extends BaseEntity {
     @Column(name = "product_id", nullable = false, updatable = false, unique = true)
     private Long productId;
 
+    @Column(name = "product_name_snapshot", nullable = false, length = 255)
+    private String productName = "";
+
+    public void snapshotProductName(String name) {
+        this.productName = name;
+    }
+
     @Column(name = "price", nullable = false)
     private Long price;
 

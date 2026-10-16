@@ -134,6 +134,44 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         return service.create(MEMBER_A, selected(), "회원", "01012345678", 25000, key);
     }
 
+    @Test
+    @DisplayName("묶음 생성과 취소는 재요청에도 업무 저장과 함께 한 번씩 기록한다")
+    void recordsCreationAndCancellationOnce() throws Exception {
+        var result = create("notification-events");
+        assertThat(create("notification-events").created()).isFalse();
+        String number = result.group().groupNumber();
+        service.cancel(MEMBER_A, number);
+        var rows =
+                jdbc.queryForList(
+                        "SELECT payload FROM event_outbox WHERE message_key=? ORDER BY id",
+                        String.class,
+                        number);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        assertThat(rows).hasSize(2);
+        var created = mapper.readTree(rows.get(0));
+        var cancelled = mapper.readTree(rows.get(1));
+        assertThat(created.path("eventType").asText()).isEqualTo("PaymentGroupCreated");
+        assertThat(cancelled.path("eventType").asText()).isEqualTo("OrderCancelled");
+        assertThat(created.at("/payload/memberId").asText()).isEqualTo(MEMBER_A);
+        assertThat(created.at("/payload/orders")).hasSize(2);
+        assertThat(cancelled.at("/payload/cancelledAmount").asLong()).isEqualTo(25000);
+        var directory = java.nio.file.Path.of("build/contract-samples");
+        java.nio.file.Files.createDirectories(directory);
+        for (String row : rows) {
+            var event = mapper.readTree(row);
+            String type = event.get("eventType").asText();
+            mapper.writeValue(
+                    directory.resolve(type + "-actual.json").toFile(),
+                    java.util.Map.of(
+                            "contract",
+                            "commerce-payment-group.yaml",
+                            "message",
+                            type,
+                            "payload",
+                            event));
+        }
+    }
+
     private void stock(Long id, int available, int reserved) {
         var current = stocks.findById(id).orElseThrow();
         assertThat(current.getAvailable()).isEqualTo(available);
