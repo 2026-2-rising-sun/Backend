@@ -660,6 +660,32 @@ paths:
         '404': {"$ref":"#/components/responses/NotFound"}
         '409': {"$ref":"#/components/responses/Conflict"}
         '503': {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/payment-groups/{number}/refundable-targets:
+    get:
+      tags: [Payment Groups]
+      operationId: listRefundableTargets
+      summary: 결제 묶음의 선택 환불 대상 조회
+      description: >-
+        commerce.refunds.api-enabled=true일 때만 제공한다. 본인 결제 묶음의 주문별 할인 반영 환불액과 선택 가능 여부를 반환한다.
+        cartItemId가 없는 직접 주문·레거시 주문 및 연결이 모호한 주문은 선택 환불에서 제외된다. 전체 환불 정책은 변경하지 않는다.
+        조회 결과는 예약이 아니므로 접수 시 소유권·168시간 기한·결제 상태·중복 대상을 다시 검증한다.
+      x-required-roles: [USER, SELLER]
+      parameters:
+        - {name: number, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: 주문별 환불 대상과 불가 이유
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success: {const: true}
+                  data: {type: array, items: {$ref: '#/components/schemas/RefundableTarget'}}
+                  error: {type: 'null'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: 본인 결제 묶음이 없거나 API가 비활성화됨}
   /v1/payment-groups/{number}/refunds:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     post:
@@ -1209,6 +1235,20 @@ components:
     RefundStatus:
       type: string
       enum: [PROCESSING, UNKNOWN, SUCCESS, FAILED]
+    RefundableTarget:
+      type: object
+      required: [orderId, cartItemId, productName, quantity, refundAmount, refundable, unavailableReason]
+      properties:
+        orderId: {type: integer, format: int64}
+        cartItemId: {type: [integer, 'null'], format: int64}
+        productName: {type: string}
+        quantity: {type: integer, minimum: 1}
+        refundAmount: {type: integer, format: int64, minimum: 0, description: 대상 주문 전체 수량의 할인 반영 금액}
+        refundable: {type: boolean}
+        unavailableReason:
+          type: [string, 'null']
+          enum: [null, PAYMENT_NOT_COMPLETED, REFUND_WINDOW_EXPIRED, ALREADY_REQUESTED, CART_ITEM_UNAVAILABLE, CART_ITEM_AMBIGUOUS]
+          description: 선택 가능하면 null. ALREADY_REQUESTED는 처리 중·결과 확인 중·완료 대상을 포함한다.
     RefundRequest:
       type: object
       additionalProperties: false

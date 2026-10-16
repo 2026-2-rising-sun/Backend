@@ -241,6 +241,84 @@ public class RefundIntakeService {
     }
 
     @Transactional(readOnly = true)
+    public List<RefundableTarget> refundableTargets(String memberId, String groupNumber) {
+        PaymentGroup group =
+                groups.findByGroupNumberAndMemberId(groupNumber, memberId)
+                        .orElseThrow(
+                                () ->
+                                        new BusinessException(
+                                                ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
+        List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
+        PaymentAttempt attempt =
+                group.getPaymentId() == null
+                        ? null
+                        : attempts.findById(group.getPaymentId()).orElse(null);
+        String groupReason = null;
+        if (group.getStatus() != OrderStatus.PAID
+                || groupOrders.stream()
+                        .anyMatch(
+                                order ->
+                                        order.getStatus() != OrderStatus.PAID
+                                                && order.getStatus() != OrderStatus.REFUNDED)) {
+            groupReason = "PAYMENT_NOT_COMPLETED";
+        } else if (attempt == null
+                || attempt.getStatus() != PaymentStatus.SUCCESS
+                || attempt.getResolvedAt() == null) {
+            groupReason = "PAYMENT_NOT_COMPLETED";
+        } else if (!isRefundWindowOpen(clock.instant(), attempt.getResolvedAt())) {
+            groupReason = "REFUND_WINDOW_EXPIRED";
+        }
+        Set<Long> requestedIds =
+                new HashSet<>(
+                        jdbc.query(
+                                """
+                SELECT t.order_id FROM refund_request r
+                JOIN refund_target_order t ON t.refund_request_id=r.id
+                WHERE r.payment_group_id=? AND r.status <> 'FAILED'
+                """,
+                                (rs, row) -> rs.getLong(1),
+                                group.getId()));
+        Map<Long, Long> cartCounts =
+                groupOrders.stream()
+                        .filter(order -> order.getSourceCartItemId() != null)
+                        .collect(
+                                Collectors.groupingBy(
+                                        Order::getSourceCartItemId, Collectors.counting()));
+        String reasonForGroup = groupReason;
+        return groupOrders.stream()
+                .map(
+                        order -> {
+                            String reason = reasonForGroup;
+                            if (reason == null
+                                    && (order.getStatus() == OrderStatus.REFUNDED
+                                            || requestedIds.contains(order.getId())))
+                                reason = "ALREADY_REQUESTED";
+                            if (reason == null && order.getSourceCartItemId() == null)
+                                reason = "CART_ITEM_UNAVAILABLE";
+                            if (reason == null && cartCounts.get(order.getSourceCartItemId()) != 1L)
+                                reason = "CART_ITEM_AMBIGUOUS";
+                            return new RefundableTarget(
+                                    order.getId(),
+                                    order.getSourceCartItemId(),
+                                    order.getProductNameSnapshot(),
+                                    order.getQuantity(),
+                                    order.getPayableAmount(),
+                                    reason == null,
+                                    reason);
+                        })
+                .toList();
+    }
+
+    public record RefundableTarget(
+            long orderId,
+            Long cartItemId,
+            String productName,
+            int quantity,
+            long refundAmount,
+            boolean refundable,
+            String unavailableReason) {}
+
+    @Transactional(readOnly = true)
     public List<RefundView> list(String memberId, String groupNumber) {
         PaymentGroup group =
                 groups.findByGroupNumberAndMemberId(groupNumber, memberId)
