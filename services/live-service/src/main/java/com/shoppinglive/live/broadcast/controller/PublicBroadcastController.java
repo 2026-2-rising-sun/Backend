@@ -4,6 +4,7 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.live.broadcast.dto.PublicBroadcastResponse;
+import com.shoppinglive.live.broadcast.entity.BroadcastStatus;
 import com.shoppinglive.live.broadcast.service.PublicBroadcastService;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,8 +26,9 @@ public class PublicBroadcastController {
     @GetMapping
     public ApiResponse<Page<PublicBroadcastResponse>> list(
             @RequestParam(defaultValue = "0") final int page,
-            @RequestParam(defaultValue = "20") final int size) {
-        return ApiResponse.ok(service.list(page, size));
+            @RequestParam(defaultValue = "20") final int size,
+            @RequestParam(required = false) final BroadcastStatus status) {
+        return ApiResponse.ok(service.list(page, size, status));
     }
 
     /** 상세 ID 누락은 입력 오류다. 목록 URL은 /v1/broadcasts로 유지한다. */

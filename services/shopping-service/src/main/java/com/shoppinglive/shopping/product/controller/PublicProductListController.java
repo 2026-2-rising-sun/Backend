@@ -3,10 +3,13 @@ package com.shoppinglive.shopping.product.controller;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
 import com.shoppinglive.shopping.product.dto.ProductListPosition;
 import com.shoppinglive.shopping.product.dto.PublicProductItemResponse;
 import com.shoppinglive.shopping.product.dto.PublicProductListResponse;
 import com.shoppinglive.shopping.product.dto.PublicProductPage;
+import com.shoppinglive.shopping.product.service.CatalogQueryService;
+import com.shoppinglive.shopping.product.service.ProductSort;
 import com.shoppinglive.shopping.product.service.PublicProductCursor;
 import com.shoppinglive.shopping.product.service.PublicProductListService;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
@@ -29,10 +32,14 @@ public class PublicProductListController {
 
     private final PublicProductListService listService;
     private final ImageUrlResolver imageUrlResolver;
+    private final CatalogQueryService catalog;
 
     public PublicProductListController(
-            PublicProductListService listService, ImageUrlResolver imageUrlResolver) {
+            PublicProductListService listService,
+            ImageUrlResolver imageUrlResolver,
+            CatalogQueryService catalog) {
         this.listService = listService;
+        this.catalog = catalog;
         this.imageUrlResolver = imageUrlResolver;
     }
 
@@ -43,17 +50,23 @@ public class PublicProductListController {
     }
 
     /**
-     * 판매중·품절 상품을 최신 등록순으로 {@code size} 개까지. 다음 페이지는 응답의 {@code nextCursor} 를 {@code cursor} 로 넘긴다.
-     * 범위 밖 size·손상된 cursor 는 400 INVALID_REQUEST.
+     * 판매중·품절 상품을 검색·상태·정렬 조건에 맞춰 {@code size} 개까지. 조건을 생략하면 기존 최신순이다. 다음 페이지는 응답의 {@code
+     * nextCursor} 를 {@code cursor} 로 넘긴다. 범위 밖 size·손상된 cursor 는 400 INVALID_REQUEST.
      */
     @GetMapping
     public ApiResponse<PublicProductListResponse> list(
             @RequestParam(name = "cursor", required = false) String cursor,
-            @RequestParam(name = "size", required = false) Integer size) {
+            @RequestParam(name = "size", required = false) Integer size,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "status", required = false) SalesDisplayStatus status,
+            @RequestParam(name = "sort", required = false) ProductSort sort) {
         int pageSize = size == null ? DEFAULT_SIZE : size;
         if (pageSize < 1 || pageSize > MAX_SIZE) {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST, "size 는 1~" + MAX_SIZE + " 이어야 합니다.");
+        }
+        if (query != null || status != null || sort != null) {
+            return ApiResponse.ok(catalog.list(query, status, sort, cursor, pageSize));
         }
         ProductListPosition after =
                 StringUtils.hasText(cursor) ? PublicProductCursor.decode(cursor) : null;
