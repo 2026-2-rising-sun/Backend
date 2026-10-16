@@ -711,6 +711,59 @@ paths:
                   code: SERVICE_UNAVAILABLE
                   message: 작성자 정보를 확인할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+  /v1/broadcasts/{id}/viewers:
+    get:
+      tags: [Broadcast]
+      summary: 방송별 현재 시청 브라우저 수 조회
+      operationId: getBroadcastViewers
+      description: |
+        최근 60초 안에 heartbeat를 보낸 브라우저 UUID의 수다. 같은 브라우저 복수 탭은 하나로 집계한다.
+        비로그인도 포함하고 서로 다른 기기는 별도로 센다. 고유한 실제 사람 수나 영상 재생 수를 보장하지 않는다.
+        Redis 공유 집계이며 만료 정리 후 반환한다. 준비·종료 방송은 0, 미존재 방송은 404다.
+        조회만으로 시청자로 등록되지 않는다. 집계 장애를 0으로 숨기지 않고 503으로 응답한다.
+      security: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        '200':
+          description: 시청 규모 추정치
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ViewerTotalEnvelope'}
+        '400': {description: 잘못된 방송 ID}
+        '404': {description: 방송 없음}
+        '503': {description: 집계 일시 불가}
+  /v1/broadcasts/{id}/viewers/heartbeat:
+    post:
+      tags: [Broadcast]
+      summary: 방송 시청 브라우저 상태 갱신
+      operationId: heartbeatBroadcastViewer
+      description: |
+        공개 시청 화면에서 15초마다 브라우저에 보존한 UUID를 보낸다. 같은 UUID는 덮어쓰며 개인정보는 받지 않는다.
+        마지막 heartbeat 이후 60초가 지나면 집계에서 제외한다. 여러 서버가 같은 Redis 집계를 공유한다.
+        방송이 진행 중일 때만 갱신할 수 있으며 집계 장애는 503이다. 종료 요청 없이 TTL로 이탈을 반영한다.
+      security: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [viewerId]
+              properties:
+                viewerId: {type: string, format: uuid}
+      responses:
+        '200':
+          description: 갱신 후 시청 규모
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ViewerTotalEnvelope'}
+        '400': {description: 잘못된 ID 또는 UUID}
+        '404': {description: 방송 없음}
+        '409': {description: 진행 중이 아닌 방송}
+        '503': {description: 집계 일시 불가}
   /v1/broadcasts/{id}/likes:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
@@ -1369,6 +1422,22 @@ components:
               message: 좋아요 저장소를 사용할 수 없습니다.
               requestId: request-001
   schemas:
+    ViewerTotal:
+      type: object
+      required: [broadcastId, total, measuredAt, expiresAfterSeconds]
+      properties:
+        broadcastId: {type: integer, format: int64}
+        total: {type: integer, format: int64, minimum: 0}
+        measuredAt: {type: string, format: date-time}
+        expiresAfterSeconds: {type: integer, const: 60}
+    ViewerTotalEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: '#/components/schemas/ViewerTotal'}
+        error: {type: 'null'}
+
     BroadcastStatus:
       type: string
       enum:

@@ -44,7 +44,12 @@ public class LiveSecurityConfiguration {
                                                 "/v1/broadcasts/{id}/products",
                                                 "/v1/broadcasts/{id}/chats",
                                                 "/v1/broadcasts/{id}/events",
-                                                "/v1/broadcasts/{id}/likes")
+                                                "/v1/broadcasts/{id}/likes",
+                                                "/v1/broadcasts/{id}/viewers")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/v1/broadcasts/{id}/viewers/heartbeat")
                                         .permitAll()
                                         .requestMatchers(
                                                 HttpMethod.GET, "/v1/broadcasts/{id}/likes/mine")
