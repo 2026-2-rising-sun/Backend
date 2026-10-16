@@ -3,6 +3,7 @@ package com.shoppinglive.notification.sales.service;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.notification.sales.entity.ProductSalesStatus;
+import com.shoppinglive.notification.sales.event.SalesInfoEventContract;
 import com.shoppinglive.notification.sales.repository.ProductSalesStatusRepository;
 import com.shoppinglive.notification.sales.repository.RestockAlertRepository;
 import org.springframework.stereotype.Service;
@@ -27,15 +28,16 @@ public class RestockAlertService {
      *
      * <p>사본에 없으면 404 다. 판매정보 이벤트를 아직 못 받은 상품이고, 받아 두지 않은 상품은 재입고도 알아챌 수 없다.
      *
-     * <p>판매 중이면 409 다. 재입고 알림은 품절을 전제한다. 판매 중인 상품에 신청해 두면 재고가 들락날락할 때마다 알림이 가서 원하지 않는 결과가 된다.
+     * <p>품절이 아니면 409 다. 재입고 알림은 품절을 전제한다. "판매 중이 아니면 통과" 로 보면 안 된다. 판매 준비(READY)나 비공개(PRIVATE) 상품에도
+     * 신청이 되는데, 그 상품은 품절에서 판매중으로 바뀌는 전이를 거치지 않아 알림이 영원히 가지 않는다.
      */
     public void register(String memberId, long productId) {
         ProductSalesStatus status =
                 statuses.findByProductId(productId)
                         .orElseThrow(
                                 () -> new BusinessException(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다."));
-        if (status.inStock()) {
-            throw new BusinessException(ErrorCode.CONFLICT, "판매 중인 상품입니다.");
+        if (!SalesInfoEventContract.SOLD_OUT.equals(status.status())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "품절 상품만 재입고 알림을 신청할 수 있습니다.");
         }
         alerts.register(memberId, productId);
     }

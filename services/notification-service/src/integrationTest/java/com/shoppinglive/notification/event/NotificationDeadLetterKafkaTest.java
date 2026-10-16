@@ -32,7 +32,13 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 @SpringBootTest(
         properties = {
             "spring.kafka.listener.auto-startup=true",
+            // 이 테스트는 broker 동작을 보므로 DB 는 늘 전용 H2 를 쓴다. 드라이버와 계정까지
+            // 함께 고정하지 않으면, 다른 테스트를 실제 PostgreSQL 로 돌릴 때 주는 환경변수가
+            // 드라이버만 바꿔 버려 H2 주소에 PostgreSQL 드라이버가 붙는다.
             "spring.datasource.url=jdbc:h2:mem:notification_dead_letter;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
+            "spring.datasource.driver-class-name=org.h2.Driver",
+            "spring.datasource.username=sa",
+            "spring.datasource.password=",
         })
 @EmbeddedKafka(
         partitions = 1,

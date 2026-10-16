@@ -39,7 +39,6 @@ record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesSta
         if (!Long.toString(salesId).equals(messageKey)) {
             throw invalid("message key does not match salesId");
         }
-        String rawStatus = statusOf(payload);
         return new SalesInfoEventMessage(
                 textOf(root, "eventId"),
                 instantOf(root, "occurredAt"),
@@ -47,14 +46,14 @@ record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesSta
                         longAtLeast(payload, "productId", 1),
                         salesId,
                         longAtLeast(payload, "snapshotVersion", 1),
-                        SalesInfoEventContract.ON_SALE.equals(rawStatus),
-                        rawStatus));
+                        statusOf(payload)));
     }
 
     /**
-     * 상태 값은 받을 때 한 번만 읽는다. 판단은 "판매 중인가" 참거짓으로 바꿔 두고, 원본은 진단용으로만 남긴다.
+     * 상태 값은 받은 그대로 둔다. 참거짓으로 줄이면 품절과 판매 준비가 같은 값이 되어 재입고 판별이 틀린다.
      *
-     * <p>모르는 값이 와도 거부하지 않는다. 판매 중이 아니라고만 보면 되고, 그게 맞는 처리다. 길이만 사본 컬럼에 맞는지 본다.
+     * <p>모르는 값이 와도 거부하지 않는다. 아는 값이 아니면 재입고 판별에도 신청 거절에도 걸리지 않아서, Commerce 가 상태를 추가해도 이쪽 판단이 흔들리지
+     * 않는다. 길이만 사본 컬럼에 맞는지 본다.
      */
     private static String statusOf(JsonNode payload) {
         String status = textOf(payload, "status");

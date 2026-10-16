@@ -25,9 +25,8 @@ public class ProductSalesStatusRepository {
     private static final String INSERT_IF_MISSING =
             """
             INSERT INTO product_sales_status
-                (product_id, sales_id, snapshot_version, in_stock, raw_status,
-                 created_at, updated_at)
-            SELECT :productId, :salesId, :snapshotVersion, :inStock, :rawStatus, :now, :now
+                (product_id, sales_id, snapshot_version, status, created_at, updated_at)
+            SELECT :productId, :salesId, :snapshotVersion, :status, :now, :now
             WHERE NOT EXISTS (
                 SELECT 1 FROM product_sales_status WHERE product_id = :productId)
             """;
@@ -35,7 +34,7 @@ public class ProductSalesStatusRepository {
             """
             UPDATE product_sales_status
             SET sales_id = :salesId, snapshot_version = :snapshotVersion,
-                in_stock = :inStock, raw_status = :rawStatus, updated_at = :now
+                status = :status, updated_at = :now
             WHERE product_id = :productId AND snapshot_version < :snapshotVersion
             """;
 
@@ -66,7 +65,7 @@ public class ProductSalesStatusRepository {
         return jdbc
                 .query(
                         """
-                        SELECT product_id, sales_id, snapshot_version, in_stock, raw_status
+                        SELECT product_id, sales_id, snapshot_version, status
                         FROM product_sales_status WHERE product_id = :productId
                         """,
                         Map.of("productId", productId),
@@ -75,8 +74,7 @@ public class ProductSalesStatusRepository {
                                         rs.getLong("product_id"),
                                         rs.getLong("sales_id"),
                                         rs.getLong("snapshot_version"),
-                                        rs.getBoolean("in_stock"),
-                                        rs.getString("raw_status")))
+                                        rs.getString("status")))
                 .stream()
                 .findFirst();
     }
@@ -86,8 +84,7 @@ public class ProductSalesStatusRepository {
                 "productId", status.productId(),
                 "salesId", status.salesId(),
                 "snapshotVersion", status.snapshotVersion(),
-                "inStock", status.inStock(),
-                "rawStatus", status.rawStatus(),
+                "status", status.status(),
                 "now", OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC));
     }
 }
