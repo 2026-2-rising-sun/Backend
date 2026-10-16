@@ -294,7 +294,7 @@ public class PaymentGroupService {
                     for (Sales s : selectedSales) {
                         guard.lockSales(s.getId());
                     }
-                    // DB 잠금을 확보한 뒤 가격을 다시 읽어 관리자의 가격 변경도 반영한다.
+                    // DB 잠금을 확보한 뒤 가격을 다시 읽어 판매자의 가격 변경도 반영한다.
                     Map<Long, Sales> currentSales = new HashMap<>();
                     long total = 0;
                     for (Item item : quote.items()) {

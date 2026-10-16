@@ -87,7 +87,7 @@ public abstract class CommerceSecurityTestSupport {
         return "Bearer " + TOKENS.token(memberId, Set.of("USER"));
     }
 
-    protected static String adminBearer() {
+    protected static String sellerBearer() {
         return "Bearer " + TOKENS.token(SELLER, Set.of("USER", "SELLER"));
     }
 }

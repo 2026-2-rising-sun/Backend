@@ -80,7 +80,7 @@ class SalesStockReserveTest extends com.shoppinglive.commerce.support.CommerceSe
     }
 
     /**
-     * 재고 총량은 배정으로 변하지 않는다. 소유만 available 에서 reserved 로 옮겨갈 뿐이라, 관리자가 보는 "판매 가능 + 배정" 합계가 흔들리면 안 된다.
+     * 재고 총량은 배정으로 변하지 않는다. 소유만 available 에서 reserved 로 옮겨갈 뿐이라, 판매자가 보는 "판매 가능 + 배정" 합계가 흔들리면 안 된다.
      */
     @DisplayName("재고를 예약해도 available과 reserved의 합을 유지한다")
     @Test

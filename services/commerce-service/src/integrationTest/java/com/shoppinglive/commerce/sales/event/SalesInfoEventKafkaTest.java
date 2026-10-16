@@ -96,7 +96,7 @@ class SalesInfoEventKafkaTest extends CommerceSecurityTestSupport {
             String response =
                     mvc.perform(
                                     post("/v1/sales")
-                                            .header("Authorization", adminBearer())
+                                            .header("Authorization", sellerBearer())
                                             .contentType(MediaType.APPLICATION_JSON)
                                             .content(
                                                     "{\"productId\":"

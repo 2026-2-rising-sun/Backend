@@ -54,22 +54,22 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
     @DisplayName("경로 중간의 ID 누락을 인증 실패로 처리하지 않는다")
     @Test
     void missingMiddleIdDoesNotBecomeAnAuthenticationFailure() throws Exception {
-        for (String token : new String[] {null, adminBearer(), "Bearer invalid"}) {
+        for (String token : new String[] {null, sellerBearer(), "Bearer invalid"}) {
             expect(request("GET", "/v1/sales//stock", token), 400, "INVALID_REQUEST");
             expect(request("PATCH", "/v1/sales//price", token), 400, "INVALID_REQUEST");
         }
         unchanged();
     }
 
-    @DisplayName("중복 슬래시를 정상 관리자 변경 경로로 정규화하지 않는다")
+    @DisplayName("중복 슬래시를 정상 판매자 변경 경로로 정규화하지 않는다")
     @Test
-    void duplicateSlashesCannotBeNormalizedIntoAValidAdministratorMutation() throws Exception {
+    void duplicateSlashesCannotBeNormalizedIntoAValidSellerMutation() throws Exception {
         expect(
-                request("GET", "/v1//sales/" + saleId + "/stock", adminBearer()),
+                request("GET", "/v1//sales/" + saleId + "/stock", sellerBearer()),
                 400,
                 "INVALID_REQUEST");
         expect(
-                request("PATCH", "/v1/sales//" + saleId + "/price", adminBearer()),
+                request("PATCH", "/v1/sales//" + saleId + "/price", sellerBearer()),
                 400,
                 "INVALID_REQUEST");
         unchanged();
@@ -78,7 +78,7 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
     @DisplayName("인코딩된 퍼센트는 보안 방화벽에서 계속 거절한다")
     @Test
     void encodedPercentRemainsRejectedByTheSecurityFirewall() throws Exception {
-        expect(request("PATCH", "/v1/sales/%252F/price", adminBearer()), 400, "INVALID_REQUEST");
+        expect(request("PATCH", "/v1/sales/%252F/price", sellerBearer()), 400, "INVALID_REQUEST");
         unchanged();
     }
 
@@ -87,19 +87,19 @@ class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
     @ValueSource(strings = {"%2F", "%2f"})
     void containerRejectsEncodedSlashesBeforeTheApplication(String slash) throws Exception {
         // Tomcat은 기본적으로 인코딩된 슬래시를 서블릿 필터와 JSON 처리 전에 거부한다.
-        assertThat(request("PATCH", "/v1/sales/" + slash + "/price", adminBearer()).statusCode())
+        assertThat(request("PATCH", "/v1/sales/" + slash + "/price", sellerBearer()).statusCode())
                 .isEqualTo(400);
         unchanged();
     }
 
-    @DisplayName("정상 경로의 인증·권한과 관리자 성공 응답을 유지한다")
+    @DisplayName("정상 경로의 인증·권한과 판매자 성공 응답을 유지한다")
     @Test
-    void normalRoutesKeepAuthenticationAuthorizationAndAdministratorSuccess() throws Exception {
+    void normalRoutesKeepAuthenticationAuthorizationAndSellerSuccess() throws Exception {
         String path = "/v1/sales/" + saleId + "/stock";
         expect(request("GET", path, null), 401, "UNAUTHORIZED");
         expect(request("GET", path, "Bearer invalid"), 401, "UNAUTHORIZED");
         expect(request("GET", path, bearer(MEMBER_A)), 403, "FORBIDDEN");
-        assertThat(request("GET", path, adminBearer()).statusCode()).isEqualTo(200);
+        assertThat(request("GET", path, sellerBearer()).statusCode()).isEqualTo(200);
         assertThat(request("GET", "/actuator/health/liveness", null).statusCode()).isEqualTo(200);
         unchanged();
     }

@@ -152,17 +152,17 @@ class SalesServiceTest {
         // 예외 없이 반환되면 성공. 세부 반환값은 mock 이라 확인 불가
     }
 
-    @DisplayName("관리자가 SOLD_OUT을 직접 지정하면 상태 전이를 거절한다")
+    @DisplayName("판매자가 SOLD_OUT을 직접 지정하면 상태 전이를 거절한다")
     @Test
-    void rejectsSoldOutAsAdministrativeTarget() {
+    void rejectsSoldOutAsSellerTarget() {
         assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.SOLD_OUT))
                 .isInstanceOf(IllegalStateTransitionException.class)
                 .hasMessageContaining("SOLD_OUT");
     }
 
-    @DisplayName("관리자가 READY를 직접 지정하면 상태 전이를 거절한다")
+    @DisplayName("판매자가 READY를 직접 지정하면 상태 전이를 거절한다")
     @Test
-    void rejectsReadyAsAdministrativeTarget() {
+    void rejectsReadyAsSellerTarget() {
         assertThatThrownBy(() -> salesService.changeStatus(1L, SalesStatus.READY))
                 .isInstanceOf(IllegalStateTransitionException.class);
     }

@@ -56,7 +56,7 @@ public class SalesService {
     }
 
     /**
-     * 재고 available 을 delta 만큼 증감한다 (판매 3, 관리자 조정 대상).
+     * 재고 available 을 delta 만큼 증감한다 (판매 3, 판매자 조정 대상).
      *
      * <p>조건부 UPDATE 로 안전을 보장한다. {@code reserved} 는 여기서 손대지 않는다.
      *
@@ -88,7 +88,7 @@ public class SalesService {
         if (salesStockRepository.restoreReserved(salesId, quantity) != 1) {
             throw new IllegalStateException("복원할 예약 재고가 부족합니다: salesId=" + salesId);
         }
-        // 관리자가 숨긴 PRIVATE와 준비 중 READY는 자동 공개하지 않는다.
+        // 판매자가 숨긴 PRIVATE와 준비 중 READY는 자동 공개하지 않는다.
         salesRepository.reopenIfStockAvailable(salesId);
     }
 
@@ -110,7 +110,7 @@ public class SalesService {
      * <p>흐름:
      *
      * <ol>
-     *   <li>대상 상태가 관리자 지정 가능한 값인지 검증 (ON_SALE · PRIVATE 만 허용)
+     *   <li>대상 상태가 판매자 지정 가능한 값인지 검증 (ON_SALE · PRIVATE 만 허용)
      *   <li>현재 상태 로드
      *   <li>ON_SALE 요청은 재고 확인. 재고 0이면 PRIVATE는 SOLD_OUT, SOLD_OUT은 유지하고 나머지는 거절
      *   <li>도메인 전이 규칙 검증 ({@link SalesStatus#canTransitionTo})
@@ -118,17 +118,17 @@ public class SalesService {
      * </ol>
      *
      * @param salesId 판매정보 식별자
-     * @param requestedTarget 관리자가 요청한 상태 (ON_SALE 또는 PRIVATE)
+     * @param requestedTarget 판매자가 요청한 상태 (ON_SALE 또는 PRIVATE)
      * @return 전이 후 판매정보
      * @throws SalesNotFoundException 판매정보가 없을 때 (404)
-     * @throws IllegalStateTransitionException 대상이 관리자 지정 불가이거나 전이 규칙 위반 (400)
+     * @throws IllegalStateTransitionException 대상이 판매자 지정 불가이거나 전이 규칙 위반 (400)
      * @throws ConcurrentStateChangeException 다른 트랜잭션이 먼저 전이했을 때 (409)
      */
     @Transactional
     public Sales changeStatus(Long salesId, SalesStatus requestedTarget) {
-        if (requestedTarget == null || !requestedTarget.isAdminChangeable()) {
+        if (requestedTarget == null || !requestedTarget.isSellerChangeable()) {
             throw new IllegalStateTransitionException(
-                    "관리자가 직접 변경할 수 없는 판매 상태입니다: " + requestedTarget);
+                    "판매자가 직접 변경할 수 없는 판매 상태입니다: " + requestedTarget);
         }
 
         events.watch(salesId);

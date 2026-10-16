@@ -88,18 +88,18 @@ class MemberPostgresTest extends MemberControllerTest {
 
     @DisplayName("판매자 초기화는 새 판매자만 생성하고 기존 회원을 승격하지 않는다")
     @Test
-    void bootstrapOnlyCreatesNewAdminAndNeverPromotesExistingUser() {
+    void bootstrapOnlyCreatesNewSellerAndNeverPromotesExistingUser() {
         service.register("user@example.com", "password123", "user");
         var command = new SellerBootstrapCommand();
         assertThatThrownBy(() -> command.execute(bootstrapEnvironment("user@example.com")))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(members.findByEmail("user@example.com").orElseThrow().roles())
                 .containsExactly("USER");
-        UUID adminId = command.execute(bootstrapEnvironment("admin@example.com"));
-        var admin = members.findById(adminId).orElseThrow();
-        assertThat(admin.roles()).containsExactly("SELLER");
-        assertThat(passwords.matches("only-test-password", admin.getPasswordHash())).isTrue();
-        assertThatThrownBy(() -> command.execute(bootstrapEnvironment("admin@example.com")))
+        UUID sellerId = command.execute(bootstrapEnvironment("seller@example.com"));
+        var seller = members.findById(sellerId).orElseThrow();
+        assertThat(seller.roles()).containsExactly("SELLER");
+        assertThat(passwords.matches("only-test-password", seller.getPasswordHash())).isTrue();
+        assertThatThrownBy(() -> command.execute(bootstrapEnvironment("seller@example.com")))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(members.count()).isEqualTo(2);
     }
@@ -119,6 +119,6 @@ class MemberPostgresTest extends MemberControllerTest {
                 "MEMBER_BOOTSTRAP_SELLER_PASSWORD",
                 "only-test-password",
                 "MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME",
-                "admin");
+                "seller");
     }
 }

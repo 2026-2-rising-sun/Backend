@@ -1,7 +1,7 @@
 package com.shoppinglive.shopping.client.commerce;
 
 /**
- * 상품 화면(관리자 목록·공개 목록·공개 상세)에 보여줄 판매 상태.
+ * 상품 화면(판매자 목록·공개 목록·공개 상세)에 보여줄 판매 상태.
  *
  * <p>{@link SalesStatus} 에 두 가지를 더한다. {@link #NOT_REGISTERED} 는 판매정보가 아직 없는 상품, {@link #UNKNOWN} 은
  * Commerce 조회 실패다. UNKNOWN 을 품절로 보여주면 사용자가 잘못 판단하므로 {@link #SOLD_OUT} 으로 대체하지 않는다. 품절 판정은 Commerce

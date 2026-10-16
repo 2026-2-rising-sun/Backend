@@ -8,7 +8,7 @@ import com.shoppinglive.commerce.sales.entity.SalesStatus;
  * <p>Shopping {@code CommerceSalesResponse} · Live {@code SalesSnapshot} 과 필드 이름·타입이 같아야 한다. 이름을
  * 바꾸거나 필드를 빼면 두 서비스가 동시에 깨지므로 계약 합의 없이 손대지 않는다. 필드 추가는 호환된다 — 부르는 쪽은 모르는 필드를 무시한다.
  *
- * <p>{@code version} 을 담지 않는 이유: 낙관적 락 버전은 관리자 화면(판매 2)의 관심사이고, 조회만 하는 다른 서비스에는 의미가 없다. 필요 없는 내부 값을
+ * <p>{@code version} 을 담지 않는 이유: 낙관적 락 버전은 판매자 화면(판매 2)의 관심사이고, 조회만 하는 다른 서비스에는 의미가 없다. 필요 없는 내부 값을
  * 계약에 넣으면 나중에 못 뺀다.
  *
  * @param productId Shopping 상품 식별자

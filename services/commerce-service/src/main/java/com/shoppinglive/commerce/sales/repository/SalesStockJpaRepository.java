@@ -15,7 +15,7 @@ import org.springframework.data.repository.query.Param;
 public interface SalesStockJpaRepository extends JpaRepository<SalesStock, Long> {
 
     /**
-     * {@code available} 을 {@code delta} 만큼 증감한다 (판매 3, 관리자 조정).
+     * {@code available} 을 {@code delta} 만큼 증감한다 (판매 3, 판매자 조정).
      *
      * <p>{@code reserved} 는 손대지 않는다.
      *

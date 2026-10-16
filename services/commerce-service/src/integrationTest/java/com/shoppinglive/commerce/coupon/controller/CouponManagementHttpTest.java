@@ -85,18 +85,18 @@ class CouponManagementHttpTest extends CommerceSecurityTestSupport {
                                 List.of(1L)));
         mvc.perform(
                         patch("/v1/seller/coupons/{id}", coupon.id())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.version").value(1));
         mvc.perform(
                         patch("/v1/seller/coupons/{id}", coupon.id())
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isConflict());
-        mvc.perform(get("/v1/seller/coupons").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/coupons").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].name").value("edited"))
                 .andExpect(jsonPath("$.data.totalElements").value(1));

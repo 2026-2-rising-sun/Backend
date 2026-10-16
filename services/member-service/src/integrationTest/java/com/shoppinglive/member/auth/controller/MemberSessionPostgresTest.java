@@ -104,7 +104,7 @@ class MemberSessionPostgresTest extends MemberSessionTest {
 
     @DisplayName("갱신과 세션 폐기가 동시에 실행되어도 활성 세션 가족을 남기지 않는다")
     @Test
-    void refreshAndAdminRevocationCannotLeaveAnActiveFamily() throws Exception {
+    void refreshAndSellerRevocationCannotLeaveAnActiveFamily() throws Exception {
         var initial = account("race@example.com");
         UUID memberId = members.findByEmail("race@example.com").orElseThrow().getId();
         var result =
