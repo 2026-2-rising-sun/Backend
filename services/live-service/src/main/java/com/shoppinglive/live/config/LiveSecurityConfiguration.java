@@ -53,7 +53,9 @@ public class LiveSecurityConfiguration {
                                                 HttpMethod.PUT, "/v1/broadcasts/{id}/likes/mine")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
-                                                HttpMethod.POST, "/v1/broadcasts/{id}/chats")
+                                                HttpMethod.POST,
+                                                "/v1/broadcasts/{id}/chats",
+                                                "/v1/broadcasts/{broadcastId}/promotions/{promotionId}/claims")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
                                                 HttpMethod.GET,
