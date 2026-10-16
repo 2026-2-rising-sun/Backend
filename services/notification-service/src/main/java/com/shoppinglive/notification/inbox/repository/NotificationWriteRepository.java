@@ -18,10 +18,16 @@ import org.springframework.stereotype.Repository;
  *
  * <ul>
  *   <li><b>중복을 예외 없이 걸러야 한다.</b> 같은 이벤트가 두 번 와도 두 번째는 조용히 넘어가야 하는데, 유일 제약 위반을 예외로 받아 잡으면 그
- *       transaction 이 못 쓰게 된다(PostgreSQL 은 오류가 난 transaction 의 후속 문장을 거부한다). 조건부 INSERT 한 문장이면 애초에
- *       예외가 나지 않는다.
+ *       transaction 이 못 쓰게 된다(PostgreSQL 은 오류가 난 transaction 의 후속 문장을 거부한다).
  *   <li><b>한 이벤트로 여러 명에게 만든다.</b> 방송 시작 알림은 신청자 전원에게 간다. 1,000명이면 1,000번 왕복하는 대신 한 번에 보낸다.
  * </ul>
+ *
+ * <p>중복 차단은 {@code ON CONFLICT DO NOTHING} 으로 한다. {@code WHERE NOT EXISTS} 로는 안 된다. 그 조건은 아직 커밋되지
+ * 않은 다른 쓰기의 행을 보지 못해서, 같은 이벤트를 두 instance 가 동시에 처리하면 양쪽 다 "없다" 로 통과한 뒤 늦게 커밋한 쪽이 유일 제약에 걸려 터진다. 그러면
+ * 알림이 유실되거나(버리면) 같은 메시지를 영원히 재시도한다.
+ *
+ * <p>충돌 대상 컬럼을 적지 않는 이유는 H2 가 그 문법을 지원하지 않기 때문이다. 테스트가 H2 로 같은 SQL 을 돌린다. 이 표의 유일 제약은 {@code
+ * (event_id, member_id)} 하나뿐이라 대상을 적는 것과 의미가 같다.
  */
 @Repository
 public class NotificationWriteRepository {
@@ -31,11 +37,9 @@ public class NotificationWriteRepository {
             INSERT INTO notification
                 (member_id, event_id, event_type, title, body, link_type, link_value,
                  occurred_at, created_at, updated_at)
-            SELECT :memberId, :eventId, :eventType, :title, :body, :linkType, :linkValue,
-                   :occurredAt, :now, :now
-            WHERE NOT EXISTS (
-                SELECT 1 FROM notification
-                WHERE event_id = :eventId AND member_id = :memberId)
+            VALUES (:memberId, :eventId, :eventType, :title, :body, :linkType, :linkValue,
+                    :occurredAt, :now, :now)
+            ON CONFLICT DO NOTHING
             """;
 
     private final NamedParameterJdbcTemplate jdbc;

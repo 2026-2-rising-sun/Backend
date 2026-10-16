@@ -113,6 +113,28 @@ class BroadcastStartingSoonTest {
     }
 
     @Test
+    @DisplayName("예정보다 일찍 시작한 방송은 보내지 않는다 — 보고 있는 사람에게 곧 시작한다고 알리면 안 된다")
+    void skipsBroadcastThatStartedEarly() {
+        // 12:00 예정인데 11:50 에 시작했다. 지금은 11:55 라서 예정 시각은 아직 10분 안에 있다.
+        schedule("2026-10-20T12:00:00Z");
+        schedules.markStarted(BROADCAST, Instant.parse("2026-10-20T11:50:00Z"));
+
+        assertThat(service.notifyStartingSoon(NOW)).isZero();
+        assertThat(notifications()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 시작 이벤트를 두 번 받아도 처음 받은 시작 시각이 남는다")
+    void keepsFirstStartedAt() {
+        schedule("2026-10-20T12:00:00Z");
+        Instant first = Instant.parse("2026-10-20T11:50:00Z");
+
+        assertThat(schedules.markStarted(BROADCAST, first)).isTrue();
+        assertThat(schedules.markStarted(BROADCAST, Instant.parse("2026-10-20T11:52:00Z")))
+                .isFalse();
+    }
+
+    @Test
     @DisplayName("신청자가 없으면 알림은 없지만 다시 보지 않도록 표시한다")
     void marksSentEvenWithoutRegistrants() {
         jdbc.getJdbcTemplate().update("DELETE FROM broadcast_alert");

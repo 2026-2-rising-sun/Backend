@@ -50,7 +50,7 @@ public class BroadcastScheduleRepository {
     /**
      * 없으면 INSERT, 있으면 version 이 더 클 때만 UPDATE 한다.
      *
-     * @return 행이 바뀌었으면 {@code true}. 중복·역순 이벤트는 {@code false}
+     * @return 행이 바뀌었으면 {@code true}. 중복, 역순 이벤트는 {@code false}
      */
     public boolean apply(BroadcastSchedule schedule) {
         int inserted;
@@ -68,6 +68,9 @@ public class BroadcastScheduleRepository {
      * 곧 시작하는데 아직 임박 알림을 보내지 않은 방송.
      *
      * <p>{@code from} 보다 뒤에 시작하는 방송만 가져온다. 서버가 멈췄다 복구된 뒤에 이미 시작 시각이 지난 방송의 "곧 시작합니다" 가 쏟아지면 안 된다.
+     *
+     * <p><b>이미 시작한 방송은 제외한다.</b> 예정보다 일찍 시작한 방송은 예정 시각이 아직 10분 안이라서 조건에 그대로 남는다. 그대로 두면 보고 있는 사람에게
+     * "곧 시작합니다" 가 간다.
      */
     public List<BroadcastSchedule> findStartingSoon(Instant from, Instant until, int limit) {
         return jdbc.query(
@@ -75,6 +78,7 @@ public class BroadcastScheduleRepository {
                 SELECT broadcast_id, broadcast_version, title, scheduled_at
                 FROM broadcast_schedule
                 WHERE starting_soon_sent_at IS NULL
+                  AND started_at IS NULL
                   AND scheduled_at > :from AND scheduled_at <= :until
                 ORDER BY scheduled_at
                 LIMIT :limit
@@ -103,6 +107,28 @@ public class BroadcastScheduleRepository {
                                 broadcastId,
                                 "sentAt",
                                 OffsetDateTime.ofInstant(sentAt, ZoneOffset.UTC)))
+                == 1;
+    }
+
+    /**
+     * 방송이 시작했다고 표시한다. 이 뒤로는 임박 알림 대상에서 빠진다.
+     *
+     * <p>일정 사본이 없으면 아무것도 하지 않는다. 일정 이벤트를 못 받은 방송은 임박 알림 대상도 아니라서 표시할 행이 없어도 문제가 없다.
+     *
+     * <p>이미 표시돼 있으면 덮지 않는다. 같은 시작 이벤트가 두 번 와도 처음 받은 시작 시각이 남는다.
+     */
+    public boolean markStarted(long broadcastId, Instant startedAt) {
+        return jdbc.update(
+                        """
+                        UPDATE broadcast_schedule
+                        SET started_at = :startedAt, updated_at = :startedAt
+                        WHERE broadcast_id = :broadcastId AND started_at IS NULL
+                        """,
+                        Map.of(
+                                "broadcastId",
+                                broadcastId,
+                                "startedAt",
+                                OffsetDateTime.ofInstant(startedAt, ZoneOffset.UTC)))
                 == 1;
     }
 
