@@ -99,7 +99,11 @@ public class BroadcastService {
                         "thumbnailId",
                         input.thumbnailId(),
                         broadcast.getThumbnailId() == null ? "" : broadcast.getThumbnailId());
-        if (input.thumbnailId() != null) thumbnails.assertOwned(thumbnailId);
+        // 기존 방송은 판매자가 공동 관리한다. 새로 연결하는 이미지에만 업로더 권한을 검사한다.
+        if (input.thumbnailId() != null
+                && !java.util.Objects.equals(thumbnailId, broadcast.getThumbnailId())) {
+            thumbnails.assertOwned(thumbnailId);
+        }
         broadcast.metadata(
                 patched("hostName", input.hostName(), broadcast.getHostName()),
                 patched("description", input.description(), broadcast.getDescription()),

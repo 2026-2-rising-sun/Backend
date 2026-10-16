@@ -1639,7 +1639,7 @@ components:
         thumbnailId:
           type: string
           maxLength: 36
-          description: 업로드한 썸네일 UUID. 생략 시 기존 값 유지, 빈 문자열은 제거, 다른 판매자 썸네일은 403이다.
+          description: 썸네일 UUID. 생략 또는 기존 ID 재전송은 유지하고 빈 문자열은 제거한다. 새로 연결·교체하는 ID만 현재 판매자 소유여야 하며 타인 이미지는 403이다.
       additionalProperties: false
 
     Broadcast:

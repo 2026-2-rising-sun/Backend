@@ -99,6 +99,51 @@ class BroadcastMetadataHttpTest extends LiveSecuritySupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(input)))
                 .andExpect(status().isForbidden());
+        var retained =
+                mvc.perform(
+                                patch("/v1/seller/broadcasts/" + id)
+                                        .param("version", Long.toString(version))
+                                        .header("Authorization", other)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "title",
+                                                                "공동 관리 제목",
+                                                                "thumbnailId",
+                                                                thumbnail))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.title").value("공동 관리 제목"))
+                        .andExpect(
+                                jsonPath("$.data.thumbnailUrl")
+                                        .value("/api/live/v1/broadcast-thumbnails/" + thumbnail))
+                        .andReturn();
+        version =
+                mapper.readTree(retained.getResponse().getContentAsString())
+                        .path("data")
+                        .path("version")
+                        .asLong();
+        var otherUpload =
+                mvc.perform(
+                                multipart("/v1/seller/broadcast-thumbnails")
+                                        .file(file)
+                                        .header("Authorization", other))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+        String otherThumbnail =
+                mapper.readTree(otherUpload.getResponse().getContentAsString())
+                        .path("data")
+                        .path("thumbnailId")
+                        .asText();
+        mvc.perform(
+                        patch("/v1/seller/broadcasts/" + id)
+                                .param("version", Long.toString(version))
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of("thumbnailId", otherThumbnail))))
+                .andExpect(status().isForbidden());
         mvc.perform(
                         patch("/v1/seller/broadcasts/" + id)
                                 .param("version", Long.toString(version))
