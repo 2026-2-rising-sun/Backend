@@ -1,16 +1,21 @@
 package com.shoppinglive.notification.sales.controller;
 
+import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.security.AuthenticatedUser;
 import com.shoppinglive.notification.sales.dto.RestockAlertRequest;
 import com.shoppinglive.notification.sales.service.RestockAlertService;
+import com.shoppinglive.notification.subscription.dto.AlertSubscriptionPage;
+import com.shoppinglive.notification.subscription.dto.AlertSubscriptionState;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -26,6 +31,21 @@ public class RestockAlertController {
 
     public RestockAlertController(RestockAlertService alerts) {
         this.alerts = alerts;
+    }
+
+    @GetMapping
+    public ApiResponse<AlertSubscriptionPage> list(
+            @AuthenticationPrincipal AuthenticatedUser member,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return ApiResponse.ok(alerts.list(member.memberId(), cursor, size));
+    }
+
+    @GetMapping("/{productId}")
+    public ApiResponse<AlertSubscriptionState> state(
+            @AuthenticationPrincipal AuthenticatedUser member, @PathVariable Long productId) {
+        return ApiResponse.ok(
+                new AlertSubscriptionState(alerts.subscribed(member.memberId(), productId)));
     }
 
     @PostMapping
