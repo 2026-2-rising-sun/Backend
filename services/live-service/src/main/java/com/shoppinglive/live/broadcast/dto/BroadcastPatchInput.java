@@ -18,11 +18,29 @@ public record BroadcastPatchInput(
         Optional<@Size(min = 1, max = 100, message = "제목은 1~100자여야 합니다.") String> title,
         Optional<Instant> scheduledAt,
         Optional<@Size(min = 1, max = 255, message = "채널 ARN은 최대 255자입니다.") String> channelArn,
-        Optional<@Size(min = 1, max = 2048, message = "재생 URL은 최대 2048자입니다.") String> playbackUrl) {
+        Optional<@Size(min = 1, max = 2048, message = "재생 URL은 최대 2048자입니다.") String> playbackUrl,
+        Optional<@Size(max = 80) String> hostName,
+        Optional<@Size(max = 2000) String> description,
+        Optional<@Size(max = 36) String> thumbnailId) {
+    public BroadcastPatchInput(
+            Optional<String> title,
+            Optional<Instant> scheduledAt,
+            Optional<String> channelArn,
+            Optional<String> playbackUrl) {
+        this(title, scheduledAt, channelArn, playbackUrl, null, null, null);
+    }
+
     /** record 생성자의 Optional 기본 역직렬화는 생략과 null을 구분하지 못한다. */
     public static final class Deserializer extends JsonDeserializer<BroadcastPatchInput> {
         private static final Set<String> FIELDS =
-                Set.of("title", "scheduledAt", "channelArn", "playbackUrl");
+                Set.of(
+                        "title",
+                        "scheduledAt",
+                        "channelArn",
+                        "playbackUrl",
+                        "hostName",
+                        "description",
+                        "thumbnailId");
 
         @Override
         public BroadcastPatchInput deserialize(
@@ -42,7 +60,10 @@ public record BroadcastPatchInput(
                     field(parser, node, "title", String.class),
                     field(parser, node, "scheduledAt", Instant.class),
                     field(parser, node, "channelArn", String.class),
-                    field(parser, node, "playbackUrl", String.class));
+                    field(parser, node, "playbackUrl", String.class),
+                    field(parser, node, "hostName", String.class),
+                    field(parser, node, "description", String.class),
+                    field(parser, node, "thumbnailId", String.class));
         }
 
         private static <T> Optional<T> field(
@@ -55,7 +76,7 @@ public record BroadcastPatchInput(
             if (value == null) {
                 return null;
             }
-            // 네 필드는 모두 JSON 문자열이다. 숫자·불리언·epoch 시각을 문자열로 자동 변환하지 않는다.
+            // 문자열 필드는 모두 JSON 문자열이다. 숫자·불리언·epoch 시각을 문자열로 자동 변환하지 않는다.
             if (!value.isNull() && !value.isTextual()) {
                 throw JsonMappingException.from(parser, name + "는 문자열이어야 합니다.");
             }

@@ -28,6 +28,7 @@ public class BroadcastService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final BroadcastRepository repository;
+    private final com.shoppinglive.live.thumbnail.BroadcastThumbnailService thumbnails;
     private final BroadcastEventPublisher events;
     private final PromotionService promotions;
     private final TransactionTemplate transaction;
@@ -36,7 +37,9 @@ public class BroadcastService {
             final BroadcastRepository repository,
             final BroadcastEventPublisher events,
             final PromotionService promotions,
-            final PlatformTransactionManager manager) {
+            final PlatformTransactionManager manager,
+            final com.shoppinglive.live.thumbnail.BroadcastThumbnailService thumbnails) {
+        this.thumbnails = thumbnails;
         this.repository = repository;
         this.events = events;
         this.promotions = promotions;
@@ -49,6 +52,7 @@ public class BroadcastService {
         if (existing != null) {
             return replay(existing, fingerprint);
         }
+        thumbnails.assertOwned(input.thumbnailId());
         try {
             // 등록 이벤트는 같은 트랜잭션의 outbox 에 남긴다. 같은 키 동시 등록에서 진 쪽은
             // 롤백되므로 이벤트도 남지 않고, 위 재조회 경로(멱등 재응답)는 이벤트를 내지 않는다.
@@ -63,6 +67,7 @@ public class BroadcastService {
                                                 input.scheduledAt(),
                                                 input.channelArn(),
                                                 input.playbackUrl()));
+                        saved.metadata(input.hostName(), input.description(), input.thumbnailId());
                         events.scheduled(saved);
                         return saved;
                     });
@@ -89,6 +94,16 @@ public class BroadcastService {
                 patched("scheduledAt", input.scheduledAt(), broadcast.getScheduledAt()),
                 patched("channelArn", input.channelArn(), broadcast.getChannelArn()),
                 patched("playbackUrl", input.playbackUrl(), broadcast.getPlaybackUrl()));
+        String thumbnailId =
+                patched(
+                        "thumbnailId",
+                        input.thumbnailId(),
+                        broadcast.getThumbnailId() == null ? "" : broadcast.getThumbnailId());
+        if (input.thumbnailId() != null) thumbnails.assertOwned(thumbnailId);
+        broadcast.metadata(
+                patched("hostName", input.hostName(), broadcast.getHostName()),
+                patched("description", input.description(), broadcast.getDescription()),
+                thumbnailId);
         repository.flush();
         // 알림 서비스가 "시작 임박" 시각을 다시 계산할 수 있게, 알림에 쓰는 제목·예정 시각이 바뀔 때만 낸다.
         // 송출 정보(채널·playback URL)만 바뀐 경우에는 알림 상태가 바뀌지 않으므로 내지 않는다.
@@ -168,6 +183,18 @@ public class BroadcastService {
         return broadcast;
     }
 
+    private static String metadataFingerprint(BroadcastInput input) {
+        String[] values = {input.hostName(), input.description(), input.thumbnailId()};
+        if (java.util.Arrays.stream(values).allMatch(value -> value == null || value.isEmpty()))
+            return "";
+        StringBuilder result = new StringBuilder("|metadata|");
+        for (String value : values) {
+            String normalized = value == null ? "" : value;
+            result.append(normalized.length()).append(':').append(normalized);
+        }
+        return result.toString();
+    }
+
     private String fingerprint(final BroadcastInput input) {
         try {
             final String normalized =
@@ -177,7 +204,8 @@ public class BroadcastService {
                             + "|"
                             + input.channelArn()
                             + "|"
-                            + input.playbackUrl();
+                            + input.playbackUrl()
+                            + metadataFingerprint(input);
             return HexFormat.of()
                     .formatHex(
                             MessageDigest.getInstance("SHA-256")

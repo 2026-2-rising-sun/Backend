@@ -13,7 +13,10 @@ public record PublicBroadcastResponse(
         String playbackUrl,
         boolean playbackAllowed,
         IvsReadiness videoStatus,
-        Instant createdAt) {
+        Instant createdAt,
+        String hostName,
+        String description,
+        String thumbnailUrl) {
     public static PublicBroadcastResponse from(final Broadcast broadcast) {
         return from(broadcast, null);
     }
@@ -44,6 +47,9 @@ public record PublicBroadcastResponse(
                 playbackUrl,
                 playbackAllowed,
                 playbackAllowed ? videoStatus : null,
-                broadcast.getCreatedAt());
+                broadcast.getCreatedAt(),
+                broadcast.getHostName(),
+                broadcast.getDescription(),
+                broadcast.getThumbnailUrl());
     }
 }

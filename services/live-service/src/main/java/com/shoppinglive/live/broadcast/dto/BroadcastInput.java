@@ -13,4 +13,12 @@ public record BroadcastInput(
                 String channelArn,
         @NotNull(message = "재생 URL은 필수입니다.")
                 @Size(min = 1, max = 2048, message = "재생 URL은 최대 2048자입니다.")
-                String playbackUrl) {}
+                String playbackUrl,
+        @Size(max = 80) String hostName,
+        @Size(max = 2000) String description,
+        @Size(max = 36) String thumbnailId) {
+    public BroadcastInput(
+            String title, Instant scheduledAt, String channelArn, String playbackUrl) {
+        this(title, scheduledAt, channelArn, playbackUrl, null, null, null);
+    }
+}
