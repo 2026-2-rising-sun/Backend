@@ -56,10 +56,11 @@ git diff --check
 |---|---|---|
 | `test` | `src/test` | 실제 실행·캐시 재사용 구분 |
 | `integrationTest` | `src/integrationTest` 중 `postgres`, `redis` 제외 | 조건부 테스트는 스킵될 수 있음 |
+| `postgresTest` | Commerce 통합 테스트 중 `postgres & !migration` | 격리 PostgreSQL 필요, 다른 서비스에는 등록하지 않음 |
 | `migrationTest` | 통합 테스트 중 `postgres & migration` | 서비스 모듈만 등록, 환경 준비 필요 |
 | `redisTest` | 통합 테스트 중 `redis` | 서비스 모듈만 등록, 환경 준비 필요 |
 
-`postgres` 단독 테스트를 실행하는 전용 작업은 현재 없다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
+Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. 다른 서비스에는 전용 작업이 없다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
 
 ## PostgreSQL·Redis 환경
 
@@ -75,6 +76,7 @@ git diff --check
 환경을 준비한 뒤 대상 서비스의 작업을 실행한다. 아래 명령만으로 환경이 생성되지는 않는다.
 
 ```bash
+./gradlew :services:commerce-service:postgresTest --tests '*NotificationEventPostgresTest'
 ./gradlew :services:member-service:migrationTest
 LIVE_PG_TEST=1 ./gradlew :services:live-service:migrationTest
 LIVE_REDIS_TEST=1 ./gradlew :services:live-service:redisTest
