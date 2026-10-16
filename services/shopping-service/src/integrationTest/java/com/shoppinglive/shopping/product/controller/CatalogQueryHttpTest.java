@@ -128,6 +128,27 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("sort", "LATEST").param("cursor", "broken"))
                 .andExpect(status().isBadRequest());
+        String excessiveTime =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(
+                                mapper.writeValueAsBytes(
+                                        java.util.Map.of(
+                                                "fingerprint",
+                                                "니트\nON_SALE\nPRICE_ASC",
+                                                "createdAt",
+                                                "+1000000000-12-31T23:59:59.999999999Z",
+                                                "id",
+                                                1,
+                                                "price",
+                                                100)));
+        mvc.perform(
+                        get("/v1/products")
+                                .param("q", "니트")
+                                .param("status", "ON_SALE")
+                                .param("sort", "PRICE_ASC")
+                                .param("cursor", excessiveTime))
+                .andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("sort", "LATEST").param("cursor", "bnVsbA"))
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("sort", "WRONG")).andExpect(status().isBadRequest());

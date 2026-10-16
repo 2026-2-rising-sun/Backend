@@ -173,8 +173,18 @@ public class CatalogQueryService {
     private Position decode(String cursor) {
         try {
             if (cursor.length() > 2048) throw new IllegalArgumentException();
-            return Objects.requireNonNull(
-                    mapper.readValue(Base64.getUrlDecoder().decode(cursor), Position.class));
+            Position position =
+                    Objects.requireNonNull(
+                            mapper.readValue(
+                                    Base64.getUrlDecoder().decode(cursor), Position.class));
+            // JDBC 시각 변환의 범위 초과·잘림이 입력 오류 대신 쿼리 오류가 되지 않게 막는다.
+            if (position.createdAt() == null
+                    || position.createdAt().isBefore(Instant.parse("0001-01-01T00:00:00Z"))
+                    || position.createdAt()
+                            .isAfter(Instant.parse("9999-12-31T23:59:59.999999999Z"))) {
+                throw new IllegalArgumentException();
+            }
+            return position;
         } catch (Exception e) {
             throw invalid("cursor 값이 올바르지 않습니다.");
         }
