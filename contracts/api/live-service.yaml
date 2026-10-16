@@ -1078,7 +1078,7 @@ paths:
       x-required-roles:
       - SELLER
       summary: 방송 중 이벤트(프로모션) 생성
-      description: 'READY 상태로 저장한다. 라이브는 `attributes` 를 해석하지 않고 그대로 저장·전달한다.
+      description: 'READY 상태로 저장한다. COUPON_DROP은 attributes.couponPolicyId의 쿠폰 UUID를 검증하고 요청 판매자의 JWT로 Commerce에서 본인 쿠폰인지 확인한다. 발급 기간 전 준비도 허용한다. 다른 유형은 메타데이터를 저장·전달하며 TIME_DEAL의 자동 가격 변경은 실행하지 않는다.
 
         같은 `Idempotency-Key` 재요청은 fingerprint(type·title·attributes·durationSeconds)가
         같으면
@@ -1101,8 +1101,7 @@ paths:
               type: COUPON_DROP
               title: 방송 한정 3,000원 할인
               attributes:
-                couponPolicyId: 7
-                claimLimit: 500
+                couponPolicyId: 55555555-5555-4555-8555-555555555555
               durationSeconds: 300
       responses:
         '401':
@@ -1160,7 +1159,7 @@ paths:
       summary: 프로모션 열기
       description: 'READY → OPEN 전이. LIVE 방송에서만 성공한다(그 외는 409). 이미 OPEN 이면 같은 응답을
 
-        돌려주고 멱등으로 성공한다. 닫혀 있던 프로모션을 다시 열면 409 다.
+        돌려주고 멱등으로 성공한다. COUPON_DROP의 READY 이벤트는 열기 전에 본인 쿠폰의 발급 기간·잔여 수량을 확인한다. 이미 OPEN인 재요청은 쿠폰 재검증 없이 기존 전이를 유지한다. 닫혀 있던 프로모션을 다시 열면 409 다.
 
         '
       operationId: openPromotion
@@ -1221,6 +1220,37 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
+  /v1/broadcasts/{broadcastId}/promotions/{promotionId}/claims:
+    parameters:
+    - $ref: '#/components/parameters/PromotionBroadcastId'
+    - $ref: '#/components/parameters/PromotionId'
+    post:
+      operationId: claimPromotionCoupon
+      tags: [Public Promotion]
+      x-required-roles: [USER, SELLER]
+      summary: 방송 쿠폰 이벤트의 쿠폰 발급
+      description: >-
+        접수 시 방송 LIVE, 이벤트 OPEN, 이벤트 자동 종료 시각 이전, COUPON_DROP 유형과 쿠폰 UUID를 확인한다.
+        이후 동일 사용자 Bearer로 Commerce 쿠폰 발급을 호출한다. 쿠폰 기간·중복 발급·전체 발급 한도는 Commerce에서 원자적으로 처리한다.
+        라이브 상태 확인과 Commerce 발급은 분산 트랜잭션이 아니므로 확인 직후 방송·이벤트가 종료되어도 이미 접수된 발급이 완료될 수 있다.
+        동일 회원의 재발급 결과는 기존 쿠폰을 반환하되, 종료된 이벤트 경로에서는 다시 발급할 수 없다. 이미 받은 쿠폰은 내 쿠폰에서 조회한다.
+      responses:
+        '201':
+          description: 새 쿠폰 발급
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PromotionCouponClaimEnvelope'}
+        '200':
+          description: 동일 회원의 기존 발급 결과
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PromotionCouponClaimEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: 방송·이벤트 종료 또는 쿠폰 기간·수량 정책 충돌}
+        '503': {$ref: '#/components/responses/AuthUnavailable'}
   /v1/broadcasts/{broadcastId}/promotions:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
@@ -2059,16 +2089,33 @@ components:
       - EXPIRED
       - BROADCAST_ENDED
       - CANCELED
+    PromotionCouponClaimEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: './commerce-service.yaml#/components/schemas/MemberCoupon'}
+        error: {type: 'null'}
     PromotionAttributes:
       type: object
-      description: '종류별 자유 JSON. 라이브는 해석하지 않고 저장·전달한다. 쿠폰 드롭 예:
-
-        `{"couponPolicyId": 7, "claimLimit": 500}`.
-
-        '
+      description: >-
+        COUPON_DROP은 couponPolicyId에 기존 쿠폰 UUID가 필요하다. 쿠폰 기간·발급 수량은 Commerce의 기존 정책을 사용한다.
+        claimLimit 등 임의 메타데이터는 별도 한도로 집행하지 않는다. 다른 종류의 메타데이터는 저장·전달만 한다.
       additionalProperties: true
     PromotionInput:
       type: object
+      allOf:
+      - if:
+          properties: {type: {const: COUPON_DROP}}
+          required: [type]
+        then:
+          required: [attributes]
+          properties:
+            attributes:
+              type: object
+              required: [couponPolicyId]
+              properties:
+                couponPolicyId: {type: string, format: uuid}
       required:
       - type
       - title

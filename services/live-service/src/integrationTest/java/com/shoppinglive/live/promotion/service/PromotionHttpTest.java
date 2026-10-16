@@ -1,22 +1,30 @@
 package com.shoppinglive.live.promotion.service;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.matching;
+import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.tomakehurst.wiremock.WireMockServer;
 import com.shoppinglive.live.broadcast.dto.BroadcastInput;
 import com.shoppinglive.live.broadcast.service.BroadcastService;
 import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -29,6 +37,40 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @DisplayName("프로모션 HTTP (생성 멱등, 공개 조회, 권한)")
 class PromotionHttpTest extends LiveSecuritySupport {
+
+    private static final String COUPON = "55555555-5555-4555-8555-555555555555";
+    private static final WireMockServer commerce =
+            new WireMockServer(
+                    com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig()
+                            .dynamicPort());
+
+    static {
+        commerce.start();
+    }
+
+    @DynamicPropertySource
+    static void configureCommerce(DynamicPropertyRegistry properties) {
+        properties.add("live.products.commerce-url", commerce::baseUrl);
+    }
+
+    @AfterAll
+    static void stopCommerce() {
+        commerce.stop();
+    }
+
+    @BeforeEach
+    void couponReady() {
+        commerce.resetAll();
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.get(
+                                urlEqualTo("/v1/seller/coupons/" + COUPON))
+                        .withHeader("Authorization", matching("Bearer .+"))
+                        .willReturn(
+                                okJson(
+                                        "{\"success\":true,\"data\":{\"id\":\""
+                                                + COUPON
+                                                + "\",\"startsAt\":\"2000-01-01T00:00:00Z\",\"endsAt\":\"2099-01-01T00:00:00Z\",\"issuanceLimit\":10,\"issuedCount\":0}}")));
+    }
 
     @Autowired MockMvc mvc;
     @Autowired BroadcastService broadcasts;
@@ -62,7 +104,7 @@ class PromotionHttpTest extends LiveSecuritySupport {
                 + type
                 + "\",\"title\":\""
                 + title
-                + "\",\"attributes\":{\"couponPolicyId\":7,\"claimLimit\":500}"
+                + "\",\"attributes\":{\"couponPolicyId\":\"55555555-5555-4555-8555-555555555555\"}"
                 + durationLine
                 + "}";
     }
@@ -184,5 +226,143 @@ class PromotionHttpTest extends LiveSecuritySupport {
 
         mvc.perform(get("/v1/broadcasts/{id}/promotions", broadcast))
                 .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    private long couponEvent(long broadcast) throws Exception {
+        return idOf(
+                mvc.perform(
+                                post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                        .header("Authorization", sellerBearer())
+                                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                                        .contentType("application/json")
+                                        .content(body("COUPON_DROP", "쿠폰 이벤트", "")))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString());
+    }
+
+    @Test
+    @DisplayName("쿠폰 UUID가 잘못됐거나 다른 판매자의 쿠폰이면 이벤트 생성을 거절한다")
+    void rejectsInvalidOrUnownedCoupon() throws Exception {
+        long broadcast = liveBroadcast();
+        mvc.perform(
+                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                .header("Authorization", sellerBearer())
+                                .header("Idempotency-Key", UUID.randomUUID().toString())
+                                .contentType("application/json")
+                                .content(body("COUPON_DROP", "잘못된 쿠폰", "").replace(COUPON, "7")))
+                .andExpect(status().isBadRequest());
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.get(
+                                urlEqualTo("/v1/seller/coupons/" + COUPON))
+                        .willReturn(
+                                com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                                        .withStatus(403)));
+        mvc.perform(
+                        post("/v1/seller/broadcasts/{id}/promotions", broadcast)
+                                .header("Authorization", sellerBearer())
+                                .header("Idempotency-Key", UUID.randomUUID().toString())
+                                .contentType("application/json")
+                                .content(body("COUPON_DROP", "다른 판매자 쿠폰", "")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("기존 쿠폰 기간 전에는 준비할 수 있지만 열 수 없고 소진 쿠폰도 열 수 없다")
+    void checksCouponPeriodAndStockOnlyWhenOpening() throws Exception {
+        long broadcast = liveBroadcast();
+        for (String data :
+                java.util.List.of(
+                        "{\"startsAt\":\"2099-01-01T00:00:00Z\",\"endsAt\":\"2099-02-01T00:00:00Z\",\"issuanceLimit\":10,\"issuedCount\":0}",
+                        "{\"startsAt\":\"2000-01-01T00:00:00Z\",\"endsAt\":\"2099-01-01T00:00:00Z\",\"issuanceLimit\":10,\"issuedCount\":10}",
+                        "{\"startsAt\":\"2000-01-01T00:00:00Z\",\"endsAt\":\"2001-01-01T00:00:00Z\",\"issuanceLimit\":10,\"issuedCount\":0}")) {
+            commerce.stubFor(
+                    com.github.tomakehurst.wiremock.client.WireMock.get(
+                                    urlEqualTo("/v1/seller/coupons/" + COUPON))
+                            .willReturn(okJson("{\"success\":true,\"data\":" + data + "}")));
+            long event = couponEvent(broadcast);
+            mvc.perform(
+                            post(
+                                            "/v1/seller/broadcasts/{id}/promotions/{event}/open",
+                                            broadcast,
+                                            event)
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isConflict());
+        }
+    }
+
+    @Test
+    @DisplayName("열린 방송 이벤트에서만 쿠폰을 발급하고 기존 발급 결과·기간·소진 오류를 유지한다")
+    void claimsOnlyOpenEventsAndPreservesCommercePolicy() throws Exception {
+        long broadcast = liveBroadcast();
+        long event = couponEvent(broadcast);
+        String path = "/v1/broadcasts/" + broadcast + "/promotions/" + event + "/claims";
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isConflict());
+        mvc.perform(
+                        post("/v1/seller/broadcasts/{id}/promotions/{event}/open", broadcast, event)
+                                .header("Authorization", sellerBearer()))
+                .andExpect(status().isOk());
+        String upstreamPath = "/v1/coupons/" + COUPON + "/claims";
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo(upstreamPath))
+                        .withHeader("Authorization", matching("Bearer .+"))
+                        .willReturn(
+                                com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                                        .withStatus(201)
+                                        .withHeader("Content-Type", "application/json")
+                                        .withBody(
+                                                "{\"success\":true,\"data\":{\"id\":\"member-coupon\",\"couponId\":\""
+                                                        + COUPON
+                                                        + "\"}}")));
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.couponId").value(COUPON));
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo(upstreamPath))
+                        .willReturn(
+                                okJson("{\"success\":true,\"data\":{\"id\":\"member-coupon\"}}")));
+        mvc.perform(post(path).header("Authorization", userBearer())).andExpect(status().isOk());
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.get(
+                                urlEqualTo("/v1/seller/coupons/" + COUPON))
+                        .willReturn(
+                                com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                                        .withStatus(503)));
+        mvc.perform(
+                        post("/v1/seller/broadcasts/{id}/promotions/{event}/open", broadcast, event)
+                                .header("Authorization", sellerBearer()))
+                .andExpect(status().isOk());
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo(upstreamPath))
+                        .willReturn(
+                                com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                                        .withStatus(409)
+                                        .withHeader("Content-Type", "application/json")
+                                        .withBody("{\"error\":{\"message\":\"발급 수량을 초과했습니다.\"}}")));
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.message").value("발급 수량을 초과했습니다."));
+        commerce.stubFor(
+                com.github.tomakehurst.wiremock.client.WireMock.post(urlEqualTo(upstreamPath))
+                        .willReturn(
+                                com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                                        .withStatus(503)));
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isServiceUnavailable());
+        commerce.verify(
+                4,
+                com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(
+                        urlEqualTo(upstreamPath)));
+        jdbc.update(
+                "UPDATE broadcast_promotion SET closes_at = TIMESTAMP '2000-01-01 00:00:00' WHERE id=?",
+                event);
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isConflict());
+        jdbc.update("UPDATE broadcast SET status='ENDED' WHERE id=?", broadcast);
+        mvc.perform(post(path).header("Authorization", userBearer()))
+                .andExpect(status().isConflict());
+        mvc.perform(post(path)).andExpect(status().isUnauthorized());
     }
 }
