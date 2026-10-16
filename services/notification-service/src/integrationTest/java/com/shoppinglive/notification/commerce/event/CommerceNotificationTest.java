@@ -151,6 +151,35 @@ class CommerceNotificationTest {
                 .isZero();
     }
 
+    @Test
+    @DisplayName("마이그레이션으로 보존한 기존 묶음의 취소·환불 알림도 생성한다")
+    void acceptsLegacyGroupNumber() throws Exception {
+        String number = "PG-LEGACY-42";
+        for (String type : List.of("OrderCancelled", "RefundCompleted")) {
+            var envelope =
+                    event(
+                            type,
+                            type.equals("OrderCancelled")
+                                    ? Map.of("cancelledAmount", 10000)
+                                    : Map.of(
+                                            "refundRequestId",
+                                            42,
+                                            "refundedAmount",
+                                            5000,
+                                            "cumulativeRefundAmount",
+                                            5000));
+            envelope.put("aggregateId", number);
+            @SuppressWarnings("unchecked")
+            var payload = (Map<String, Object>) envelope.get("payload");
+            payload.put("groupNumber", number);
+            listener.consume(record(envelope, number));
+        }
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT link_value FROM notification ORDER BY id", String.class))
+                .containsExactly(number, number + "/42");
+    }
+
     private Map<String, Object> event(String type, Map<String, Object> details) {
         var payload = new LinkedHashMap<String, Object>();
         payload.putAll(

@@ -79,7 +79,8 @@ public class CommerceNotificationListener {
                                 key,
                                 at));
             }
-            if (!key.startsWith("PG-") || !uuid(key.substring(3)).equals(key.substring(3)))
+            if (!key.matches("PG-LEGACY-[1-9][0-9]{0,18}")
+                    && (!key.startsWith("PG-") || !uuid(key.substring(3)).equals(key.substring(3))))
                 throw invalid("결제 묶음 번호가 올바르지 않습니다");
             number(payload, "paymentGroupId", 1);
             if (!text(payload, "currency").equals("KRW")) throw invalid("지원하지 않는 통화입니다");

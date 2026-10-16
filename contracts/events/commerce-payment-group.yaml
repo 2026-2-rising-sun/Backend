@@ -61,7 +61,7 @@ components:
             const: commerce-service
           aggregateId: &id001
             type: string
-            pattern: ^PG-[0-9a-f-]{36}$
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
@@ -82,7 +82,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid
@@ -179,7 +179,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid
@@ -287,7 +287,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid
@@ -399,7 +399,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid
@@ -500,7 +500,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid
@@ -603,7 +603,7 @@ components:
                 minimum: 1
               groupNumber:
                 type: string
-                pattern: ^PG-[0-9a-f-]{36}$
+                pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
               memberId:
                 type: string
                 format: uuid

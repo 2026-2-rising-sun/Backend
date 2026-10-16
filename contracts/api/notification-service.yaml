@@ -474,7 +474,7 @@ components:
           - string
           - 'null'
           maxLength: 100
-          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID, PAYMENT_GROUP 은 PG-UUID, REFUND 는 PG-UUID/환불요청ID, COUPON 은 쿠폰 ID(쿠폰함 이동).
+          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID, PAYMENT_GROUP 은 PG-UUID 또는 기존 PG-LEGACY-주문ID, REFUND 는 해당 묶음번호/환불요청ID, COUPON 은 쿠폰 ID(쿠폰함 이동).
           example: '42'
         occurredAt:
           type: string
