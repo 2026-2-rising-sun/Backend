@@ -503,6 +503,14 @@ public class PaymentGroupService {
                         }
                         g.transition(OrderStatus.PAID);
                         groups.saveAndFlush(g);
+                        notificationEvents.publish(
+                                "PaymentSucceeded",
+                                g.getId(),
+                                Map.of(
+                                        "paymentId",
+                                        attempt.getId(),
+                                        "paidAmount",
+                                        g.getPayableAmount()));
                         return attempt;
                     }
                     Long id = attempt.getId();
