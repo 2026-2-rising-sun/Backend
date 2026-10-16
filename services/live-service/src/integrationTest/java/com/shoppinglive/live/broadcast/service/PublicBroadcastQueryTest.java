@@ -61,6 +61,28 @@ class PublicBroadcastQueryTest extends LiveSecuritySupport {
         assertThat(publicBroadcasts.list(999, 20).getContent()).isEmpty();
     }
 
+    @Test
+    @DisplayName("공개 상태 필터는 전체 상태 목록에서 총건수와 페이지를 계산한다")
+    void statusFilterUsesWholeGroup() throws Exception {
+        register("filtered-preparing");
+        Page<PublicBroadcastResponse> preparing =
+                publicBroadcasts.list(0, 1, BroadcastStatus.PREPARING);
+        assertThat(preparing.getContent()).allMatch(item -> item.status().equals("예정"));
+        assertThat(preparing.getTotalElements())
+                .isEqualTo(repository.countByStatus(BroadcastStatus.PREPARING));
+        mvc.perform(get("/v1/broadcasts").param("status", "PREPARING").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].status").value("예정"));
+        mvc.perform(get("/v1/broadcasts").param("status", "WRONG"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        get("/v1/broadcasts")
+                                .param("status", "LIVE")
+                                .param("page", "2147483647")
+                                .param("size", "100"))
+                .andExpect(status().isBadRequest());
+    }
+
     @DisplayName("존재하지 않는 방송을 공개 조회하면 404를 반환한다")
     @Test
     void missingBroadcastIs404() throws Exception {

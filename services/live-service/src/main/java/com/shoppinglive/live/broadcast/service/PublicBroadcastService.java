@@ -40,7 +40,15 @@ public class PublicBroadcastService {
 
     @Transactional(readOnly = true)
     public Page<PublicBroadcastResponse> list(final int page, final int size) {
-        if (page < 0 || size < 1) {
+        return list(page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PublicBroadcastResponse> list(
+            final int page, final int size, final BroadcastStatus status) {
+        if (page < 0
+                || size < 1
+                || (long) page * Math.min(size, MAX_PAGE_SIZE) > Integer.MAX_VALUE) {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST, "page는 0 이상, size는 1 이상이어야 합니다.");
         }
@@ -56,6 +64,12 @@ public class PublicBroadcastService {
                                 repository.findAllPreparing(new OffsetPageable(offset, limit)),
                         (offset, limit) ->
                                 repository.findAllEnded(new OffsetPageable(offset, limit)));
+
+        if (status != null) {
+            return finders.get(groups.indexOf(status))
+                    .apply(Math.toIntExact(pageable.getOffset()), pageable.getPageSize())
+                    .map(PublicBroadcastResponse::from);
+        }
 
         final long windowStart = pageable.getOffset();
         final long windowEnd = windowStart + pageable.getPageSize();

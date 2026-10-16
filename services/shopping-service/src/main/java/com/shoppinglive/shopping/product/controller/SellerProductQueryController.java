@@ -4,8 +4,10 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
+import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
 import com.shoppinglive.shopping.product.dto.SellerProductDetail;
 import com.shoppinglive.shopping.product.dto.SellerProductPage;
+import com.shoppinglive.shopping.product.service.CatalogQueryService;
 import com.shoppinglive.shopping.product.service.SellerProductQueryService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,9 +27,12 @@ public class SellerProductQueryController {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final SellerProductQueryService queryService;
+    private final CatalogQueryService catalog;
 
-    public SellerProductQueryController(SellerProductQueryService queryService) {
+    public SellerProductQueryController(
+            SellerProductQueryService queryService, CatalogQueryService catalog) {
         this.queryService = queryService;
+        this.catalog = catalog;
     }
 
     /** 최신 등록순. page 는 0부터, size 는 1~100. */
@@ -35,13 +40,17 @@ public class SellerProductQueryController {
     public ApiResponse<SellerProductPage> list(
             @AuthenticationPrincipal AuthenticatedUser seller,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) SalesDisplayStatus status) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST,
                     "page 는 0 이상, size 는 1~" + MAX_PAGE_SIZE + " 이어야 합니다.");
         }
-        return ApiResponse.ok(queryService.list(seller.memberId(), page, size));
+        return ApiResponse.ok(
+                status == null
+                        ? queryService.list(seller.memberId(), page, size)
+                        : catalog.sellerList(seller.memberId(), status, page, size));
     }
 
     /** 상세 경로의 누락 ID는 SELLER 인가 후 입력 오류로 응답한다. */
