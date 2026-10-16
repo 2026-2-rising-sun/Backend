@@ -13,7 +13,7 @@ public enum SalesStatus {
     ON_SALE,
     /** 판매 가능한 재고가 0. 조회는 가능하지만 신규 주문 불가. */
     SOLD_OUT,
-    /** 관리자 판단으로 숨김. 공개 목록·방송 상품 영역에서 제외되고 신규 주문 불가. */
+    /** 판매자 판단으로 숨김. 공개 목록·방송 상품 영역에서 제외되고 신규 주문 불가. */
     PRIVATE;
 
     /**
@@ -47,11 +47,11 @@ public enum SalesStatus {
     }
 
     /**
-     * 관리자 요청으로 직접 지정할 수 있는 상태인가.
+     * 판매자 요청으로 직접 지정할 수 있는 상태인가.
      *
      * <p>{@code SOLD_OUT} 은 재고 0 진입 시 시스템 자동, {@code READY} 는 최초 생성(판매 1) 전용이라 둘 다 제외.
      */
-    public boolean isAdminChangeable() {
+    public boolean isSellerChangeable() {
         return this == ON_SALE || this == PRIVATE;
     }
 }

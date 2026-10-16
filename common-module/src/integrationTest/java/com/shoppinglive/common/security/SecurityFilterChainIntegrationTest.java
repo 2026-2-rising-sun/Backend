@@ -66,13 +66,13 @@ class SecurityFilterChainIntegrationTest {
     @DisplayName("안전하지 않은 경로는 인증 체인에 진입하기 전에 방화벽에서 거절한다")
     @ParameterizedTest
     @ValueSource(
-            strings = {"/public//extra", "/admin%2Fextra", "/admin%2fextra", "/admin%252Fextra"})
+            strings = {"/public//extra", "/seller%2Fextra", "/seller%2fextra", "/seller%252Fextra"})
     void firewallStillRejectsUnsafePathsBeforeAnyAuthenticationChain(String path) throws Exception {
         mvc.perform(get(URI.create(path)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"))
                 .andExpect(header().doesNotExist("WWW-Authenticate"));
-        mvc.perform(get(URI.create(path)).header("Authorization", adminBearer()))
+        mvc.perform(get(URI.create(path)).header("Authorization", sellerBearer()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
@@ -134,22 +134,21 @@ class SecurityFilterChainIntegrationTest {
         mvc.perform(get("/member"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"));
-        mvc.perform(get("/admin").header("Authorization", userBearer()))
+        mvc.perform(get("/seller").header("Authorization", userBearer()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
-        mvc.perform(get("/admin").header("Authorization", adminBearer()))
+        mvc.perform(get("/seller").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
     }
 
     @DisplayName("서비스 키와 사용자 토큰은 서로의 인증 주체로 사용할 수 없다")
     @Test
-    void serviceKeyCannotBecomeMemberOrAdministratorAndUserTokenCannotBecomeCaller()
-            throws Exception {
+    void serviceKeyCannotBecomeMemberOrSellerAndUserTokenCannotBecomeCaller() throws Exception {
         mvc.perform(get("/member").header("X-Service-Token", SHOPPING_KEY))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/admin").header("X-Service-Token", SHOPPING_KEY))
+        mvc.perform(get("/seller").header("X-Service-Token", SHOPPING_KEY))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/internal/sales").header("Authorization", adminBearer()))
+        mvc.perform(get("/internal/sales").header("Authorization", sellerBearer()))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -159,7 +158,7 @@ class SecurityFilterChainIntegrationTest {
         mvc.perform(
                         get("/internal/sales")
                                 .header("X-Service-Token", SHOPPING_KEY)
-                                .header("X-Service-Caller", "admin"))
+                                .header("X-Service-Caller", "seller"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("shopping"));
         mvc.perform(get("/internal/sales").header("X-Service-Token", COMMERCE_KEY))
@@ -175,7 +174,7 @@ class SecurityFilterChainIntegrationTest {
         return "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("USER"));
     }
 
-    private String adminBearer() {
+    private String sellerBearer() {
         return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER"));
     }
 
@@ -253,7 +252,7 @@ class SecurityFilterChainIntegrationTest {
                                             .permitAll()
                                             .requestMatchers("/member")
                                             .authenticated()
-                                            .requestMatchers("/admin")
+                                            .requestMatchers("/seller")
                                             .hasRole("SELLER")
                                             .anyRequest()
                                             .denyAll())
@@ -292,9 +291,9 @@ class SecurityFilterChainIntegrationTest {
             return user;
         }
 
-        @GetMapping("/admin")
-        String admin() {
-            return "admin";
+        @GetMapping("/seller")
+        String seller() {
+            return "seller";
         }
 
         @GetMapping("/internal/sales")

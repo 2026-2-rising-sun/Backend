@@ -140,7 +140,7 @@ public class SalesController {
     }
 
     /**
-     * 판매 재고 available 을 delta 만큼 조정한다 (판매 3, 관리자 대상).
+     * 판매 재고 available 을 delta 만큼 조정한다 (판매 3, 판매자 대상).
      *
      * <p>delta 양수: 추가. 음수: 감소. 감소 후 available 이 음수가 되면 409 Conflict.
      */
@@ -154,7 +154,7 @@ public class SalesController {
     /**
      * 판매 상태를 변경한다 (판매 4).
      *
-     * <p>관리자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은 400, 조회 실패는 404, 동시 변경
+     * <p>판매자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은 400, 조회 실패는 404, 동시 변경
      * 감지는 409.
      */
     @PatchMapping("/{id}/status")

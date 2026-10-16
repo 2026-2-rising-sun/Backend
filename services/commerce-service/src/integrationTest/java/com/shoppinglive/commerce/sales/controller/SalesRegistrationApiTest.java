@@ -78,7 +78,7 @@ class SalesRegistrationApiTest
     private ResultActions register(String json) throws Exception {
         return mockMvc.perform(
                 post("/v1/sales")
-                        .header("Authorization", adminBearer())
+                        .header("Authorization", sellerBearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json));
     }

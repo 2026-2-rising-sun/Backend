@@ -228,7 +228,7 @@ class OrderCreationApiTest extends com.shoppinglive.commerce.support.CommerceSec
         order(body(Map.of("productId", 999_999L)), null).andExpect(status().isNotFound());
     }
 
-    /** 사용자가 본 금액과 현재 금액이 다르면 주문을 만들지 않고 409 로 알린다. 주문서를 열어둔 사이 관리자가 가격을 바꾼 상황이다. */
+    /** 사용자가 본 금액과 현재 금액이 다르면 주문을 만들지 않고 409 로 알린다. 주문서를 열어둔 사이 판매자가 가격을 바꾼 상황이다. */
     @DisplayName("확인 금액이 현재 금액과 다르면 409로 응답하고 주문을 생성하지 않는다")
     @Test
     void rejectsPriceMismatchWithoutCreatingOrder() throws Exception {

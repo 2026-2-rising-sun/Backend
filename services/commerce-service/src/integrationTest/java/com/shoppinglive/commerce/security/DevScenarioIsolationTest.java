@@ -23,13 +23,13 @@ class DevScenarioIsolationTest extends CommerceSecurityTestSupport {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
 
-    @DisplayName("dev 환경은 플래그와 관리자 토큰이 있어도 결제 시나리오를 활성화할 수 없다")
+    @DisplayName("dev 환경은 플래그와 판매자 토큰이 있어도 결제 시나리오를 활성화할 수 없다")
     @Test
-    void externalDevCannotEnableScenarioEvenWithFlagAndAdminToken() throws Exception {
+    void externalDevCannotEnableScenarioEvenWithFlagAndSellerToken() throws Exception {
         assertThat(context.getBeansOfType(DevPaymentScenarioRegistry.class)).isEmpty();
         mvc.perform(
                         put("/v1/dev/payment-scenarios/any")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"scenario\":\"INSTANT_SUCCESS\"}"))
                 .andExpect(status().isForbidden());

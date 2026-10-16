@@ -80,7 +80,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
     void createsAtPolicyMaximumAndStoresAuthenticatedSellerAndTargets() throws Exception {
         mvc.perform(
                         post("/v1/seller/coupons")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(request())))
                 .andExpect(status().isCreated())
@@ -100,7 +100,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
             body.put("productIds", List.of(1L, id));
             mvc.perform(
                             post("/v1/seller/coupons")
-                                    .header("Authorization", adminBearer())
+                                    .header("Authorization", sellerBearer())
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content(mapper.writeValueAsString(body)))
                     .andExpect(status().isForbidden());
@@ -118,7 +118,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
         body.put("issuanceLimit", 10001);
         mvc.perform(
                         post("/v1/seller/coupons")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
@@ -144,7 +144,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
         body.put("expiresAt", "2026-10-10T00:00:00.000000002Z");
         mvc.perform(
                         post("/v1/seller/coupons")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isBadRequest());
@@ -152,7 +152,7 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
         body.put("expiresAt", "2026-10-11T00:00:00.000000002Z");
         mvc.perform(
                         post("/v1/seller/coupons")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().isCreated())

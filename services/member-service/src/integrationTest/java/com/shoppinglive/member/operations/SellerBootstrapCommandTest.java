@@ -45,7 +45,7 @@ class SellerBootstrapCommandTest {
                                 "MEMBER_BOOTSTRAP_SELLER_PASSWORD",
                                 "secret-password",
                                 "MEMBER_BOOTSTRAP_SELLER_DISPLAY_NAME",
-                                "admin"));
+                                "seller"));
         assertThatThrownBy(() -> command.execute(environment))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("판매자 이메일·표시 이름·비밀번호가 올바르지 않습니다.");

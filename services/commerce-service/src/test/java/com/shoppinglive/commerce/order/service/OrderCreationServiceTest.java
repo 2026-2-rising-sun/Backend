@@ -150,7 +150,7 @@ class OrderCreationServiceTest {
         assertThat(order.getTotalAmount()).isEqualTo(30_000L);
     }
 
-    /** 상품명·단가는 주문 시점 값으로 고정된다. 나중에 Shopping 이 이름을 바꾸거나 관리자가 가격을 올려도 이미 만들어진 주문의 영수증은 그대로여야 한다. */
+    /** 상품명·단가는 주문 시점 값으로 고정된다. 나중에 Shopping 이 이름을 바꾸거나 판매자가 가격을 올려도 이미 만들어진 주문의 영수증은 그대로여야 한다. */
     @Test
     @DisplayName("주문 당시 상품명과 단가를 스냅샷으로 저장한다")
     void snapshotsProductNameAndUnitPriceAtCreation() {

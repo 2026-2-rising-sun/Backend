@@ -9,7 +9,7 @@ import com.shoppinglive.common.core.ErrorCode;
  * <p>두 자리에서 쓴다.
  *
  * <ul>
- *   <li>관리자 재고 감소 (판매 3) — 감소 후 {@code available} 이 음수가 되는 경우
+ *   <li>판매자 재고 감소 (판매 3) — 감소 후 {@code available} 이 음수가 되는 경우
  *   <li>주문 생성 (주문 2) — 주문 수량만큼 배정할 재고가 없는 경우. 사용자에게는 품절·재고 부족으로 안내한다
  * </ul>
  *

@@ -123,7 +123,7 @@ class SalesRegistrationServiceTest {
         assertThat(stockCaptor.getValue().getReserved()).as("최초 등록 시 배정된 수량은 없다").isZero();
     }
 
-    /** 등록만으로 판매가 시작되면 안 된다. 관리자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
+    /** 등록만으로 판매가 시작되면 안 된다. 판매자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
     @DisplayName("판매 등록 직후 상태는 READY다")
     @Test
     void createsSaleInReadyStatus() {

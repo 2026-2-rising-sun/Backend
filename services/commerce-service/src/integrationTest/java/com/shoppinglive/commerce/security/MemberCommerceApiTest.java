@@ -152,11 +152,11 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         }
     }
 
-    @DisplayName("다른 사용자와 관리자는 타인 주문을 조회·취소·결제·목록 조회할 수 없다")
+    @DisplayName("다른 사용자와 판매자는 타인 주문을 조회·취소·결제·목록 조회할 수 없다")
     @Test
-    void otherUserAndAdminCannotReadCancelPayOrListAnotherMembersOrder() throws Exception {
+    void otherUserAndSellerCannotReadCancelPayOrListAnotherMembersOrder() throws Exception {
         Order order = order(MEMBER_A);
-        for (String token : List.of(bearer(MEMBER_B), adminBearer())) {
+        for (String token : List.of(bearer(MEMBER_B), sellerBearer())) {
             mvc.perform(
                             get("/v1/orders/{number}", order.getOrderNumber())
                                     .header("Authorization", token))
@@ -219,7 +219,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                         .getResponse()
                         .getContentAsString();
         long itemId = mapper.readTree(cartBody).get("id").asLong();
-        for (String token : List.of(bearer(MEMBER_B), adminBearer())) {
+        for (String token : List.of(bearer(MEMBER_B), sellerBearer())) {
             mvc.perform(
                             patch("/v1/cart/items/{id}", itemId)
                                     .header("Authorization", token)
@@ -287,9 +287,9 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(7);
     }
 
-    @DisplayName("일반 사용자는 판매를 관리할 수 없고 관리자는 가능하며 서비스가 회원을 대신할 수 없다")
+    @DisplayName("일반 사용자는 판매를 관리할 수 없고 판매자는 가능하며 서비스가 회원을 대신할 수 없다")
     @Test
-    void userCannotManageSalesWhileAdminCanAndCallerCannotActAsMember() throws Exception {
+    void userCannotManageSalesWhileSellerCanAndCallerCannotActAsMember() throws Exception {
         mvc.perform(
                         post("/v1/sales")
                                 .header("Authorization", bearer(MEMBER_A))
@@ -306,11 +306,11 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         }
         mvc.perform(get("/v1/sales/{id}/stock", salesId).header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/v1/sales/{id}/stock", salesId).header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/sales/{id}/stock", salesId).header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
         mvc.perform(
                         post("/v1/sales")
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"productId\":2,\"price\":1000,\"initialStock\":5}"))
                 .andExpect(status().isCreated());
@@ -321,7 +321,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
     @DisplayName("판매 일괄 조회는 허용된 서비스만 접근하고 health는 probe만 공개한다")
     @Test
     void bulkSalesRequiresAllowedCallerAndHealthOnlyExposesProbes() throws Exception {
-        mvc.perform(get("/v1/sales?productIds=1").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/sales?productIds=1").header("Authorization", sellerBearer()))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/sales?productIds=1").header("X-Service-Token", "wrong"))
                 .andExpect(status().isUnauthorized());
