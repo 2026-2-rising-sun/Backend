@@ -27,8 +27,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *       미도달·일시 장애로 실패한 행을 다시 집어 보낸다.
  * </ol>
  *
- * 두 경로가 동시에 돌아 같은 행을 중복 전송하지 않도록 {@link AtomicBoolean} 으로 단일 흐름을 보장한다. 전송 성공 후 발행 표시 전에 죽거나 인스턴스 둘이
- * 같은 행을 보내면 중복이 생길 수 있고, 소비자는 eventId 로 중복을 거른다. 전송은 트랜잭션 밖에서 하므로 DB 잠금을 오래 잡지 않는다.
+ * claim 모드는 DB token·lease로 여러 worker를 제어한다. 기본 모드에서는 두 경로가 동시에 돌아 같은 행을 중복 전송하지 않도록 {@link
+ * AtomicBoolean} 으로 단일 흐름을 보장한다. 전송 성공 후 발행 표시 전에 죽거나 인스턴스 둘이 같은 행을 보내면 중복이 생길 수 있고, 소비자는 eventId 로
+ * 중복을 거른다. 전송은 트랜잭션 밖에서 하므로 DB 잠금을 오래 잡지 않는다.
  */
 public class OutboxRelay {
     public static final String EVENT_TYPE_HEADER = "eventType";
@@ -40,6 +41,7 @@ public class OutboxRelay {
     private final KafkaTemplate<String, String> kafka;
     private final OutboxProperties properties;
     private final java.util.concurrent.Executor fastPath;
+    private final OutboxLeaseStore leases;
     private final AtomicBoolean draining = new AtomicBoolean();
 
     public OutboxRelay(
@@ -47,10 +49,21 @@ public class OutboxRelay {
             final KafkaTemplate<String, String> kafka,
             final OutboxProperties properties,
             java.util.concurrent.Executor fastPath) {
+        this(repository, kafka, properties, fastPath, null);
+    }
+
+    public OutboxRelay(
+            OutboxMessageRepository repository,
+            KafkaTemplate<String, String> kafka,
+            OutboxProperties properties,
+            java.util.concurrent.Executor fastPath,
+            OutboxLeaseStore leases) {
         this.repository = repository;
         this.kafka = kafka;
         this.properties = properties;
         this.fastPath = fastPath;
+        this.leases = leases;
+        if (leases != null) leases.validateTimeout(properties.sendTimeout());
     }
 
     @Scheduled(fixedDelayString = "${shoppinglive.outbox.relay.fixed-delay:1s}")
@@ -77,7 +90,7 @@ public class OutboxRelay {
             return 0;
         }
         try {
-            return drainBatch();
+            return leases == null ? drainBatch() : drainClaimed();
         } finally {
             draining.set(false);
         }
@@ -110,13 +123,51 @@ public class OutboxRelay {
         return published;
     }
 
+    private int drainClaimed() {
+        int published = 0;
+        for (int i = 0; i < properties.batchSize(); i++) {
+            var claim = leases.claim();
+            if (claim == null) break;
+            try {
+                send(
+                        claim.topic(),
+                        claim.messageKey(),
+                        claim.payload(),
+                        claim.eventType(),
+                        claim.eventId());
+            } catch (Exception failure) {
+                if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+                log.warn(
+                        "Outbox 전송 실패 eventId={} topic={} attempts={}",
+                        claim.eventId(),
+                        claim.topic(),
+                        claim.attempts() + 1,
+                        failure);
+                leases.failed(claim, failure.toString());
+                if (failure instanceof InterruptedException) break;
+                continue;
+            }
+            if (leases.published(claim)) published++;
+            else log.warn("Outbox 발행 완료 권한 만료 eventId={}", claim.eventId());
+        }
+        return published;
+    }
+
     private void send(final OutboxMessage message) throws Exception {
-        final ProducerRecord<String, String> record =
-                new ProducerRecord<>(
-                        message.getTopic(), message.getMessageKey(), message.getPayload());
+        send(
+                message.getTopic(),
+                message.getMessageKey(),
+                message.getPayload(),
+                message.getEventType(),
+                message.getEventId());
+    }
+
+    private void send(String topic, String key, String payload, String eventType, String eventId)
+            throws Exception {
+        final ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, payload);
         record.headers()
-                .add(EVENT_TYPE_HEADER, message.getEventType().getBytes(StandardCharsets.UTF_8))
-                .add(EVENT_ID_HEADER, message.getEventId().getBytes(StandardCharsets.UTF_8));
+                .add(EVENT_TYPE_HEADER, eventType.getBytes(StandardCharsets.UTF_8))
+                .add(EVENT_ID_HEADER, eventId.getBytes(StandardCharsets.UTF_8));
         kafka.send(record).get(properties.sendTimeout().toMillis(), TimeUnit.MILLISECONDS);
     }
 
