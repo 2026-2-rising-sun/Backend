@@ -21,6 +21,10 @@ spring:
     locations: classpath:db/migration
 
 shoppinglive:
+  outbox:
+    relay:
+      claim:
+        enabled: true
   security:
     session:
       base-url: ${MEMBER_SESSION_BASE_URL:}
