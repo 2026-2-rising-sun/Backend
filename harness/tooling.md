@@ -94,7 +94,7 @@ Commerce의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCE_TEST_K
 ./gradlew :services:commerce-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
 ```
 
-Shopping의 `SalesInfoEventKafkaTest`는 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
+Commerce의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Shopping의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
 
 ## API·이벤트 계약 검사
 

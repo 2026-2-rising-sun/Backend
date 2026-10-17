@@ -45,4 +45,4 @@ void returnsExistingOrderForSameIdempotencyKey() {
 
 `postgres` 단독 테스트는 일반 `integrationTest`와 `migrationTest` 모두에서 제외된다. Commerce는 격리 PostgreSQL 환경에서 `postgresTest`로 `postgres & !migration` 테스트를 실행한다. 다른 서비스는 필요한 실행 경로가 없다면 미검증으로 보고한다. `--tests`로 클래스 이름을 지정해도 태그 제외를 우회하지 못한다.
 
-Commerce의 외부 Kafka 테스트 두 개는 환경변수로 실행을 선택한다. Shopping의 EmbeddedKafka 테스트는 일반 통합 검사에 포함된다. 기본 빌드 성공을 외부 Kafka 전달 검증 성공으로 확대하지 않는다. 구체적인 조건은 [도구](../tooling.md)를 따른다.
+Commerce의 외부 Kafka 테스트 두 개는 환경변수로 실행을 선택한다. Commerce의 `SalesInfoMainConfigurationKafkaTest`와 Shopping의 EmbeddedKafka 테스트는 일반 통합 검사에 포함된다. 기본 빌드 성공을 외부 Kafka 전달 검증 성공으로 확대하지 않는다. 구체적인 조건은 [도구](../tooling.md)를 따른다.
