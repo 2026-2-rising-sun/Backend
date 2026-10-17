@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** 격리된 외부 Kafka 브로커 주소를 지정했을 때 판매 이벤트 전달을 검증한다. */
 @SpringBootTest(
         properties = {
-            "commerce.sales.events.enabled=true",
+            "shoppinglive.outbox.relay.enabled=true",
             "spring.kafka.bootstrap-servers=${COMMERCE_TEST_KAFKA_SERVERS:localhost:29092}"
         })
 @AutoConfigureMockMvc

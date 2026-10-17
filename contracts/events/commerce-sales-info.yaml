@@ -15,7 +15,8 @@ channels:
       등록 시 snapshotVersion은 1이다. 한 트랜잭션에서 가격·판매 가능 재고·상태의 최종값이 바뀌면 버전이 한 번 증가한다.
       여러 값이 함께 바뀌면 해당 이벤트들이 같은 버전과 최종 스냅샷을 공유한다. 값이 그대로인 요청에는 이벤트가 없다.
       소비자는 마지막으로 반영한 값보다 큰 버전만 반영하며 occurredAt·eventId로 순서를 판단하지 않는다.
-      DB 커밋 후 직접 발행하며 전송 실패 시 애플리케이션이 재발행하지 않아 유실될 수 있다.
+      DB 변경과 같은 트랜잭션에서 Outbox에 기록하고 커밋 후 relay가 재시도하며 발행한다.
+      재전송으로 중복될 수 있으므로 소비자는 eventId와 snapshotVersion으로 방어한다.
     messages:
       SalesRegistered:
         $ref: '#/components/messages/SalesRegistered'
@@ -29,7 +30,7 @@ operations:
   publishSalesInfo:
     action: send
     title: 판매정보 스냅샷 발행 계약
-    description: 트랜잭션의 최종 판매정보 스냅샷을 커밋 후 발행한다.
+    description: 트랜잭션의 최종 판매정보 스냅샷을 Outbox에 기록하고 커밋 후 발행한다.
     channel:
       $ref: '#/channels/salesInfo'
     messages:
