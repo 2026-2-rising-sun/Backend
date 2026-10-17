@@ -474,6 +474,11 @@ class NotificationEventPostgresTest extends RefundTestSupport {
     void unavailableBrokerRetainsEventAndRecoveryDeliversSameEnvelope() {
         create("relay");
         var original = events("PaymentGroupCreated").getFirst();
+        // 판매정보도 같은 Outbox에 기록되므로 이번 트랜잭션의 전체 pending을 확인한다.
+        int pending =
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM event_outbox WHERE published_at IS NULL",
+                        Integer.class);
         var properties = new OutboxProperties(100, Duration.ofSeconds(2));
         var failingFactory =
                 new DefaultKafkaProducerFactory<String, String>(
@@ -515,7 +520,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
                         new StringDeserializer())) {
             consumer.subscribe(List.of("commerce.payment-group.v1"));
             assertThat(new OutboxRelay(outbox, kafka, properties, Runnable::run).relay())
-                    .isEqualTo(1);
+                    .isEqualTo(pending);
             var received =
                     new java.util.ArrayList<
                             org.apache.kafka.clients.consumer.ConsumerRecord<String, String>>();
