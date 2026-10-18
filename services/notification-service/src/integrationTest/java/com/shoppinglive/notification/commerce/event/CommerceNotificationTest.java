@@ -3,6 +3,7 @@ package com.shoppinglive.notification.commerce.event;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.notification.commerce.repository.PaymentGroupRepository;
 import com.shoppinglive.notification.event.InvalidEventMessageException;
 import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import java.util.*;
@@ -34,9 +35,11 @@ class CommerceNotificationTest {
         ds.setUrl(ds.getUrl() + ";DB_CLOSE_DELAY=-1");
         Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
         jdbc = new JdbcTemplate(ds);
+        var named = new NamedParameterJdbcTemplate(ds);
         listener =
                 new CommerceNotificationListener(
-                        new NotificationWriteRepository(new NamedParameterJdbcTemplate(ds)));
+                        new NotificationWriteRepository(named),
+                        new PaymentGroupTracker(new PaymentGroupRepository(named)));
     }
 
     @Test
