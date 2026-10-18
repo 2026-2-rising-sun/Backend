@@ -88,7 +88,7 @@ public interface SalesJpaRepository extends JpaRepository<Sales, Long> {
             @Param("expectedStatus") String expectedStatus,
             @Param("nextStatus") String nextStatus);
 
-    /** 복원/보충된 재고가 있는 품절 판매만 재개한다. 관리자 비공개 상태는 보존한다. */
+    /** 복원/보충된 재고가 있는 품절 판매만 재개한다. 판매자 비공개 상태는 보존한다. */
     @Modifying(clearAutomatically = true)
     @Query(
             value =

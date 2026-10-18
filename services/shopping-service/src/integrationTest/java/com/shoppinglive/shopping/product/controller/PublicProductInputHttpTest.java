@@ -58,7 +58,7 @@ class PublicProductInputHttpTest extends ShoppingSecuritySupport {
         expect(request("GET", "/v1/product-images" + suffix, null), 400, "INVALID_REQUEST");
     }
 
-    @DisplayName("관리자 상품 경로는 ID 누락 검증 전에 인증을 확인한다")
+    @DisplayName("판매자 상품 경로는 ID 누락 검증 전에 인증을 확인한다")
     @ParameterizedTest
     @ValueSource(strings = {"GET", "PATCH"})
     void sellerMustAuthenticateBeforeMissingIdValidation(String method) throws Exception {

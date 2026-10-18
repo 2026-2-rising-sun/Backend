@@ -88,7 +88,7 @@ public class MemberSecurityConfiguration {
                                         .authenticated()
                                         .requestMatchers(
                                                 HttpMethod.POST,
-                                                "/v1/admin/members/*/sessions/revoke")
+                                                "/v1/seller/members/*/sessions/revoke")
                                         .hasRole("SELLER")
                                         .anyRequest()
                                         .denyAll())

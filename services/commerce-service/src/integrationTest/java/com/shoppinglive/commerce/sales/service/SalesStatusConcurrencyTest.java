@@ -24,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 판매 상태 전이 조건부 UPDATE 의 동시성 안전을 검증한다.
  *
- * <p>두 관리자가 동시에 서로 다른 target 을 요청해도 조건부 UPDATE `WHERE status = :expected` 로 한 명만 성공하고 나머지는 {@link
+ * <p>두 판매자가 동시에 서로 다른 target 을 요청해도 조건부 UPDATE `WHERE status = :expected` 로 한 명만 성공하고 나머지는 {@link
  * ConcurrentStateChangeException} 을 받는다.
  */
 @SpringBootTest
@@ -59,7 +59,7 @@ class SalesStatusConcurrencyTest
     }
 
     /**
-     * 두 관리자가 동시에 서로 다른 target 을 요청해도 상태가 깨지지 않는다.
+     * 두 판매자가 동시에 서로 다른 target 을 요청해도 상태가 깨지지 않는다.
      *
      * <p><b>왜 "한 명만 성공" 을 단정하지 않는가:</b> 스레드를 같은 순간에 풀어줘도 두 요청이 실제로 겹친다는 보장은 없다. 첫 요청이 {@code READY
      * → ON_SALE} 을 커밋한 뒤에 두 번째 요청이 읽기 시작하면, 두 번째는 {@code ON_SALE} 을 읽고 {@code ON_SALE → PRIVATE} 로

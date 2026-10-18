@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.sales.event;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 
 import com.shoppinglive.commerce.client.shopping.InMemoryShoppingClientStub;
@@ -23,6 +24,7 @@ import com.shoppinglive.commerce.sales.service.SalesRegistrationService;
 import com.shoppinglive.commerce.sales.service.SalesService;
 import com.shoppinglive.commerce.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.common.outbox.EventOutbox;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -39,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -58,7 +61,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
     @Autowired PlatformTransactionManager manager;
-    @MockitoBean SalesInfoEventProducer producer;
+    @MockitoSpyBean EventOutbox outbox;
     @MockitoBean MockPaymentEngine engine;
     final List<EventEnvelope<SalesInfoSnapshot>> emitted = new CopyOnWriteArrayList<>();
     final List<Long> fixtureSales = new java.util.ArrayList<>();
@@ -68,11 +71,14 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
         emitted.clear();
         doAnswer(
                         call -> {
-                            emitted.add(call.getArgument(0));
-                            return null;
+                            var result = call.callRealMethod();
+                            emitted.add(call.getArgument(1));
+                            return result;
                         })
-                .when(producer)
-                .send(any());
+                .when(
+                        org.springframework.test.util.AopTestUtils
+                                .<EventOutbox>getUltimateTargetObject(outbox))
+                .append(eq(SalesInfoEventContract.TOPIC_NAME), any());
     }
 
     private long register(int available) {

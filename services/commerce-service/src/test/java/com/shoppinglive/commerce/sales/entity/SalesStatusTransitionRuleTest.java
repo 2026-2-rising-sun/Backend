@@ -42,16 +42,15 @@ class SalesStatusTransitionRuleTest {
         assertThat(from.canTransitionTo(to)).isEqualTo(allowed);
     }
 
-    @DisplayName("관리자는 ON_SALE과 PRIVATE만 직접 지정할 수 있다")
-    @ParameterizedTest(name = "{0}.isAdminChangeable() = {1}")
+    @DisplayName("판매자는 ON_SALE과 PRIVATE만 직접 지정할 수 있다")
+    @ParameterizedTest(name = "{0}.isSellerChangeable() = {1}")
     @CsvSource({
         "READY, false",
         "ON_SALE, true",
         "SOLD_OUT, false",
         "PRIVATE, true",
     })
-    void allowsOnlyOnSaleAndPrivateAsAdministrativeTargets(
-            SalesStatus status, boolean adminChangeable) {
-        assertThat(status.isAdminChangeable()).isEqualTo(adminChangeable);
+    void allowsOnlyOnSaleAndPrivateAsSellerTargets(SalesStatus status, boolean sellerChangeable) {
+        assertThat(status.isSellerChangeable()).isEqualTo(sellerChangeable);
     }
 }

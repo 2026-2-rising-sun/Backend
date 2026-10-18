@@ -44,7 +44,13 @@ public class LiveSecurityConfiguration {
                                                 "/v1/broadcasts/{id}/products",
                                                 "/v1/broadcasts/{id}/chats",
                                                 "/v1/broadcasts/{id}/events",
-                                                "/v1/broadcasts/{id}/likes")
+                                                "/v1/broadcasts/{id}/likes",
+                                                "/v1/broadcasts/{id}/viewers",
+                                                "/v1/broadcast-thumbnails/{id}")
+                                        .permitAll()
+                                        .requestMatchers(
+                                                HttpMethod.POST,
+                                                "/v1/broadcasts/{id}/viewers/heartbeat")
                                         .permitAll()
                                         .requestMatchers(
                                                 HttpMethod.GET, "/v1/broadcasts/{id}/likes/mine")
@@ -53,34 +59,37 @@ public class LiveSecurityConfiguration {
                                                 HttpMethod.PUT, "/v1/broadcasts/{id}/likes/mine")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
-                                                HttpMethod.POST, "/v1/broadcasts/{id}/chats")
+                                                HttpMethod.POST,
+                                                "/v1/broadcasts/{id}/chats",
+                                                "/v1/broadcasts/{broadcastId}/promotions/{promotionId}/claims")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
                                                 HttpMethod.GET,
-                                                "/v1/admin/broadcasts",
-                                                "/v1/admin/broadcasts/",
-                                                "/v1/admin/broadcasts/{id}",
-                                                "/v1/admin/broadcasts/{id}/products")
+                                                "/v1/seller/broadcasts",
+                                                "/v1/seller/broadcasts/",
+                                                "/v1/seller/broadcasts/{id}",
+                                                "/v1/seller/broadcasts/{id}/products")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.POST,
-                                                "/v1/admin/broadcasts",
-                                                "/v1/admin/broadcasts/{id}/start",
-                                                "/v1/admin/broadcasts/{id}/end",
-                                                "/v1/admin/broadcasts/{id}/products")
+                                                "/v1/seller/broadcast-thumbnails",
+                                                "/v1/seller/broadcasts",
+                                                "/v1/seller/broadcasts/{id}/start",
+                                                "/v1/seller/broadcasts/{id}/end",
+                                                "/v1/seller/broadcasts/{id}/products")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.PATCH,
-                                                "/v1/admin/broadcasts/",
-                                                "/v1/admin/broadcasts/{id}")
+                                                "/v1/seller/broadcasts/",
+                                                "/v1/seller/broadcasts/{id}")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.PUT,
-                                                "/v1/admin/broadcasts/{id}/products/order")
+                                                "/v1/seller/broadcasts/{id}/products/order")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.DELETE,
-                                                "/v1/admin/broadcasts/{id}/products/{linkId}")
+                                                "/v1/seller/broadcasts/{id}/products/{linkId}")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.GET,
@@ -88,13 +97,13 @@ public class LiveSecurityConfiguration {
                                         .permitAll()
                                         .requestMatchers(
                                                 HttpMethod.GET,
-                                                "/v1/admin/broadcasts/{broadcastId}/promotions")
+                                                "/v1/seller/broadcasts/{broadcastId}/promotions")
                                         .hasRole("SELLER")
                                         .requestMatchers(
                                                 HttpMethod.POST,
-                                                "/v1/admin/broadcasts/{broadcastId}/promotions",
-                                                "/v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/open",
-                                                "/v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/close")
+                                                "/v1/seller/broadcasts/{broadcastId}/promotions",
+                                                "/v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/open",
+                                                "/v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/close")
                                         .hasRole("SELLER")
                                         .anyRequest()
                                         .denyAll())

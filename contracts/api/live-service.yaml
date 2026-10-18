@@ -19,9 +19,9 @@ servers:
 - url: http://dev-live-service:8080
   description: Live 서비스 dev 네임스페이스 Service 주소 (컨테이너 port 8080)
 tags:
-- name: Admin Broadcast
+- name: Seller Broadcast
   description: 관리 방송 등록·수정·조회·시작·종료
-- name: Admin Broadcast Product
+- name: Seller Broadcast Product
   description: 관리 방송 상품 연결·해제·정렬·조회
 - name: Public Broadcast
   description: 비회원 공개 방송 조회·시청 연결
@@ -34,7 +34,61 @@ tags:
 - name: Broadcast Event Stream
   description: 방송 실시간 이벤트 SSE
 paths:
-  /v1/admin/broadcasts:
+  /v1/seller/broadcast-thumbnails:
+    post:
+      tags: [Seller Broadcast]
+      summary: 판매자 방송 썸네일 업로드
+      operationId: uploadBroadcastThumbnail
+      x-required-roles: [SELLER]
+      description: PNG·JPEG만 허용하며 실제 디코딩·형식·2MB·최대 4096×4096 픽셀을 검증한다. 썸네일 ID는 업로드한 판매자만 방송에 연결할 수 있다.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: 업로드 완료
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success: {type: boolean}
+                  error: {type: 'null'}
+                  data:
+                    type: object
+                    required: [thumbnailId, thumbnailUrl]
+                    properties:
+                      thumbnailId: {type: string, format: uuid}
+                      thumbnailUrl: {type: string}
+        '400': {description: 파일 누락·손상·형식·크기 초과}
+        '401': {description: 로그인 필요}
+        '403': {description: SELLER 권한 필요}
+  /v1/broadcast-thumbnails/{id}:
+    get:
+      tags: [Public Broadcast]
+      summary: 공개 방송 썸네일 조회
+      operationId: getBroadcastThumbnail
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: 원본 이미지. nosniff와 하루 공개 캐시를 적용한다.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+        '404': {description: 존재하지 않는 썸네일}
+  /v1/seller/broadcasts:
     post:
       x-required-roles:
       - SELLER
@@ -48,7 +102,7 @@ paths:
         '
       operationId: registerBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -101,7 +155,7 @@ paths:
         '
       operationId: listBroadcasts
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - name: status
         in: query
@@ -125,7 +179,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}:
+  /v1/seller/broadcasts/{id}:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
     get:
@@ -134,7 +188,7 @@ paths:
       summary: 관리 방송 상세
       operationId: getBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -163,7 +217,7 @@ paths:
         '
       operationId: editBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/Version'
       requestBody:
@@ -197,7 +251,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/start:
+  /v1/seller/broadcasts/{id}/start:
     post:
       x-required-roles:
       - SELLER
@@ -214,7 +268,7 @@ paths:
         '
       operationId: startBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       - $ref: '#/components/parameters/ExpectedVersion'
@@ -248,7 +302,7 @@ paths:
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/admin/broadcasts/{id}/end:
+  /v1/seller/broadcasts/{id}/end:
     post:
       x-required-roles:
       - SELLER
@@ -260,7 +314,7 @@ paths:
         '
       operationId: endBroadcast
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       responses:
@@ -286,7 +340,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/products:
+  /v1/seller/broadcasts/{id}/products:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
     post:
@@ -300,7 +354,7 @@ paths:
         '
       operationId: linkBroadcastProduct
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       requestBody:
         required: true
         content:
@@ -346,9 +400,9 @@ paths:
         정상 조회에서 사라진 연결도 linkId/position 과 `missing: true` 로 식별할 수 있다.
 
         '
-      operationId: listAdminBroadcastProducts
+      operationId: listSellerBroadcastProducts
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -366,7 +420,7 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/admin/broadcasts/{id}/products/order:
+  /v1/seller/broadcasts/{id}/products/order:
     put:
       x-required-roles:
       - SELLER
@@ -378,7 +432,7 @@ paths:
         '
       operationId: reorderBroadcastProducts
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       requestBody:
@@ -416,7 +470,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{id}/products/{linkId}:
+  /v1/seller/broadcasts/{id}/products/{linkId}:
     delete:
       x-required-roles:
       - SELLER
@@ -428,7 +482,7 @@ paths:
         '
       operationId: unlinkBroadcastProduct
       tags:
-      - Admin Broadcast Product
+      - Seller Broadcast Product
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
       - name: linkId
@@ -483,6 +537,10 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Page'
       - $ref: '#/components/parameters/Size'
+      - name: status
+        in: query
+        description: 생략하면 기존 전체 순서. 지정하면 해당 상태 전체에서 페이지를 계산한다.
+        schema: { type: string, enum: [PREPARING, LIVE, ENDED] }
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -711,6 +769,59 @@ paths:
                   code: SERVICE_UNAVAILABLE
                   message: 작성자 정보를 확인할 수 없습니다.
                   requestId: 6f1c1f0e-1d2a-4a3b-9c8d-0e1f2a3b4c5d
+  /v1/broadcasts/{id}/viewers:
+    get:
+      tags: [Broadcast]
+      summary: 방송별 현재 시청 브라우저 수 조회
+      operationId: getBroadcastViewers
+      description: |
+        최근 60초 안에 heartbeat를 보낸 브라우저 UUID의 수다. 같은 브라우저 복수 탭은 하나로 집계한다.
+        비로그인도 포함하고 서로 다른 기기는 별도로 센다. 고유한 실제 사람 수나 영상 재생 수를 보장하지 않는다.
+        Redis 공유 집계이며 만료 정리 후 반환한다. 준비·종료 방송은 0, 미존재 방송은 404다.
+        조회만으로 시청자로 등록되지 않는다. 집계 장애를 0으로 숨기지 않고 503으로 응답한다.
+      security: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      responses:
+        '200':
+          description: 시청 규모 추정치
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ViewerTotalEnvelope'}
+        '400': {description: 잘못된 방송 ID}
+        '404': {description: 방송 없음}
+        '503': {description: 집계 일시 불가}
+  /v1/broadcasts/{id}/viewers/heartbeat:
+    post:
+      tags: [Broadcast]
+      summary: 방송 시청 브라우저 상태 갱신
+      operationId: heartbeatBroadcastViewer
+      description: |
+        공개 시청 화면에서 15초마다 브라우저에 보존한 UUID를 보낸다. 같은 UUID는 덮어쓰며 개인정보는 받지 않는다.
+        마지막 heartbeat 이후 60초가 지나면 집계에서 제외한다. 여러 서버가 같은 Redis 집계를 공유한다.
+        방송이 진행 중일 때만 갱신할 수 있으며 집계 장애는 503이다. 종료 요청 없이 TTL로 이탈을 반영한다.
+      security: []
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: integer, format: int64}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [viewerId]
+              properties:
+                viewerId: {type: string, format: uuid}
+      responses:
+        '200':
+          description: 갱신 후 시청 규모
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ViewerTotalEnvelope'}
+        '400': {description: 잘못된 ID 또는 UUID}
+        '404': {description: 방송 없음}
+        '409': {description: 진행 중이 아닌 방송}
+        '503': {description: 집계 일시 불가}
   /v1/broadcasts/{id}/likes:
     parameters:
     - $ref: '#/components/parameters/BroadcastId'
@@ -964,13 +1075,13 @@ paths:
           $ref: '#/components/responses/BroadcastNotLive'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/:
+  /v1/seller/broadcasts/:
     get:
-      operationId: missingAdminBroadcastIdOnGet
+      operationId: missingSellerBroadcastIdOnGet
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       x-required-roles:
       - SELLER
       responses:
@@ -983,11 +1094,11 @@ paths:
         '503':
           $ref: '#/components/responses/AuthUnavailable'
     patch:
-      operationId: missingAdminBroadcastIdOnPatch
+      operationId: missingSellerBroadcastIdOnPatch
       summary: 누락된 ID 요청 거절
       description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
       tags:
-      - Admin Broadcast
+      - Seller Broadcast
       x-required-roles:
       - SELLER
       responses:
@@ -1014,14 +1125,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions:
+  /v1/seller/broadcasts/{broadcastId}/promotions:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     post:
       x-required-roles:
       - SELLER
       summary: 방송 중 이벤트(프로모션) 생성
-      description: 'READY 상태로 저장한다. 라이브는 `attributes` 를 해석하지 않고 그대로 저장·전달한다.
+      description: 'READY 상태로 저장한다. COUPON_DROP은 attributes.couponPolicyId의 쿠폰 UUID를 검증하고 요청 판매자의 JWT로 Commerce에서 본인 쿠폰인지 확인한다. 발급 기간 전 준비도 허용한다. 다른 유형은 메타데이터를 저장·전달하며 TIME_DEAL의 자동 가격 변경은 실행하지 않는다.
 
         같은 `Idempotency-Key` 재요청은 fingerprint(type·title·attributes·durationSeconds)가
         같으면
@@ -1031,7 +1142,7 @@ paths:
         '
       operationId: createPromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -1044,8 +1155,7 @@ paths:
               type: COUPON_DROP
               title: 방송 한정 3,000원 할인
               attributes:
-                couponPolicyId: 7
-                claimLimit: 500
+                couponPolicyId: 55555555-5555-4555-8555-555555555555
               durationSeconds: 300
       responses:
         '401':
@@ -1077,7 +1187,7 @@ paths:
       description: 상태와 관계없이 해당 방송의 프로모션을 id 오름차순으로 반환한다. 방송이 없거나 프로모션이 없으면 빈 목록이다.
       operationId: listPromotions
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -1093,7 +1203,7 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/open:
+  /v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/open:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     - $ref: '#/components/parameters/PromotionId'
@@ -1103,12 +1213,12 @@ paths:
       summary: 프로모션 열기
       description: 'READY → OPEN 전이. LIVE 방송에서만 성공한다(그 외는 409). 이미 OPEN 이면 같은 응답을
 
-        돌려주고 멱등으로 성공한다. 닫혀 있던 프로모션을 다시 열면 409 다.
+        돌려주고 멱등으로 성공한다. COUPON_DROP의 READY 이벤트는 열기 전에 본인 쿠폰의 발급 기간·잔여 수량을 확인한다. 이미 OPEN인 재요청은 쿠폰 재검증 없이 기존 전이를 유지한다. 닫혀 있던 프로모션을 다시 열면 409 다.
 
         '
       operationId: openPromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
@@ -1131,7 +1241,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-  /v1/admin/broadcasts/{broadcastId}/promotions/{promotionId}/close:
+  /v1/seller/broadcasts/{broadcastId}/promotions/{promotionId}/close:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
     - $ref: '#/components/parameters/PromotionId'
@@ -1147,7 +1257,7 @@ paths:
         '
       operationId: closePromotion
       tags:
-      - Admin Promotion
+      - Seller Promotion
       responses:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
@@ -1164,6 +1274,37 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
+  /v1/broadcasts/{broadcastId}/promotions/{promotionId}/claims:
+    parameters:
+    - $ref: '#/components/parameters/PromotionBroadcastId'
+    - $ref: '#/components/parameters/PromotionId'
+    post:
+      operationId: claimPromotionCoupon
+      tags: [Public Promotion]
+      x-required-roles: [USER, SELLER]
+      summary: 방송 쿠폰 이벤트의 쿠폰 발급
+      description: >-
+        접수 시 방송 LIVE, 이벤트 OPEN, 이벤트 자동 종료 시각 이전, COUPON_DROP 유형과 쿠폰 UUID를 확인한다.
+        이후 동일 사용자 Bearer로 Commerce 쿠폰 발급을 호출한다. 쿠폰 기간·중복 발급·전체 발급 한도는 Commerce에서 원자적으로 처리한다.
+        라이브 상태 확인과 Commerce 발급은 분산 트랜잭션이 아니므로 확인 직후 방송·이벤트가 종료되어도 이미 접수된 발급이 완료될 수 있다.
+        동일 회원의 재발급 결과는 기존 쿠폰을 반환하되, 종료된 이벤트 경로에서는 다시 발급할 수 없다. 이미 받은 쿠폰은 내 쿠폰에서 조회한다.
+      responses:
+        '201':
+          description: 새 쿠폰 발급
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PromotionCouponClaimEnvelope'}
+        '200':
+          description: 동일 회원의 기존 발급 결과
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PromotionCouponClaimEnvelope'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: 방송·이벤트 종료 또는 쿠폰 기간·수량 정책 충돌}
+        '503': {$ref: '#/components/responses/AuthUnavailable'}
   /v1/broadcasts/{broadcastId}/promotions:
     parameters:
     - $ref: '#/components/parameters/PromotionBroadcastId'
@@ -1369,6 +1510,22 @@ components:
               message: 좋아요 저장소를 사용할 수 없습니다.
               requestId: request-001
   schemas:
+    ViewerTotal:
+      type: object
+      required: [broadcastId, total, measuredAt, expiresAfterSeconds]
+      properties:
+        broadcastId: {type: integer, format: int64}
+        total: {type: integer, format: int64, minimum: 0}
+        measuredAt: {type: string, format: date-time}
+        expiresAfterSeconds: {type: integer, const: 60}
+    ViewerTotalEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: '#/components/schemas/ViewerTotal'}
+        error: {type: 'null'}
+
     BroadcastStatus:
       type: string
       enum:
@@ -1435,6 +1592,19 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 업로드한 썸네일 UUID. 생략 시 기존 값 유지, 빈 문자열은 제거, 다른 판매자 썸네일은 403이다.
+
     BroadcastPatchInput:
       type: object
       description: '생략한 필드는 기존 값을 유지한다. 명시적 null 은 400 이다.
@@ -1458,7 +1628,20 @@ components:
           type: string
           minLength: 1
           maxLength: 2048
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 썸네일 UUID. 생략 또는 기존 ID 재전송은 유지하고 빈 문자열은 제거한다. 새로 연결·교체하는 ID만 현재 판매자 소유여야 하며 타인 이미지는 403이다.
       additionalProperties: false
+
     Broadcast:
       type: object
       description: 관리 응답. 운영자가 채널·시청 URL 일치를 확인해야 하므로 IVS 필드를 포함한다.
@@ -1508,6 +1691,22 @@ components:
         updatedAt:
           type: string
           format: date-time
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailId:
+          type: string
+          maxLength: 36
+          description: 업로드한 썸네일 UUID. 생략 시 기존 값 유지, 빈 문자열은 제거, 다른 판매자 썸네일은 403이다.
+        thumbnailUrl:
+          type: [string, 'null']
+          description: 공개 썸네일 주소. 기존 방송 또는 미등록은 null이다.
+
     PublicBroadcast:
       type: object
       description: 공개 응답. 채널 ARN·등록 키·fingerprint 를 포함하지 않는다.
@@ -1551,6 +1750,18 @@ components:
         createdAt:
           type: string
           format: date-time
+        hostName:
+          type: string
+          maxLength: 80
+          description: 판매자가 입력하는 공개 진행자 이름. 생략 시 기존 값 또는 빈 문자열이다.
+        description:
+          type: string
+          maxLength: 2000
+          description: 공개 방송 소개. 생략 시 기존 값 또는 빈 문자열이다.
+        thumbnailUrl:
+          type: [string, 'null']
+          description: 공개 썸네일 주소. 기존 방송 또는 미등록은 null이다.
+
     LinkProductInput:
       type: object
       required:
@@ -1986,16 +2197,33 @@ components:
       - EXPIRED
       - BROADCAST_ENDED
       - CANCELED
+    PromotionCouponClaimEnvelope:
+      type: object
+      required: [success, data, error]
+      properties:
+        success: {const: true}
+        data: {$ref: './commerce-service.yaml#/components/schemas/MemberCoupon'}
+        error: {type: 'null'}
     PromotionAttributes:
       type: object
-      description: '종류별 자유 JSON. 라이브는 해석하지 않고 저장·전달한다. 쿠폰 드롭 예:
-
-        `{"couponPolicyId": 7, "claimLimit": 500}`.
-
-        '
+      description: >-
+        COUPON_DROP은 couponPolicyId에 기존 쿠폰 UUID가 필요하다. 쿠폰 기간·발급 수량은 Commerce의 기존 정책을 사용한다.
+        claimLimit 등 임의 메타데이터는 별도 한도로 집행하지 않는다. 다른 종류의 메타데이터는 저장·전달만 한다.
       additionalProperties: true
     PromotionInput:
       type: object
+      allOf:
+      - if:
+          properties: {type: {const: COUPON_DROP}}
+          required: [type]
+        then:
+          required: [attributes]
+          properties:
+            attributes:
+              type: object
+              required: [couponPolicyId]
+              properties:
+                couponPolicyId: {type: string, format: uuid}
       required:
       - type
       - title

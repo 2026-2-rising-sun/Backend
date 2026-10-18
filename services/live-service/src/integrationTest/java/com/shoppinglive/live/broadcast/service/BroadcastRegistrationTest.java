@@ -141,8 +141,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", "http-key")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -162,8 +162,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isBadRequest());
@@ -179,8 +179,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", "invalid key!")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -197,8 +197,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", "k".repeat(129))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
@@ -215,8 +215,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
                                 .header("Idempotency-Key", "no-title")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(bodyNoTitle))
@@ -225,19 +225,19 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
 
     @DisplayName("관리 응답은 IVS 필드를 노출하되 비밀 필드는 숨긴다")
     @Test
-    void adminResponseExposesIvsFieldsForOperatorVerification() throws Exception {
+    void sellerResponseExposesIvsFieldsForOperatorVerification() throws Exception {
         // 관리 응답은 운영자가 채널/재생 URL 일치를 확인해야 하므로 IVS 필드를 포함한다.
         // 비밀 필드(requestKey/fingerprint)는 어떤 응답에도 넣지 않는다.
         final String body =
                 String.format(
                         """
-            {"title":"admin-arn","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
+            {"title":"seller-arn","scheduledAt":"%s","channelArn":"%s","playbackUrl":"%s"}
             """,
                         past, channelArn, playbackUrl);
         mvc.perform(
-                        post("/v1/admin/broadcasts")
-                                .header("Authorization", adminBearer())
-                                .header("Idempotency-Key", "admin-key")
+                        post("/v1/seller/broadcasts")
+                                .header("Authorization", sellerBearer())
+                                .header("Idempotency-Key", "seller-key")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(body))
                 .andExpect(status().isCreated())
@@ -313,8 +313,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
                         newTime, channelArn, playbackUrl);
 
         mvc.perform(
-                        patch("/v1/admin/broadcasts/{id}", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        patch("/v1/seller/broadcasts/{id}", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .param("version", String.valueOf(version))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(patchBody))
@@ -337,8 +337,8 @@ class BroadcastRegistrationTest extends LiveSecuritySupport {
                         past, channelArn, playbackUrl);
 
         mvc.perform(
-                        patch("/v1/admin/broadcasts/{id}", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        patch("/v1/seller/broadcasts/{id}", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(patchBody))
                 .andExpect(status().isBadRequest());

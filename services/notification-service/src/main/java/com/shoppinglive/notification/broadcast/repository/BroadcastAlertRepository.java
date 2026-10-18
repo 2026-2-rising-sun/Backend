@@ -1,5 +1,6 @@
 package com.shoppinglive.notification.broadcast.repository;
 
+import com.shoppinglive.notification.subscription.dto.AlertSubscription;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -68,6 +69,24 @@ public class BroadcastAlertRepository {
                 """,
                 Map.of("broadcastId", broadcastId),
                 String.class);
+    }
+
+    public List<AlertSubscription> list(String memberId, Long cursor, int limit) {
+        String sql =
+                "SELECT broadcast_id, created_at FROM broadcast_alert WHERE member_id = :memberId"
+                        + (cursor == null ? "" : " AND broadcast_id < :cursor")
+                        + " ORDER BY broadcast_id DESC LIMIT :limit";
+        var params = new java.util.HashMap<String, Object>();
+        params.put("memberId", memberId);
+        params.put("cursor", cursor);
+        params.put("limit", limit);
+        return jdbc.query(
+                sql,
+                params,
+                (rs, row) ->
+                        new AlertSubscription(
+                                rs.getLong("broadcast_id"),
+                                rs.getObject("created_at", OffsetDateTime.class).toInstant()));
     }
 
     public boolean exists(String memberId, long broadcastId) {

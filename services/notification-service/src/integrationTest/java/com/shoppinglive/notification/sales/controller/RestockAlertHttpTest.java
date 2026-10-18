@@ -2,6 +2,7 @@ package com.shoppinglive.notification.sales.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -30,6 +31,74 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 @DisplayName("재입고 알림 신청 실제 HTTP 계약")
 class RestockAlertHttpTest extends NotificationSecuritySupport {
+
+    @Test
+    @DisplayName("신청 상태와 목록은 토큰 본인 것만 보여주고 해제 후 사라진다")
+    void readsOnlyOwnSubscriptions() throws Exception {
+        register(SOLD_OUT_PRODUCT).andExpect(status().isCreated());
+        alerts.register(JwtTestTokens.MEMBER_B, 888);
+        mvc.perform(
+                        get("/v1/restock-alerts/{id}", SOLD_OUT_PRODUCT)
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscribed").value(true));
+        mvc.perform(get("/v1/restock-alerts/888").header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscribed").value(false));
+        mvc.perform(
+                        get("/v1/restock-alerts")
+                                .param("memberId", JwtTestTokens.MEMBER_B)
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].targetId").value(SOLD_OUT_PRODUCT));
+        mvc.perform(
+                        delete("/v1/restock-alerts/{id}", SOLD_OUT_PRODUCT)
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isNoContent());
+        mvc.perform(
+                        get("/v1/restock-alerts/{id}", SOLD_OUT_PRODUCT)
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscribed").value(false));
+    }
+
+    @Test
+    @DisplayName("대상 ID 커서로 중복 없이 페이지를 넘기고 잘못된 입력과 비로그인을 거절한다")
+    void paginatesAndValidatesQueries() throws Exception {
+        alerts.register(JwtTestTokens.MEMBER_A, 1);
+        alerts.register(JwtTestTokens.MEMBER_A, 2);
+        mvc.perform(
+                        get("/v1/restock-alerts")
+                                .param("size", "1")
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].targetId").value(2))
+                .andExpect(jsonPath("$.data.nextCursor").value("2"))
+                .andExpect(jsonPath("$.data.hasNext").value(true));
+        mvc.perform(
+                        get("/v1/restock-alerts")
+                                .param("size", "1")
+                                .param("cursor", "2")
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].targetId").value(1))
+                .andExpect(jsonPath("$.data.hasNext").value(false));
+        for (String cursor : new String[] {"bad", "0", "-1", "999999999999999999999999"}) {
+            mvc.perform(
+                            get("/v1/restock-alerts")
+                                    .param("cursor", cursor)
+                                    .header("Authorization", userBearer()))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(
+                        get("/v1/restock-alerts")
+                                .param("size", "0")
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/restock-alerts")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/restock-alerts/1")).andExpect(status().isUnauthorized());
+    }
 
     private static final long SOLD_OUT_PRODUCT = 501L;
     private static final long ON_SALE_PRODUCT = 502L;

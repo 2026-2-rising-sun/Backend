@@ -54,6 +54,13 @@ public class NotificationSecurityConfiguration {
                                         .requestMatchers(
                                                 HttpMethod.POST, "/v1/notifications/{id}/read")
                                         .hasAnyRole("USER", "SELLER")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/broadcast-alerts",
+                                                "/v1/broadcast-alerts/{id}",
+                                                "/v1/restock-alerts",
+                                                "/v1/restock-alerts/{id}")
+                                        .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(HttpMethod.POST, "/v1/broadcast-alerts")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(

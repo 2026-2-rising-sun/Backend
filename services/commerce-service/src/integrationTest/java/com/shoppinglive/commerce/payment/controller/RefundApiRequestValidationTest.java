@@ -1,5 +1,6 @@
 package com.shoppinglive.commerce.payment.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,6 +17,22 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class RefundApiRequestValidationTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
+
+    @Test
+    @DisplayName("환불 대상 조회는 인증이 없으면 거절한다")
+    void requiresAuthenticationForRefundableTargets() throws Exception {
+        mvc.perform(get("/v1/payment-groups/PG-missing/refundable-targets"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("환불 대상 조회는 본인 결제 묶음이 없으면 정보를 노출하지 않는다")
+    void hidesMissingOrUnownedRefundableTargets() throws Exception {
+        mvc.perform(
+                        get("/v1/payment-groups/PG-missing/refundable-targets")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isNotFound());
+    }
 
     @DisplayName("알 수 없는 환불 필드는 묶음 전체 요청으로 해석하지 않고 거절한다")
     @Test

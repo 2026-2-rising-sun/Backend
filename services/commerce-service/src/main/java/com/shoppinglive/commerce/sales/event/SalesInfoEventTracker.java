@@ -1,7 +1,7 @@
 package com.shoppinglive.commerce.sales.event;
 
 import com.shoppinglive.commerce.sales.exception.SalesNotFoundException;
-import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.common.outbox.EventOutbox;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -14,16 +14,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** 업무 트랜잭션 안에서 판매별 최종 스냅샷을 수집하고 커밋 후에만 발행한다. */
+/** 업무 변경과 판매별 최종 스냅샷의 Outbox 기록을 같은 트랜잭션에 저장한다. */
 @Component
 public class SalesInfoEventTracker {
     private final JdbcTemplate jdbc;
-    private final SalesInfoEventProducer producer;
+    private final EventOutbox outbox;
     @PersistenceContext private EntityManager entityManager;
 
-    public SalesInfoEventTracker(JdbcTemplate jdbc, SalesInfoEventProducer producer) {
+    public SalesInfoEventTracker(JdbcTemplate jdbc, EventOutbox outbox) {
         this.jdbc = jdbc;
-        this.producer = producer;
+        this.outbox = outbox;
     }
 
     /** 기존 구매 잠금 순서를 유지하도록 가격·상태·재고 변경 전에 호출한다. */
@@ -69,7 +69,7 @@ public class SalesInfoEventTracker {
     private SalesInfoSnapshot snapshot(long id) {
         return jdbc.queryForObject(
                 """
-            SELECT s.id,s.product_id,s.snapshot_version,s.price,s.status,t.available
+            SELECT s.id,s.product_id,s.snapshot_version,s.price,s.status,t.available,s.product_name_snapshot
             FROM sales_info s JOIN sales_stock t ON t.sales_info_id=s.id WHERE s.id=?
             """,
                 (rs, row) ->
@@ -80,13 +80,13 @@ public class SalesInfoEventTracker {
                                 rs.getLong(4),
                                 SalesInfoStatus.valueOf(rs.getString(5)),
                                 rs.getInt(6),
-                                "KRW"),
+                                "KRW",
+                                rs.getString(7)),
                 id);
     }
 
     private final class Pending implements TransactionSynchronization {
         private final Map<Long, SalesInfoSnapshot> before = new LinkedHashMap<>();
-        private final List<EventEnvelope<SalesInfoSnapshot>> events = new ArrayList<>();
 
         private SalesInfoEventTracker owner() {
             return SalesInfoEventTracker.this;
@@ -118,13 +118,10 @@ public class SalesInfoEventTracker {
                 }
                 Instant occurredAt = Instant.now();
                 for (SalesInfoEventType type : types)
-                    events.add(SalesInfoEventContract.create(type, occurredAt, current));
+                    outbox.append(
+                            SalesInfoEventContract.TOPIC_NAME,
+                            SalesInfoEventContract.create(type, occurredAt, current));
             }
-        }
-
-        @Override
-        public void afterCommit() {
-            events.forEach(producer::send);
         }
     }
 }

@@ -28,7 +28,7 @@ tags:
     description: 상품별 주문을 연결한 회원 본인 통합 결제
   - name: Cart
     description: Commerce 소유 장바구니
-  - name: Sales Admin
+  - name: Seller Sales
     description: SELLER 판매·재고 관리
   - name: Coupons
     description: 회원 쿠폰 수령·보유 조회
@@ -39,7 +39,7 @@ tags:
 paths:
   /v1/seller/coupons:
     get:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: listSellerCoupons
       summary: 본인 쿠폰 목록
       description: 본인 쿠폰만 조회한다. page × size가 2147483647을 초과하면 400이다.
@@ -72,7 +72,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
     post:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: createSellerCoupon
       summary: 판매자 정액 쿠폰 생성
       x-required-roles: [SELLER]
@@ -99,7 +99,7 @@ paths:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     get:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: getSellerCoupon
       summary: 본인 쿠폰 상세
       x-required-roles: [SELLER]
@@ -114,7 +114,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/AuthUnavailable' }
     patch:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: updateSellerCoupon
       summary: 발급 이벤트 시작 전 쿠폰 설정 수정
       x-required-roles: [SELLER]
@@ -660,6 +660,32 @@ paths:
         '404': {"$ref":"#/components/responses/NotFound"}
         '409': {"$ref":"#/components/responses/Conflict"}
         '503': {"$ref":"#/components/responses/AuthUnavailable"}
+  /v1/payment-groups/{number}/refundable-targets:
+    get:
+      tags: [Payment Groups]
+      operationId: listRefundableTargets
+      summary: 결제 묶음의 선택 환불 대상 조회
+      description: >-
+        commerce.refunds.api-enabled=true일 때만 제공한다. 본인 결제 묶음의 주문별 할인 반영 환불액과 선택 가능 여부를 반환한다.
+        cartItemId가 없는 직접 주문·레거시 주문 및 연결이 모호한 주문은 선택 환불에서 제외된다. 전체 환불 정책은 변경하지 않는다.
+        조회 결과는 예약이 아니므로 접수 시 소유권·168시간 기한·결제 상태·중복 대상을 다시 검증한다.
+      x-required-roles: [USER, SELLER]
+      parameters:
+        - {name: number, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: 주문별 환불 대상과 불가 이유
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success: {const: true}
+                  data: {type: array, items: {$ref: '#/components/schemas/RefundableTarget'}}
+                  error: {type: 'null'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: 본인 결제 묶음이 없거나 API가 비활성화됨}
   /v1/payment-groups/{number}/refunds:
     parameters: [{"$ref":"#/components/parameters/GroupNumber"}]
     post:
@@ -727,7 +753,7 @@ paths:
         '503': {"$ref":"#/components/responses/AuthUnavailable"}
   /v1/seller/refunds:
     get:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: listMySellerRefunds
       summary: 본인 대상 주문의 환불 상태 목록
       description: 혼합 판매자 요청에서 본인 대상 주문·실부담액만 반환한다. 결제 묶음 총액·다른 판매자 주문과 대상은 반환하지 않는다.
@@ -744,7 +770,7 @@ paths:
   /v1/seller/refunds/{id}:
     parameters: [{"$ref":"#/components/parameters/RefundId"}]
     get:
-      tags: [Sales Admin]
+      tags: [Seller Sales]
       operationId: getMySellerRefund
       summary: 본인 대상 주문의 환불 상세
       description: 요청의 판매자별 대상 금액과 주문만 반환하며 타 판매자 정보와 결제 묶음 총액은 숨긴다.
@@ -778,7 +804,7 @@ paths:
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
     post:
-      tags: ["Sales Admin"]
+      tags: ["Seller Sales"]
       summary: "판매·초기 재고 등록"
       operationId: "registerSales"
       description: "Shopping 상품 존재 확인 후 READY로 등록한다."
@@ -806,7 +832,7 @@ paths:
   /v1/sales/{id}/price:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     patch:
-      tags: ["Sales Admin"]
+      tags: ["Seller Sales"]
       summary: "판매가 변경"
       operationId: "changeSalesPrice"
       description: "클라이언트 version을 받지 않는다. 서버 트랜잭션 간 낙관적 충돌은 409."
@@ -835,7 +861,7 @@ paths:
   /v1/sales/{id}/stock:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     get:
-      tags: ["Sales Admin"]
+      tags: ["Seller Sales"]
       summary: "판매 재고 조회"
       operationId: "getSalesStock"
       x-required-roles: ["SELLER"]
@@ -854,7 +880,7 @@ paths:
         "503":
           $ref: "#/components/responses/AuthUnavailable"
     patch:
-      tags: ["Sales Admin"]
+      tags: ["Seller Sales"]
       summary: "판매 가능 재고 증감"
       operationId: "adjustSalesStock"
       requestBody:
@@ -882,7 +908,7 @@ paths:
   /v1/sales/{id}/status:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     patch:
-      tags: ["Sales Admin"]
+      tags: ["Seller Sales"]
       summary: "판매 상태 변경"
       operationId: "changeSalesStatus"
       requestBody:
@@ -1209,6 +1235,20 @@ components:
     RefundStatus:
       type: string
       enum: [PROCESSING, UNKNOWN, SUCCESS, FAILED]
+    RefundableTarget:
+      type: object
+      required: [orderId, cartItemId, productName, quantity, refundAmount, refundable, unavailableReason]
+      properties:
+        orderId: {type: integer, format: int64}
+        cartItemId: {type: [integer, 'null'], format: int64}
+        productName: {type: string}
+        quantity: {type: integer, minimum: 1}
+        refundAmount: {type: integer, format: int64, minimum: 0, description: 대상 주문 전체 수량의 할인 반영 금액}
+        refundable: {type: boolean}
+        unavailableReason:
+          type: [string, 'null']
+          enum: [null, PAYMENT_NOT_COMPLETED, REFUND_WINDOW_EXPIRED, ALREADY_REQUESTED, CART_ITEM_UNAVAILABLE, CART_ITEM_AMBIGUOUS]
+          description: 선택 가능하면 null. ALREADY_REQUESTED는 처리 중·결과 확인 중·완료 대상을 포함한다.
     RefundRequest:
       type: object
       additionalProperties: false

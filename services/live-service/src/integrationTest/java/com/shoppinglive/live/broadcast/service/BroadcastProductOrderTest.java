@@ -167,8 +167,8 @@ class BroadcastProductOrderTest extends LiveSecuritySupport {
         final Broadcast broadcast = register("order-http");
         final List<Long> ids = linkTwo(broadcast.getId());
         mvc.perform(
-                        put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        put("/v1/seller/broadcasts/{id}/products/order", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"linkIds\":["
@@ -181,8 +181,8 @@ class BroadcastProductOrderTest extends LiveSecuritySupport {
                                                 + "}"))
                 .andExpect(status().isOk());
         mvc.perform(
-                        put("/v1/admin/broadcasts/{id}/products/order", broadcast.getId())
-                                .header("Authorization", adminBearer())
+                        put("/v1/seller/broadcasts/{id}/products/order", broadcast.getId())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"linkIds\":[" + ids.get(0) + "," + ids.get(1) + "]}"))
                 .andExpect(status().isBadRequest());
@@ -210,9 +210,9 @@ class BroadcastProductOrderTest extends LiveSecuritySupport {
                     gate.await();
                     return mvc.perform(
                                     put(
-                                                    "/v1/admin/broadcasts/{id}/products/order",
+                                                    "/v1/seller/broadcasts/{id}/products/order",
                                                     broadcast.getId())
-                                            .header("Authorization", adminBearer())
+                                            .header("Authorization", sellerBearer())
                                             .contentType(MediaType.APPLICATION_JSON)
                                             .content(body))
                             .andReturn()

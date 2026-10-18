@@ -26,7 +26,7 @@ class DevApiAuthorizationTest extends ShoppingSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired ProductImageRepository images;
 
-    @DisplayName("개발 이미지 초기화는 local·test에서 활성화해도 삭제 전 관리자 인증을 요구한다")
+    @DisplayName("개발 이미지 초기화는 local·test에서 활성화해도 삭제 전 판매자 인증을 요구한다")
     @Test
     void enabledLocalTestResetStillRequiresSellerBeforeDeleting() throws Exception {
         images.saveAndFlush(

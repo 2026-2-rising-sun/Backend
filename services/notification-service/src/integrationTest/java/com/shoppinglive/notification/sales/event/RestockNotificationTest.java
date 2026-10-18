@@ -129,7 +129,7 @@ class RestockNotificationTest {
         RestockNotificationService failing = mock(RestockNotificationService.class);
         doThrow(new DataAccessResourceFailureException("db down"))
                 .when(failing)
-                .create(any(), anyLong(), any());
+                .create(any(), anyLong(), any(), any());
         SalesInfoEventListener failingListener =
                 new SalesInfoEventListener(new ProductSalesStatusRepository(jdbc), failing);
 
@@ -193,6 +193,18 @@ class RestockNotificationTest {
         listener.consume(record(snapshot(2, "ON_SALE")));
 
         assertThat(notifications()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("판매 이벤트의 상품 이름 사본을 재입고 알림 본문에 표시한다")
+    void includesProductNameWithoutRemoteLookup() {
+        listener.consume(record(snapshot(1, "SOLD_OUT")));
+        listener.consume(
+                record(
+                        snapshot(2, "ON_SALE")
+                                .replace(
+                                        "\"currency\"", "\"productName\":\"가을 니트\",\"currency\"")));
+        assertThat(notifications().getFirst().get("body")).isEqualTo("가을 니트 상품이 재입고되었습니다");
     }
 
     private List<Map<String, Object>> notifications() {

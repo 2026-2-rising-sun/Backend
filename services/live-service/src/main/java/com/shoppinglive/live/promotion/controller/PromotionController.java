@@ -5,6 +5,7 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.live.promotion.dto.PromotionInput;
 import com.shoppinglive.live.promotion.dto.PromotionResponse;
 import com.shoppinglive.live.promotion.entity.BroadcastPromotion;
+import com.shoppinglive.live.promotion.service.CouponPromotionService;
 import com.shoppinglive.live.promotion.service.PromotionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
@@ -20,13 +21,18 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/admin/broadcasts/{broadcastId}/promotions")
+@RequestMapping("/v1/seller/broadcasts/{broadcastId}/promotions")
 public class PromotionController {
 
     private final PromotionService service;
+    private final CouponPromotionService coupons;
     private final ObjectMapper objectMapper;
 
-    public PromotionController(final PromotionService service, final ObjectMapper objectMapper) {
+    public PromotionController(
+            final PromotionService service,
+            final ObjectMapper objectMapper,
+            CouponPromotionService coupons) {
+        this.coupons = coupons;
         this.service = service;
         this.objectMapper = objectMapper;
     }
@@ -38,8 +44,9 @@ public class PromotionController {
             @RequestHeader("Idempotency-Key")
                     @Size(min = 1, max = 128, message = "Idempotency-Key는 1~128자여야 합니다.")
                     final String key,
-            @Valid @RequestBody final PromotionInput input) {
-        final BroadcastPromotion promotion = service.create(broadcastId, key, input);
+            @Valid @RequestBody final PromotionInput input,
+            @RequestHeader("Authorization") String authorization) {
+        final BroadcastPromotion promotion = coupons.create(broadcastId, key, input, authorization);
         return ApiResponse.ok(PromotionResponse.from(promotion, objectMapper));
     }
 
@@ -54,8 +61,10 @@ public class PromotionController {
 
     @PostMapping("/{promotionId}/open")
     public ApiResponse<PromotionResponse> open(
-            @PathVariable final long broadcastId, @PathVariable final long promotionId) {
-        final BroadcastPromotion promotion = service.open(broadcastId, promotionId);
+            @PathVariable final long broadcastId,
+            @PathVariable final long promotionId,
+            @RequestHeader("Authorization") String authorization) {
+        final BroadcastPromotion promotion = coupons.open(broadcastId, promotionId, authorization);
         return ApiResponse.ok(PromotionResponse.from(promotion, objectMapper));
     }
 

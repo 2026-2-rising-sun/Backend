@@ -4,6 +4,7 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.notification.broadcast.repository.BroadcastAlertRepository;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
+import com.shoppinglive.notification.subscription.dto.AlertSubscriptionPage;
 import org.springframework.stereotype.Service;
 
 /** 방송 시작 알림 신청과 해제. */
@@ -17,6 +18,17 @@ public class BroadcastAlertService {
             BroadcastAlertRepository alerts, BroadcastScheduleRepository schedules) {
         this.alerts = alerts;
         this.schedules = schedules;
+    }
+
+    public boolean subscribed(String memberId, long targetId) {
+        return alerts.exists(memberId, targetId);
+    }
+
+    public AlertSubscriptionPage list(String memberId, String cursor, Integer size) {
+        int pageSize = AlertSubscriptionPage.pageSize(size);
+        return AlertSubscriptionPage.of(
+                alerts.list(memberId, AlertSubscriptionPage.cursor(cursor), pageSize + 1),
+                pageSize);
     }
 
     /**

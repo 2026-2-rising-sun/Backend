@@ -18,7 +18,8 @@ import java.time.Instant;
  *
  * @param occurredAt 알림 시각의 근거. 판매정보 payload 에는 시각이 없어서 봉투의 값을 쓴다
  */
-record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesStatus status) {
+record SalesInfoEventMessage(
+        String eventId, Instant occurredAt, ProductSalesStatus status, String productName) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -46,7 +47,16 @@ record SalesInfoEventMessage(String eventId, Instant occurredAt, ProductSalesSta
                         longAtLeast(payload, "productId", 1),
                         salesId,
                         longAtLeast(payload, "snapshotVersion", 1),
-                        statusOf(payload)));
+                        statusOf(payload)),
+                productName(payload));
+    }
+
+    /** 상품 이름은 선택 필드다. 없으면 빈 문자열이고, 문구에서 일반 표현으로 대체된다. */
+    private static String productName(JsonNode payload) {
+        JsonNode name = payload.get("productName");
+        if (name == null || name.isNull()) return "";
+        if (!name.isTextual() || name.textValue().length() > 255) throw invalid("상품 이름이 올바르지 않습니다");
+        return name.textValue();
     }
 
     /**

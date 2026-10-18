@@ -79,12 +79,13 @@ class SalesRegistrationServiceTest {
                                         .doInTransaction(new SimpleTransactionStatus()));
     }
 
-    /**
-     * 서비스는 {@link ShoppingClient#exists(Long)} 로 존재만 묻는다. {@code exists} 는 default 메서드지만 mock 은
-     * default 구현을 타지 않으므로 {@code findProduct} 가 아니라 이 쪽을 스텁해야 한다.
-     */
+    /** 등록 시 존재 여부와 알림에 쓸 상품 이름을 함께 확인한다. */
     private void productExists() {
-        given(shoppingClient.exists(PRODUCT_ID)).willReturn(true);
+        given(shoppingClient.findProduct(PRODUCT_ID))
+                .willReturn(
+                        java.util.Optional.of(
+                                new com.shoppinglive.commerce.client.shopping.ProductSnapshot(
+                                        PRODUCT_ID, "상품 이름", null)));
     }
 
     /**
@@ -123,7 +124,7 @@ class SalesRegistrationServiceTest {
         assertThat(stockCaptor.getValue().getReserved()).as("최초 등록 시 배정된 수량은 없다").isZero();
     }
 
-    /** 등록만으로 판매가 시작되면 안 된다. 관리자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
+    /** 등록만으로 판매가 시작되면 안 된다. 판매자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
     @DisplayName("판매 등록 직후 상태는 READY다")
     @Test
     void createsSaleInReadyStatus() {
@@ -159,7 +160,7 @@ class SalesRegistrationServiceTest {
     @Test
     void rejectsMissingProductWithoutPersistingSale() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
-        given(shoppingClient.exists(PRODUCT_ID)).willReturn(false);
+        given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(java.util.Optional.empty());
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
                 .isInstanceOf(ProductNotFoundException.class);
@@ -176,7 +177,7 @@ class SalesRegistrationServiceTest {
     @Test
     void propagatesShoppingOutageWithoutAssumingProductIsMissing() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
-        given(shoppingClient.exists(PRODUCT_ID))
+        given(shoppingClient.findProduct(PRODUCT_ID))
                 .willThrow(new ShoppingUnavailableException("shopping timeout"));
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
@@ -198,7 +199,7 @@ class SalesRegistrationServiceTest {
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.CONFLICT);
 
-        verify(shoppingClient, never()).exists(any());
+        verify(shoppingClient, never()).findProduct(any());
         verify(salesRepository, never()).saveAndFlush(any());
     }
 
@@ -260,6 +261,6 @@ class SalesRegistrationServiceTest {
                 .isInstanceOf(BusinessException.class);
 
         verify(salesRepository, never()).existsByProductId(any());
-        verify(shoppingClient, never()).exists(any());
+        verify(shoppingClient, never()).findProduct(any());
     }
 }

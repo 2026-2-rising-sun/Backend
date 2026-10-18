@@ -19,7 +19,11 @@ public record BroadcastResponse(
         Instant endedAt,
         long version,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        String hostName,
+        String description,
+        String thumbnailId,
+        String thumbnailUrl) {
     public static BroadcastResponse from(final Broadcast broadcast) {
         return new BroadcastResponse(
                 broadcast.getId(),
@@ -32,6 +36,10 @@ public record BroadcastResponse(
                 broadcast.getEndedAt(),
                 broadcast.getVersion(),
                 broadcast.getCreatedAt(),
-                broadcast.getUpdatedAt());
+                broadcast.getUpdatedAt(),
+                broadcast.getHostName(),
+                broadcast.getDescription(),
+                broadcast.getThumbnailId(),
+                broadcast.getThumbnailUrl());
     }
 }

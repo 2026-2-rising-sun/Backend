@@ -136,7 +136,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk());
     }
 
-    @DisplayName("모든 관리자 메서드는 부수 효과 전에 익명·일반 사용자를 거절한다")
+    @DisplayName("모든 판매자 메서드는 부수 효과 전에 익명·일반 사용자를 거절한다")
     @Test
     void allSellerMethodsDenyAnonymousAndUserBeforeSideEffects() throws Exception {
         for (String route :
@@ -162,7 +162,7 @@ class ShoppingAuthorizationTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk());
     }
 
-    @DisplayName("잘못된 토큰이나 클레임 헤더로 관리자 권한을 얻을 수 없다")
+    @DisplayName("잘못된 토큰이나 클레임 헤더로 판매자 권한을 얻을 수 없다")
     @Test
     void invalidTokensAndClaimHeadersCannotCreateSeller() throws Exception {
         var claims = TOKENS.claims(JwtTestTokens.SELLER, Set.of("SELLER"));

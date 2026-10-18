@@ -52,7 +52,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
                 .andExpect(jsonPath("$.data[0].refundAmount").value(25000))
                 .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0));
 
-        mvc.perform(get("/v1/seller/refunds").header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/refunds").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].refundAmount").value(20000))
                 .andExpect(jsonPath("$.data[0].cumulativeRefundAmount").value(0))
@@ -108,7 +108,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
                         get("/v1/payment-groups/{number}/refunds/{id}", group.groupNumber(), id)
                                 .header("Authorization", bearer(MEMBER_B)))
                 .andExpect(status().isNotFound());
-        mvc.perform(get("/v1/seller/refunds/{id}", id).header("Authorization", adminBearer()))
+        mvc.perform(get("/v1/seller/refunds/{id}", id).header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.refundAmount").value(20000))
                 .andExpect(jsonPath("$.data.targets.length()").value(1))

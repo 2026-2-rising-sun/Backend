@@ -37,6 +37,37 @@ public class Broadcast extends BaseEntity {
     @Column(nullable = false, length = 16)
     private BroadcastStatus status = BroadcastStatus.PREPARING;
 
+    @Column(nullable = false, length = 80)
+    private String hostName = "";
+
+    @Column(nullable = false, length = 2000)
+    private String description = "";
+
+    @Column(length = 36)
+    private String thumbnailId;
+
+    public void metadata(String hostName, String description, String thumbnailId) {
+        this.hostName = hostName == null ? "" : hostName.trim();
+        this.description = description == null ? "" : description;
+        this.thumbnailId = thumbnailId == null || thumbnailId.isEmpty() ? null : thumbnailId;
+    }
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getThumbnailId() {
+        return thumbnailId;
+    }
+
+    public String getThumbnailUrl() {
+        return thumbnailId == null ? null : "/api/live/v1/broadcast-thumbnails/" + thumbnailId;
+    }
+
     private Instant startedAt;
     private Instant endedAt;
 

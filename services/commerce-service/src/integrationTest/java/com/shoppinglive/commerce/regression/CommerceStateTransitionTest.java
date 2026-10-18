@@ -139,7 +139,7 @@ class CommerceStateTransitionTest
         assertThat(create().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
-    @DisplayName("재고를 복구해도 관리자가 지정한 비공개 상태를 유지한다")
+    @DisplayName("재고를 복구해도 판매자가 지정한 비공개 상태를 유지한다")
     @ParameterizedTest
     @ValueSource(strings = {"cancel", "expire", "fail"})
     void preservesPrivateStatusWhenRestoringStock(String path) {
@@ -203,7 +203,7 @@ class CommerceStateTransitionTest
         var result =
                 mvc.perform(
                         patch("/v1/sales/{id}/status", salesId)
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"status\":\"ON_SALE\"}"));
         if (current == SalesStatus.READY || current == SalesStatus.ON_SALE) {
@@ -215,7 +215,7 @@ class CommerceStateTransitionTest
         }
     }
 
-    @DisplayName("관리자가 재고를 보충하면 품절만 해제하고 다른 상태는 유지한다")
+    @DisplayName("판매자가 재고를 보충하면 품절만 해제하고 다른 상태는 유지한다")
     @Test
     void reopensOnlySoldOutSalesAfterStockReplenishment() {
         create();
@@ -233,7 +233,7 @@ class CommerceStateTransitionTest
     void mapsBusinessRejectionsTo400404Or409InsteadOf500() throws Exception {
         mvc.perform(
                         patch("/v1/sales/{id}/status", salesId)
-                                .header("Authorization", adminBearer())
+                                .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"status\":\"SOLD_OUT\"}"))
                 .andExpect(status().isBadRequest());

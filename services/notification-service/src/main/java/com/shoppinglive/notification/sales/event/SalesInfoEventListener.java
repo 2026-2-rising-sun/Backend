@@ -45,7 +45,10 @@ public class SalesInfoEventListener {
         Optional<ProductSalesStatus> stored = statuses.findByProductId(incoming.productId());
         if (stored.isPresent() && isRestocked(stored.get(), incoming)) {
             restockNotifications.create(
-                    message.eventId(), incoming.productId(), message.occurredAt());
+                    message.eventId(),
+                    incoming.productId(),
+                    message.occurredAt(),
+                    message.productName());
         }
         statuses.apply(incoming);
     }

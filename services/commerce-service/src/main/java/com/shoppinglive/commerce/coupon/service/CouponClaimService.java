@@ -104,7 +104,9 @@ public class CouponClaimService {
                                 couponId);
                         events.publish(Type.CouponSoldOut, couponId);
                     }
-                    return new Claim(owned(member, couponId).getFirst(), true);
+                    var claimed = owned(member, couponId).getFirst();
+                    events.issued(member, claimed);
+                    return new Claim(claimed, true);
                 });
     }
 

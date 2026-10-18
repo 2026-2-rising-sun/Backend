@@ -75,8 +75,8 @@ class PublicViewingTest extends LiveSecuritySupport {
     void endedBroadcastOffersNoPlaybackEvenThoughTheChannelIsReused() throws Exception {
         final Broadcast broadcast = live("viewing-ended");
         mvc.perform(
-                        post("/v1/admin/broadcasts/{id}/end", broadcast.getId())
-                                .header("Authorization", adminBearer()))
+                        post("/v1/seller/broadcasts/{id}/end", broadcast.getId())
+                                .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk());
         mvc.perform(get("/v1/broadcasts/{id}", broadcast.getId()))
                 .andExpect(status().isOk())

@@ -89,6 +89,12 @@ public class RefundController {
                 ErrorCode.INVALID_REQUEST, "환불 요청 본문에는 비어 있지 않은 cartItemIds 배열이 필요합니다.");
     }
 
+    @GetMapping("/v1/payment-groups/{number}/refundable-targets")
+    public ApiResponse<List<RefundIntakeService.RefundableTarget>> refundableTargets(
+            @AuthenticationPrincipal AuthenticatedUser member, @PathVariable String number) {
+        return ApiResponse.ok(refunds.refundableTargets(member.memberId(), number));
+    }
+
     @GetMapping("/v1/payment-groups/{number}/refunds")
     public ApiResponse<List<RefundView>> list(
             @AuthenticationPrincipal AuthenticatedUser member, @PathVariable String number) {

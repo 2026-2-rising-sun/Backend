@@ -122,8 +122,8 @@ class ChatWriteTest extends LiveSecuritySupport {
 
     @DisplayName("SELLER 역할도 채팅을 쓸 수 있다")
     @Test
-    void adminMayWrite() throws Exception {
-        write(broadcast("write-admin", "LIVE"), adminBearer(), "공지입니다")
+    void sellerMayWrite() throws Exception {
+        write(broadcast("write-seller", "LIVE"), sellerBearer(), "공지입니다")
                 .andExpect(status().isCreated());
     }
 

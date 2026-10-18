@@ -6,6 +6,7 @@ import com.shoppinglive.notification.sales.entity.ProductSalesStatus;
 import com.shoppinglive.notification.sales.event.SalesInfoEventContract;
 import com.shoppinglive.notification.sales.repository.ProductSalesStatusRepository;
 import com.shoppinglive.notification.sales.repository.RestockAlertRepository;
+import com.shoppinglive.notification.subscription.dto.AlertSubscriptionPage;
 import org.springframework.stereotype.Service;
 
 /** 재입고 알림 신청과 해제. */
@@ -19,6 +20,17 @@ public class RestockAlertService {
             RestockAlertRepository alerts, ProductSalesStatusRepository statuses) {
         this.alerts = alerts;
         this.statuses = statuses;
+    }
+
+    public boolean subscribed(String memberId, long targetId) {
+        return alerts.exists(memberId, targetId);
+    }
+
+    public AlertSubscriptionPage list(String memberId, String cursor, Integer size) {
+        int pageSize = AlertSubscriptionPage.pageSize(size);
+        return AlertSubscriptionPage.of(
+                alerts.list(memberId, AlertSubscriptionPage.cursor(cursor), pageSize + 1),
+                pageSize);
     }
 
     /**

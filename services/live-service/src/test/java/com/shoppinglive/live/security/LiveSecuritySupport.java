@@ -41,7 +41,7 @@ public abstract class LiveSecuritySupport {
         properties.add("shoppinglive.security.jwt.public-key-set-location", () -> KEY_FILE);
     }
 
-    public static String adminBearer() {
+    public static String sellerBearer() {
         return "Bearer " + TOKENS.token(JwtTestTokens.SELLER, Set.of("SELLER"));
     }
 

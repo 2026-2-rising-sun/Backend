@@ -95,7 +95,33 @@ public class OutboxConfiguration {
             final OutboxMessageRepository repository,
             final KafkaTemplate<String, String> outboxKafkaTemplate,
             final OutboxProperties properties,
-            java.util.concurrent.ThreadPoolExecutor outboxFastPathExecutor) {
-        return new OutboxRelay(repository, outboxKafkaTemplate, properties, outboxFastPathExecutor);
+            java.util.concurrent.ThreadPoolExecutor outboxFastPathExecutor,
+            org.springframework.beans.factory.ObjectProvider<OutboxLeaseStore> leases) {
+        return new OutboxRelay(
+                repository,
+                outboxKafkaTemplate,
+                properties,
+                outboxFastPathExecutor,
+                leases.getIfAvailable());
+    }
+
+    @Bean
+    @ConditionalOnProperty(
+            prefix = "shoppinglive.outbox.relay.claim",
+            name = "enabled",
+            havingValue = "true")
+    public OutboxLeaseStore outboxLeaseStore(
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
+            org.springframework.transaction.PlatformTransactionManager transactions,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${shoppinglive.outbox.relay.claim.lease:30s}")
+                    java.time.Duration lease,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${shoppinglive.outbox.relay.claim.retry:1s}")
+                    java.time.Duration retry,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${shoppinglive.outbox.relay.claim.max-retry:1m}")
+                    java.time.Duration maxRetry) {
+        return new OutboxLeaseStore(jdbc, transactions, lease, retry, maxRetry);
     }
 }
