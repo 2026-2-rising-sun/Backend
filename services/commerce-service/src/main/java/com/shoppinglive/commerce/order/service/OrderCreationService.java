@@ -25,8 +25,10 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -204,14 +206,18 @@ public class OrderCreationService {
             try {
                 return persist(command, product.name(), idempotencyKey);
             } catch (DataIntegrityViolationException e) {
-                // 멱등키 충돌이면 같은 키로 이미 만들어진 주문이 있다는 뜻이다. 동시에 들어온
-                // 두 재전송 중 진 쪽이 여기로 온다.
-                Optional<Order> concurrent =
-                        findByIdempotencyKey(command.memberId(), idempotencyKey);
-                if (concurrent.isPresent()) {
-                    return replayMatching(command, concurrent.get());
+                if (violatesUniqueConstraint(e, "uk_orders_member_idempotency")) {
+                    // 실패한 트랜잭션이 종료된 뒤 다른 요청이 커밋한 주문을 조회한다.
+                    Optional<Order> concurrent =
+                            findByIdempotencyKey(command.memberId(), idempotencyKey);
+                    if (concurrent.isPresent()) {
+                        return replayMatching(command, concurrent.get());
+                    }
+                    throw e;
                 }
-                // 아니면 주문번호 난수가 겹친 것이므로 새 번호로 다시 시도한다.
+                if (!violatesUniqueConstraint(e, "uk_orders_order_number")) {
+                    throw e;
+                }
                 log.warn(
                         "order number collision, retrying (attempt {}/{})",
                         attempt,
@@ -220,6 +226,27 @@ public class OrderCreationService {
         }
 
         throw new BusinessException(ErrorCode.INTERNAL_ERROR, "주문번호를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    private boolean violatesUniqueConstraint(Throwable failure, String expectedName) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (!(cause instanceof ConstraintViolationException violation)
+                    || !"23505".equals(violation.getSQLState())
+                    || violation.getConstraintName() == null) {
+                continue;
+            }
+            String name = violation.getConstraintName().replace("\"", "");
+            name = name.substring(name.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+            if (name.equals(expectedName)) {
+                return true;
+            }
+            // H2는 명명된 UNIQUE 제약 대신 자동 생성한 인덱스 이름을 보고한다.
+            if (violation.getSQLException().getClass().getName().startsWith("org.h2.")
+                    && name.matches(expectedName + "_index_[0-9a-f]+(?:_[0-9]+)?")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
