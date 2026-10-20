@@ -66,6 +66,26 @@ public class NotificationWriteRepository {
         return Arrays.stream(jdbc.batchUpdate(INSERT_IF_ABSENT, batch)).sum();
     }
 
+    /**
+     * 저장한 지 오래된 알림을 지운다. 한 번에 지우는 양에 상한을 둔다.
+     *
+     * <p><b>기준은 저장한 시각(created_at)이고 일어난 시각(occurred_at)이 아니다.</b> 이벤트가 늦게 도착하면 일어난 시각이 과거일 수 있어서,
+     * 그 기준으로 지우면 방금 만든 알림이 바로 지워진다.
+     *
+     * @return 지운 알림 수. 상한에 닿았으면 아직 남은 것이 있다는 뜻이다
+     */
+    public int deleteCreatedBefore(Instant before, int limit) {
+        return jdbc.update(
+                """
+                DELETE FROM notification
+                WHERE id IN (
+                    SELECT id FROM notification WHERE created_at < :before LIMIT :limit)
+                """,
+                new MapSqlParameterSource()
+                        .addValue("before", OffsetDateTime.ofInstant(before, ZoneOffset.UTC))
+                        .addValue("limit", limit));
+    }
+
     private static SqlParameterSource params(
             NewNotification notification, String memberId, OffsetDateTime now) {
         return new MapSqlParameterSource()
