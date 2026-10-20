@@ -26,13 +26,15 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "orders",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_orders_member_idempotency",
-                        columnNames = {"member_id", "idempotency_key"}))
+        uniqueConstraints = {
+            @UniqueConstraint(name = "uk_orders_order_number", columnNames = "order_number"),
+            @UniqueConstraint(
+                    name = "uk_orders_member_idempotency",
+                    columnNames = {"member_id", "idempotency_key"})
+        })
 public class Order extends BaseEntity {
 
-    @Column(name = "order_number", nullable = false, unique = true, updatable = false, length = 64)
+    @Column(name = "order_number", nullable = false, updatable = false, length = 64)
     private String orderNumber;
 
     @Column(name = "sales_info_id", nullable = false, updatable = false)

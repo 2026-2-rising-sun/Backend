@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.shoppinglive.commerce.client.shopping.ProductNotFoundException;
@@ -30,13 +31,18 @@ import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -365,7 +371,7 @@ class OrderCreationServiceTest {
                 .willReturn(Optional.empty())
                 .willReturn(Optional.of(existing));
         given(transactionTemplate.execute(any()))
-                .willThrow(new DataIntegrityViolationException("uk_orders_idempotency_key"));
+                .willThrow(integrityViolation("23505", "uk_orders_member_idempotency"));
 
         OrderCreationResult result = orderCreationService.create(command(2, null), "key-1");
 
@@ -388,17 +394,125 @@ class OrderCreationServiceTest {
     }
 
     /** 주문번호는 난수라 같은 날 겹칠 수 있다. 유일성은 DB 제약이 보장하고, 서비스는 새 번호로 다시 시도한다. */
-    @Test
+    @ParameterizedTest
+    @ValueSource(strings = {"uk_orders_order_number", "\"public\".\"UK_ORDERS_ORDER_NUMBER\""})
     @DisplayName("주문번호가 충돌하면 새 번호로 재시도한다")
-    void retriesWithNewNumberAfterOrderNumberCollision() {
+    void retriesWithNewNumberAfterOrderNumberCollision(String constraint) {
         productExists();
         given(transactionTemplate.execute(any()))
-                .willThrow(new DataIntegrityViolationException("uk_orders_order_number"))
+                .willThrow(integrityViolation("23505", constraint))
                 .willAnswer(invocation -> new OrderCreationResult(existingOrder(), true));
 
         OrderCreationResult result = orderCreationService.create(command(1, null), null);
 
         assertThat(result.created()).isTrue();
+    }
+
+    @Test
+    @DisplayName("주문번호 충돌이 세 번 발생하면 발급 실패를 반환한다")
+    void stopsAfterThreeOrderNumberCollisions() {
+        productExists();
+        given(transactionTemplate.execute(any()))
+                .willThrow(integrityViolation("23505", "uk_orders_order_number"));
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.INTERNAL_ERROR);
+        verify(transactionTemplate, times(3)).execute(any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "23505, uk_other_unique",
+        "23503, fk_orders_sales_info",
+        "23502, uk_orders_order_number",
+        "23514, ck_orders_quantity_positive",
+        "23505, uk_orders_order_number_extra",
+        "23505, PUBLIC.UK_ORDERS_ORDER_NUMBER_INDEX_8"
+    })
+    @DisplayName("알 수 없는 제약과 유니크 이외 오류는 재시도 없이 원래 예외를 전파한다")
+    void propagatesOtherIntegrityViolations(String state, String constraint) {
+        productExists();
+        DataIntegrityViolationException failure = integrityViolation(state, constraint);
+        given(transactionTemplate.execute(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
+                .isSameAs(failure);
+        verify(transactionTemplate).execute(any());
+    }
+
+    @Test
+    @DisplayName("다른 무결성 오류가 발생하면 기존 주문을 재조회해 오류를 감추지 않는다")
+    void doesNotReplayOrderAfterUnrelatedIntegrityViolation() {
+        productExists();
+        var failure = integrityViolation("23503", "fk_orders_sales_info");
+        given(transactionTemplate.execute(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), "key-1"))
+                .isSameAs(failure);
+        verify(orderRepository).findByMemberIdAndIdempotencyKey(anyString(), eq("key-1"));
+        verify(transactionTemplate).execute(any());
+    }
+
+    @Test
+    @DisplayName("제약 이름을 메시지에만 담은 오류는 원래 예외를 전파한다")
+    void doesNotClassifyTopLevelMessageAsConstraint() {
+        productExists();
+        var failure = new DataIntegrityViolationException("uk_orders_order_number");
+        given(transactionTemplate.execute(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
+                .isSameAs(failure);
+        verify(transactionTemplate).execute(any());
+    }
+
+    @Test
+    @DisplayName("멱등키 충돌 후 기존 주문이 없으면 원래 예외를 전파한다")
+    void propagatesIdempotencyConflictWhenOrderCannotBeFound() {
+        productExists();
+        var failure = integrityViolation("23505", "uk_orders_member_idempotency");
+        given(transactionTemplate.execute(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), "missing"))
+                .isSameAs(failure);
+        verify(transactionTemplate).execute(any());
+    }
+
+    @Test
+    @DisplayName("멱등키 충돌 후 기존 주문의 입력이 다르면 충돌을 반환한다")
+    void rejectsDifferentInputAfterIdempotencyConflict() {
+        productExists();
+        given(orderRepository.findByMemberIdAndIdempotencyKey(anyString(), eq("key-1")))
+                .willReturn(Optional.empty(), Optional.of(existingOrder()));
+        given(salesRepository.findById(SALES_ID))
+                .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(transactionTemplate.execute(any()))
+                .willThrow(integrityViolation("23505", "uk_orders_member_idempotency"));
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), "key-1"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.CONFLICT);
+        verify(transactionTemplate).execute(any());
+    }
+
+    @Test
+    @DisplayName("유니크 오류에 제약 이름이 없으면 원래 예외를 전파한다")
+    void propagatesUniqueViolationWithoutConstraintName() {
+        productExists();
+        var failure = integrityViolation("23505", null);
+        given(transactionTemplate.execute(any())).willThrow(failure);
+
+        assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
+                .isSameAs(failure);
+    }
+
+    private DataIntegrityViolationException integrityViolation(String state, String constraint) {
+        return new DataIntegrityViolationException(
+                "무결성 위반",
+                new ConstraintViolationException(
+                        "DB 제약 위반", new SQLException("DB 오류", state), constraint));
     }
 
     // ----- 입력 검증 -----
