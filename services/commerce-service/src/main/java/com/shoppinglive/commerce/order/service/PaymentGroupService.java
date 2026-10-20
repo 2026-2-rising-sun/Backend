@@ -29,15 +29,29 @@ import com.shoppinglive.commerce.sales.entity.SalesStock;
 import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commerce.support.AfterCommit;
-import com.shoppinglive.common.core.*;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.security.MessageDigest;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.*;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PaymentGroupService {
@@ -94,7 +108,7 @@ public class PaymentGroupService {
     private final CouponReservationService couponReservations;
     private final ObjectMapper mapper;
     private final OrderNumberGenerator numbers;
-    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+    @PersistenceContext private EntityManager entityManager;
     private final PaymentGroupEventPublisher notificationEvents;
     private final Duration expiration;
 
