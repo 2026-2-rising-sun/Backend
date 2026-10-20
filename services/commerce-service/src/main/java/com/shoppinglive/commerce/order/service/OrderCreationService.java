@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.order.service;
 import com.shoppinglive.commerce.client.shopping.ProductNotFoundException;
 import com.shoppinglive.commerce.client.shopping.ProductSnapshot;
 import com.shoppinglive.commerce.client.shopping.ShoppingClient;
+import com.shoppinglive.commerce.coupon.service.CouponPreviewService;
 import com.shoppinglive.commerce.order.dto.CartOrderCommand;
 import com.shoppinglive.commerce.order.dto.CreateOrderCommand;
 import com.shoppinglive.commerce.order.dto.OrderCreationResult;
@@ -23,8 +24,11 @@ import com.shoppinglive.commerce.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commerce.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -72,10 +76,10 @@ public class OrderCreationService {
     private final OrderNumberGenerator orderNumberGenerator;
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
-    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
+    @PersistenceContext private EntityManager entityManager;
     private final Duration expiration;
-    private final com.shoppinglive.commerce.order.service.PurchaseGuard purchaseGuard;
-    private final com.shoppinglive.commerce.order.service.PaymentGroupService paymentGroups;
+    private final PurchaseGuard purchaseGuard;
+    private final PaymentGroupService paymentGroups;
 
     public OrderCreationService(
             OrderJpaRepository orderRepository,
@@ -85,8 +89,8 @@ public class OrderCreationService {
             OrderNumberGenerator orderNumberGenerator,
             CartItemRepository cartItems,
             TransactionTemplate transactionTemplate,
-            com.shoppinglive.commerce.order.service.PurchaseGuard purchaseGuard,
-            com.shoppinglive.commerce.order.service.PaymentGroupService paymentGroups,
+            PurchaseGuard purchaseGuard,
+            PaymentGroupService paymentGroups,
             // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
             // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
             @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration) {
@@ -279,9 +283,8 @@ public class OrderCreationService {
                     command.verifyExpectedAmount(totalAmount);
                     var coupon =
                             command.couponId() == null
-                                    ? new com.shoppinglive.commerce.coupon.service
-                                            .CouponPreviewService.Preview(
-                                            null, 0L, totalAmount, java.util.Map.of())
+                                    ? new CouponPreviewService.Preview(
+                                            null, 0L, totalAmount, Map.of())
                                     : paymentGroups.previewSingle(
                                             command.memberId(),
                                             command.couponId(),
