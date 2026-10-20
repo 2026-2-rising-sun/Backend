@@ -47,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <pre>
  *   (밖) 입력 검증 → 멱등키로 기존 주문 조회 → Shopping 에서 상품명 확인
- *   (안) 판매정보 조회 → 상태·금액 검증 → 재고 배정 → 주문 INSERT → 품절 전이
+ *   (안) 판매정보 조회 → 상태·금액 검증 → 주문 INSERT → 재고 예약 → 품절 전이
  * </pre>
  *
  * Shopping 호출을 트랜잭션 밖에 두는 이유는 timeout 동안 DB 커넥션을 잡고 있지 않기 위함이다. 반대로 가격·재고 검증은 배정과 같은 트랜잭션 안에 있어야
@@ -291,11 +291,8 @@ public class OrderCreationService {
                                             command.productId(),
                                             totalAmount);
 
-                    // 재고 배정보다 주문 INSERT 를 먼저 한다. Postgres 는 미커밋 중복 INSERT 에서
-                    // 뒤따르는 트랜잭션을 대기시키므로, 같은 멱등키의 동시 요청이 재고에 손대기 전에
-                    // uk_orders_idempotency_key 에서 걸린다. 다만 H2 는 커밋 시점에야 위반을 알려
-                    // 이 순서만으로는 부족하다 — 엔진과 무관한 보장은 lockFor(String) 가 맡는다.
-                    // 어느 쪽이든 실패하면 트랜잭션 전체가 롤백되므로 결과는 같다.
+                    // 재고 예약 전에 INSERT 하여 중복 요청을 uk_orders_member_idempotency 로 차단한다.
+                    // 같은 JVM 의 요청은 lockFor(String) 로 직렬화한다. 실패하면 INSERT 와 예약이 함께 롤백된다.
                     Order order =
                             new Order(
                                     orderNumberGenerator.generate(),
@@ -401,12 +398,12 @@ public class OrderCreationService {
      * 주문은 UNIQUE 제약 덕에 한 건만 남지만, 진 요청들이 재고를 점유했다 되돌리는 사이 다른 구매자에게 "품절" 이 보이고, 연타한 본인도 자기 주문 대신 오류를
      * 받는다. 실제로 그렇게 동작하다 동시성 테스트에서 잡혔다.
      *
-     * <p><b>왜 DB 제약만으로는 부족한가:</b> Postgres 는 미커밋 중복 INSERT 에서 뒤따르는 트랜잭션을 대기시키지만, 통합 테스트가 쓰는 H2 는 커밋
-     * 시점에야 위반을 알린다. 엔진에 기대지 않고 같은 결과를 보장하려면 이 층이 있어야 한다.
+     * <p><b>DB 제약과의 역할:</b> 유니크 제약은 중복 저장을 막고, 이 잠금은 같은 JVM 의 요청을 기존 주문 조회부터 직렬화한다. DB 엔진의 충돌 처리
+     * 시점에 기대지 않고 동일 요청의 중복 실행을 줄인다.
      *
      * <p><b>한계:</b> 프로세스 안에서만 유효하다. 인스턴스를 여러 개 띄우면 인스턴스 간 동시 재전송은 다시 DB 제약에 기대게 되고, 진 쪽은 기존 주문 대신
      * 409 를 받을 수 있다. 동시 요청의 멱등 처리는 DB 제약과 기존 주문 재조회로 확인한다. 어떤 경우에도 <b>주문이 두 건 생기지는 않는다</b> — {@code
-     * uk_orders_idempotency_key} 가 최종 방어선이다.
+     * uk_orders_member_idempotency} 가 최종 방어선이다.
      *
      * <p>스트라이프 방식이라 서로 다른 키가 같은 잠금을 공유할 수 있다. 잠깐 줄을 설 뿐 정확성에 영향은 없고, 키마다 잠금 객체를 만들고 지우는 번거로움을 피한다.
      */
