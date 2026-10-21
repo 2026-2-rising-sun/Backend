@@ -73,7 +73,7 @@ public class ConsumerObservation {
                         "OrderExpired",
                         "RefundCompleted",
                         "CouponIssued",
-                        "SalesInfoChanged")
+                        "Restocked")
                 .contains(notification.eventType())) return call.proceed();
         Map<String, Object> ids =
                 Map.of(

@@ -28,6 +28,7 @@ class RestockNotificationTest {
     private NamedParameterJdbcTemplate jdbc;
     private RestockAlertRepository alerts;
     private SalesInfoEventListener listener;
+    private io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics;
 
     @BeforeEach
     void setUp() {
@@ -47,11 +48,17 @@ class RestockNotificationTest {
         jdbc.getJdbcTemplate().update("DELETE FROM restock_alert");
         jdbc.getJdbcTemplate().update("DELETE FROM product_sales_status");
         alerts = new RestockAlertRepository(jdbc);
+        metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var repository =
+                new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
+                        new NotificationWriteRepository(jdbc));
+        repository.addAspect(
+                new com.shoppinglive.notification.observability.ConsumerObservation(
+                        new com.shoppinglive.common.observability.BusinessTelemetry(metrics)));
         listener =
                 new SalesInfoEventListener(
                         new ProductSalesStatusRepository(jdbc),
-                        new RestockNotificationService(
-                                alerts, new NotificationWriteRepository(jdbc)));
+                        new RestockNotificationService(alerts, repository.getProxy()));
         alerts.register(MEMBER, PRODUCT);
     }
 
@@ -68,6 +75,8 @@ class RestockNotificationTest {
         assertThat(row.get("link_value")).isEqualTo("501");
         // 재입고 알림은 한 번만 간다. 다음 재입고에도 받으려면 다시 신청해야 한다.
         assertThat(alerts.exists(MEMBER, PRODUCT)).isFalse();
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -96,6 +105,8 @@ class RestockNotificationTest {
         listener.consume(record(snapshot(2, "ON_SALE")));
 
         assertThat(notifications()).hasSize(1);
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
     }
 
     @Test
