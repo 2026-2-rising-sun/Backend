@@ -1,6 +1,5 @@
 package com.shoppinglive.common.observability;
 
-import com.shoppinglive.common.web.CorrelationId;
 import jakarta.servlet.AsyncEvent;
 import jakarta.servlet.AsyncListener;
 import jakarta.servlet.FilterChain;
@@ -30,9 +29,7 @@ public class RequestLogFilter extends OncePerRequestFilter implements Ordered {
             HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         long started = System.nanoTime();
-        String requestId = response.getHeader(CorrelationId.HEADER);
-        String traceId = MDC.get("trace_id");
-        String spanId = MDC.get("span_id");
+        java.util.Map<String, String> context = MDC.getCopyOfContextMap();
         AtomicBoolean logged = new AtomicBoolean();
         AtomicBoolean failed = new AtomicBoolean();
         Runnable completed =
@@ -40,16 +37,22 @@ public class RequestLogFilter extends OncePerRequestFilter implements Ordered {
                     if (!logged.compareAndSet(false, true)) return;
                     Object route =
                             request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
-                    log.atInfo()
-                            .addKeyValue("event", "http_completed")
-                            .addKeyValue("requestId", requestId)
-                            .addKeyValue("trace_id", traceId)
-                            .addKeyValue("span_id", spanId)
-                            .addKeyValue("method", request.getMethod())
-                            .addKeyValue("route", route == null ? "UNMAPPED" : route.toString())
-                            .addKeyValue("status", failed.get() ? 500 : response.getStatus())
-                            .addKeyValue("durationMs", (System.nanoTime() - started) / 1_000_000)
-                            .log("HTTP 요청 처리 종료");
+                    var previous = MDC.getCopyOfContextMap();
+                    try {
+                        if (context == null) MDC.clear();
+                        else MDC.setContextMap(context);
+                        log.atInfo()
+                                .addKeyValue("event", "http_completed")
+                                .addKeyValue("method", request.getMethod())
+                                .addKeyValue("route", route == null ? "UNMAPPED" : route.toString())
+                                .addKeyValue("status", failed.get() ? 500 : response.getStatus())
+                                .addKeyValue(
+                                        "durationMs", (System.nanoTime() - started) / 1_000_000)
+                                .log("HTTP 요청 처리 종료");
+                    } finally {
+                        if (previous == null) MDC.clear();
+                        else MDC.setContextMap(previous);
+                    }
                 };
         try {
             chain.doFilter(request, response);
