@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.*;
             "spring.profiles.active=observability",
             "spring.application.name=observability-test"
         })
+@org.junit.jupiter.api.extension.ExtendWith(
+        org.springframework.boot.test.system.OutputCaptureExtension.class)
 class ObservabilityHttpTest {
     static final int MANAGEMENT = availablePort();
     @LocalServerPort int port;
@@ -55,8 +57,12 @@ class ObservabilityHttpTest {
 
     @Test
     @DisplayName("관리 포트만 Prometheus를 공개하고 실제 API 경로 템플릿을 계측한다")
-    void isolatesMetricsAndMeasuresRoute() throws Exception {
+    void isolatesMetricsAndMeasuresRoute(org.springframework.boot.test.system.CapturedOutput output)
+            throws Exception {
         assertThat(get(port, "/items/123").statusCode()).isEqualTo(200);
+        assertThat(output.getAll())
+                .contains("\"event\":\"http_completed\"", "\"requestId\"")
+                .doesNotContain("has already been written");
         var metrics = get(MANAGEMENT, "/actuator/prometheus");
         assertThat(metrics.statusCode()).isEqualTo(200);
         assertThat(metrics.body())
