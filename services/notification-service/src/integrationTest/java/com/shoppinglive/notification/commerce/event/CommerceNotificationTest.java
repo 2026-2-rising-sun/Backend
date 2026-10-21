@@ -15,6 +15,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @DisplayName("거래 결과 알림")
 class CommerceNotificationTest {
+    private io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics;
     private JdbcTemplate jdbc;
     private CommerceNotificationListener listener;
     private static final String MEMBER = "11111111-1111-4111-8111-111111111111";
@@ -34,9 +35,19 @@ class CommerceNotificationTest {
         ds.setUrl(ds.getUrl() + ";DB_CLOSE_DELAY=-1");
         Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
         jdbc = new JdbcTemplate(ds);
-        listener =
-                new CommerceNotificationListener(
+        metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var observation =
+                new com.shoppinglive.notification.observability.ConsumerObservation(
+                        new com.shoppinglive.common.observability.BusinessTelemetry(metrics));
+        var repository =
+                new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
                         new NotificationWriteRepository(new NamedParameterJdbcTemplate(ds)));
+        repository.addAspect(observation);
+        var delivery =
+                new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
+                        new CommerceNotificationListener(repository.getProxy()));
+        delivery.addAspect(observation);
+        listener = delivery.getProxy();
     }
 
     @Test
@@ -46,6 +57,14 @@ class CommerceNotificationTest {
         listener.consume(record(event, GROUP));
         listener.consume(record(event, GROUP));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification", Integer.class))
+                .isEqualTo(1);
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
+        assertThat(
+                        metrics.get("shoppinglive.consumer")
+                                .tag("result", "duplicate_or_no_recipient")
+                                .timer()
+                                .count())
                 .isEqualTo(1);
         var row = jdbc.queryForMap("SELECT * FROM notification");
         assertThat(row.get("member_id")).isEqualTo(MEMBER);
