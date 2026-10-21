@@ -65,6 +65,7 @@ public class ConsumerObservation {
     @Around(
             "execution(* com.shoppinglive.shopping.sales.repository.ProductSalesRepository.apply(..)) || execution(* com.shoppinglive.shopping.coupon.repository.CouponDisplayRepository.apply(..))")
     public Object consume(ProceedingJoinPoint call) throws Throwable {
+        if (org.slf4j.MDC.get("eventId") == null) return call.proceed();
         Map<String, Object> ids;
         if (call.getArgs()[0] instanceof SalesInfo info)
             ids = Map.of("salesId", info.salesId(), "snapshotVersion", call.getArgs()[1]);

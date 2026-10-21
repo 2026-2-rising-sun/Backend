@@ -29,7 +29,10 @@ public class BusinessTelemetry {
         registry.counter(metric, labels).increment();
         var entry = log.atInfo().addKeyValue("event", metric);
         labels.forEach(tag -> entry.addKeyValue(tag.getKey(), tag.getValue()));
-        identifiers.forEach(entry::addKeyValue);
+        identifiers.forEach(
+                (key, value) -> {
+                    if (MDC.get(key) == null) entry.addKeyValue(key, value);
+                });
         entry.log("업무 처리 결과 확정");
     }
 
@@ -43,7 +46,10 @@ public class BusinessTelemetry {
                                     .addKeyValue("event", metric)
                                     .addKeyValue("durationMs", elapsed / 1_000_000);
                     labels.forEach(tag -> entry.addKeyValue(tag.getKey(), tag.getValue()));
-                    identifiers.forEach(entry::addKeyValue);
+                    identifiers.forEach(
+                            (key, value) -> {
+                                if (MDC.get(key) == null) entry.addKeyValue(key, value);
+                            });
                     entry.log("업무 처리 관측");
                 });
     }
@@ -54,7 +60,10 @@ public class BusinessTelemetry {
                     registry.counter(metric, labels).increment();
                     var entry = log.atWarn().addKeyValue("event", metric);
                     labels.forEach(tag -> entry.addKeyValue(tag.getKey(), tag.getValue()));
-                    identifiers.forEach(entry::addKeyValue);
+                    identifiers.forEach(
+                            (key, value) -> {
+                                if (MDC.get(key) == null) entry.addKeyValue(key, value);
+                            });
                     entry.log("업무 처리 실패");
                 });
     }

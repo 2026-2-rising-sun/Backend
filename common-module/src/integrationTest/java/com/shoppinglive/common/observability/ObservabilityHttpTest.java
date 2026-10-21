@@ -73,6 +73,39 @@ class ObservabilityHttpTest {
         assertThat(get(port, "/actuator/prometheus").statusCode()).isIn(403, 404);
     }
 
+    @Test
+    @DisplayName("이벤트 MDC와 업무 식별자가 겹쳐도 JSON 로그가 정상 출력된다")
+    void businessLogKeepsMdcWithoutDuplicate(
+            org.springframework.boot.test.system.CapturedOutput output) {
+        var telemetry =
+                new BusinessTelemetry(
+                        new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        try {
+            org.slf4j.MDC.put("eventId", "event-log-test");
+            telemetry.count(
+                    "sample.business",
+                    io.micrometer.core.instrument.Tags.of("result", "applied"),
+                    java.util.Map.of("eventId", "event-log-test"));
+            telemetry.failure(
+                    "sample.failure",
+                    io.micrometer.core.instrument.Tags.of("result", "failed"),
+                    java.util.Map.of("eventId", "event-log-test"));
+            telemetry.duration(
+                    "sample.duration",
+                    io.micrometer.core.instrument.Tags.of("result", "applied"),
+                    java.util.Map.of("eventId", "event-log-test"),
+                    System.nanoTime());
+        } finally {
+            org.slf4j.MDC.remove("eventId");
+        }
+        assertThat(output.getAll())
+                .contains(
+                        "\"event\":\"sample.business\"",
+                        "\"event\":\"sample.failure\"",
+                        "\"event\":\"sample.duration\"")
+                .doesNotContain("has already been written");
+    }
+
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = DataSourceAutoConfiguration.class)
     @Import({WebConfiguration.class, Controller.class})
