@@ -96,13 +96,19 @@ public class OutboxConfiguration {
             final KafkaTemplate<String, String> outboxKafkaTemplate,
             final OutboxProperties properties,
             java.util.concurrent.ThreadPoolExecutor outboxFastPathExecutor,
-            org.springframework.beans.factory.ObjectProvider<OutboxLeaseStore> leases) {
-        return new OutboxRelay(
-                repository,
-                outboxKafkaTemplate,
-                properties,
-                outboxFastPathExecutor,
-                leases.getIfAvailable());
+            org.springframework.beans.factory.ObjectProvider<OutboxLeaseStore> leases,
+            org.springframework.beans.factory.ObjectProvider<
+                            com.shoppinglive.common.observability.BusinessTelemetry>
+                    telemetry) {
+        var relay =
+                new OutboxRelay(
+                        repository,
+                        outboxKafkaTemplate,
+                        properties,
+                        outboxFastPathExecutor,
+                        leases.getIfAvailable());
+        relay.observeWith(telemetry.getIfAvailable());
+        return relay;
     }
 
     @Bean

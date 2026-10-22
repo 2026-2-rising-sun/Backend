@@ -35,6 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 class PaymentGroupLifecycleService {
+    private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
@@ -65,7 +66,9 @@ class PaymentGroupLifecycleService {
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             CouponReservationService couponReservations,
-            PaymentGroupEventPublisher notificationEvents) {
+            PaymentGroupEventPublisher notificationEvents,
+            ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
+        this.telemetry = telemetry;
         this.groups = groups;
         this.orders = orders;
         this.cart = cart;
@@ -122,6 +125,21 @@ class PaymentGroupLifecycleService {
                         attempt.completeWithoutCharge(requestedAt);
                     }
                     attempt = payments.saveAndFlush(attempt);
+                    Long acceptedAttemptId = attempt.getId();
+                    telemetry.ifAvailable(
+                            observer ->
+                                    observer.count(
+                                            "shoppinglive.payment.operations",
+                                            io.micrometer.core.instrument.Tags.of(
+                                                    "operation",
+                                                    "payment_intake",
+                                                    "result",
+                                                    "accepted"),
+                                            Map.of(
+                                                    "paymentAttemptId",
+                                                    acceptedAttemptId,
+                                                    "groupNumber",
+                                                    number)));
                     g.transition(OrderStatus.PAYMENT_CONFIRMING);
                     g.setPaymentId(attempt.getId());
                     groups.saveAndFlush(g);

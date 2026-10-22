@@ -12,6 +12,16 @@ import org.springframework.security.web.SecurityFilterChain;
 @ConditionalOnProperty(name = "shoppinglive.observability.enabled", havingValue = "true")
 public class ObservabilityConfiguration {
     @Bean
+    BusinessTelemetry businessTelemetry(io.micrometer.core.instrument.MeterRegistry registry) {
+        return new BusinessTelemetry(registry);
+    }
+
+    @Bean
+    DomainEventObservation domainEventObservation(BusinessTelemetry telemetry) {
+        return new DomainEventObservation(telemetry);
+    }
+
+    @Bean
     @Order(0)
     SecurityFilterChain metricsSecurity(
             HttpSecurity http,
