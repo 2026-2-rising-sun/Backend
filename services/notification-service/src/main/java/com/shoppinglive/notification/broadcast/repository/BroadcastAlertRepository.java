@@ -14,7 +14,11 @@ import org.springframework.stereotype.Repository;
  *
  * <p>신청과 해제는 모두 <b>여러 번 호출해도 결과가 같다</b>. 사용자가 버튼을 두 번 눌렀다고 오류를 줄 이유가 없다.
  *
- * <p>신청은 조건부 INSERT 한 문장으로 끝낸다. "있는지 보고 없으면 넣기" 를 두 문장으로 나누면 같은 사용자의 동시 요청에서 한쪽이 유일 제약에 걸려 터진다.
+ * <p>신청은 {@code ON CONFLICT DO NOTHING} 한 문장으로 끝낸다. "있는지 보고 없으면 넣기" 로는 안 된다. 그 조건은 아직 커밋되지 않은 다른
+ * 요청의 행을 보지 못해서, 같은 사용자가 버튼을 빠르게 두 번 누르면 양쪽 다 통과한 뒤 늦은 쪽이 유일 제약에 걸려 500 이 난다.
+ *
+ * <p>충돌 대상 컬럼을 적지 않는 이유는 H2 가 그 문법을 지원하지 않기 때문이다. 이 표의 유일 제약은 {@code (member_id, broadcast_id)}
+ * 하나뿐이라 의미가 같다.
  */
 @Repository
 public class BroadcastAlertRepository {
@@ -22,10 +26,8 @@ public class BroadcastAlertRepository {
     private static final String INSERT_IF_MISSING =
             """
             INSERT INTO broadcast_alert (member_id, broadcast_id, created_at, updated_at)
-            SELECT :memberId, :broadcastId, :now, :now
-            WHERE NOT EXISTS (
-                SELECT 1 FROM broadcast_alert
-                WHERE member_id = :memberId AND broadcast_id = :broadcastId)
+            VALUES (:memberId, :broadcastId, :now, :now)
+            ON CONFLICT DO NOTHING
             """;
 
     private final NamedParameterJdbcTemplate jdbc;

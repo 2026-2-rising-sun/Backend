@@ -59,8 +59,7 @@ class SalesInfoEventListenerTest {
         listener.consume(record(snapshot(1, "SOLD_OUT")));
 
         ProductSalesStatus stored = statuses.findByProductId(PRODUCT).orElseThrow();
-        assertThat(stored.inStock()).isFalse();
-        assertThat(stored.rawStatus()).isEqualTo("SOLD_OUT");
+        assertThat(stored.status()).isEqualTo("SOLD_OUT");
         assertThat(stored.salesId()).isEqualTo(SALES);
     }
 
@@ -74,18 +73,17 @@ class SalesInfoEventListenerTest {
 
         ProductSalesStatus stored = statuses.findByProductId(PRODUCT).orElseThrow();
         assertThat(stored.snapshotVersion()).isEqualTo(2);
-        assertThat(stored.inStock()).isTrue();
+        assertThat(stored.status()).isEqualTo("ON_SALE");
     }
 
     @Test
-    @DisplayName("모르는 상태는 판매 중이 아닌 것으로 본다. 원본은 진단용으로 남긴다")
-    void treatsUnknownStatusAsNotInStock() {
+    @DisplayName("모르는 상태도 받은 값 그대로 저장한다")
+    void storesUnknownStatusAsReceived() {
         listener.consume(record(snapshot(1, "NEW_STATE")));
 
-        ProductSalesStatus stored = statuses.findByProductId(PRODUCT).orElseThrow();
+        // 아는 값이 아니면 재입고 판별에도 신청 거절에도 걸리지 않는다.
         // Commerce 가 상태 값을 추가해도 이쪽 판단이 흔들리지 않는다.
-        assertThat(stored.inStock()).isFalse();
-        assertThat(stored.rawStatus()).isEqualTo("NEW_STATE");
+        assertThat(statuses.findByProductId(PRODUCT).orElseThrow().status()).isEqualTo("NEW_STATE");
     }
 
     @Test
