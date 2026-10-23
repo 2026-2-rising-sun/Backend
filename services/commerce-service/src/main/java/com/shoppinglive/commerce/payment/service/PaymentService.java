@@ -3,6 +3,7 @@ package com.shoppinglive.commerce.payment.service;
 import com.shoppinglive.commerce.order.entity.Order;
 import com.shoppinglive.commerce.order.repository.OrderJpaRepository;
 import com.shoppinglive.commerce.order.service.OrderService;
+import com.shoppinglive.commerce.order.service.PaymentGroupService;
 import com.shoppinglive.commerce.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commerce.payment.entity.MockPaymentResultUnknownException;
 import com.shoppinglive.commerce.payment.entity.PaymentAttempt;
@@ -20,13 +21,14 @@ import java.time.Instant;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 결제 도메인 유스케이스 서비스. */
 @Service
 public class PaymentService {
 
-    private final com.shoppinglive.commerce.order.service.PaymentGroupService groups;
-    private final org.springframework.transaction.support.TransactionTemplate transaction;
+    private final PaymentGroupService groups;
+    private final TransactionTemplate transaction;
     private final OrderService orderService;
     private final OrderJpaRepository orderRepository;
     private final PaymentAttemptJpaRepository paymentAttemptRepository;
@@ -39,8 +41,8 @@ public class PaymentService {
     private final PaymentRetryPolicy retryPolicy;
 
     public PaymentService(
-            org.springframework.transaction.support.TransactionTemplate transaction,
-            com.shoppinglive.commerce.order.service.PaymentGroupService groups,
+            TransactionTemplate transaction,
+            PaymentGroupService groups,
             OrderService orderService,
             OrderJpaRepository orderRepository,
             PaymentAttemptJpaRepository paymentAttemptRepository,

@@ -1,0 +1,22 @@
+# local,observability처럼 선택적으로 적용한다. 관리 포트는 앱 진입점과 분리한다.
+shoppinglive:
+  observability:
+    enabled: true
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${OBSERVABILITY_ENVIRONMENT:local}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+logging:
+  structured:
+    format:
+      console: logstash

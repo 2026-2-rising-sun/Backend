@@ -1,5 +1,6 @@
 package com.shoppinglive.common.web;
 
+import com.shoppinglive.common.observability.ObservabilityConfiguration;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -7,10 +8,12 @@ import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilde
 import org.springframework.boot.web.client.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Configuration(proxyBeanMethods = false)
+@Import(ObservabilityConfiguration.class)
 @ConditionalOnClass(name = "jakarta.servlet.Filter")
 public class WebConfiguration {
 

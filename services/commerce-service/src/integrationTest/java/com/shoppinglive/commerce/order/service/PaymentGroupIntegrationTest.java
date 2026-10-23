@@ -53,9 +53,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** 테스트 전체를 감싸는 트랜잭션은 사용하지 않는다. 결제 승인과 롤백 경계를 실제 커밋으로 확인한다. */
-@SpringBootTest
+@SpringBootTest(properties = "shoppinglive.observability.enabled=true")
+@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
 @AutoConfigureMockMvc
 class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
+    @Autowired io.micrometer.core.instrument.MeterRegistry metrics;
     @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
     @Autowired PaymentGroupRepository groups;
@@ -137,8 +139,16 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     @Test
     @DisplayName("묶음 생성과 취소는 재요청에도 업무 저장과 함께 한 번씩 기록한다")
     void recordsCreationAndCancellationOnce() throws Exception {
+        double before = count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated");
+        double replayBefore = count("shoppinglive.order.requests", "result", "replayed");
         var result = create("notification-events");
         assertThat(create("notification-events").created()).isFalse();
+        assertThat(
+                        count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated")
+                                - before)
+                .isEqualTo(1);
+        assertThat(count("shoppinglive.order.requests", "result", "replayed") - replayBefore)
+                .isEqualTo(1);
         String number = result.group().groupNumber();
         service.cancel(MEMBER_A, number);
         var rows =
@@ -170,6 +180,12 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                             "payload",
                             event));
         }
+    }
+
+    private double count(String name, String label, String value) {
+        return metrics.find(name).tag(label, value).counters().stream()
+                .mapToDouble(io.micrometer.core.instrument.Counter::count)
+                .sum();
     }
 
     private void stock(Long id, int available, int reserved) {
@@ -690,10 +706,15 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     @DisplayName("두 번째 재고 예약에 실패하면 첫 상품 예약과 전체 주문을 롤백한다")
     @Test
     void secondConditionalReservationFailureRollsBackAlreadyReservedFirstProductAndOrders() {
+        double before = count("shoppinglive.order.requests", "result", "created");
+        double events = count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated");
         // 주문서 조회 이후 재고가 줄어든 상황을 만들어 첫 항목의 실제 예약 이후 실패하도록 한다.
         doReturn(0).when(stocks).reserve(salesB, 1);
         assertThatThrownBy(() -> create("race")).isInstanceOf(BusinessException.class);
         untouched();
+        assertThat(count("shoppinglive.order.requests", "result", "created")).isEqualTo(before);
+        assertThat(count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated"))
+                .isEqualTo(events);
     }
 
     @DisplayName("묶음 취소는 모든 상품 재고를 한 번만 복구하고 장바구니를 유지한다")

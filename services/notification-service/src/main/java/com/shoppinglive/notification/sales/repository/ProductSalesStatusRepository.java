@@ -1,6 +1,7 @@
 package com.shoppinglive.notification.sales.repository;
 
 import com.shoppinglive.notification.sales.entity.ProductSalesStatus;
+import com.shoppinglive.notification.sales.event.SalesInfoEventContract;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -22,11 +23,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ProductSalesStatusRepository {
 
+    // 이전 버전과 함께 실행할 수 있도록 기존 컬럼을 유지한다. 판별에는 raw_status만 사용한다.
     private static final String INSERT_IF_MISSING =
             """
             INSERT INTO product_sales_status
-                (product_id, sales_id, snapshot_version, status, created_at, updated_at)
-            SELECT :productId, :salesId, :snapshotVersion, :status, :now, :now
+                (product_id, sales_id, snapshot_version, in_stock, raw_status, created_at, updated_at)
+            SELECT :productId, :salesId, :snapshotVersion, :inStock, :status, :now, :now
             WHERE NOT EXISTS (
                 SELECT 1 FROM product_sales_status WHERE product_id = :productId)
             """;
@@ -34,7 +36,7 @@ public class ProductSalesStatusRepository {
             """
             UPDATE product_sales_status
             SET sales_id = :salesId, snapshot_version = :snapshotVersion,
-                status = :status, updated_at = :now
+                in_stock = :inStock, raw_status = :status, updated_at = :now
             WHERE product_id = :productId AND snapshot_version < :snapshotVersion
             """;
 
@@ -65,7 +67,7 @@ public class ProductSalesStatusRepository {
         return jdbc
                 .query(
                         """
-                        SELECT product_id, sales_id, snapshot_version, status
+                        SELECT product_id, sales_id, snapshot_version, raw_status AS status
                         FROM product_sales_status WHERE product_id = :productId
                         """,
                         Map.of("productId", productId),
@@ -85,6 +87,7 @@ public class ProductSalesStatusRepository {
                 "salesId", status.salesId(),
                 "snapshotVersion", status.snapshotVersion(),
                 "status", status.status(),
+                "inStock", SalesInfoEventContract.ON_SALE.equals(status.status()),
                 "now", OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC));
     }
 }
