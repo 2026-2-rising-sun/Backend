@@ -718,6 +718,8 @@ paths:
 
         저장 후 SSE `chat.created` 로 전달을 시도한다. 전달에 실패해도 응답은 201 이고 채팅은 최근 내역에서 조회된다.
 
+        방송별로 초당 5건(설정값)을 넘는 일반 채팅은 저장만 하고 실시간 전달을 생략한다. SELLER 역할의 채팅은 생략하지 않는다. 작성자는 이 응답으로 자기 채팅을 표시한다.
+
         '
       operationId: createBroadcastChat
       tags:
@@ -1003,7 +1005,7 @@ paths:
 
         | `stream.ready` | `StreamReadyEvent` | 연결 직후 한 번 |
 
-        | `chat.created` | `ChatMessage` (`id:` 는 messageId) | 채팅 저장 후 |
+        | `chat.created` | `ChatMessage` (`id:` 는 messageId) | 채팅 저장 후. 방송별 초당 예산을 넘은 일반 채팅은 생략 |
 
         | `likes.updated` | `LikeTotal` | 커밋 version이 바뀌면 약 1초 간격 |
 

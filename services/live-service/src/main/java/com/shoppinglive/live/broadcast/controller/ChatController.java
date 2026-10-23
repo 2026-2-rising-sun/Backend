@@ -44,6 +44,12 @@ public class ChatController {
             @AuthenticationPrincipal final AuthenticatedUser user,
             @RequestHeader(HttpHeaders.AUTHORIZATION) final String authorization,
             @Valid @RequestBody final ChatInput input) {
-        return ApiResponse.ok(writes.write(id, user.memberId(), authorization, input.content()));
+        return ApiResponse.ok(
+                writes.write(
+                        id,
+                        user.memberId(),
+                        user.roles().contains("SELLER"),
+                        authorization,
+                        input.content()));
     }
 }

@@ -25,7 +25,7 @@ class BroadcastConnectionTest {
 
     private final BroadcastStreamRegistry registry =
             new BroadcastStreamRegistry(
-                    new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2));
+                    new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 5));
 
     @AfterEach
     void stop() {

@@ -66,6 +66,8 @@ class ChatOrderingRedisTest extends LiveSecuritySupport {
                 "spring.data.redis.port",
                 () -> System.getenv().getOrDefault("LIVE_REDIS_PORT", "56379"));
         properties.add("live.stream.subscribe-retry", () -> "200ms");
+        // 전달 경로를 검증하므로 화면 예산으로 생략되지 않게 한다. 예산 동작은 ChatRelayBudgetRedisTest 가 검증한다.
+        properties.add("live.stream.chat-budget-per-second", () -> "1000000");
     }
 
     @BeforeEach
