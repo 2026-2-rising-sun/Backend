@@ -25,7 +25,7 @@ class BroadcastConnectionTest {
 
     private final BroadcastStreamRegistry registry =
             new BroadcastStreamRegistry(
-                    new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 2));
+                    new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2));
 
     @AfterEach
     void stop() {
@@ -295,30 +295,46 @@ class BroadcastConnectionTest {
     }
 
     @Test
-    @DisplayName("종료 시 전송 작업이 대기 중인 연결도 완료한다")
-    void shutdownCompletesConnectionsWhoseDrainIsStillQueued() throws Exception {
-        final BroadcastStreamRegistry singleWriter =
-                new BroadcastStreamRegistry(
-                        new StreamProperties(Duration.ofSeconds(15), Duration.ofMinutes(30), 2, 1));
+    @DisplayName("종료 시 전송이 막혀 있는 연결도 전송이 끝난 뒤 완료한다")
+    void shutdownCompletesConnectionsWhoseSendIsBlocked() throws Exception {
         final CountDownLatch gate = new CountDownLatch(1);
         final RecordingEmitter slow = new RecordingEmitter(gate);
-        final RecordingEmitter queued = new RecordingEmitter(null);
+        final RecordingEmitter idle = new RecordingEmitter(null);
         try {
-            singleWriter.register(BROADCAST, slow).activate(ready(BROADCAST));
-            singleWriter.publish(BROADCAST, chat(1));
+            registry.register(BROADCAST, slow).activate(ready(BROADCAST));
+            registry.publish(BROADCAST, chat(1));
             assertThat(slow.firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            singleWriter.register(2L, queued).activate(ready(2L));
-            singleWriter.publish(2L, chat(1));
+            registry.register(2L, idle).activate(ready(2L));
+            awaitSent(idle, 1);
 
-            singleWriter.shutdown();
+            registry.shutdown();
             gate.countDown();
 
             assertThat(slow.completed.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(queued.completed.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThat(queued.sent).isEmpty();
+            assertThat(idle.completed.await(5, TimeUnit.SECONDS)).isTrue();
         } finally {
             gate.countDown();
-            singleWriter.shutdown();
+        }
+    }
+
+    @Test
+    @DisplayName("한 연결의 전송이 막혀 있어도 다른 연결에는 전송된다")
+    void blockedSendDoesNotDelayOtherConnections() throws Exception {
+        final CountDownLatch gate = new CountDownLatch(1);
+        try {
+            // 예전 고정 writer 수(8)보다 많은 연결을 막아 둔다.
+            for (long id = 10; id < 20; id++) {
+                final RecordingEmitter emitter = new RecordingEmitter(gate);
+                registry.register(id, emitter).activate(ready(id));
+                assertThat(emitter.firstSendStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            }
+            final RecordingEmitter healthy = new RecordingEmitter(null);
+            registry.register(BROADCAST, healthy).activate(ready(BROADCAST));
+            registry.publish(BROADCAST, chat(1));
+
+            awaitSent(healthy, 2);
+        } finally {
+            gate.countDown();
         }
     }
 

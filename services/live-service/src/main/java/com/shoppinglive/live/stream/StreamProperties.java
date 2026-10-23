@@ -9,5 +9,4 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record StreamProperties(
         @DefaultValue("15s") Duration heartbeat,
         @DefaultValue("30m") Duration emitterTimeout,
-        @DefaultValue("256") int queueCapacity,
-        @DefaultValue("8") int writerThreads) {}
+        @DefaultValue("256") int queueCapacity) {}
