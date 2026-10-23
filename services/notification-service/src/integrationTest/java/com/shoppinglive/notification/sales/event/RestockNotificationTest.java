@@ -1,6 +1,13 @@
 package com.shoppinglive.notification.sales.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 
 import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import com.shoppinglive.notification.sales.repository.ProductSalesStatusRepository;
@@ -14,6 +21,9 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -88,6 +98,20 @@ class RestockNotificationTest {
         assertThat(notifications()).isEmpty();
     }
 
+    // Commerce 의 SalesStatus 는 READY, ON_SALE, SOLD_OUT, PRIVATE 넷이다.
+    // 품절이 아닌 둘과, 아직 없는 값이 생겼을 때를 함께 본다.
+    @ParameterizedTest(name = "{0} 에서 판매중으로 바뀌어도 재입고가 아니다")
+    @ValueSource(strings = {"READY", "PRIVATE", "NEW_STATE"})
+    @DisplayName("품절이 아니었던 상품이 판매중이 되는 것은 재입고가 아니다")
+    void doesNotNotifyWhenPreviousStatusWasNotSoldOut(String previousStatus) {
+        listener.consume(record(snapshot(1, previousStatus)));
+        listener.consume(record(snapshot(2, "ON_SALE")));
+
+        // 판매 준비에서 판매 시작으로 바뀐 것까지 재입고로 보면, 품절된 적이 없는 상품에
+        // "재입고되었습니다" 가 간다. 상태를 참거짓으로 줄였을 때 실제로 그랬다.
+        assertThat(notifications()).isEmpty();
+    }
+
     @Test
     @DisplayName("사본에 없던 상품의 첫 이벤트는 재입고가 아니다")
     void firstEventIsNotRestock() {
@@ -101,12 +125,75 @@ class RestockNotificationTest {
     void doesNotDuplicateOnRedelivery() {
         listener.consume(record(snapshot(1, "SOLD_OUT")));
         listener.consume(record(snapshot(2, "ON_SALE")));
-        // 재전달. 사본 갱신이 0건으로 끝나므로 알림도 다시 만들지 않는다.
+        // 재전달. 사본이 이미 판매중이라 전이가 보이지 않는다.
         listener.consume(record(snapshot(2, "ON_SALE")));
 
         assertThat(notifications()).hasSize(1);
         assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
                 .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("알림 만들기가 실패하면 재시도에서 다시 만든다 — 사본을 먼저 갱신하면 전이가 사라져 유실된다")
+    void recoversRestockNotificationAfterFailure() {
+        listener.consume(record(snapshot(1, "SOLD_OUT")));
+
+        RestockNotificationService failing = mock(RestockNotificationService.class);
+        doThrow(new DataAccessResourceFailureException("db down"))
+                .when(failing)
+                .create(any(), anyLong(), any(), any());
+        SalesInfoEventListener failingListener =
+                new SalesInfoEventListener(new ProductSalesStatusRepository(jdbc), failing);
+
+        assertThatThrownBy(() -> failingListener.consume(record(snapshot(2, "ON_SALE"))))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        assertThat(notifications()).isEmpty();
+
+        // Kafka 가 같은 메시지를 다시 준다. 사본이 아직 품절이라 전이가 그대로 보인다.
+        listener.consume(record(snapshot(2, "ON_SALE")));
+
+        assertThat(notifications()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("알림은 만들어졌는데 신청 정리가 실패하면, 재처리에서 알림은 늘지 않고 신청만 지워진다")
+    void cleansUpRegistrationsOnRetryAfterDeleteFailure() {
+        listener.consume(record(snapshot(1, "SOLD_OUT")));
+
+        RestockAlertRepository failingAlerts = spy(new RestockAlertRepository(jdbc));
+        doThrow(new DataAccessResourceFailureException("db down"))
+                .when(failingAlerts)
+                .deleteSubscriptions(any());
+        SalesInfoEventListener failingListener =
+                new SalesInfoEventListener(
+                        new ProductSalesStatusRepository(jdbc),
+                        new RestockNotificationService(
+                                failingAlerts, new NotificationWriteRepository(jdbc)));
+
+        assertThatThrownBy(() -> failingListener.consume(record(snapshot(2, "ON_SALE"))))
+                .isInstanceOf(DataAccessResourceFailureException.class);
+        // 알림은 이미 만들어졌고 신청은 남아 있다. 둘이 어긋난 상태다.
+        assertThat(notifications()).hasSize(1);
+        assertThat(alerts.exists(MEMBER, PRODUCT)).isTrue();
+
+        // 재처리. 사본이 아직 품절이라 전이가 그대로 보인다.
+        listener.consume(record(snapshot(2, "ON_SALE")));
+
+        // 알림은 유일 제약이 막아서 늘지 않고, 신청은 이번에 정리된다.
+        assertThat(notifications()).hasSize(1);
+        assertThat(alerts.exists(MEMBER, PRODUCT)).isFalse();
+    }
+
+    @Test
+    @DisplayName("품절, 판매중, 품절 순으로 바뀐 뒤 가운데 이벤트가 늦게 와도 알림을 만들지 않는다")
+    void doesNotNotifyOnStaleOnSaleEvent() {
+        listener.consume(record(snapshot(1, "SOLD_OUT")));
+        listener.consume(record(snapshot(3, "SOLD_OUT")));
+        // 순서 역전: 가운데 판매중 이벤트가 지금 도착했다. 지금 이 상품은 품절이다.
+        listener.consume(record(snapshot(2, "ON_SALE")));
+
+        assertThat(notifications()).isEmpty();
+        assertThat(alerts.exists(MEMBER, PRODUCT)).isTrue();
     }
 
     @Test
@@ -130,6 +217,34 @@ class RestockNotificationTest {
                                 .replace(
                                         "\"currency\"", "\"productName\":\"가을 니트\",\"currency\"")));
         assertThat(notifications().getFirst().get("body")).isEqualTo("가을 니트 상품이 재입고되었습니다");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("알림 생성 중 새 신청이나 같은 회원의 재신청이 들어오면 그 신청은 지우지 않는다")
+    void preservesRegistrationsCreatedDuringNotification(boolean resubscribe) {
+        String nextMember = resubscribe ? MEMBER : "22222222-2222-4222-8222-222222222222";
+        var writes = spy(new NotificationWriteRepository(jdbc));
+        doAnswer(
+                        invocation -> {
+                            Object result = invocation.callRealMethod();
+                            if (resubscribe) alerts.unregister(MEMBER, PRODUCT);
+                            alerts.register(nextMember, PRODUCT);
+                            return result;
+                        })
+                .when(writes)
+                .createAll(any(), any());
+        var service = new RestockNotificationService(alerts, writes);
+
+        assertThat(
+                        service.create(
+                                "74b623b8-90ee-4f65-919c-d9ad2ea46fb1",
+                                PRODUCT,
+                                java.time.Instant.parse("2026-10-15T00:00:00Z")))
+                .isEqualTo(1);
+
+        assertThat(notifications()).hasSize(1);
+        assertThat(alerts.exists(nextMember, PRODUCT)).isTrue();
     }
 
     private List<Map<String, Object>> notifications() {

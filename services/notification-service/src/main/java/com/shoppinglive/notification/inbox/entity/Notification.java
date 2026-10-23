@@ -22,8 +22,12 @@ public class Notification extends BaseEntity {
     @Column(nullable = false, length = 36, updatable = false)
     private String memberId;
 
-    /** 이 알림을 만들게 한 이벤트의 ID. {@code (eventId, memberId)} 유일 제약이 중복 알림을 막는다. */
-    @Column(nullable = false, length = 36, updatable = false)
+    /**
+     * 이 알림을 만들게 한 이벤트의 ID. {@code (eventId, memberId)} 유일 제약이 중복 알림을 막는다.
+     *
+     * <p>UUID 보다 길다. 스케줄러가 만드는 알림은 받은 이벤트가 없어서 {@code payment-expiry-<묶음번호>} 처럼 알림이 직접 키를 만든다.
+     */
+    @Column(nullable = false, length = 64, updatable = false)
     private String eventId;
 
     /** 어떤 이벤트에서 왔는지. 모르는 값이 와도 멈추지 않도록 enum 이 아니라 문자열로 둔다. */

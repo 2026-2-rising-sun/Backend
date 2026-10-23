@@ -41,7 +41,9 @@ public class RestockNotificationService {
     }
 
     public int create(String eventId, long productId, Instant occurredAt, String productName) {
-        List<String> memberIds = alerts.findMemberIds(productId);
+        var subscriptions = alerts.findSubscriptions(productId);
+        List<String> memberIds =
+                subscriptions.stream().map(RestockAlertRepository.Subscription::memberId).toList();
         if (memberIds.isEmpty()) {
             return 0;
         }
@@ -57,7 +59,8 @@ public class RestockNotificationService {
                         Long.toString(productId),
                         occurredAt);
         int created = notifications.createAll(notification, memberIds);
-        alerts.deleteByProductId(productId);
+        alerts.deleteSubscriptions(
+                subscriptions.stream().map(RestockAlertRepository.Subscription::id).toList());
         return created;
     }
 }

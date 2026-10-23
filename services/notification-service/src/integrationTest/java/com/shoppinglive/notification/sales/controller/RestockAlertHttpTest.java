@@ -102,6 +102,7 @@ class RestockAlertHttpTest extends NotificationSecuritySupport {
 
     private static final long SOLD_OUT_PRODUCT = 501L;
     private static final long ON_SALE_PRODUCT = 502L;
+    private static final long READY_PRODUCT = 503L;
     private static final long UNKNOWN_PRODUCT = 999L;
 
     @Autowired MockMvc mvc;
@@ -112,8 +113,9 @@ class RestockAlertHttpTest extends NotificationSecuritySupport {
     @BeforeEach
     void prepareSalesStatus() {
         clean();
-        statuses.apply(new ProductSalesStatus(SOLD_OUT_PRODUCT, 9001, 1, false, "SOLD_OUT"));
-        statuses.apply(new ProductSalesStatus(ON_SALE_PRODUCT, 9002, 1, true, "ON_SALE"));
+        statuses.apply(new ProductSalesStatus(SOLD_OUT_PRODUCT, 9001, 1, "SOLD_OUT"));
+        statuses.apply(new ProductSalesStatus(ON_SALE_PRODUCT, 9002, 1, "ON_SALE"));
+        statuses.apply(new ProductSalesStatus(READY_PRODUCT, 9003, 1, "READY"));
     }
 
     @AfterEach
@@ -151,6 +153,16 @@ class RestockAlertHttpTest extends NotificationSecuritySupport {
                 .andExpect(jsonPath("$.error.code").value("CONFLICT"));
 
         assertThat(alerts.exists(JwtTestTokens.MEMBER_A, ON_SALE_PRODUCT)).isFalse();
+    }
+
+    @Test
+    @DisplayName("판매 준비 상품도 409 — 품절이 아니면 재입고 전이를 거치지 않아 알림이 영원히 가지 않는다")
+    void registeringNotSoldOutProductIsConflict() throws Exception {
+        register(READY_PRODUCT)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+
+        assertThat(alerts.exists(JwtTestTokens.MEMBER_A, READY_PRODUCT)).isFalse();
     }
 
     @Test
