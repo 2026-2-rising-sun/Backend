@@ -9,6 +9,9 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-web")
     api("org.springframework.boot:spring-boot-starter-validation")
     api("org.springframework.boot:spring-boot-starter-data-jpa")
+    api("org.springframework.boot:spring-boot-starter-actuator")
+    api("org.springframework.boot:spring-boot-starter-aop")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     compileOnly("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")

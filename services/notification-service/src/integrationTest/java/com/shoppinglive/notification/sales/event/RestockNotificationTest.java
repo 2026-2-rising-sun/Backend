@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -37,6 +38,7 @@ class RestockNotificationTest {
     private NamedParameterJdbcTemplate jdbc;
     private RestockAlertRepository alerts;
     private SalesInfoEventListener listener;
+    private io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics;
 
     @BeforeEach
     void setUp() {
@@ -56,11 +58,17 @@ class RestockNotificationTest {
         jdbc.getJdbcTemplate().update("DELETE FROM restock_alert");
         jdbc.getJdbcTemplate().update("DELETE FROM product_sales_status");
         alerts = new RestockAlertRepository(jdbc);
+        metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var repository =
+                new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
+                        new NotificationWriteRepository(jdbc));
+        repository.addAspect(
+                new com.shoppinglive.notification.observability.ConsumerObservation(
+                        new com.shoppinglive.common.observability.BusinessTelemetry(metrics)));
         listener =
                 new SalesInfoEventListener(
                         new ProductSalesStatusRepository(jdbc),
-                        new RestockNotificationService(
-                                alerts, new NotificationWriteRepository(jdbc)));
+                        new RestockNotificationService(alerts, repository.getProxy()));
         alerts.register(MEMBER, PRODUCT);
     }
 
@@ -77,6 +85,8 @@ class RestockNotificationTest {
         assertThat(row.get("link_value")).isEqualTo("501");
         // 재입고 알림은 한 번만 간다. 다음 재입고에도 받으려면 다시 신청해야 한다.
         assertThat(alerts.exists(MEMBER, PRODUCT)).isFalse();
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -119,6 +129,8 @@ class RestockNotificationTest {
         listener.consume(record(snapshot(2, "ON_SALE")));
 
         assertThat(notifications()).hasSize(1);
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -151,7 +163,7 @@ class RestockNotificationTest {
         RestockAlertRepository failingAlerts = spy(new RestockAlertRepository(jdbc));
         doThrow(new DataAccessResourceFailureException("db down"))
                 .when(failingAlerts)
-                .deleteByProductId(PRODUCT);
+                .deleteSubscriptions(any());
         SalesInfoEventListener failingListener =
                 new SalesInfoEventListener(
                         new ProductSalesStatusRepository(jdbc),
@@ -205,6 +217,34 @@ class RestockNotificationTest {
                                 .replace(
                                         "\"currency\"", "\"productName\":\"가을 니트\",\"currency\"")));
         assertThat(notifications().getFirst().get("body")).isEqualTo("가을 니트 상품이 재입고되었습니다");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("알림 생성 중 새 신청이나 같은 회원의 재신청이 들어오면 그 신청은 지우지 않는다")
+    void preservesRegistrationsCreatedDuringNotification(boolean resubscribe) {
+        String nextMember = resubscribe ? MEMBER : "22222222-2222-4222-8222-222222222222";
+        var writes = spy(new NotificationWriteRepository(jdbc));
+        doAnswer(
+                        invocation -> {
+                            Object result = invocation.callRealMethod();
+                            if (resubscribe) alerts.unregister(MEMBER, PRODUCT);
+                            alerts.register(nextMember, PRODUCT);
+                            return result;
+                        })
+                .when(writes)
+                .createAll(any(), any());
+        var service = new RestockNotificationService(alerts, writes);
+
+        assertThat(
+                        service.create(
+                                "74b623b8-90ee-4f65-919c-d9ad2ea46fb1",
+                                PRODUCT,
+                                java.time.Instant.parse("2026-10-15T00:00:00Z")))
+                .isEqualTo(1);
+
+        assertThat(notifications()).hasSize(1);
+        assertThat(alerts.exists(nextMember, PRODUCT)).isTrue();
     }
 
     private List<Map<String, Object>> notifications() {

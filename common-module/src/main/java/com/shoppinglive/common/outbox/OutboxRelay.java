@@ -42,6 +42,12 @@ public class OutboxRelay {
     private final OutboxProperties properties;
     private final java.util.concurrent.Executor fastPath;
     private final OutboxLeaseStore leases;
+    private com.shoppinglive.common.observability.BusinessTelemetry telemetry;
+
+    void observeWith(com.shoppinglive.common.observability.BusinessTelemetry telemetry) {
+        this.telemetry = telemetry;
+    }
+
     private final AtomicBoolean draining = new AtomicBoolean();
 
     public OutboxRelay(
@@ -168,7 +174,19 @@ public class OutboxRelay {
         record.headers()
                 .add(EVENT_TYPE_HEADER, eventType.getBytes(StandardCharsets.UTF_8))
                 .add(EVENT_ID_HEADER, eventId.getBytes(StandardCharsets.UTF_8));
-        kafka.send(record).get(properties.sendTimeout().toMillis(), TimeUnit.MILLISECONDS);
+        long started = System.nanoTime();
+        String result = "failed";
+        try {
+            kafka.send(record).get(properties.sendTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            result = "broker_acked";
+        } finally {
+            if (telemetry != null)
+                telemetry.duration(
+                        "shoppinglive.outbox.send",
+                        io.micrometer.core.instrument.Tags.of("topic", topic, "result", result),
+                        java.util.Map.of("eventId", eventId, "aggregateId", key),
+                        started);
+        }
     }
 
     private static String truncate(final String error) {
