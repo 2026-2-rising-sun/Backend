@@ -63,12 +63,41 @@ class NotificationPostgresMigrationTest extends NotificationSecuritySupport {
                       (product_id, sales_id, snapshot_version, in_stock, raw_status, created_at, updated_at)
                     VALUES (501, 9001, 1, false, 'SOLD_OUT', now(), now())
                     """);
+            jdbc.update(
+                    """
+                    INSERT INTO notification
+                      (member_id, title, body, occurred_at, created_at, updated_at, event_id, event_type)
+                    VALUES ('legacy-member', '기존 알림', '보존할 내용', now(), now(), now(), 'legacy-event', 'OrderCreated')
+                    """);
             Flyway.configure()
                     .dataSource(url, user, password)
                     .schemas(schema)
                     .defaultSchema(schema)
                     .load()
                     .migrate();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT body FROM notification WHERE event_id = 'legacy-event'",
+                                    String.class))
+                    .isEqualTo("보존할 내용");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT character_maximum_length FROM information_schema.columns WHERE table_schema = ? AND table_name = 'notification' AND column_name = 'event_id'",
+                                    Integer.class,
+                                    schema))
+                    .isEqualTo(64);
+            String longEventId = "payment-expiry-PG-" + UUID.randomUUID();
+            String insert =
+                    """
+                    INSERT INTO notification
+                      (member_id, title, body, occurred_at, created_at, updated_at, event_id, event_type)
+                    VALUES ('legacy-member', '만료 임박', '새 알림', now(), now(), now(), ?, 'PaymentExpiringSoon')
+                    ON CONFLICT (event_id, member_id) DO NOTHING
+                    """;
+            assertThat(jdbc.update(insert, longEventId)).isEqualTo(1);
+            assertThat(jdbc.update(insert, longEventId)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_group", Integer.class))
+                    .isZero();
             var statuses = new ProductSalesStatusRepository(new NamedParameterJdbcTemplate(source));
             assertThat(statuses.findByProductId(501).orElseThrow().status()).isEqualTo("SOLD_OUT");
             statuses.apply(new ProductSalesStatus(501, 9001, 2, "ON_SALE"));

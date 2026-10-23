@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 결제 만료 전에 묶음을 만든 사람에게 알림을 만든다.
@@ -38,14 +40,17 @@ public class PaymentExpiringSoonService {
     private final PaymentGroupRepository groups;
     private final NotificationWriteRepository notifications;
     private final Duration leadTime;
+    private final TransactionTemplate transaction;
 
     public PaymentExpiringSoonService(
             PaymentGroupRepository groups,
             NotificationWriteRepository notifications,
-            @Value("${notification.payment-expiry-lead:PT5M}") Duration leadTime) {
+            @Value("${notification.payment-expiry-lead:PT5M}") Duration leadTime,
+            PlatformTransactionManager transactionManager) {
         this.groups = groups;
         this.notifications = notifications;
         this.leadTime = leadTime;
+        this.transaction = new TransactionTemplate(transactionManager);
     }
 
     /**
@@ -69,17 +74,14 @@ public class PaymentExpiringSoonService {
         return created;
     }
 
-    /**
-     * 알림을 먼저 만들고, 보냈다는 표시를 나중에 한다.
-     *
-     * <p>순서가 중요하다. 표시를 먼저 하면 그 뒤 알림 만들기가 실패했을 때 다시 시도하지 못해 알림이 유실된다. 반대로 하면 표시가 실패해도 다음 주기에 다시
-     * 시도하고, 이미 만든 알림은 {@code (이벤트ID, 회원ID)} 유일 제약이 걸러 준다.
-     */
+    /** 조건부 갱신과 알림 저장을 한 트랜잭션으로 묶어 종료 이벤트와 직렬화하고, 저장 실패 시 발송 표시도 되돌린다. */
     private int notifyOne(PaymentGroup group, Instant now) {
-        int created =
-                notifications.createAll(toNotification(group, now), List.of(group.memberId()));
-        groups.markExpiringSoonSent(group.groupNumber(), now);
-        return created;
+        return transaction.execute(
+                status -> {
+                    if (!groups.markExpiringSoonSent(group.groupNumber(), now)) return 0;
+                    return notifications.createAll(
+                            toNotification(group, now), List.of(group.memberId()));
+                });
     }
 
     private NewNotification toNotification(PaymentGroup group, Instant now) {

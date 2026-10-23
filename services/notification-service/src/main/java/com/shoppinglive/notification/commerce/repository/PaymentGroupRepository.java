@@ -103,6 +103,7 @@ public class PaymentGroupRepository {
                         UPDATE payment_group
                         SET expiring_soon_sent_at = :sentAt, updated_at = :sentAt
                         WHERE group_number = :groupNumber AND expiring_soon_sent_at IS NULL
+                          AND closed_at IS NULL AND expires_at > :sentAt
                         """,
                         Map.of("groupNumber", groupNumber, "sentAt", utc(sentAt)))
                 == 1;

@@ -46,8 +46,11 @@ class CommerceNotificationTest {
         repository.addAspect(observation);
         var delivery =
                 new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
-                        new CommerceNotificationListener(repository.getProxy(),
-                                new PaymentGroupTracker(new PaymentGroupRepository(new NamedParameterJdbcTemplate(ds)))));
+                        new CommerceNotificationListener(
+                                repository.getProxy(),
+                                new PaymentGroupTracker(
+                                        new PaymentGroupRepository(
+                                                new NamedParameterJdbcTemplate(ds)))));
         delivery.addAspect(observation);
         listener = delivery.getProxy();
     }

@@ -3,6 +3,8 @@ package com.shoppinglive.notification.commerce.service;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.shoppinglive.notification.commerce.entity.PaymentGroup;
 import com.shoppinglive.notification.commerce.event.CommerceNotificationListener;
@@ -24,7 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /** 만료 5분 전에 알림이 나가는지, 끝난 묶음에는 안 나가는지 확인한다. broker 는 필요하지 않다. */
 @DisplayName("결제 만료 임박 알림")
@@ -38,6 +39,7 @@ class PaymentExpiringSoonTest {
     private static final Instant NOW = Instant.parse("2026-10-20T11:56:00Z");
 
     private NamedParameterJdbcTemplate jdbc;
+    private org.springframework.transaction.PlatformTransactionManager transactions;
     private PaymentGroupRepository groups;
     private PaymentExpiringSoonService service;
     private CommerceNotificationListener listener;
@@ -45,10 +47,8 @@ class PaymentExpiringSoonTest {
     @BeforeEach
     void setUp() {
         DataSource dataSource =
-                new DriverManagerDataSource(
-                        "jdbc:h2:mem:payment_expiring_soon_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-                        "sa",
-                        "");
+                com.shoppinglive.notification.NotificationTestDatabase.create(
+                        "payment_expiring_soon_test");
         Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
@@ -59,9 +59,76 @@ class PaymentExpiringSoonTest {
         jdbc.getJdbcTemplate().update("DELETE FROM notification");
         jdbc.getJdbcTemplate().update("DELETE FROM payment_group");
         groups = new PaymentGroupRepository(jdbc);
+        transactions =
+                new org.springframework.jdbc.datasource.DataSourceTransactionManager(dataSource);
         NotificationWriteRepository notifications = new NotificationWriteRepository(jdbc);
-        service = new PaymentExpiringSoonService(groups, notifications, Duration.ofMinutes(5));
+        service =
+                new PaymentExpiringSoonService(
+                        groups, notifications, Duration.ofMinutes(5), transactions);
         listener = new CommerceNotificationListener(notifications, new PaymentGroupTracker(groups));
+    }
+
+    @Test
+    @DisplayName("알림 저장이 실패하면 발송 표시를 되돌리고 다음 주기에 다시 보낸다")
+    void rollsBackClaimWhenNotificationInsertFails() {
+        listener.consume(record(created()));
+        var writes = mock(NotificationWriteRepository.class);
+        doThrow(new org.springframework.dao.DataAccessResourceFailureException("의도한 저장 실패"))
+                .when(writes)
+                .createAll(any(), any());
+        var failing =
+                new PaymentExpiringSoonService(groups, writes, Duration.ofMinutes(5), transactions);
+
+        assertThat(failing.notifyExpiringSoon(NOW)).isZero();
+        assertThat(groups.findExpiringSoon(NOW, NOW.plusSeconds(300), 100)).hasSize(1);
+        assertThat(service.notifyExpiringSoon(NOW)).isEqualTo(1);
+        assertThat(notifications()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("스케줄러 두 개가 동시에 실행돼도 만료 임박 알림은 하나만 만든다")
+    void concurrentSchedulersCreateOneNotification() throws Exception {
+        listener.consume(record(created()));
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Integer> task =
+                    () -> {
+                        start.await();
+                        return service.notifyExpiringSoon(NOW);
+                    };
+            var first = workers.submit(task);
+            var second = workers.submit(task);
+            start.countDown();
+            assertThat(
+                            first.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    + second.get(10, java.util.concurrent.TimeUnit.SECONDS))
+                    .isEqualTo(1);
+        }
+        assertThat(notifications()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("대상을 조회한 직후 결제가 끝나면 만료 임박 알림을 만들지 않는다")
+    void skipsGroupClosedAfterCandidateQuery() {
+        listener.consume(record(created()));
+        var racing = spy(groups);
+        doAnswer(
+                        call -> {
+                            Object candidates = call.callRealMethod();
+                            groups.close(GROUP, NOW);
+                            return candidates;
+                        })
+                .when(racing)
+                .findExpiringSoon(any(), any(), anyInt());
+        var racingService =
+                new PaymentExpiringSoonService(
+                        racing,
+                        new NotificationWriteRepository(jdbc),
+                        Duration.ofMinutes(5),
+                        transactions);
+
+        assertThat(racingService.notifyExpiringSoon(NOW)).isZero();
+        assertThat(notifications()).isEmpty();
     }
 
     @Test
