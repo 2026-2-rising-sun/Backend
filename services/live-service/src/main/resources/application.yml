@@ -5,6 +5,9 @@ spring:
       max-request-size: 3MB
   application:
     name: live-service
+  jpa:
+    # 켜 두면 SSE 연결이 열려 있는 동안(최대 30분) DB 연결을 쥐고 있어 pod 당 시청자가 커넥션 풀 크기에서 막힌다.
+    open-in-view: false
   flyway:
     enabled: true
     locations: classpath:db/migration
