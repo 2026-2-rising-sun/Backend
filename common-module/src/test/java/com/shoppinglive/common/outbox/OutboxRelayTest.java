@@ -38,6 +38,14 @@ class OutboxRelayTest {
                     new OutboxProperties(100, Duration.ofSeconds(1)),
                     Runnable::run);
 
+    private final io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics =
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+
+    @org.junit.jupiter.api.BeforeEach
+    void observe() {
+        relay.observeWith(new com.shoppinglive.common.observability.BusinessTelemetry(metrics));
+    }
+
     @DisplayName("대기 이벤트를 키·타입 헤더와 함께 순서대로 전송하고 발행 표시를 남긴다")
     @Test
     void sendsPendingMessagesInOrderWithKeyAndTypeHeaderThenMarksThemPublished() {
@@ -49,6 +57,12 @@ class OutboxRelayTest {
         when(kafka.send(any(ProducerRecord.class))).thenReturn(sent());
 
         assertEquals(2, relay.relay());
+        assertEquals(
+                2,
+                metrics.get("shoppinglive.outbox.send")
+                        .tag("result", "broker_acked")
+                        .timer()
+                        .count());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<ProducerRecord<String, String>> records =
@@ -118,6 +132,8 @@ class OutboxRelayTest {
                         CompletableFuture.failedFuture(new IllegalStateException("broker down")));
 
         assertEquals(0, relay.relay());
+        assertEquals(
+                1, metrics.get("shoppinglive.outbox.send").tag("result", "failed").timer().count());
 
         verify(kafka, org.mockito.Mockito.times(1)).send(any(ProducerRecord.class));
         verify(repository).markFailed(eq(1L), anyString());

@@ -43,6 +43,7 @@ class SalesInfoEventListenerTest {
                     .registerModule(new JavaTimeModule())
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+    private io.micrometer.core.instrument.simple.SimpleMeterRegistry metrics;
     private NamedParameterJdbcTemplate jdbc;
     private ProductSalesRepository repository;
     private SalesInfoEventListener listener;
@@ -57,8 +58,17 @@ class SalesInfoEventListenerTest {
         Flyway.configure().dataSource(dataSource).load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         jdbc.getJdbcOperations().update("DELETE FROM product_sales");
-        repository = new ProductSalesRepository(jdbc);
-        listener = new SalesInfoEventListener(repository);
+        metrics = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        repository = observed(new ProductSalesRepository(jdbc));
+        listener = observed(new SalesInfoEventListener(repository));
+    }
+
+    private <T> T observed(T target) {
+        var factory = new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(target);
+        factory.addAspect(
+                new com.shoppinglive.shopping.observability.ConsumerObservation(
+                        new com.shoppinglive.common.observability.BusinessTelemetry(metrics)));
+        return factory.getProxy();
     }
 
     @Test
@@ -82,6 +92,14 @@ class SalesInfoEventListenerTest {
         listener.consume(record(json(event(1, SalesStatus.SOLD_OUT, 1000))));
 
         assertThat(stored().get(PRODUCT).price()).isEqualTo(27000);
+        assertThat(metrics.get("shoppinglive.consumer").tag("result", "applied").timer().count())
+                .isEqualTo(1);
+        assertThat(
+                        metrics.get("shoppinglive.consumer")
+                                .tag("result", "duplicate_or_stale")
+                                .timer()
+                                .count())
+                .isEqualTo(2);
     }
 
     @Test
@@ -129,8 +147,13 @@ class SalesInfoEventListenerTest {
                 .thenThrow(new DataAccessResourceFailureException("db down"));
         String raw = json(event(2, SalesStatus.ON_SALE, 27000));
 
-        assertThatThrownBy(() -> new SalesInfoEventListener(failing).consume(record(raw)))
+        assertThatThrownBy(
+                        () ->
+                                observed(new SalesInfoEventListener(observed(failing)))
+                                        .consume(record(raw)))
                 .isInstanceOf(DataAccessResourceFailureException.class);
+        assertThat(metrics.get("shoppinglive.consumer.failures").counter().count()).isEqualTo(1);
+        assertThat(metrics.find("shoppinglive.consumer").timer()).isNull();
     }
 
     static Stream<Arguments> invalidMessages() {

@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
+import org.hibernate.dialect.PostgreSQLDialect;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -83,6 +85,54 @@ class MemberCommerceMigrationPostgresTest {
                                         + "' AND table_name = 'orders' AND column_name = 'lookup_password_hash'"))
                 .isZero();
         assertThat(count("SELECT count(*) FROM orders")).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("최신 주문 스키마는 유니크·외래키·필수값·수량 제약을 구별 가능한 오류로 보고한다")
+    void reportsDistinctOrderConstraintsAfterMigration() throws Exception {
+        migration(null).migrate();
+        sale();
+        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "key");
+        memberOrderWithDiscountSnapshot(2, "22222222-2222-4222-8222-222222222222", "other");
+
+        assertOrderViolation(
+                "UPDATE orders SET order_number='member-1' WHERE id=2",
+                "23505",
+                "uk_orders_order_number");
+        assertOrderViolation(
+                "UPDATE orders SET member_id='11111111-1111-4111-8111-111111111111',idempotency_key='key' WHERE id=2",
+                "23505",
+                "uk_orders_member_idempotency");
+        assertOrderViolation(
+                "UPDATE orders SET sales_info_id=999999 WHERE id=2",
+                "23503",
+                "fk_orders_sales_info");
+        assertOrderViolation("UPDATE orders SET member_id=NULL WHERE id=2", "23502", null);
+        assertOrderViolation(
+                "UPDATE orders SET quantity=0 WHERE id=2", "23514", "ck_orders_quantity_positive");
+        assertThat(count("SELECT count(*) FROM orders")).isEqualTo(2);
+        assertThat(
+                        count(
+                                "SELECT count(*) FROM orders WHERE quantity=1 AND sales_info_id=1 AND member_id IS NOT NULL"))
+                .isEqualTo(2);
+        assertThat(count("SELECT available FROM sales_stock WHERE sales_info_id=1")).isEqualTo(10);
+        assertThat(count("SELECT reserved FROM sales_stock WHERE sales_info_id=1")).isZero();
+    }
+
+    private void assertOrderViolation(String statement, String state, String constraint) {
+        assertThatThrownBy(() -> sql(statement))
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        failure -> {
+                            assertThat(failure.getSQLState()).isEqualTo(state);
+                            if (constraint != null) {
+                                assertThat(
+                                                new PostgreSQLDialect()
+                                                        .getViolatedConstraintNameExtractor()
+                                                        .extractConstraintName(failure))
+                                        .isEqualTo(constraint);
+                            }
+                        });
     }
 
     @DisplayName("결제 묶음 마이그레이션은 기존 주문과 최근 결제 시도를 연결한다")
