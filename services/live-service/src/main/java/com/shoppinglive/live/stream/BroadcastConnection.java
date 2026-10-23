@@ -1,5 +1,7 @@
 package com.shoppinglive.live.stream;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
@@ -24,7 +26,7 @@ final class BroadcastConnection {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean completed = new AtomicBoolean();
     private final AtomicBoolean active = new AtomicBoolean();
-    private StreamEvent firstEvent;
+    private List<StreamEvent> firstEvents = List.of();
     private volatile StreamEvent terminalEvent;
 
     BroadcastConnection(
@@ -53,13 +55,20 @@ final class BroadcastConnection {
         }
     }
 
-    /** 상태 확인 전 이벤트는 큐에만 쌓고, 준비 이벤트부터 전송을 시작한다. */
     void activate(final StreamEvent ready) {
+        activate(ready, List.of());
+    }
+
+    /** 상태 확인 전 이벤트는 큐에만 쌓고, 준비 이벤트와 재전송 이벤트부터 전송을 시작한다. 재전송 이벤트는 대기 한도에 세지 않으므로 호출자가 개수를 제한한다. */
+    void activate(final StreamEvent ready, final List<StreamEvent> replay) {
         synchronized (this) {
             if (closed.get() || active.get()) {
                 return;
             }
-            firstEvent = ready;
+            final List<StreamEvent> head = new ArrayList<>(replay.size() + 1);
+            head.add(ready);
+            head.addAll(replay);
+            firstEvents = head;
             active.set(true);
         }
         scheduleDrain();
@@ -116,11 +125,15 @@ final class BroadcastConnection {
 
     private void drain() {
         try {
-            StreamEvent event = firstEvent;
-            firstEvent = null;
-            if (event == null) {
-                event = pending.poll();
+            final List<StreamEvent> head = firstEvents;
+            firstEvents = List.of();
+            for (final StreamEvent first : head) {
+                if (closed.get()) {
+                    break;
+                }
+                send(first);
             }
+            StreamEvent event = pending.poll();
             while (event != null && !closed.get()) {
                 send(event);
                 if (event == terminalEvent) {

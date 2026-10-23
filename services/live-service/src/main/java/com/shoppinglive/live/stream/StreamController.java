@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -27,14 +28,19 @@ public class StreamController {
         this.streams = streams;
     }
 
-    /** X-Accel-Buffering 은 nginx 계열 프록시가 이벤트를 모아 두지 않게 한다. */
+    /**
+     * X-Accel-Buffering 은 nginx 계열 프록시가 이벤트를 모아 두지 않게 한다. Last-Event-ID 는 브라우저 EventSource 가 재연결 때
+     * 마지막으로 받은 id 를 담아 보낸다.
+     */
     @GetMapping("/v1/broadcasts/{id}/events")
-    public ResponseEntity<SseEmitter> events(@PathVariable final long id) {
+    public ResponseEntity<SseEmitter> events(
+            @PathVariable final long id,
+            @RequestHeader(name = "Last-Event-ID", required = false) final String lastEventId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .cacheControl(CacheControl.noCache())
                 .header("X-Accel-Buffering", "no")
-                .body(streams.open(id));
+                .body(streams.open(id, lastEventId));
     }
 
     /**
