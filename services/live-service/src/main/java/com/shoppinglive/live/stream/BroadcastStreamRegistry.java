@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * 이 pod 에 붙은 SSE 연결만 방송별로 보관한다. 다른 pod 의 연결은 알지 못한다. 전송은 공용 writer 가 맡는다. 연결 하나는 대기 중인 전송 작업을 최대
- * 1개만 가지므로 작업 큐의 크기는 연결 수를 넘지 않는다.
+ * 이 pod 에 붙은 SSE 연결만 방송별로 보관한다. 다른 pod 의 연결은 알지 못한다. 전송은 writer 가 맡는다. 연결 하나는 전송 작업을 동시에 최대 1개만
+ * 가지므로 writer 수는 연결 수를 넘지 않는다.
  */
 @Component
 @EnableConfigurationProperties(StreamProperties.class)
@@ -24,17 +24,18 @@ public class BroadcastStreamRegistry {
     private static final Logger log = LoggerFactory.getLogger(BroadcastStreamRegistry.class);
     private final Map<Long, Set<BroadcastConnection>> connections = new ConcurrentHashMap<>();
     private final StreamProperties properties;
-    // ponytail: 멈춘 클라이언트는 컨테이너 write timeout(Tomcat connection-timeout)까지 writer 하나를 붙잡는다.
-    // 멈춘 연결이 writer 수만큼 겹치면 그동안 이 pod 의 전송이 모두 밀리고, 밀린 연결은 대기량 초과로 닫힐 수 있다.
-    // 부하·장애 테스트에서 측정한 뒤 writer 수 조정 또는 non-blocking 전송으로 바꾼다.
+    // 멈춘 클라이언트는 Tomcat 쓰기 timeout(connection-timeout, 기본 60초)까지 writer 하나를 붙잡는다.
+    // 고정 크기 풀이면 멈춘 연결이 writer 수만큼 겹칠 때 이 pod 의 전송이 모두 멈춘다(StalledViewerRedisTest).
+    // 그래서 전송마다 가상 스레드를 쓴다. 다만 Tomcat 10.1 의 블로킹 쓰기는 synchronized 안에서 wait 하므로
+    // Java 21 에서는 운반 스레드를 붙잡고, JDK 가 운반 스레드를 최대 256개까지 늘려 보충한다(JEP 444).
+    // 동시에 멈춘 연결이 그보다 많아지면 다시 밀린다.
     private final ExecutorService writers;
 
     public BroadcastStreamRegistry(final StreamProperties properties) {
         this.properties = properties;
         this.writers =
-                Executors.newFixedThreadPool(
-                        properties.writerThreads(),
-                        Thread.ofPlatform().name("live-stream-writer-", 0).daemon().factory());
+                Executors.newThreadPerTaskExecutor(
+                        Thread.ofVirtual().name("live-stream-writer-", 0).factory());
     }
 
     /** timeout·오류·완료 어느 경로로 끝나도 등록을 지운다. */

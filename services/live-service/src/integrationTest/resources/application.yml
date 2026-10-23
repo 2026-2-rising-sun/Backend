@@ -9,6 +9,8 @@ spring:
     username: sa
     password:
   jpa:
+    # 이 파일이 main application.yml 을 대신하므로 운영과 같게 둔다(BroadcastStreamHttpTest 가 검증).
+    open-in-view: false
     hibernate:
       ddl-auto: create-drop
   # 마이그레이션은 PostgreSQL 전용 구문(partial unique index)을 쓰므로 H2 에서는 돌리지 않는다.

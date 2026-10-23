@@ -5,14 +5,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.shoppinglive.live.broadcast.dto.BroadcastInput;
 import com.shoppinglive.live.broadcast.service.BroadcastService;
 import com.shoppinglive.live.security.LiveSecuritySupport;
+import com.zaxxer.hikari.HikariDataSource;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +35,7 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
     @Autowired BroadcastService broadcasts;
     @Autowired BroadcastStreamRegistry registry;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource dataSource;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -71,6 +79,56 @@ class BroadcastStreamHttpTest extends LiveSecuritySupport {
             assertThat(stream.nextNonEmpty()).isEqualTo("event:stream.ready");
             assertThat(stream.nextNonEmpty()).isEqualTo("data:{\"broadcastId\":" + id + "}");
             assertThat(registry.connectionCount(id)).isEqualTo(1);
+        }
+    }
+
+    @DisplayName("두 시청자가 동시에 연결하기를 반복해도 모든 연결이 stream.ready 를 받는다")
+    @Test
+    void concurrentConnectionsAllReceiveReady() throws Exception {
+        final long id = broadcast("stream-concurrent", "LIVE");
+        // 실패 시 멈춘 연결 작업을 기다리지 않도록 close 대신 shutdownNow 로 끊는다.
+        final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            for (int n = 0; n < 300; n++) {
+                // 응답 확정과 보안 헤더 쓰기가 다른 스레드에서 겹치면 Tomcat 헤더가 깨져 연결이 응답 없이 멈췄다.
+                final Future<SseTestClient> first = pool.submit(() -> new SseTestClient(port, id));
+                final Future<SseTestClient> second = pool.submit(() -> new SseTestClient(port, id));
+                try (SseTestClient a = first.get(5, TimeUnit.SECONDS);
+                        SseTestClient b = second.get(5, TimeUnit.SECONDS)) {
+                    assertThat(a.nextNonEmpty()).as("%d번째 첫 연결", n).isEqualTo("event:stream.ready");
+                    assertThat(b.nextNonEmpty())
+                            .as("%d번째 둘째 연결", n)
+                            .isEqualTo("event:stream.ready");
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @DisplayName("DB 연결 풀보다 많은 시청자가 연결을 유지해도 모두 stream.ready 를 받는다")
+    @Test
+    void openStreamsDoNotHoldDatabaseConnections() throws Exception {
+        final long id = broadcast("stream-pool", "LIVE");
+        final int viewers = ((HikariDataSource) dataSource).getMaximumPoolSize() + 5;
+        final List<SseTestClient> streams = new ArrayList<>();
+        // 실패 시 멈춘 연결 작업을 기다리지 않도록 close 대신 shutdownNow 로 끊는다.
+        final ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();
+        try {
+            for (int n = 0; n < viewers; n++) {
+                // 연결이 DB 연결을 붙잡으면 풀이 바닥난 뒤의 연결은 응답 헤더조차 받지 못한다.
+                final SseTestClient stream =
+                        pool.submit(() -> new SseTestClient(port, id)).get(10, TimeUnit.SECONDS);
+                streams.add(stream);
+                assertThat(stream.nextNonEmpty())
+                        .as("%d번째 연결", n + 1)
+                        .isEqualTo("event:stream.ready");
+            }
+        } finally {
+            pool.shutdownNow();
+            for (final SseTestClient stream : streams) {
+                stream.close();
+            }
         }
     }
 

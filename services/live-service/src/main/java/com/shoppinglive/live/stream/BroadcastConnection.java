@@ -1,5 +1,6 @@
 package com.shoppinglive.live.stream;
 
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executor;
@@ -24,7 +25,7 @@ final class BroadcastConnection {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean completed = new AtomicBoolean();
     private final AtomicBoolean active = new AtomicBoolean();
-    private StreamEvent firstEvent;
+    private List<StreamEvent> firstEvents = List.of();
     private volatile StreamEvent terminalEvent;
 
     BroadcastConnection(
@@ -53,16 +54,32 @@ final class BroadcastConnection {
         }
     }
 
-    /** 상태 확인 전 이벤트는 큐에만 쌓고, 준비 이벤트부터 전송을 시작한다. */
-    void activate(final StreamEvent ready) {
+    void activate(final StreamEvent first) {
+        activate(List.of(first));
+    }
+
+    /** 상태 확인 전 이벤트는 큐에만 쌓고, 주어진 이벤트부터 전송을 시작한다. 이 이벤트들은 대기 한도에 세지 않으므로 호출자가 개수를 제한한다. */
+    void activate(final List<StreamEvent> first) {
         synchronized (this) {
             if (closed.get() || active.get()) {
                 return;
             }
-            firstEvent = ready;
+            firstEvents = List.copyOf(first);
             active.set(true);
         }
         scheduleDrain();
+    }
+
+    /**
+     * 활성화 전에 호출한 스레드에서 바로 보낸다. 컨트롤러가 반환하기 전에 요청 스레드에서 부르면 Spring 이 담아 두었다가 요청 스레드에서 응답을 확정한다. 그러면
+     * 보안 헤더 필터가 처리 뒤에 헤더를 쓰는 동안 writer 스레드가 응답을 확정해 Tomcat 헤더를 동시에 고치는 일이 없다(Servlet 응답 객체는 스레드
+     * 안전하지 않다). 활성화 전이라 drain 과 겹치지 않는다.
+     */
+    void sendBeforeActivate(final StreamEvent event) throws Exception {
+        if (active.get()) {
+            throw new IllegalStateException("이미 활성화된 연결입니다.");
+        }
+        send(event);
     }
 
     /** 마지막 이벤트 등록과 추가 전송 차단을 함께 처리한다. 전송이 끝나면 writer가 닫는다. */
@@ -116,11 +133,15 @@ final class BroadcastConnection {
 
     private void drain() {
         try {
-            StreamEvent event = firstEvent;
-            firstEvent = null;
-            if (event == null) {
-                event = pending.poll();
+            final List<StreamEvent> head = firstEvents;
+            firstEvents = List.of();
+            for (final StreamEvent first : head) {
+                if (closed.get()) {
+                    break;
+                }
+                send(first);
             }
+            StreamEvent event = pending.poll();
             while (event != null && !closed.get()) {
                 send(event);
                 if (event == terminalEvent) {

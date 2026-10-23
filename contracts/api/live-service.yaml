@@ -718,6 +718,8 @@ paths:
 
         저장 후 SSE `chat.created` 로 전달을 시도한다. 전달에 실패해도 응답은 201 이고 채팅은 최근 내역에서 조회된다.
 
+        방송별로 초당 5건(설정값)을 넘는 일반 채팅은 저장만 하고 실시간 전달을 생략한다. SELLER 역할의 채팅은 생략하지 않는다. 작성자는 이 응답으로 자기 채팅을 표시한다.
+
         '
       operationId: createBroadcastChat
       tags:
@@ -1003,7 +1005,7 @@ paths:
 
         | `stream.ready` | `StreamReadyEvent` | 연결 직후 한 번 |
 
-        | `chat.created` | `ChatMessage` (`id:` 는 messageId) | 채팅 저장 후 |
+        | `chat.created` | `ChatMessage` (`id:` 는 messageId) | 채팅 저장 후. 방송별 초당 예산을 넘은 일반 채팅은 생략 |
 
         | `likes.updated` | `LikeTotal` | 커밋 version이 바뀌면 약 1초 간격 |
 
@@ -1021,7 +1023,9 @@ paths:
         - `broadcast.ended`를 받으면 열린 프로모션 표시를 종료하고 재연결하지 않는다. 마지막 좋아요 합계를 GET으로 조회한다. 받지 못하고 끊겼다면 재연결이
         409 일 때 방송 상태와 합계를 조회한다.
 
-        - 전달은 보장하지 않는다. `Last-Event-ID`로 놓친 이벤트를 다시 보내지 않는다. 재연결 후 채팅은 최근 50건, 좋아요와 프로모션은 현재 상태 조회로 복구한다.
+        - 전달은 보장하지 않는다. 재연결 요청의 `Last-Event-ID`(마지막으로 받은 messageId)가 최근 2분 안의 채팅이면 `stream.ready`
+        뒤에 그 채팅 시각 5초 전부터의 채팅을 `chat.created`로 다시 보낸다(최대 256건). 겹치는 채팅은 messageId로 거른다. 채팅 외 이벤트는 다시 보내지 않는다.
+        재연결 후 채팅은 최근 50건, 좋아요와 프로모션은 현재 상태 조회로도 복구한다.
 
         - 약 15초마다 comment 줄(`:heartbeat`)이 온다. 수신이 느려 대기량을 넘으면 서버가 연결을 닫는다.
 
@@ -1033,6 +1037,13 @@ paths:
       - Broadcast Event Stream
       parameters:
       - $ref: '#/components/parameters/BroadcastId'
+      - name: Last-Event-ID
+        in: header
+        required: false
+        description: 브라우저 EventSource 가 재연결 때 마지막으로 받은 이벤트 id(messageId)를 담아 보낸다. 숫자가 아니거나 최근 2분 밖이면 무시한다.
+        schema:
+          type: string
+        example: '9001'
       responses:
         '200':
           description: 이벤트 스트림

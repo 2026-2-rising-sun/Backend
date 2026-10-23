@@ -20,7 +20,8 @@ class StreamControllerTest {
     @DisplayName("스트림 시작 전 DB 오류는 JSON 응답으로 반환한다")
     void databaseFailureBeforeStreamingReturnsJson() throws Exception {
         final BroadcastStreamService streams = mock(BroadcastStreamService.class);
-        when(streams.open(1L)).thenThrow(new DataAccessResourceFailureException("DB를 사용할 수 없습니다."));
+        when(streams.open(1L, null))
+                .thenThrow(new DataAccessResourceFailureException("DB를 사용할 수 없습니다."));
         final MockMvc mvc =
                 MockMvcBuilders.standaloneSetup(new StreamController(streams))
                         .setControllerAdvice(new GlobalExceptionHandler())

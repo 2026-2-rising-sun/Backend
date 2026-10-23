@@ -20,19 +20,27 @@ final class SseTestClient implements AutoCloseable {
     private final BlockingQueue<String> lines = new LinkedBlockingQueue<>();
 
     SseTestClient(final int port, final long broadcastId) throws Exception {
+        this(port, broadcastId, null);
+    }
+
+    /** 브라우저 EventSource 의 재연결처럼 마지막으로 받은 id 를 Last-Event-ID 헤더로 보낸다. */
+    SseTestClient(final int port, final long broadcastId, final String lastEventId)
+            throws Exception {
+        final HttpRequest.Builder request =
+                HttpRequest.newBuilder(
+                                URI.create(
+                                        "http://127.0.0.1:"
+                                                + port
+                                                + "/v1/broadcasts/"
+                                                + broadcastId
+                                                + "/events"))
+                        .header("Accept", "text/event-stream");
+        if (lastEventId != null) {
+            request.header("Last-Event-ID", lastEventId);
+        }
         response =
                 HttpClient.newHttpClient()
-                        .send(
-                                HttpRequest.newBuilder(
-                                                URI.create(
-                                                        "http://127.0.0.1:"
-                                                                + port
-                                                                + "/v1/broadcasts/"
-                                                                + broadcastId
-                                                                + "/events"))
-                                        .header("Accept", "text/event-stream")
-                                        .build(),
-                                HttpResponse.BodyHandlers.ofInputStream());
+                        .send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
         Thread.ofVirtual()
                 .start(
                         () -> {
