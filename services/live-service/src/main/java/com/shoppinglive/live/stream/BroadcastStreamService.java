@@ -52,9 +52,14 @@ public class BroadcastStreamService {
             connection.close();
             throw e;
         }
-        connection.activate(
-                StreamEvent.of("stream.ready", Map.of("broadcastId", broadcastId)),
-                missedChats(broadcastId, lastEventId));
+        try {
+            connection.sendBeforeActivate(
+                    StreamEvent.of("stream.ready", Map.of("broadcastId", broadcastId)));
+        } catch (Exception e) {
+            connection.close();
+            throw new IllegalStateException("stream.ready 를 보내지 못했습니다.", e);
+        }
+        connection.activate(missedChats(broadcastId, lastEventId));
         return emitter;
     }
 

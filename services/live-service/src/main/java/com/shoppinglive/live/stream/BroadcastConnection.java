@@ -1,6 +1,5 @@
 package com.shoppinglive.live.stream;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -55,23 +54,32 @@ final class BroadcastConnection {
         }
     }
 
-    void activate(final StreamEvent ready) {
-        activate(ready, List.of());
+    void activate(final StreamEvent first) {
+        activate(List.of(first));
     }
 
-    /** 상태 확인 전 이벤트는 큐에만 쌓고, 준비 이벤트와 재전송 이벤트부터 전송을 시작한다. 재전송 이벤트는 대기 한도에 세지 않으므로 호출자가 개수를 제한한다. */
-    void activate(final StreamEvent ready, final List<StreamEvent> replay) {
+    /** 상태 확인 전 이벤트는 큐에만 쌓고, 주어진 이벤트부터 전송을 시작한다. 이 이벤트들은 대기 한도에 세지 않으므로 호출자가 개수를 제한한다. */
+    void activate(final List<StreamEvent> first) {
         synchronized (this) {
             if (closed.get() || active.get()) {
                 return;
             }
-            final List<StreamEvent> head = new ArrayList<>(replay.size() + 1);
-            head.add(ready);
-            head.addAll(replay);
-            firstEvents = head;
+            firstEvents = List.copyOf(first);
             active.set(true);
         }
         scheduleDrain();
+    }
+
+    /**
+     * 활성화 전에 호출한 스레드에서 바로 보낸다. 컨트롤러가 반환하기 전에 요청 스레드에서 부르면 Spring 이 담아 두었다가 요청 스레드에서 응답을 확정한다. 그러면
+     * 보안 헤더 필터가 처리 뒤에 헤더를 쓰는 동안 writer 스레드가 응답을 확정해 Tomcat 헤더를 동시에 고치는 일이 없다(Servlet 응답 객체는 스레드
+     * 안전하지 않다). 활성화 전이라 drain 과 겹치지 않는다.
+     */
+    void sendBeforeActivate(final StreamEvent event) throws Exception {
+        if (active.get()) {
+            throw new IllegalStateException("이미 활성화된 연결입니다.");
+        }
+        send(event);
     }
 
     /** 마지막 이벤트 등록과 추가 전송 차단을 함께 처리한다. 전송이 끝나면 writer가 닫는다. */
