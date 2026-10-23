@@ -62,6 +62,9 @@ class ChatRealtimeRedisTest extends LiveSecuritySupport {
                 "spring.data.redis.port",
                 () -> System.getenv().getOrDefault("LIVE_REDIS_PORT", "56379"));
         properties.add("live.stream.subscribe-retry", () -> "200ms");
+        // 전달 경로를 검증하므로 화면 예산으로 생략되지 않게 한다. 테스트 컨텍스트마다 H2 방송 id 가 1부터 다시 시작해
+        // 다른 테스트가 같은 초에 쓴 예산 키와 겹칠 수 있다. 예산 동작은 ChatRelayBudgetRedisTest 가 검증한다.
+        properties.add("live.stream.chat-budget-per-second", () -> "1000000");
     }
 
     @BeforeEach
