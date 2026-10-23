@@ -2,6 +2,11 @@ package com.shoppinglive.notification.broadcast.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
+import com.shoppinglive.notification.broadcast.repository.BroadcastAlertRepository;
+import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
+import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
+import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +29,7 @@ class BroadcastStartNotificationTest {
     private static final String STARTED_AT = "2026-10-20T12:00:00Z";
 
     private NamedParameterJdbcTemplate jdbc;
+    private BroadcastScheduleRepository schedules;
     private BroadcastEventListener listener;
 
     @BeforeEach
@@ -42,18 +48,14 @@ class BroadcastStartNotificationTest {
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         jdbc.getJdbcTemplate().update("DELETE FROM notification");
         jdbc.getJdbcTemplate().update("DELETE FROM broadcast_alert");
-        var alerts =
-                new com.shoppinglive.notification.broadcast.repository.BroadcastAlertRepository(
-                        jdbc);
+        jdbc.getJdbcTemplate().update("DELETE FROM broadcast_schedule");
+        BroadcastAlertRepository alerts = new BroadcastAlertRepository(jdbc);
+        schedules = new BroadcastScheduleRepository(jdbc);
         listener =
                 new BroadcastEventListener(
-                        new com.shoppinglive.notification.broadcast.repository
-                                .BroadcastScheduleRepository(jdbc),
-                        new com.shoppinglive.notification.broadcast.service
-                                .BroadcastStartNotificationService(
-                                alerts,
-                                new com.shoppinglive.notification.inbox.repository
-                                        .NotificationWriteRepository(jdbc)));
+                        schedules,
+                        new BroadcastStartNotificationService(
+                                alerts, new NotificationWriteRepository(jdbc)));
         alerts.register(MEMBER_A, BROADCAST);
         alerts.register(MEMBER_B, BROADCAST);
     }
@@ -110,6 +112,32 @@ class BroadcastStartNotificationTest {
         assertThat(notifications()).isEmpty();
     }
 
+    @Test
+    @DisplayName("시작 이벤트를 받으면 일정 사본에 시작 시각을 기록한다 — 임박 알림 대상에서 빼는 근거다")
+    void recordsStartedAtOnSchedule() {
+        // 예정보다 일찍 시작했다. 예정 시각이 아직 10분 뒤라서, 기록하지 않으면
+        // 임박 알림 스케줄러가 방송 중인 이 방송을 "곧 시작" 으로 잡는다.
+        schedules.apply(
+                new BroadcastSchedule(
+                        BROADCAST, 1, "가을 신상 라이브", Instant.parse("2026-10-20T12:10:00Z")));
+
+        listener.consume(record(started("가을 신상 라이브")));
+
+        assertThat(startedAt()).isEqualTo(Instant.parse(STARTED_AT));
+    }
+
+    @Test
+    @DisplayName("일정 사본이 없어도 시작 알림은 만든다")
+    void createsStartNotificationsWithoutScheduleCopy() {
+        listener.consume(record(started("가을 신상 라이브")));
+
+        assertThat(notifications()).hasSize(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM broadcast_schedule", Map.of(), Integer.class))
+                .isZero();
+    }
+
     private List<Map<String, Object>> notifications() {
         return jdbc.queryForList(
                 """
@@ -119,9 +147,21 @@ class BroadcastStartNotificationTest {
                 Map.of());
     }
 
-    /** 드라이버에 따라 timestamptz 를 OffsetDateTime 이나 Timestamp 로 돌려주므로 둘 다 받는다. */
+    private Instant startedAt() {
+        return toInstant(
+                jdbc.queryForMap(
+                                "SELECT started_at FROM broadcast_schedule"
+                                        + " WHERE broadcast_id = :id",
+                                Map.of("id", BROADCAST))
+                        .get("started_at"));
+    }
+
     private static Instant occurredAt(Map<String, Object> row) {
-        Object value = row.get("occurred_at");
+        return toInstant(row.get("occurred_at"));
+    }
+
+    /** 드라이버에 따라 timestamptz 를 OffsetDateTime 이나 Timestamp 로 돌려주므로 둘 다 받는다. */
+    private static Instant toInstant(Object value) {
         return value instanceof java.time.OffsetDateTime time
                 ? time.toInstant()
                 : ((java.sql.Timestamp) value).toInstant();

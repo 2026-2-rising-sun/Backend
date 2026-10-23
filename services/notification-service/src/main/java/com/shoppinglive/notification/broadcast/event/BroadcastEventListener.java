@@ -3,6 +3,7 @@ package com.shoppinglive.notification.broadcast.event;
 import com.shoppinglive.notification.broadcast.entity.BroadcastSchedule;
 import com.shoppinglive.notification.broadcast.repository.BroadcastScheduleRepository;
 import com.shoppinglive.notification.broadcast.service.BroadcastStartNotificationService;
+import java.time.Instant;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -56,15 +57,22 @@ public class BroadcastEventListener {
      *
      * <p>알림 시각은 받은 시각이 아니라 payload 의 {@code startedAt} 을 쓴다. 이벤트가 늦게 도착해도 사용자에게는 실제로 일어난 순서로 보여야
      * 한다.
+     *
+     * <p>알림을 먼저 만들고 시작 표시를 나중에 한다. 표시를 먼저 하면 그 뒤 알림 만들기가 실패했을 때 재시도에서 복구할 근거가 사라진다. 반대로 하면 표시가 실패해도
+     * 재시도에서 다시 하고, 이미 만든 알림은 {@code (이벤트ID, 회원ID)} 유일 제약이 걸러 준다.
      */
     private void createStartNotifications(LiveBroadcastEventMessage message, String messageKey) {
         long broadcastId = message.payloadLongAtLeast("broadcastId", 1);
         message.requireKeyMatches(messageKey, broadcastId);
+        Instant startedAt = message.payloadInstant("startedAt");
         startNotifications.create(
                 message.eventId(),
                 message.eventType(),
                 broadcastId,
                 message.payloadText("title", TITLE_MAX_LENGTH),
-                message.payloadInstant("startedAt"));
+                startedAt);
+        // 시작한 방송은 임박 알림 대상에서 빠진다. 예정보다 일찍 시작하면 예정 시각이 아직
+        // 10분 안이어서, 표시하지 않으면 보고 있는 사람에게 "곧 시작합니다" 가 간다.
+        schedules.markStarted(broadcastId, startedAt);
     }
 }
