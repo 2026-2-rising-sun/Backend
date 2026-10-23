@@ -2,6 +2,7 @@ package com.shoppinglive.notification.inbox.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -13,12 +14,26 @@ import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 /** 스케줄러가 기준 시각을 어떻게 정하고, 실패를 어떻게 다루는지 확인한다. 지우는 SQL 은 저장소 테스트가 본다. */
 @DisplayName("알림 보관 기간 스케줄러")
 class NotificationRetentionSchedulerTest {
+
+    @ParameterizedTest
+    @ValueSource(longs = {0, -1})
+    @DisplayName("보관 기간이 0 이하이면 알림 삭제를 시작하지 않고 설정 오류를 알린다")
+    void rejectsNonPositiveRetention(long days) {
+        assertThatThrownBy(
+                        () ->
+                                new NotificationRetentionScheduler(
+                                        mock(NotificationWriteRepository.class),
+                                        Duration.ofDays(days)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Test
     @DisplayName("보관 기간을 설정으로 바꾸면 지우는 기준 시각도 따라 바뀐다")
@@ -35,7 +50,7 @@ class NotificationRetentionSchedulerTest {
     }
 
     @Test
-    @DisplayName("한 주기가 실패해도 던지지 않는다 — 던지면 다음 주기가 돌지 않는다")
+    @DisplayName("삭제 실패를 처리하고 다음 호출에서 다시 시도한다")
     void swallowsFailureSoNextSweepRuns() {
         NotificationWriteRepository failing = mock(NotificationWriteRepository.class);
         when(failing.deleteCreatedBefore(any(), anyInt()))
@@ -45,7 +60,7 @@ class NotificationRetentionSchedulerTest {
 
         assertThatCode(scheduler::run).doesNotThrowAnyException();
 
-        // 다음 주기에 다시 시도한다. 예외를 삼키지 않으면 Spring 이 이 작업을 더 돌리지 않는다.
+        // 다음 예약 실행에서 같은 삭제 작업을 다시 시도할 수 있다.
         assertThatCode(scheduler::run).doesNotThrowAnyException();
     }
 }

@@ -2,6 +2,7 @@ package com.shoppinglive.notification.inbox.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.shoppinglive.notification.NotificationTestDatabase;
 import com.shoppinglive.notification.inbox.entity.NotificationLinkType;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @DisplayName("알림 보관 기간 정리")
 class NotificationRetentionTest {
@@ -27,11 +27,7 @@ class NotificationRetentionTest {
 
     @BeforeEach
     void setUp() {
-        DataSource dataSource =
-                new DriverManagerDataSource(
-                        "jdbc:h2:mem:notification_retention_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-                        "sa",
-                        "");
+        DataSource dataSource = NotificationTestDatabase.create("notification_retention_test");
         Flyway.configure()
                 .dataSource(dataSource)
                 .locations("classpath:db/migration")
@@ -47,12 +43,13 @@ class NotificationRetentionTest {
     @DisplayName("기준 시각보다 먼저 저장된 알림만 지운다")
     void deletesOnlyOlderNotifications() {
         save("old", NOW.minusSeconds(60));
+        save("boundary", NOW);
         save("new", NOW.plusSeconds(60));
 
         int deleted = notifications.deleteCreatedBefore(NOW, 100);
 
         assertThat(deleted).isEqualTo(1);
-        assertThat(remainingEventIds()).containsExactly("new");
+        assertThat(remainingEventIds()).containsExactly("boundary", "new");
     }
 
     @Test
@@ -75,6 +72,29 @@ class NotificationRetentionTest {
 
         assertThat(notifications.deleteCreatedBefore(NOW, 100)).isZero();
         assertThat(remainingEventIds()).containsExactly("late");
+    }
+
+    @Test
+    @DisplayName("두 정리 작업이 동시에 실행돼도 오래된 알림만 삭제한다")
+    void concurrentSweepsKeepRecentNotifications() throws Exception {
+        for (int i = 0; i < 20; i++) save("old-" + i, NOW.minusSeconds(60));
+        save("new", NOW.plusSeconds(60));
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Integer> sweep =
+                    () -> {
+                        start.await();
+                        return notifications.deleteCreatedBefore(NOW, 20);
+                    };
+            var first = workers.submit(sweep);
+            var second = workers.submit(sweep);
+            start.countDown();
+            assertThat(
+                            first.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                                    + second.get(10, java.util.concurrent.TimeUnit.SECONDS))
+                    .isEqualTo(20);
+        }
+        assertThat(remainingEventIds()).containsExactly("new");
     }
 
     private void save(String eventId, Instant createdAt) {

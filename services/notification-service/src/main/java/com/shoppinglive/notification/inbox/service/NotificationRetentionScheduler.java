@@ -31,6 +31,9 @@ public class NotificationRetentionScheduler {
     public NotificationRetentionScheduler(
             NotificationWriteRepository notifications,
             @Value("${notification.retention:P30D}") Duration retention) {
+        if (retention.isZero() || retention.isNegative()) {
+            throw new IllegalArgumentException("알림 보관 기간은 0보다 커야 합니다");
+        }
         this.notifications = notifications;
         this.retention = retention;
     }
@@ -44,7 +47,7 @@ public class NotificationRetentionScheduler {
                 log.info("old notifications deleted count={} retention={}", deleted, retention);
             }
         } catch (RuntimeException e) {
-            // 던지면 다음 주기가 돌지 않는다. 한 주기가 실패해도 하루 뒤 다시 시도해야 한다.
+            // 실패한 주기를 기록하고 다음 예약 실행에서 다시 시도한다.
             log.error("notification retention sweep failed", e);
         }
     }
