@@ -3,6 +3,7 @@ package com.shoppinglive.notification.commerce.event;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.notification.commerce.repository.PaymentGroupRepository;
 import com.shoppinglive.notification.event.InvalidEventMessageException;
 import com.shoppinglive.notification.inbox.repository.NotificationWriteRepository;
 import java.util.*;
@@ -45,7 +46,11 @@ class CommerceNotificationTest {
         repository.addAspect(observation);
         var delivery =
                 new org.springframework.aop.aspectj.annotation.AspectJProxyFactory(
-                        new CommerceNotificationListener(repository.getProxy()));
+                        new CommerceNotificationListener(
+                                repository.getProxy(),
+                                new PaymentGroupTracker(
+                                        new PaymentGroupRepository(
+                                                new NamedParameterJdbcTemplate(ds)))));
         delivery.addAspect(observation);
         listener = delivery.getProxy();
     }

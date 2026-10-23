@@ -25,13 +25,19 @@ public class CommerceNotificationListener {
                     "OrderExpired",
                     "RefundCompleted");
     private final NotificationWriteRepository notifications;
+    private final PaymentGroupTracker paymentGroups;
 
-    public CommerceNotificationListener(NotificationWriteRepository notifications) {
+    public CommerceNotificationListener(
+            NotificationWriteRepository notifications, PaymentGroupTracker paymentGroups) {
         this.notifications = notifications;
+        this.paymentGroups = paymentGroups;
     }
 
+    // 사본 갱신이 먼저다. 묶음이 끝났다는 표시가 늦으면 그사이 만료 임박 알림이 나갈 수 있다.
+    // 반대로 알림 만들기가 실패해 재시도되어도 사본 갱신은 여러 번 해도 결과가 같다.
     @KafkaListener(topics = {"commerce.payment-group.v1", "commerce.coupon-info.v1"})
     public void consume(ConsumerRecord<String, String> record) {
+        paymentGroups.track(record);
         Message message = parse(record);
         if (message != null)
             notifications.createAll(message.notification(), List.of(message.memberId()));
