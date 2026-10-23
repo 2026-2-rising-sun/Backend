@@ -31,6 +31,7 @@ public class UpcomingBroadcastAlertMetrics implements AutoCloseable {
             FROM broadcast_alert alert
             JOIN broadcast_schedule schedule ON schedule.broadcast_id = alert.broadcast_id
             WHERE schedule.scheduled_at > :now AND schedule.scheduled_at <= :until
+              AND schedule.started_at IS NULL
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
