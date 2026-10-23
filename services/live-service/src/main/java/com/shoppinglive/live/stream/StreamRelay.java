@@ -3,6 +3,8 @@ package com.shoppinglive.live.stream;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
@@ -30,6 +32,15 @@ public class StreamRelay implements MessageListener {
     private final ObjectMapper mapper;
     private final BroadcastStreamRegistry registry;
     private final RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+
+    /**
+     * Redis 는 발행 순서대로 보내지만 container 의 기본 executor(SimpleAsyncTaskExecutor)는 메시지마다 새 스레드에서 리스너를
+     * 부른다. 그러면 이어서 온 메시지끼리 경쟁해 시청자마다 순서가 달라지므로(ChatOrderingRedisTest) 한 스레드가 받은 순서대로 넘긴다.
+     */
+    private final ExecutorService dispatcher =
+            Executors.newSingleThreadExecutor(
+                    Thread.ofPlatform().name("live-stream-relay").daemon().factory());
+
     private volatile boolean subscribed;
 
     record Envelope(String type, long broadcastId, String id, JsonNode data) {}
@@ -42,6 +53,7 @@ public class StreamRelay implements MessageListener {
         this.mapper = mapper;
         this.registry = registry;
         container.setConnectionFactory(redis.getRequiredConnectionFactory());
+        container.setTaskExecutor(dispatcher);
         container.addMessageListener(this, new ChannelTopic(CHANNEL));
         container.afterPropertiesSet();
     }
@@ -108,6 +120,10 @@ public class StreamRelay implements MessageListener {
 
     @PreDestroy
     void stop() throws Exception {
-        container.destroy();
+        try {
+            container.destroy();
+        } finally {
+            dispatcher.shutdown();
+        }
     }
 }
