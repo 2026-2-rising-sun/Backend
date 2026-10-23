@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -162,7 +163,7 @@ class RestockNotificationTest {
         RestockAlertRepository failingAlerts = spy(new RestockAlertRepository(jdbc));
         doThrow(new DataAccessResourceFailureException("db down"))
                 .when(failingAlerts)
-                .deleteByProductId(PRODUCT);
+                .deleteSubscriptions(any());
         SalesInfoEventListener failingListener =
                 new SalesInfoEventListener(
                         new ProductSalesStatusRepository(jdbc),
@@ -216,6 +217,34 @@ class RestockNotificationTest {
                                 .replace(
                                         "\"currency\"", "\"productName\":\"가을 니트\",\"currency\"")));
         assertThat(notifications().getFirst().get("body")).isEqualTo("가을 니트 상품이 재입고되었습니다");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("알림 생성 중 새 신청이나 같은 회원의 재신청이 들어오면 그 신청은 지우지 않는다")
+    void preservesRegistrationsCreatedDuringNotification(boolean resubscribe) {
+        String nextMember = resubscribe ? MEMBER : "22222222-2222-4222-8222-222222222222";
+        var writes = spy(new NotificationWriteRepository(jdbc));
+        doAnswer(
+                        invocation -> {
+                            Object result = invocation.callRealMethod();
+                            if (resubscribe) alerts.unregister(MEMBER, PRODUCT);
+                            alerts.register(nextMember, PRODUCT);
+                            return result;
+                        })
+                .when(writes)
+                .createAll(any(), any());
+        var service = new RestockNotificationService(alerts, writes);
+
+        assertThat(
+                        service.create(
+                                "74b623b8-90ee-4f65-919c-d9ad2ea46fb1",
+                                PRODUCT,
+                                java.time.Instant.parse("2026-10-15T00:00:00Z")))
+                .isEqualTo(1);
+
+        assertThat(notifications()).hasSize(1);
+        assertThat(alerts.exists(nextMember, PRODUCT)).isTrue();
     }
 
     private List<Map<String, Object>> notifications() {
