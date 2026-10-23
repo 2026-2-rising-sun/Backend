@@ -81,6 +81,15 @@ public class BroadcastStreamRegistry {
         return local(broadcastId).size();
     }
 
+    /** 이 pod 에 열려 있는 SSE 연결 전체. 파드 확장 판단에 쓰는 지표의 근거다. */
+    public int connectionCount() {
+        int total = 0;
+        for (Set<BroadcastConnection> local : connections.values()) {
+            total += local.size();
+        }
+        return total;
+    }
+
     @Scheduled(fixedDelayString = "${live.stream.heartbeat:15s}")
     void heartbeat() {
         connections
