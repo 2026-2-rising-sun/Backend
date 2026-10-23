@@ -59,7 +59,12 @@ public class BroadcastStreamService {
             connection.close();
             throw new IllegalStateException("stream.ready 를 보내지 못했습니다.", e);
         }
-        connection.activate(missedChats(broadcastId, lastEventId));
+        try {
+            connection.activate(missedChats(broadcastId, lastEventId));
+        } catch (RuntimeException e) {
+            connection.close();
+            throw e;
+        }
         return emitter;
     }
 
