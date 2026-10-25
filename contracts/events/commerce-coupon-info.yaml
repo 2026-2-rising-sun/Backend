@@ -52,7 +52,7 @@ components:
     couponInfo:
       bindings:
         kafka:
-          key: &id002
+          key:
             type: string
             minLength: 1
             maxLength: 36
@@ -86,7 +86,7 @@ components:
             snapshotVersion: 1
             name: 상품 할인 쿠폰
             fixedDiscount: 1000
-            productIds: &id001
+            productIds:
             - 501
             - 502
             startsAt: '2026-10-15T09:00:00Z'
@@ -119,7 +119,9 @@ components:
             snapshotVersion: 2
             name: 상품 할인 쿠폰
             fixedDiscount: 1000
-            productIds: *id001
+            productIds:
+            - 501
+            - 502
             startsAt: '2026-10-15T09:00:00Z'
             endsAt: '2026-10-16T09:00:00Z'
             expiresAt: '2026-10-17T09:00:00Z'
@@ -150,7 +152,9 @@ components:
             snapshotVersion: 3
             name: 상품 할인 쿠폰
             fixedDiscount: 1000
-            productIds: *id001
+            productIds:
+            - 501
+            - 502
             startsAt: '2026-10-15T09:00:00Z'
             endsAt: '2026-10-16T09:00:00Z'
             expiresAt: '2026-10-17T09:00:00Z'
@@ -219,7 +223,12 @@ components:
           const: 1
         source:
           const: commerce-service
-        aggregateId: *id002
+        aggregateId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          pattern: \S
+          description: 기존 ID를 유지하는 opaque 문자열. UUID 형식으로 한정하지 않는다.
         occurredAt:
           type: string
           format: date-time
@@ -238,7 +247,12 @@ components:
       - expiresAt
       - soldOut
       properties:
-        couponId: *id002
+        couponId:
+          type: string
+          minLength: 1
+          maxLength: 36
+          pattern: \S
+          description: 기존 ID를 유지하는 opaque 문자열. UUID 형식으로 한정하지 않는다.
         snapshotVersion:
           type: integer
           format: int64
