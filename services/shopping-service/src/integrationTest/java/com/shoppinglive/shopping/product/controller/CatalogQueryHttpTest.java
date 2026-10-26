@@ -1,8 +1,10 @@
 package com.shoppinglive.shopping.product.controller;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,6 +33,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest(
         properties =
@@ -238,6 +241,40 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
                 assertThat(item.path("purchasable").asBoolean()).isFalse();
             }
         }
+    }
+
+    @Test
+    @DisplayName("조건을 모두 생략한 목록은 sort=LATEST와 같은 페이지와 커서를 반환하고 이전 형식 커서는 거부한다")
+    void omittedConditionsMatchLatestAndRejectLegacyCursor() throws Exception {
+        for (int i = 0; i < 3; i++)
+            product("상품 " + i, 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        String bare = page(get("/v1/products").param("size", "2"));
+        assertThat(bare)
+                .isEqualTo(page(get("/v1/products").param("sort", "LATEST").param("size", "2")));
+        String cursor = mapper.readTree(bare).path("data").path("nextCursor").asText();
+        assertThat(page(get("/v1/products").param("cursor", cursor).param("size", "2")))
+                .isEqualTo(
+                        page(
+                                get("/v1/products")
+                                        .param("sort", "LATEST")
+                                        .param("cursor", cursor)
+                                        .param("size", "2")));
+        // 삭제한 기존 목록 경로의 커서 형식: Base64URL("<createdAt>_<id>")
+        String legacy =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString("2026-10-26T00:00:00Z_1".getBytes(UTF_8));
+        mvc.perform(get("/v1/products").param("cursor", legacy))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    private String page(MockHttpServletRequestBuilder request) throws Exception {
+        return mvc.perform(request)
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
     }
 
     private JsonNode listing(String q, String state, String sort, String cursor) throws Exception {
