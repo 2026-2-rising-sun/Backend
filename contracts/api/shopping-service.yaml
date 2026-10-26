@@ -41,7 +41,7 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/RegisterProductRequest' }
-            example: { name: 가을 니트, description: 울 혼방 니트, mainImageId: 10 }
+            example: { name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, category: FASHION }
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -50,7 +50,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProductEnvelope' }
-              example: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', sellerId: '00000000-0000-0000-0000-000000000003' }, error: null }
+              example: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', sellerId: '00000000-0000-0000-0000-000000000003', category: FASHION }, error: null }
         '400': { $ref: '#/components/responses/BadRequest' }
         '409': { $ref: '#/components/responses/Conflict' }
         "503":
@@ -104,8 +104,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SellerProductDetailEnvelope' }
               examples:
-                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5 }, error: null } }
-                notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null }, error: null } }
+                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: ON_SALE, price: 39000, available: 5, category: FASHION }, error: null } }
+                notRegistered: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 0, createdAt: '2026-09-30T03:00:00Z', updatedAt: '2026-09-30T03:00:00Z', salesStatus: NOT_REGISTERED, price: null, available: null, category: null }, error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404':
           description: 상품이 없거나 본인 상품이 아니다. 다른 판매자 상품의 존재 여부를 드러내지 않는다.
@@ -133,7 +133,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProductEnvelope' }
-              example: { success: true, data: { productId: 1, name: 가을 니트 수정, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 1, createdAt: '2026-09-30T03:00:00Z', sellerId: '00000000-0000-0000-0000-000000000003' }, error: null }
+              example: { success: true, data: { productId: 1, name: 가을 니트 수정, description: 울 혼방 니트, mainImageId: 10, mainImageUrl: /api/shopping/v1/product-images/10, version: 1, createdAt: '2026-09-30T03:00:00Z', sellerId: '00000000-0000-0000-0000-000000000003', category: FASHION }, error: null }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
@@ -147,8 +147,9 @@ paths:
       operationId: listPublicProducts
       description: |-
         모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도 200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 shopping.sales.backfill.enabled=true로 적재해야 한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
-        q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
-        q/status/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
+        q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
+        category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
+        q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
       parameters:
         - name: q
           in: query
@@ -156,6 +157,10 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [ON_SALE, SOLD_OUT] }
+        - name: category
+          in: query
+          description: 목록에 없는 값은 400 INVALID_REQUEST.
+          schema: { type: string, enum: [FASHION, BEAUTY, FOOD, LIVING, DIGITAL, KIDS, ETC] }
         - name: sort
           in: query
           schema: { type: string, enum: [LATEST, PRICE_ASC, PRICE_DESC], default: LATEST }
@@ -169,13 +174,13 @@ paths:
       responses:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '200':
-          description: ON_SALE 또는 SOLD_OUT 상품에 검색·상태·정렬 조건을 적용한다. 기본은 최신 등록순이다.
+          description: ON_SALE 또는 SOLD_OUT 상품에 검색·상태·카테고리·정렬 조건을 적용한다. 기본은 최신 등록순이다.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PublicProductListEnvelope' }
               examples:
-                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 5, salesStatus: ON_SALE, purchasable: true }], nextCursor: null, hasNext: false }, error: null } }
-                zeroStock: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 0, salesStatus: ON_SALE, purchasable: false }], nextCursor: null, hasNext: false }, error: null } }
+                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 5, salesStatus: ON_SALE, purchasable: true, category: FASHION }], nextCursor: null, hasNext: false }, error: null } }
+                zeroStock: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 0, salesStatus: ON_SALE, purchasable: false, category: null }], nextCursor: null, hasNext: false }, error: null } }
                 empty: { value: { success: true, data: { items: [], nextCursor: null, hasNext: false }, error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
   /v1/products/{productId}:
@@ -194,8 +199,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PublicProductDetailEnvelope' }
               examples:
-                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, available: 5, purchasable: true, maxQuantity: 5 }, error: null } }
-                soldOut: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: SOLD_OUT, available: 0, purchasable: false, maxQuantity: 0 }, error: null } }
+                normal: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, available: 5, purchasable: true, maxQuantity: 5, category: FASHION }, error: null } }
+                soldOut: { value: { success: true, data: { productId: 1, name: 가을 니트, description: 울 혼방 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: SOLD_OUT, available: 0, purchasable: false, maxQuantity: 0, category: null }, error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/SalesUnavailable' }
@@ -551,18 +556,20 @@ components:
         name: { type: string, minLength: 1, description: 앞뒤 공백 제거 후 1~100자 }
         description: { type: string, minLength: 1, description: 앞뒤 공백 제거 후 1~2000자 }
         mainImageId: { type: integer, format: int64, minimum: 1 }
+        category: { $ref: '#/components/schemas/ProductCategory' }
     UpdateProductRequest:
       type: object
       required: [version]
-      description: 생략하거나 null인 기본정보 필드는 유지한다. 빈 문자열은 허용하지 않는다.
+      description: 생략하거나 null인 기본정보 필드는 유지한다. category도 null이면 기존 값을 유지하므로 미분류로 되돌릴 수 없다. 빈 문자열은 허용하지 않는다.
       properties:
         name: { type: ['string', 'null'] }
         description: { type: ['string', 'null'] }
         mainImageId: { type: ['integer', 'null'], format: int64, minimum: 1 }
+        category: { $ref: '#/components/schemas/ProductCategory' }
         version: { type: integer, format: int64, minimum: 0 }
     Product:
       type: object
-      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, sellerId]
+      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, sellerId, category]
       properties:
         productId: { type: integer, format: int64 }
         name: { type: string }
@@ -575,6 +582,7 @@ components:
           type: [string, "null"]
           description: 등록 판매자 회원 ID. 기존 소유자 미지정 상품은 null.
           maxLength: 36
+        category: { $ref: '#/components/schemas/ProductCategory' }
     ProductSnapshot:
       type: object
       required: [id, name, mainImageUrl]
@@ -588,7 +596,7 @@ components:
           description: 등록 판매자 회원 ID. 기존 상품은 null이며 이전 소비자 계약과 호환되는 추가 필드.
     PublicProductItem:
       type: object
-      required: [productId, name, mainImageUrl, price, available, salesStatus, purchasable]
+      required: [productId, name, mainImageUrl, price, available, salesStatus, purchasable, category]
       properties:
         productId: { type: integer, format: int64 }
         name: { type: string }
@@ -597,6 +605,7 @@ components:
         available: { type: integer, minimum: 0, description: 결제 대기 예약분을 제외한 주문 가능 재고. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다. }
         salesStatus: { type: string, enum: [ON_SALE, SOLD_OUT] }
         purchasable: { type: boolean, description: ON_SALE이고 available이 0보다 클 때만 true. }
+        category: { $ref: '#/components/schemas/ProductCategory' }
     PublicProductList:
       type: object
       required: [items, nextCursor, hasNext]
@@ -607,7 +616,7 @@ components:
         hasNext: { type: boolean }
     PublicProductDetail:
       type: object
-      required: [productId, name, description, mainImageUrl, price, salesStatus, available, purchasable, maxQuantity]
+      required: [productId, name, description, mainImageUrl, price, salesStatus, available, purchasable, maxQuantity, category]
       properties:
         productId: { type: integer, format: int64 }
         name: { type: string }
@@ -618,6 +627,7 @@ components:
         available: { type: integer, minimum: 0 }
         purchasable: { type: boolean }
         maxQuantity: { type: integer, minimum: 0 }
+        category: { $ref: '#/components/schemas/ProductCategory' }
     ProductCoupon:
       type: object
       required: [couponId, name, fixedDiscount, startsAt, endsAt, expiresAt, soldOut]
@@ -679,7 +689,7 @@ components:
       description: NOT_REGISTERED는 판매정보 미등록, UNKNOWN은 조회 실패다. 둘 다 price와 available이 null이다.
     SellerProductDetail:
       type: object
-      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, updatedAt, salesStatus, price, available]
+      required: [productId, name, description, mainImageId, mainImageUrl, version, createdAt, updatedAt, salesStatus, price, available, category]
       properties:
         productId: { type: integer, format: int64 }
         name: { type: string }
@@ -692,6 +702,11 @@ components:
         salesStatus: { $ref: '#/components/schemas/SellerSalesStatus' }
         price: { type: ['integer', 'null'], format: int64, minimum: 0 }
         available: { type: ['integer', 'null'], minimum: 0 }
+        category: { $ref: '#/components/schemas/ProductCategory' }
+    ProductCategory:
+      type: ['string', 'null']
+      enum: [FASHION, BEAUTY, FOOD, LIVING, DIGITAL, KIDS, ETC, null]
+      description: 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST.
     ApiError:
       $ref: './common.yaml#/components/schemas/ApiError'
     ErrorEnvelope:

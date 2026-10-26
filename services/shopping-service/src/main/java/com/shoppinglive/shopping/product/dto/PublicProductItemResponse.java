@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.product.dto;
 
 import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 
 /**
  * 공개 목록 한 줄.
@@ -19,4 +20,5 @@ public record PublicProductItemResponse(
         long price,
         int available,
         SalesDisplayStatus salesStatus,
-        boolean purchasable) {}
+        boolean purchasable,
+        ProductCategory category) {}

@@ -249,6 +249,72 @@ class ProductHttpContractTest extends ShoppingSecuritySupport {
         }
     }
 
+    @Test
+    @DisplayName("카테고리는 생략하면 미분류(null), 수정에서 생략하면 유지되고 목록에 없는 값은 400이다")
+    void categoryIsOptionalKeptOnPartialUpdateAndValidated() throws Exception {
+        JsonNode registered = register();
+        assertThat(registered.path("category").isNull()).isTrue();
+        long id = registered.path("productId").asLong();
+
+        mvc.perform(
+                        post("/v1/seller/products")
+                                .header("Authorization", sellerBearer())
+                                .header("X-Idempotency-Key", "invalid-category")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of(
+                                                        "name", "상품",
+                                                        "description", "상품 설명",
+                                                        "mainImageId", imageId,
+                                                        "category", "WRONG"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        assertThat(products.findByIdempotencyKey("invalid-category")).isEmpty();
+
+        String classified =
+                mvc.perform(
+                                patch("/v1/seller/products/{id}", id)
+                                        .header("Authorization", sellerBearer())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "category",
+                                                                "BEAUTY",
+                                                                "version",
+                                                                registered
+                                                                        .path("version")
+                                                                        .asLong()))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.category").value("BEAUTY"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        long version = mapper.readTree(classified).path("data").path("version").asLong();
+        mvc.perform(
+                        patch("/v1/seller/products/{id}", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of("name", "이름만 수정", "version", version))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value("BEAUTY"));
+        mvc.perform(
+                        patch("/v1/seller/products/{id}", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of("category", "WRONG", "version", version))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value("BEAUTY"));
+    }
+
     private JsonNode register() throws Exception {
         String response =
                 mvc.perform(

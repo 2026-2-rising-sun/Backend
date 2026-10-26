@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.product.dto;
 
 import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import java.time.Instant;
 
 /**
@@ -18,4 +19,5 @@ public record SellerProductDetail(
         Instant updatedAt,
         SalesDisplayStatus salesStatus,
         Long price,
-        Integer available) {}
+        Integer available,
+        ProductCategory category) {}
