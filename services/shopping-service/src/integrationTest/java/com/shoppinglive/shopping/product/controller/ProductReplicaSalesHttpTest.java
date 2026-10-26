@@ -89,6 +89,7 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].productId").value(id))
                 .andExpect(jsonPath("$.data.items[0].price").value(PRICE))
+                .andExpect(jsonPath("$.data.items[0].available").value(4))
                 .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
                 .andExpect(jsonPath("$.data.items[0].purchasable").value(true));
         mvc.perform(get("/v1/products/{id}", id))
@@ -103,7 +104,8 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
         mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
-                .andExpect(jsonPath("$.data.items[0].price").value(PRICE));
+                .andExpect(jsonPath("$.data.items[0].price").value(PRICE))
+                .andExpect(jsonPath("$.data.items[0].available").value(4));
         mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.salesStatus").value("ON_SALE"))
@@ -146,6 +148,22 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
                                 .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.salesStatus").value("NOT_REGISTERED"));
+    }
+
+    @Test
+    @DisplayName("기본 목록은 재고 0을 반환하고 판매중·품절 상태와 구매 불가를 유지한다")
+    void zeroStockPreservesSalesStatusAndPreventsPurchase() throws Exception {
+        for (SalesStatus salesStatus :
+                new SalesStatus[] {SalesStatus.ON_SALE, SalesStatus.SOLD_OUT}) {
+            long id = product(salesStatus.name());
+            sales(id, salesStatus, 0);
+            mvc.perform(get("/v1/products"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.items[0].productId").value(id))
+                    .andExpect(jsonPath("$.data.items[0].available").value(0))
+                    .andExpect(jsonPath("$.data.items[0].salesStatus").value(salesStatus.name()))
+                    .andExpect(jsonPath("$.data.items[0].purchasable").value(false));
+        }
     }
 
     private long product(String name) {

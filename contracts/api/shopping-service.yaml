@@ -174,7 +174,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PublicProductListEnvelope' }
               examples:
-                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, salesStatus: ON_SALE, purchasable: true }], nextCursor: null, hasNext: false }, error: null } }
+                normal: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 5, salesStatus: ON_SALE, purchasable: true }], nextCursor: null, hasNext: false }, error: null } }
+                zeroStock: { value: { success: true, data: { items: [{ productId: 1, name: 가을 니트, mainImageUrl: /api/shopping/v1/product-images/10, price: 39000, available: 0, salesStatus: ON_SALE, purchasable: false }], nextCursor: null, hasNext: false }, error: null } }
                 empty: { value: { success: true, data: { items: [], nextCursor: null, hasNext: false }, error: null } }
         '400': { $ref: '#/components/responses/BadRequest' }
         '503': { $ref: '#/components/responses/SalesUnavailable' }
@@ -588,14 +589,15 @@ components:
           description: 등록 판매자 회원 ID. 기존 상품은 null이며 이전 소비자 계약과 호환되는 추가 필드.
     PublicProductItem:
       type: object
-      required: [productId, name, mainImageUrl, price, salesStatus, purchasable]
+      required: [productId, name, mainImageUrl, price, available, salesStatus, purchasable]
       properties:
         productId: { type: integer, format: int64 }
         name: { type: string }
         mainImageUrl: { type: string, format: uri-reference }
         price: { type: integer, format: int64, minimum: 0 }
+        available: { type: integer, minimum: 0, description: 결제 대기 예약분을 제외한 주문 가능 재고. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다. }
         salesStatus: { type: string, enum: [ON_SALE, SOLD_OUT] }
-        purchasable: { type: boolean }
+        purchasable: { type: boolean, description: ON_SALE이고 available이 0보다 클 때만 true. }
     PublicProductList:
       type: object
       required: [items, nextCursor, hasNext]

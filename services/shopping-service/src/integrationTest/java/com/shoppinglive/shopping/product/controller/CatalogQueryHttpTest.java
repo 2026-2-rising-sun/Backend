@@ -83,7 +83,16 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
             String cursor = "";
             do {
                 JsonNode data = listing("검색", "ON_SALE", sort, cursor);
-                data.path("items").forEach(item -> actual.add(item.path("productId").asLong()));
+                data.path("items")
+                        .forEach(
+                                item -> {
+                                    actual.add(item.path("productId").asLong());
+                                    assertThat(item.path("available").isIntegralNumber()).isTrue();
+                                    assertThat(item.path("available").intValue()).isEqualTo(1);
+                                    assertThat(item.path("salesStatus").asText())
+                                            .isEqualTo("ON_SALE");
+                                    assertThat(item.path("purchasable").asBoolean()).isTrue();
+                                });
                 cursor = data.path("nextCursor").asText("");
                 if (!data.path("hasNext").asBoolean()) break;
                 assertThat(cursor).isNotBlank();
@@ -210,6 +219,25 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
         assertThat(data.path("items").size()).isEqualTo(1);
         assertThat(data.path("items").get(0).path("productId").asLong()).isEqualTo(id);
         assertThat(data.path("items").get(0).path("price").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("검색·상태·정렬 목록은 재고 0과 판매 상태를 보존하고 구매 불가로 응답한다")
+    void filteredZeroStockPreservesStatusAndPreventsPurchase() throws Exception {
+        for (SalesStatus state : List.of(SalesStatus.ON_SALE, SalesStatus.SOLD_OUT)) {
+            long id = product("재고 확인 " + state, 100, state, JwtTestTokens.SELLER);
+            sales.apply(new SalesInfo(id, id * 10, 100, state, 0), 2);
+            for (String sort : List.of("LATEST", "PRICE_ASC", "PRICE_DESC")) {
+                JsonNode items = listing("재고 확인", state.name(), sort, "").path("items");
+                assertThat(items.size()).isEqualTo(1);
+                JsonNode item = items.get(0);
+                assertThat(item.path("productId").asLong()).isEqualTo(id);
+                assertThat(item.path("available").isIntegralNumber()).isTrue();
+                assertThat(item.path("available").intValue()).isZero();
+                assertThat(item.path("salesStatus").asText()).isEqualTo(state.name());
+                assertThat(item.path("purchasable").asBoolean()).isFalse();
+            }
+        }
     }
 
     private JsonNode listing(String q, String state, String sort, String cursor) throws Exception {
