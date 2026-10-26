@@ -77,6 +77,28 @@ paths:
         '500':
           description: 서버 내부 오류
           content: *id001
+  /v1/notifications/read-all:
+    post:
+      summary: 내 미읽음 알림 전체 읽음 처리
+      operationId: markAllNotificationsRead
+      description: 토큰의 USER·SELLER 본인의 미읽음 알림 전체를 서버 시각으로 한 번에 갱신한다. 조회 여부·페이지·커서와
+        무관하며 요청 본문이나 알림 ID 목록은 필요하지 않다. 다른 회원의 알림과 기존 읽음 시각·수정 시각은 변경하지 않는다.
+        빈 목록과 반복·동시 요청도 성공한다. 갱신 이후 도착한 알림은 다음 요청의 대상이다.
+      responses:
+        '204':
+          description: 전체 읽음 처리 완료. 대상이 없거나 반복 호출이어도 성공. 본문 없음.
+        '401':
+          description: 토큰 누락·무효 또는 보안 폐기된 세션
+          content: *id001
+        '403':
+          description: USER·SELLER 권한이 없는 호출
+          content: *id001
+        '503':
+          description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+          content: *id001
+        '500':
+          description: 서버 내부 오류
+          content: *id001
   /v1/notifications/{notificationId}/read:
     post:
       summary: 내 알림 읽음 처리
