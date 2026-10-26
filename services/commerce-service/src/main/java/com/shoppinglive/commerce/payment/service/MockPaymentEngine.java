@@ -49,7 +49,7 @@ public class MockPaymentEngine {
                         paymentServiceProvider.getObject().resolvePayment(paymentAttemptId);
                     } catch (Exception e) {
                         log.warn(
-                                "mock resolve failed for attemptId={}: {}",
+                                "모의 결제 결과 확정 실패: 결제 시도 ID={} 원인={}",
                                 paymentAttemptId,
                                 e.toString());
                     }

@@ -45,7 +45,7 @@ public class CommerceExceptionHandler {
     @ExceptionHandler(ShoppingUnavailableException.class)
     public ResponseEntity<ApiResponse<Void>> handleShoppingUnavailable(
             ShoppingUnavailableException e) {
-        log.warn("shopping unavailable: {}", e.getMessage());
+        log.warn("상품 서비스 호출 불가: {}", e.getMessage());
         ApiResponse<Void> body =
                 new ApiResponse<>(
                         false,

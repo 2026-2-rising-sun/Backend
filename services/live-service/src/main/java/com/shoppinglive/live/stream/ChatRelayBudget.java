@@ -56,8 +56,7 @@ public class ChatRelayBudget {
             count = redis.execute(INCREMENT, List.of(key), String.valueOf(KEY_TTL.toSeconds()));
         } catch (DataAccessException e) {
             uncounted.increment();
-            log.debug(
-                    "chat budget not counted: broadcastId={} cause={}", broadcastId, e.toString());
+            log.debug("채팅 중계 사용량 집계 실패: 방송 ID={} 원인={}", broadcastId, e.toString());
             return true;
         }
         if (count == null || count <= properties.chatBudgetPerSecond()) {

@@ -31,7 +31,7 @@ public class RefundReconciler {
     public void runScheduled() {
         int resolved = reconcileDue();
         if (resolved > 0) {
-            log.info("reconciled {} refund requests", resolved);
+            log.info("환불 요청 복구 완료: 복구 건수={}", resolved);
         }
     }
 
@@ -49,10 +49,7 @@ public class RefundReconciler {
                     resolved++;
                 }
             } catch (RuntimeException failure) {
-                log.warn(
-                        "refund reconciliation failed for requestId={}; persisted work will be retried",
-                        lease.requestId(),
-                        failure);
+                log.warn("환불 요청 복구 실패, 저장된 작업 재시도 예정: 환불 요청 ID={}", lease.requestId(), failure);
             }
         }
         return resolved;

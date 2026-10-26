@@ -29,7 +29,7 @@ public class SalesInfoUnavailableExceptionHandler {
 
     @ExceptionHandler(SalesInfoUnavailableException.class)
     public ResponseEntity<ApiResponse<Void>> handle(SalesInfoUnavailableException e) {
-        log.warn("sales info unavailable: {}", e.getMessage());
+        log.warn("판매정보 조회 불가: {}", e.getMessage());
         ApiResponse<Void> body =
                 new ApiResponse<>(
                         false,

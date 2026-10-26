@@ -61,7 +61,7 @@ public class BroadcastStartingSoonService {
             try {
                 created += notifyOne(schedule, now);
             } catch (RuntimeException e) {
-                log.warn("starting soon alert failed broadcastId={}", schedule.broadcastId(), e);
+                log.warn("방송 시작 임박 알림 생성 실패: 방송 ID={}", schedule.broadcastId(), e);
             }
         }
         return created;

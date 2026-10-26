@@ -48,7 +48,7 @@ public class CouponSync {
         try {
             sync();
         } catch (RuntimeException e) {
-            log.error("coupon sync stopped: cause={}", e.toString(), e);
+            log.error("쿠폰 동기화 중단: 원인={}", e.toString(), e);
         }
     }
 
@@ -76,11 +76,7 @@ public class CouponSync {
                 applied += commerce.find(couponId).map(this::apply).orElse(false) ? 1 : 0;
             }
         }
-        log.info(
-                "coupon sync finished: listed={} refreshed={} applied={}",
-                listed.size(),
-                refreshed,
-                applied);
+        log.info("쿠폰 동기화 완료: 조회 쿠폰 수={} 재조회 쿠폰 수={} 반영 쿠폰 수={}", listed.size(), refreshed, applied);
         return applied;
     }
 

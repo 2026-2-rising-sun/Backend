@@ -112,7 +112,7 @@ class ChatReconnectRedisTest extends LiveSecuritySupport {
             unrecovered.removeAll(byStream);
             unrecovered.removeAll(byHistory);
             System.out.printf(
-                    "[ChatReconnect] missed=%d byStream=%d byHistory=%d unrecovered=%d%n",
+                    "[ChatReconnect] 누락 건수=%d 스트림 복구 건수=%d 이력 복구 건수=%d 미복구 건수=%d%n",
                     missed.size(), byStream.size(), byHistory.size(), unrecovered.size());
 
             assertThat(byStream).as("재연결 스트림으로 다시 받은 놓친 채팅").hasSize(WHILE_DISCONNECTED);

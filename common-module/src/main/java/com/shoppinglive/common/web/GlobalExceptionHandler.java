@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
-        log.warn("business exception: {}", e.getMessage());
+        log.warn("업무 예외: {}", e.getMessage());
         return toResponse(e.errorCode(), e.getMessage());
     }
 
@@ -47,7 +47,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(
             ObjectOptimisticLockingFailureException e) {
-        log.warn("optimistic locking failure: {}", e.getMessage());
+        log.warn("낙관적 잠금 충돌: {}", e.getMessage());
         return toResponse(ErrorCode.CONFLICT, "다른 요청이 먼저 변경했습니다. 다시 조회하세요.");
     }
 
@@ -61,13 +61,13 @@ public class GlobalExceptionHandler {
                                     ? ErrorCode.INVALID_REQUEST
                                     : ErrorCode.INTERNAL_ERROR;
             if (error.getStatusCode().is5xxServerError()) {
-                log.error("HTTP server exception", e);
+                log.error("HTTP 서버 예외", e);
             }
             return ResponseEntity.status(error.getStatusCode())
                     .headers(error.getHeaders())
                     .body(ApiResponse.fail(code, code.defaultMessage(), CorrelationId.current()));
         }
-        log.error("unhandled exception", e);
+        log.error("처리하지 못한 예외", e);
         return toResponse(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage());
     }
 

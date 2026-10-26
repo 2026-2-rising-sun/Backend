@@ -68,7 +68,7 @@ public class PaymentExpiringSoonService {
             try {
                 created += notifyOne(group, now);
             } catch (RuntimeException e) {
-                log.warn("payment expiry alert failed groupNumber={}", group.groupNumber(), e);
+                log.warn("결제 만료 임박 알림 생성 실패: 결제 그룹 번호={}", group.groupNumber(), e);
             }
         }
         return created;

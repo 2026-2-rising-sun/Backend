@@ -1,4 +1,4 @@
-"""Select CI work from the diff of the commit actually checked out for testing."""
+"""검사에 실제로 사용하는 커밋의 변경 내역으로 CI 작업을 선택한다."""
 import argparse
 from dataclasses import dataclass
 import importlib.util
@@ -29,7 +29,7 @@ class Change:
 
 
 def java_tokens(source):
-    # Java processes Unicode escapes before recognizing comments. Tree-sitter does not.
+    # Java는 주석을 인식하기 전에 유니코드 이스케이프를 처리하지만 Tree-sitter는 그렇지 않다.
     if re.search(rb"\\u+[0-9a-fA-F]{4}", source):
         raise ValueError("Unicode escapes require a build")
     tree = API.Parser(API.JAVA).parse(source)
@@ -62,7 +62,7 @@ def comments_only(change):
 def routes_changed(change):
     try:
         def routes(source):
-            # Line numbers move when comments change; operation multiplicity matters.
+            # 주석 변경으로 줄 번호가 이동할 수 있으므로 같은 API 동작의 선언 개수를 비교한다.
             found = API.controller_routes((source or b"").decode("utf-8"), change.path)
             return {operation: len(locations) for operation, locations in found.items()}
         return routes(change.before) != routes(change.after)
@@ -71,7 +71,7 @@ def routes_changed(change):
 
 
 def document(path):
-    # Runtime resources are never documentation just because of their extension/name.
+    # 실행 시 사용하는 리소스는 확장자나 이름만으로 문서로 분류하지 않는다.
     if "/src/" in path or path.startswith("contracts/api/"):
         return False
     name = Path(path).name
@@ -81,7 +81,7 @@ def document(path):
 
 
 def tags(source):
-    """Read actual @Tag annotations; comments and string mentions are not tags."""
+    """실제 @Tag 애너테이션을 읽는다. 주석이나 문자열에 나온 태그는 제외한다."""
     if source is None:
         return set()
     tree = API.Parser(API.JAVA).parse(source)
@@ -130,7 +130,7 @@ def redis_changed(change):
             "/stream/" in path or Path(path).name in PUBSUB_CALLERS
         ):
             return True
-        # A cache annotation alone cannot establish which CacheManager backs it.
+        # 캐시 애너테이션만으로 실제 사용하는 CacheManager를 판별할 수 없다.
         identifiers = set()
         for source in (change.before, change.after):
             if source:
@@ -253,7 +253,7 @@ def diff_changes(root, base, head):
         return result
     old, new = entries(base), entries(head)
     changes = []
-    # Disabling rename detection treats moves as delete + add, covering both services.
+    # 이름 변경 감지를 끄면 이동을 삭제와 추가로 처리하므로 양쪽 서비스를 모두 검사한다.
     paths = git(root, "diff", "--no-renames", "--name-only", "-z", base, head, "--")
     for name in filter(None, paths.split(b"\0")):
         def content(tree):
@@ -305,7 +305,7 @@ def main():
             for key, value in plan.items():
                 if key != "reasons":
                     stream.write(key + "=" + json.dumps(value) + "\n")
-    summary = "### Selected CI work\n\n```json\n" + json.dumps(
+    summary = "### 선택한 CI 작업\n\n```json\n" + json.dumps(
         plan, ensure_ascii=False, indent=2) + "\n```\n"
     if os.getenv("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:

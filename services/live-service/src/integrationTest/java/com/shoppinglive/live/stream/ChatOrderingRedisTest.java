@@ -105,7 +105,7 @@ class ChatOrderingRedisTest extends LiveSecuritySupport {
                 highest = Math.max(highest, messageId);
             }
             System.out.printf(
-                    "[ChatOrdering] sent=%d received=%d late=%d%n",
+                    "[ChatOrdering] 전송 건수=%d 수신 건수=%d 순서 지연 건수=%d%n",
                     TOTAL, firstArrived.size(), late);
 
             assertThat(firstArrived).as("유실 없이 모두 도착").hasSize(TOTAL);

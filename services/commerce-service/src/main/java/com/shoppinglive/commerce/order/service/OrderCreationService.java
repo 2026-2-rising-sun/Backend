@@ -222,10 +222,7 @@ public class OrderCreationService {
                 if (!violatesUniqueConstraint(e, "uk_orders_order_number")) {
                     throw e;
                 }
-                log.warn(
-                        "order number collision, retrying (attempt {}/{})",
-                        attempt,
-                        ORDER_NUMBER_RETRY);
+                log.warn("주문 번호 중복으로 재시도: 시도 횟수={}/{}", attempt, ORDER_NUMBER_RETRY);
             }
         }
 
@@ -383,7 +380,7 @@ public class OrderCreationService {
                 salesRepository.transitionStatus(
                         sales.getId(), SalesStatus.ON_SALE.name(), SalesStatus.SOLD_OUT.name());
         if (updated > 0) {
-            log.info("sales marked SOLD_OUT after order: salesId={}", sales.getId());
+            log.info("주문 후 판매 상태를 SOLD_OUT으로 변경: 판매정보 ID={}", sales.getId());
         }
     }
 

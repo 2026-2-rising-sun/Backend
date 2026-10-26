@@ -47,7 +47,7 @@ public class PromotionExpiryScheduler {
                     closed++;
                 }
             } catch (ObjectOptimisticLockingFailureException concurrent) {
-                log.debug("promotion {} already handled by another pod", id);
+                log.debug("다른 파드에서 이미 처리한 프로모션: 프로모션 ID={}", id);
             }
         }
         return closed;
