@@ -22,9 +22,9 @@ class SalesClientConfigurationIntegrationTest extends ShoppingSecuritySupport {
     @Autowired SalesInfoClient salesInfoClient;
 
     @Test
-    @DisplayName("기동한 서비스는 판매정보 조회에 HTTP 클라이언트를 사용한다")
+    @DisplayName("기본 설정으로 기동한 서비스는 판매정보 조회에 사본 클라이언트를 사용한다")
     void contextLoads() {
-        assertThat(salesInfoClient).isInstanceOf(HttpSalesInfoClient.class);
+        assertThat(salesInfoClient).isInstanceOf(ReplicaSalesInfoClient.class);
     }
 
     @Test

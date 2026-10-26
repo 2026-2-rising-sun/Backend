@@ -29,6 +29,9 @@ spring:
       max-request-size: 7MB
 
 shopping:
+  # main 과 같은 기본값. HTTP 경로를 검증하는 테스트는 shopping.sales.source=http 를 명시한다.
+  sales:
+    source: replica
   sales-client:
     service-token: test-shopping-commerce-credential-00000001
     # 실제 Commerce 대신 연결 거절을 재현하는 루프백 주소다. HTTP 장애 계약 테스트는 이 주소로 연결을 시도한다.

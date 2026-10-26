@@ -35,6 +35,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @SpringBootTest(
         properties = {
+            // 판매정보 장애 계약은 되돌리기 스위치인 http 경로에서 유지한다.
+            "shopping.sales.source=http",
             "spring.datasource.url=jdbc:h2:mem:shopping_http_contracts;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
         })
 @AutoConfigureMockMvc

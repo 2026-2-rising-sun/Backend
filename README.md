@@ -23,7 +23,7 @@
 | Kafka | Commerce 판매정보 → Shopping 조회용 사본 갱신. 쿠폰과 방송·프로모션 이벤트는 Outbox를 통해 발행 |
 | Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |
 
-판매정보 조회는 HTTP가 기본이며 `shopping.sales.source=replica`로 사본 조회를 선택할 수 있습니다. 판매정보 이벤트는 DB 커밋 후 직접 발행하고, 쿠폰·방송·프로모션 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다. 쿠폰·방송 이벤트의 소비 연동은 별도 작업입니다.
+판매정보 조회는 이벤트로 채운 사본(`replica`)이 기본이며 `shopping.sales.source=http`(`SHOPPING_SALES_SOURCE=http`)로 Commerce 직접 조회로 되돌릴 수 있습니다. 판매정보 이벤트는 DB 커밋 후 직접 발행하고, 쿠폰·방송·프로모션 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다. 쿠폰·방송 이벤트의 소비 연동은 별도 작업입니다.
 
 ## 주요 기능
 

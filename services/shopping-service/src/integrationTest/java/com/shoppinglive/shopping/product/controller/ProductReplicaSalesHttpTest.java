@@ -33,17 +33,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * {@code shopping.sales.source=replica} 에서 네 조회가 Commerce 없이 사본만으로 응답하는지 확인한다. HTTP 클라이언트는 mock 이라
- * 호출되면 빈 결과를 돌려주고, 어떤 호출이든 {@code verifyNoInteractions} 로 실패한다.
+ * 기본 설정(사본)에서 네 조회가 Commerce 없이 사본만으로 응답하는지 확인한다. HTTP 클라이언트는 mock 이라 호출되면 빈 결과를 돌려주고, 어떤 호출이든
+ * {@code verifyNoInteractions} 로 실패한다.
  */
 @SpringBootTest(
         properties = {
-            "shopping.sales.source=replica",
             "spring.datasource.url=jdbc:h2:mem:product_replica_sales_http;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;"
                     + "DATABASE_TO_LOWER=TRUE"
         })
 @AutoConfigureMockMvc
-@DisplayName("replica 모드의 상품 판매정보 조회")
+@DisplayName("기본 설정(replica)의 상품 판매정보 조회")
 class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
 
     private static final long PRICE = 1_500L;

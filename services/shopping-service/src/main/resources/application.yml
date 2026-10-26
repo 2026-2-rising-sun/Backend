@@ -40,11 +40,11 @@ shopping:
     connect-timeout: 1s
     read-timeout: 1s
     service-token: ${SHOPPING_COMMERCE_SERVICE_TOKEN:}
-  # 판매정보 조회 원본. http = Commerce 를 요청마다 호출(기본), replica = product_sales 사본을 읽는다.
+  # 판매정보 조회 원본. replica = product_sales 사본을 읽는다(기본), http = Commerce 를 요청마다 호출한다.
   # 기동 때 한 번만 읽으므로 바꾸면 rolling restart 가 필요하다. consume 은 두 모드 모두 계속 돈다.
-  # replica 로 바꾸는 것은 부모 이슈 #203 의 운영 전환 gate 를 모두 통과한 뒤에만 한다.
+  # http 는 되돌리기 스위치다 (SHOPPING_SALES_SOURCE=http). 처음 전환하는 환경은 SHOPPING_SALES_BACKFILL_ENABLED=true 로 한 번 채운다.
   sales:
-    source: http
+    source: ${SHOPPING_SALES_SOURCE:replica}
   # 쿠폰 replica 동기화 (초기 적재 + 주기 대조). Commerce 주소·token 은 sales-client 설정을 같이 쓴다.
   # 기본은 꺼 둔다. Commerce 를 같이 띄우는 local·dev 프로필에서만 켠다.
   coupons:
