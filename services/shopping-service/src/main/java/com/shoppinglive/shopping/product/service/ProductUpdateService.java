@@ -4,6 +4,7 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.product.dto.UpdateProductCommand;
 import com.shoppinglive.shopping.product.entity.Product;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.product.repository.ProductImageRepository;
 import com.shoppinglive.shopping.product.repository.ProductRepository;
 import java.util.Objects;
@@ -70,7 +71,9 @@ public class ProductUpdateService {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST, ProductRegistrationService.MAIN_IMAGE_NOT_FOUND);
         }
-        product.changeBasicInfo(name, description, mainImageId);
+        ProductCategory category =
+                command.category() == null ? product.getCategory() : command.category();
+        product.changeBasicInfo(name, description, mainImageId, category);
         try {
             // 응답에 오른 version 을 담고, 동시 수정 충돌을 커밋 전에 여기서 잡기 위해 바로 flush 한다.
             productRepository.flush();

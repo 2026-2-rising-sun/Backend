@@ -5,6 +5,7 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
 import com.shoppinglive.shopping.product.dto.PublicProductListResponse;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.product.service.CatalogQueryService;
 import com.shoppinglive.shopping.product.service.ProductSort;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,8 +37,9 @@ public class PublicProductListController {
     }
 
     /**
-     * 판매중·품절 상품을 검색·상태·정렬 조건에 맞춰 {@code size} 개까지. 조건을 생략하면 최신순({@code sort=LATEST})과 같다. 다음 페이지는
-     * 응답의 {@code nextCursor} 를 {@code cursor} 로 넘긴다. 범위 밖 size·손상된 cursor 는 400 INVALID_REQUEST.
+     * 판매중·품절 상품을 검색·상태·카테고리·정렬 조건에 맞춰 {@code size} 개까지. 조건을 생략하면 최신순({@code sort=LATEST})과 같다. 다음
+     * 페이지는 응답의 {@code nextCursor} 를 {@code cursor} 로 넘긴다. 범위 밖 size·손상된 cursor 는 400
+     * INVALID_REQUEST.
      */
     @GetMapping
     public ApiResponse<PublicProductListResponse> list(
@@ -45,12 +47,13 @@ public class PublicProductListController {
             @RequestParam(name = "size", required = false) Integer size,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "status", required = false) SalesDisplayStatus status,
+            @RequestParam(name = "category", required = false) ProductCategory category,
             @RequestParam(name = "sort", required = false) ProductSort sort) {
         int pageSize = size == null ? DEFAULT_SIZE : size;
         if (pageSize < 1 || pageSize > MAX_SIZE) {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST, "size 는 1~" + MAX_SIZE + " 이어야 합니다.");
         }
-        return ApiResponse.ok(catalog.list(query, status, sort, cursor, pageSize));
+        return ApiResponse.ok(catalog.list(query, status, category, sort, cursor, pageSize));
     }
 }

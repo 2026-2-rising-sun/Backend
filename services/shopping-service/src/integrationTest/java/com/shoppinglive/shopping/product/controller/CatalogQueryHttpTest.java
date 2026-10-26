@@ -14,6 +14,7 @@ import com.shoppinglive.shopping.client.commerce.HttpSalesInfoClient;
 import com.shoppinglive.shopping.client.commerce.SalesInfo;
 import com.shoppinglive.shopping.client.commerce.SalesStatus;
 import com.shoppinglive.shopping.product.entity.Product;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.product.entity.ProductImage;
 import com.shoppinglive.shopping.product.repository.ProductImageRepository;
 import com.shoppinglive.shopping.product.repository.ProductRepository;
@@ -269,6 +270,60 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
+    @Test
+    @DisplayName("카테고리는 검색·상태·정렬과 함께 적용되고 미분류 상품은 카테고리 필터에서 빠진다")
+    void categoryCombinesWithSearchSortAndCursor() throws Exception {
+        List<Long> expected = new ArrayList<>();
+        for (int i = 0; i < 5; i++)
+            expected.add(
+                    product(
+                            "니트 " + i,
+                            i / 2 * 100L,
+                            SalesStatus.ON_SALE,
+                            JwtTestTokens.SELLER,
+                            ProductCategory.FASHION));
+        product("니트 뷰티", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.BEAUTY);
+        product("코트", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.FASHION);
+        long unclassified = product("니트 미분류", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        List<Long> actual = new ArrayList<>();
+        String cursor = "";
+        String firstCursor = null;
+        do {
+            JsonNode data = mapper.readTree(page(categoryListing("FASHION", cursor))).path("data");
+            data.path("items")
+                    .forEach(
+                            item -> {
+                                actual.add(item.path("productId").asLong());
+                                assertThat(item.path("category").asText()).isEqualTo("FASHION");
+                            });
+            if (!data.path("hasNext").asBoolean()) break;
+            cursor = data.path("nextCursor").asText();
+            if (firstCursor == null) firstCursor = cursor;
+        } while (actual.size() < 10);
+        assertThat(actual).containsExactlyElementsOf(expected);
+
+        JsonNode all = listing("니트", "ON_SALE", "LATEST", "");
+        assertThat(all.path("items").get(0).path("productId").asLong()).isEqualTo(unclassified);
+        assertThat(all.path("items").get(0).path("category").isNull()).isTrue();
+        mvc.perform(categoryListing("BEAUTY", firstCursor)).andExpect(status().isBadRequest());
+        mvc.perform(categoryListing(null, firstCursor)).andExpect(status().isBadRequest());
+        for (String invalid : List.of("WRONG", "0"))
+            mvc.perform(categoryListing(invalid, ""))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    private MockHttpServletRequestBuilder categoryListing(String category, String cursor) {
+        MockHttpServletRequestBuilder request =
+                get("/v1/products")
+                        .param("q", "니트")
+                        .param("status", "ON_SALE")
+                        .param("sort", "PRICE_ASC")
+                        .param("cursor", cursor)
+                        .param("size", "2");
+        return category == null ? request : request.param("category", category);
+    }
+
     private String page(MockHttpServletRequestBuilder request) throws Exception {
         return mvc.perform(request)
                 .andExpect(status().isOk())
@@ -294,6 +349,15 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
     }
 
     private long product(String name, long price, SalesStatus status, String sellerId) {
+        return product(name, price, status, sellerId, null);
+    }
+
+    private long product(
+            String name,
+            long price,
+            SalesStatus status,
+            String sellerId,
+            ProductCategory category) {
         long id =
                 products.saveAndFlush(
                                 new Product(
@@ -301,7 +365,8 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
                                         name,
                                         imageId,
                                         UUID.randomUUID().toString(),
-                                        sellerId))
+                                        sellerId,
+                                        category))
                         .getId();
         if (status != null) sales.apply(new SalesInfo(id, id * 10, price, status, 1), 1);
         return id;
