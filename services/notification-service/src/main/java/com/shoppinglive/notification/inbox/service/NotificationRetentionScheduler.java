@@ -44,11 +44,11 @@ public class NotificationRetentionScheduler {
             int deleted =
                     notifications.deleteCreatedBefore(Instant.now().minus(retention), DELETE_LIMIT);
             if (deleted > 0) {
-                log.info("old notifications deleted count={} retention={}", deleted, retention);
+                log.info("보관 기간이 지난 알림 삭제 완료: 삭제 건수={} 보관 기간={}", deleted, retention);
             }
         } catch (RuntimeException e) {
             // 실패한 주기를 기록하고 다음 예약 실행에서 다시 시도한다.
-            log.error("notification retention sweep failed", e);
+            log.error("보관 기간이 지난 알림 일괄 삭제 실패", e);
         }
     }
 }

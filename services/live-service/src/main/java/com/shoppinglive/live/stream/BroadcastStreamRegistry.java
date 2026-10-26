@@ -114,9 +114,7 @@ public class BroadcastStreamRegistry {
                                                         try {
                                                             connection.close();
                                                         } catch (RuntimeException e) {
-                                                            log.warn(
-                                                                    "stream connection cleanup failed",
-                                                                    e);
+                                                            log.warn("스트림 연결 정리 실패", e);
                                                         }
                                                     }));
         } finally {

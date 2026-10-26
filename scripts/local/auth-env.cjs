@@ -51,7 +51,7 @@ function duration(value, name) {
       Number(match?.[4] || 0);
   if (!match || !Number.isSafeInteger(seconds) || seconds < 1) {
     throw new Error(
-      `${name} must be an explicit positive ISO-8601 duration in whole seconds (no default)`,
+      `${name}에 양수의 정수 초로 된 ISO-8601 기간을 명시해야 합니다(기본값 없음)`,
     );
   }
   return value;
@@ -63,8 +63,8 @@ function create(args) {
       !['--access-ttl', '--refresh-ttl', '--member-url', '--out'].includes(args[i]) ||
       !args[i + 1]
     )
-      throw new Error('Invalid create option');
-    if (args[i] in options) throw new Error('Duplicate create option');
+      throw new Error('인증정보 생성 옵션이 올바르지 않습니다');
+    if (args[i] in options) throw new Error('인증정보 생성 옵션이 중복되었습니다');
     options[args[i]] = args[i + 1];
   }
   const accessTtl = duration(options['--access-ttl'], '--access-ttl');
@@ -73,7 +73,7 @@ function create(args) {
   try {
     memberUrl = new URL(options['--member-url'] || 'http://localhost:8081');
   } catch {
-    throw new Error('--member-url must be an HTTP(S) service origin');
+    throw new Error('--member-url은 HTTP(S) 서비스 원본 주소여야 합니다');
   }
   if (
     !['http:', 'https:'].includes(memberUrl.protocol) ||
@@ -84,11 +84,11 @@ function create(args) {
     memberUrl.hash ||
     memberUrl.pathname !== '/'
   )
-    throw new Error('--member-url must be an HTTP(S) service origin without credentials or path');
+    throw new Error('--member-url은 인증정보나 경로가 없는 HTTP(S) 서비스 원본 주소여야 합니다');
   const parent = path.join(root, 'build/local');
   fs.mkdirSync(parent, { recursive: true });
   const dest = path.resolve(options['--out'] || path.join(parent, `auth-${crypto.randomUUID()}`));
-  // Never overwrite existing credentials or rotate a running environment implicitly.
+  // 기존 인증정보를 덮어쓰거나 실행 중인 환경의 인증정보를 암묵적으로 교체하지 않는다.
   fs.mkdirSync(dest, { mode: 0o700 });
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
   const kid = `local-${crypto.randomUUID()}`;
@@ -126,35 +126,35 @@ function create(args) {
     JSON.stringify({ purpose: 'isolated local development only', env }, null, 2) + '\n',
     { mode: 0o600, flag: 'wx' },
   );
-  console.log(`Local credentials written: ${envPath}`);
+  console.log(`로컬 인증정보 저장 완료: ${envPath}`);
   console.log(
-    'No account or token was issued. Local profile initializes user@local.test/user and seller@local.test/seller; use normal Member login; do not commit these files.',
+    '계정이나 토큰은 발급하지 않았습니다. local 프로필은 user@local.test/user와 seller@local.test/seller를 초기화합니다. 회원 서비스의 일반 로그인을 사용하고 이 파일들은 커밋하지 마세요.',
   );
 }
 function execute(args) {
   const [service, option, envPath, separator, command, ...commandArgs] = args;
   if (!serviceKeys[service] || option !== '--env' || !envPath || separator !== '--' || !command) {
     throw new Error(
-      'Usage: auth-env.cjs exec <member|shopping|commerce|live|notification> --env <env.json> -- <command> [args]',
+      '사용법: auth-env.cjs exec <member|shopping|commerce|live|notification> --env <env.json> -- <command> [args]',
     );
   }
   let record;
   try {
     record = JSON.parse(fs.readFileSync(path.resolve(envPath), 'utf8'));
   } catch {
-    throw new Error('Cannot read or parse local credential configuration');
+    throw new Error('로컬 인증정보 설정을 읽거나 해석할 수 없습니다');
   }
   if (record.purpose !== 'isolated local development only')
-    throw new Error('Expected generated local credentials');
+    throw new Error('생성된 로컬 인증정보가 필요합니다');
   const env = { ...process.env };
   for (const name of new Set([...publicKeys, ...Object.values(serviceKeys).flat()]))
     delete env[name];
   for (const name of [...publicKeys, ...serviceKeys[service]]) {
     if (typeof record.env?.[name] !== 'string' || !record.env[name])
-      throw new Error(`Missing ${name}`);
+      throw new Error(`${name} 값이 없습니다`);
     env[name] = record.env[name];
   }
-  // Pass credentials through the environment, never shell interpolation or command-line arguments.
+  // 인증정보는 환경변수로만 전달하고 셸 치환이나 명령행 인자로 전달하지 않는다.
   const result = spawnSync(command, commandArgs, { env, stdio: 'inherit', shell: false });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
@@ -165,7 +165,7 @@ try {
   else if (mode === 'exec') execute(args);
   else
     throw new Error(
-      'Usage: auth-env.cjs create --access-ttl <duration> --refresh-ttl <duration> [--member-url <origin>] [--out <new-directory>] | exec ...',
+      '사용법: auth-env.cjs create --access-ttl <duration> --refresh-ttl <duration> [--member-url <origin>] [--out <new-directory>] | exec ...',
     );
 } catch (error) {
   console.error(error.message);

@@ -102,10 +102,7 @@ public class SellerProductQueryService {
         try {
             view = SalesView.of(salesInfoClient.findByProductId(productId).orElse(null));
         } catch (SalesInfoUnavailableException e) {
-            log.warn(
-                    "seller product detail without sales info: productId={} cause={}",
-                    productId,
-                    e.getMessage());
+            log.warn("판매정보 없이 판매자 상품 상세 반환: 상품 ID={} 원인={}", productId, e.getMessage());
             view = SalesView.UNKNOWN;
         }
         return new SellerProductDetail(
@@ -127,10 +124,7 @@ public class SellerProductQueryService {
         try {
             return salesInfoClient.findByProductIds(productIds);
         } catch (SalesInfoUnavailableException e) {
-            log.warn(
-                    "seller product list without sales info: ids={} cause={}",
-                    productIds.size(),
-                    e.getMessage());
+            log.warn("판매정보 없이 판매자 상품 목록 반환: 상품 수={} 원인={}", productIds.size(), e.getMessage());
             return null;
         }
     }

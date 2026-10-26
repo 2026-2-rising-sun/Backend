@@ -45,10 +45,7 @@ public class PaymentDelayReconciler {
                     count++;
                 }
             } catch (RuntimeException failure) {
-                log.warn(
-                        "payment recovery failed: attemptId={}, will retry when due",
-                        lease.id(),
-                        failure);
+                log.warn("결제 복구 실패, 예정 시각에 재시도: 결제 시도 ID={}", lease.id(), failure);
             }
         }
         return count;

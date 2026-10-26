@@ -64,9 +64,7 @@ public class ProductRegistrationService {
                     .findByIdempotencyKey(idempotencyKey)
                     .map(
                             winner -> {
-                                log.info(
-                                        "concurrent product registration replayed: key={}",
-                                        idempotencyKey);
+                                log.info("동시 상품 등록 요청의 기존 결과 반환: 멱등성 키={}", idempotencyKey);
                                 return requireSameSeller(winner, sellerId);
                             })
                     .orElseThrow(() -> e);

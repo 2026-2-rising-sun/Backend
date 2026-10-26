@@ -40,7 +40,7 @@ public class OrderExpirationScheduler {
     public void runScheduled() {
         int processed = processExpiredOrders();
         if (processed > 0) {
-            log.info("expired {} pending orders", processed);
+            log.info("결제 대기 주문 만료 처리 완료: 처리 건수={}", processed);
         }
     }
 

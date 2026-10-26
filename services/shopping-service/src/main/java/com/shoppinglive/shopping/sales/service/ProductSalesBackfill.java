@@ -70,7 +70,7 @@ public class ProductSalesBackfill implements ApplicationRunner {
             } catch (SalesInfoUnavailableException e) {
                 // 다시 실행하면 없는 행만 채우므로 재시도하지 않고 여기서 끝낸다. 앱은 계속 뜬다.
                 log.error(
-                        "sales backfill stopped: scannedProducts={} lastProductId={} cause={}",
+                        "판매정보 초기 적재 중단: 조회 상품 수={} 마지막 상품 ID={} 원인={}",
                         scanned,
                         lastId,
                         e.toString());
@@ -85,7 +85,7 @@ public class ProductSalesBackfill implements ApplicationRunner {
             lastId = ids.getLast();
             ids = products.findIdsAfter(lastId, Limit.of(CHUNK_SIZE));
         }
-        log.info("sales backfill finished: scannedProducts={} insertedRows={}", scanned, inserted);
+        log.info("판매정보 초기 적재 완료: 조회 상품 수={} 추가 행 수={}", scanned, inserted);
         return inserted;
     }
 }

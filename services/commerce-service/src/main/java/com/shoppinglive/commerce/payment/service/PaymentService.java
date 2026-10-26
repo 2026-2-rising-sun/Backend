@@ -74,7 +74,7 @@ public class PaymentService {
      *
      * <ol>
      *   <li>명시적으로 켠 local/test 레지스트리의 scenario
-     *   <li>Default: {@link PaymentScenario#INSTANT_SUCCESS}
+     *   <li>기본값: {@link PaymentScenario#INSTANT_SUCCESS}
      * </ol>
      */
     @Transactional

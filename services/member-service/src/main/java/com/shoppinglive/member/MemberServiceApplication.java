@@ -22,7 +22,7 @@ public class MemberServiceApplication {
             try (var context = SellerBootstrapCommand.openNonWebContext()) {
                 var memberId =
                         context.getBean(SellerBootstrapCommand.class).execute(System.getenv());
-                System.out.println("Created SELLER member " + memberId);
+                System.out.println("판매자 계정 생성 완료: 회원 ID=" + memberId);
             }
             return;
         }

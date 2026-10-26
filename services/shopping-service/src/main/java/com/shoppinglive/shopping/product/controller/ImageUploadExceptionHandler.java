@@ -36,7 +36,7 @@ public class ImageUploadExceptionHandler {
     /** multipart 한도는 검증기 한도보다 조금 크게 잡혀 있어 여기 걸린 요청은 어차피 용량 초과다. */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
-        log.warn("multipart size limit exceeded: {}", e.getMessage());
+        log.warn("멀티파트 요청 크기 제한 초과: {}", e.getMessage());
         return toResponse(ErrorCode.INVALID_REQUEST, ImageValidator.oversizeMessage(properties));
     }
 
@@ -50,7 +50,7 @@ public class ImageUploadExceptionHandler {
 
     @ExceptionHandler(MultipartException.class)
     public ResponseEntity<ApiResponse<Void>> handleMultipart(MultipartException e) {
-        log.warn("multipart request rejected: {}", e.getMessage());
+        log.warn("멀티파트 요청 거부: {}", e.getMessage());
         return toResponse(
                 ErrorCode.INVALID_REQUEST, "파일 업로드 요청을 해석할 수 없습니다 (multipart/form-data 로 보내 주세요)");
     }
@@ -58,7 +58,7 @@ public class ImageUploadExceptionHandler {
     /** 서버 문제라 원인을 error 로 남기고, 응답에는 경로 같은 내부 정보 없이 재시도 안내만 준다. */
     @ExceptionHandler(ImageStorageException.class)
     public ResponseEntity<ApiResponse<Void>> handleStorage(ImageStorageException e) {
-        log.error("image storage failure: {}", e.detail(), e);
+        log.error("이미지 저장 실패: {}", e.detail(), e);
         return toResponse(e.errorCode(), e.getMessage());
     }
 

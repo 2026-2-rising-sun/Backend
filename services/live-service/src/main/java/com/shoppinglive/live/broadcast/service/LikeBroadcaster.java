@@ -34,7 +34,7 @@ public class LikeBroadcaster {
                 }
             }
         } catch (RuntimeException e) {
-            log.debug("like totals not published: cause={}", e.toString());
+            log.debug("좋아요 집계 발행 실패: 원인={}", e.toString());
         }
     }
 }

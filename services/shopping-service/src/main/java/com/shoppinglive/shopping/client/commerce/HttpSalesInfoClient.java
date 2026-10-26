@@ -95,7 +95,7 @@ public class HttpSalesInfoClient implements SalesInfoClient {
                             retry, CircuitBreaker.decorateSupplier(circuitBreaker, call))
                     .get();
         } catch (RuntimeException e) {
-            log.warn("commerce sales lookup failed: ids={} cause={}", chunk.size(), e.toString());
+            log.warn("판매정보 조회 실패: 요청 상품 수={} 원인={}", chunk.size(), e.toString());
             throw new SalesInfoUnavailableException("Commerce 판매정보 조회에 실패했습니다.", e);
         }
     }

@@ -190,7 +190,7 @@ class ClassificationTests(unittest.TestCase):
                       b'class Cache {StringRedisTemplate redis;}'):
             for old, new in ((before, after), (after, before)):
                 self.assertEqual(classify([Change(path, old, new)])["redis_tasks"], [":services:member-service:redisTest"])
-        # Spring caching may use a non-Redis backend.
+        # Spring 캐시는 Redis 이외의 저장소를 사용할 수 있다.
         self.assertEqual(classify([Change(path, before, b'@Cacheable("x") class Cache {}')])["redis_tasks"], [])
 
     def test_non_redis_cache_configuration_does_not_select_redis(self):

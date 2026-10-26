@@ -90,7 +90,7 @@ jobs:
             --env POSTGRES_PASSWORD=test --publish 127.0.0.1:55432:5432 postgres:16
           for attempt in {1..30}; do
             if docker exec ci-migration-postgres pg_isready --username postgres; then break; fi
-            echo "Waiting for PostgreSQL ($attempt/30)"
+            echo "PostgreSQL 준비 대기 중 ($attempt/30)"
             sleep 1
           done
           docker exec ci-migration-postgres pg_isready --username postgres
@@ -134,7 +134,7 @@ jobs:
             --publish 127.0.0.1:56379:6379 redis:7-alpine
           for attempt in {1..30}; do
             if docker exec ci-redis redis-cli ping; then break; fi
-            echo "Waiting for Redis ($attempt/30)"
+            echo "Redis 준비 대기 중 ($attempt/30)"
             sleep 1
           done
           docker exec ci-redis redis-cli ping

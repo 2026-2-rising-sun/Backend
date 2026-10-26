@@ -9,7 +9,7 @@ const command = path.join(__dirname, 'auth-env.cjs');
 const run = (args, env = process.env) =>
   spawnSync(process.execPath, [command, ...args], { env, encoding: 'utf8' });
 
-test('local keys match; missing/invalid TTL and credential overwrites fail', () => {
+test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기는 거부한다', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-auth-env-test-'));
   const dest = path.join(temp, 'keys');
   try {
@@ -45,7 +45,7 @@ test('local keys match; missing/invalid TTL and credential overwrites fail', () 
     assert.equal(env.MEMBER_SESSION_BASE_URL, 'http://localhost:8081');
     assert.equal(run(args).status, 1);
     assert.equal(fs.readFileSync(envPath, 'utf8'), saved);
-    // Even pre-existing parent secrets must not reach a different service child.
+    // 부모 프로세스에 이미 있던 인증정보도 다른 서비스의 자식 프로세스에 전달되면 안 된다.
     const child = run(
       [
         'exec',
@@ -104,7 +104,7 @@ test('local keys match; missing/invalid TTL and credential overwrites fail', () 
   }
 });
 
-test('malformed credential JSON never appears in diagnostic output', () => {
+test('잘못된 인증정보 JSON 원문은 진단 출력에 포함하지 않는다', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-auth-env-invalid-'));
   try {
     const file = path.join(temp, 'env.json');
@@ -120,14 +120,14 @@ test('malformed credential JSON never appears in diagnostic output', () => {
       'process.exit(99)',
     ]);
     assert.equal(result.status, 1);
-    assert.equal(result.stderr.trim(), 'Cannot read or parse local credential configuration');
+    assert.equal(result.stderr.trim(), '로컬 인증정보 설정을 읽거나 해석할 수 없습니다');
     assert.equal(result.stdout, '');
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
 });
 
-test('Member authority URL is explicit and never accepts embedded credentials', () => {
+test('회원 인증 서버 주소를 명시하며 주소에 포함된 인증정보는 거부한다', () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-auth-env-url-'));
   try {
     const dest = path.join(temp, 'keys');

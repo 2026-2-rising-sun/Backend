@@ -24,7 +24,7 @@ public class PaymentGroupExpirationScheduler {
             try {
                 service.expire(id);
             } catch (RuntimeException e) {
-                LoggerFactory.getLogger(getClass()).warn("group expiry failed id={}", id, e);
+                LoggerFactory.getLogger(getClass()).warn("결제 그룹 만료 처리 실패: 결제 그룹 ID={}", id, e);
             }
         }
     }

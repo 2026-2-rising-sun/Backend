@@ -32,7 +32,7 @@ public class RefundMockEngine {
                         executions.execute(refundRequestId);
                     } catch (RuntimeException failure) {
                         log.warn(
-                                "mock refund execution failed for requestId={}: {}",
+                                "모의 환불 실행 실패: 환불 요청 ID={} 원인={}",
                                 refundRequestId,
                                 failure.toString());
                     }

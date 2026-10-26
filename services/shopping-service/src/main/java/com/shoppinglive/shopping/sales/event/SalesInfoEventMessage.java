@@ -106,7 +106,7 @@ public record SalesInfoEventMessage(
             }
         }
         log.warn(
-                "unknown sales status stored as PRIVATE: status={} productId={} snapshotVersion={}",
+                "알 수 없는 판매 상태를 PRIVATE으로 저장: 상태={} 상품 ID={} 스냅샷 버전={}",
                 raw,
                 productId,
                 snapshotVersion);
