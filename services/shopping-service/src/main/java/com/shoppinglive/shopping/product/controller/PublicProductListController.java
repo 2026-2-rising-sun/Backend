@@ -4,24 +4,18 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
-import com.shoppinglive.shopping.product.dto.ProductListPosition;
-import com.shoppinglive.shopping.product.dto.PublicProductItemResponse;
 import com.shoppinglive.shopping.product.dto.PublicProductListResponse;
-import com.shoppinglive.shopping.product.dto.PublicProductPage;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.product.service.CatalogQueryService;
 import com.shoppinglive.shopping.product.service.ProductSort;
-import com.shoppinglive.shopping.product.service.PublicProductCursor;
-import com.shoppinglive.shopping.product.service.PublicProductListService;
-import com.shoppinglive.shopping.storage.ImageUrlResolver;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 공개 상품 목록 API (상품 5). 로그인·방송 여부와 무관하게 누구나 조회한다. 방송 연동은 필터가 아니라서 Live 를 호출하지 않는다. 판매정보를 확인하지 못하면
- * 503 SALES_INFO_UNAVAILABLE.
+ * 공개 상품 목록 API (상품 5). 로그인·방송 여부와 무관하게 누구나 조회한다. 방송 연동은 필터가 아니라서 Live 를 호출하지 않는다. 가격·재고는 Commerce
+ * 이벤트로 채운 판매정보 사본에서 읽으므로 Commerce 가 응답하지 않아도 목록을 반환한다.
  */
 @RestController
 @RequestMapping("/v1/products")
@@ -30,17 +24,10 @@ public class PublicProductListController {
     static final int DEFAULT_SIZE = 20;
     static final int MAX_SIZE = 50;
 
-    private final PublicProductListService listService;
-    private final ImageUrlResolver imageUrlResolver;
     private final CatalogQueryService catalog;
 
-    public PublicProductListController(
-            PublicProductListService listService,
-            ImageUrlResolver imageUrlResolver,
-            CatalogQueryService catalog) {
-        this.listService = listService;
+    public PublicProductListController(CatalogQueryService catalog) {
         this.catalog = catalog;
-        this.imageUrlResolver = imageUrlResolver;
     }
 
     /** 상세 경로에서 ID를 비운 요청은 목록 조회와 구분하여 입력 오류로 응답한다. */
@@ -50,8 +37,9 @@ public class PublicProductListController {
     }
 
     /**
-     * 판매중·품절 상품을 검색·상태·정렬 조건에 맞춰 {@code size} 개까지. 조건을 생략하면 기존 최신순이다. 다음 페이지는 응답의 {@code
-     * nextCursor} 를 {@code cursor} 로 넘긴다. 범위 밖 size·손상된 cursor 는 400 INVALID_REQUEST.
+     * 판매중·품절 상품을 검색·상태·카테고리·정렬 조건에 맞춰 {@code size} 개까지. 조건을 생략하면 최신순({@code sort=LATEST})과 같다. 다음
+     * 페이지는 응답의 {@code nextCursor} 를 {@code cursor} 로 넘긴다. 범위 밖 size·손상된 cursor 는 400
+     * INVALID_REQUEST.
      */
     @GetMapping
     public ApiResponse<PublicProductListResponse> list(
@@ -59,33 +47,13 @@ public class PublicProductListController {
             @RequestParam(name = "size", required = false) Integer size,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "status", required = false) SalesDisplayStatus status,
+            @RequestParam(name = "category", required = false) ProductCategory category,
             @RequestParam(name = "sort", required = false) ProductSort sort) {
         int pageSize = size == null ? DEFAULT_SIZE : size;
         if (pageSize < 1 || pageSize > MAX_SIZE) {
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST, "size 는 1~" + MAX_SIZE + " 이어야 합니다.");
         }
-        if (query != null || status != null || sort != null) {
-            return ApiResponse.ok(catalog.list(query, status, sort, cursor, pageSize));
-        }
-        ProductListPosition after =
-                StringUtils.hasText(cursor) ? PublicProductCursor.decode(cursor) : null;
-        PublicProductPage page = listService.list(after, pageSize);
-        return ApiResponse.ok(
-                new PublicProductListResponse(
-                        page.entries().stream().map(this::toItem).toList(),
-                        page.next() == null ? null : PublicProductCursor.encode(page.next()),
-                        page.hasNext()));
-    }
-
-    private PublicProductItemResponse toItem(PublicProductPage.Entry entry) {
-        return new PublicProductItemResponse(
-                entry.product().getId(),
-                entry.product().getName(),
-                imageUrlResolver.urlOf(entry.product().getMainImageId()),
-                entry.salesInfo().price(),
-                entry.salesInfo().available(),
-                entry.status(),
-                entry.status().isPurchasable() && entry.salesInfo().available() > 0);
+        return ApiResponse.ok(catalog.list(query, status, category, sort, cursor, pageSize));
     }
 }

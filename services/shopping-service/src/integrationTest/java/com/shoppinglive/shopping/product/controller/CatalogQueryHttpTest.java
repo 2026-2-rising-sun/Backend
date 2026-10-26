@@ -1,8 +1,10 @@
 package com.shoppinglive.shopping.product.controller;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,6 +14,7 @@ import com.shoppinglive.shopping.client.commerce.HttpSalesInfoClient;
 import com.shoppinglive.shopping.client.commerce.SalesInfo;
 import com.shoppinglive.shopping.client.commerce.SalesStatus;
 import com.shoppinglive.shopping.product.entity.Product;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.product.entity.ProductImage;
 import com.shoppinglive.shopping.product.repository.ProductImageRepository;
 import com.shoppinglive.shopping.product.repository.ProductRepository;
@@ -31,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 @SpringBootTest(
         properties =
@@ -240,6 +244,94 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
         }
     }
 
+    @Test
+    @DisplayName("조건을 모두 생략한 목록은 sort=LATEST와 같은 페이지와 커서를 반환하고 이전 형식 커서는 거부한다")
+    void omittedConditionsMatchLatestAndRejectLegacyCursor() throws Exception {
+        for (int i = 0; i < 3; i++)
+            product("상품 " + i, 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        String bare = page(get("/v1/products").param("size", "2"));
+        assertThat(bare)
+                .isEqualTo(page(get("/v1/products").param("sort", "LATEST").param("size", "2")));
+        String cursor = mapper.readTree(bare).path("data").path("nextCursor").asText();
+        assertThat(page(get("/v1/products").param("cursor", cursor).param("size", "2")))
+                .isEqualTo(
+                        page(
+                                get("/v1/products")
+                                        .param("sort", "LATEST")
+                                        .param("cursor", cursor)
+                                        .param("size", "2")));
+        // 삭제한 기존 목록 경로의 커서 형식: Base64URL("<createdAt>_<id>")
+        String legacy =
+                java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString("2026-10-26T00:00:00Z_1".getBytes(UTF_8));
+        mvc.perform(get("/v1/products").param("cursor", legacy))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    @DisplayName("카테고리는 검색·상태·정렬과 함께 적용되고 미분류 상품은 카테고리 필터에서 빠진다")
+    void categoryCombinesWithSearchSortAndCursor() throws Exception {
+        List<Long> expected = new ArrayList<>();
+        for (int i = 0; i < 5; i++)
+            expected.add(
+                    product(
+                            "니트 " + i,
+                            i / 2 * 100L,
+                            SalesStatus.ON_SALE,
+                            JwtTestTokens.SELLER,
+                            ProductCategory.FASHION));
+        product("니트 뷰티", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.BEAUTY);
+        product("코트", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.FASHION);
+        long unclassified = product("니트 미분류", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        List<Long> actual = new ArrayList<>();
+        String cursor = "";
+        String firstCursor = null;
+        do {
+            JsonNode data = mapper.readTree(page(categoryListing("FASHION", cursor))).path("data");
+            data.path("items")
+                    .forEach(
+                            item -> {
+                                actual.add(item.path("productId").asLong());
+                                assertThat(item.path("category").asText()).isEqualTo("FASHION");
+                            });
+            if (!data.path("hasNext").asBoolean()) break;
+            cursor = data.path("nextCursor").asText();
+            if (firstCursor == null) firstCursor = cursor;
+        } while (actual.size() < 10);
+        assertThat(actual).containsExactlyElementsOf(expected);
+
+        JsonNode all = listing("니트", "ON_SALE", "LATEST", "");
+        assertThat(all.path("items").get(0).path("productId").asLong()).isEqualTo(unclassified);
+        assertThat(all.path("items").get(0).path("category").isNull()).isTrue();
+        mvc.perform(categoryListing("BEAUTY", firstCursor)).andExpect(status().isBadRequest());
+        mvc.perform(categoryListing(null, firstCursor)).andExpect(status().isBadRequest());
+        for (String invalid : List.of("WRONG", "0"))
+            mvc.perform(categoryListing(invalid, ""))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+    }
+
+    private MockHttpServletRequestBuilder categoryListing(String category, String cursor) {
+        MockHttpServletRequestBuilder request =
+                get("/v1/products")
+                        .param("q", "니트")
+                        .param("status", "ON_SALE")
+                        .param("sort", "PRICE_ASC")
+                        .param("cursor", cursor)
+                        .param("size", "2");
+        return category == null ? request : request.param("category", category);
+    }
+
+    private String page(MockHttpServletRequestBuilder request) throws Exception {
+        return mvc.perform(request)
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+    }
+
     private JsonNode listing(String q, String state, String sort, String cursor) throws Exception {
         return mapper.readTree(
                         mvc.perform(
@@ -257,6 +349,15 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
     }
 
     private long product(String name, long price, SalesStatus status, String sellerId) {
+        return product(name, price, status, sellerId, null);
+    }
+
+    private long product(
+            String name,
+            long price,
+            SalesStatus status,
+            String sellerId,
+            ProductCategory category) {
         long id =
                 products.saveAndFlush(
                                 new Product(
@@ -264,7 +365,8 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
                                         name,
                                         imageId,
                                         UUID.randomUUID().toString(),
-                                        sellerId))
+                                        sellerId,
+                                        category))
                         .getId();
         if (status != null) sales.apply(new SalesInfo(id, id * 10, price, status, 1), 1);
         return id;

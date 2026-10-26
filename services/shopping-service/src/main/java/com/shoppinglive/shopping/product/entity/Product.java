@@ -3,6 +3,8 @@ package com.shoppinglive.shopping.product.entity;
 import com.shoppinglive.common.persistence.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -32,6 +34,11 @@ public class Product extends BaseEntity {
     @Column(name = "seller_id", length = 36, updatable = false)
     private String sellerId;
 
+    /** null 이면 미분류. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private ProductCategory category;
+
     /** 기본정보 수정의 낙관적 락. */
     @Version
     @Column(nullable = false)
@@ -49,18 +56,31 @@ public class Product extends BaseEntity {
             Long mainImageId,
             String idempotencyKey,
             String sellerId) {
+        this(name, description, mainImageId, idempotencyKey, sellerId, null);
+    }
+
+    public Product(
+            String name,
+            String description,
+            Long mainImageId,
+            String idempotencyKey,
+            String sellerId,
+            ProductCategory category) {
         this.name = name;
         this.description = description;
         this.mainImageId = mainImageId;
         this.idempotencyKey = idempotencyKey;
         this.sellerId = sellerId;
+        this.category = category;
     }
 
     /** 검증된 값으로 기본정보를 바꾼다. 실제로 바뀐 값이 있으면 flush 때 version 이 오른다. */
-    public void changeBasicInfo(String name, String description, Long mainImageId) {
+    public void changeBasicInfo(
+            String name, String description, Long mainImageId, ProductCategory category) {
         this.name = name;
         this.description = description;
         this.mainImageId = mainImageId;
+        this.category = category;
     }
 
     public String getName() {
@@ -81,6 +101,10 @@ public class Product extends BaseEntity {
 
     public String getSellerId() {
         return sellerId;
+    }
+
+    public ProductCategory getCategory() {
+        return category;
     }
 
     public Long getVersion() {

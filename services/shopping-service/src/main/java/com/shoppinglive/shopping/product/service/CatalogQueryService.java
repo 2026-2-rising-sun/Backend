@@ -8,6 +8,7 @@ import com.shoppinglive.shopping.product.dto.PublicProductItemResponse;
 import com.shoppinglive.shopping.product.dto.PublicProductListResponse;
 import com.shoppinglive.shopping.product.dto.SellerProductPage;
 import com.shoppinglive.shopping.product.dto.SellerProductSummary;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import com.shoppinglive.shopping.storage.ImageUrlResolver;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -37,14 +38,26 @@ public class CatalogQueryService {
 
     @Transactional(readOnly = true)
     public PublicProductListResponse list(
-            String query, SalesDisplayStatus status, ProductSort sort, String cursor, int size) {
+            String query,
+            SalesDisplayStatus status,
+            ProductCategory category,
+            ProductSort sort,
+            String cursor,
+            int size) {
         String keyword = query == null ? "" : query.strip().toLowerCase(Locale.ROOT);
         if ((query != null && query.length() > 100)
                 || (status != null && !status.isPubliclyVisible())) {
             throw invalid("검색어는 100자 이하이며 공개 상태는 ON_SALE 또는 SOLD_OUT 이어야 합니다.");
         }
         ProductSort ordering = sort == null ? ProductSort.LATEST : sort;
-        String fingerprint = keyword + "\n" + status + "\n" + ordering;
+        // 카테고리가 없을 때는 기존 커서 형식을 그대로 받는다.
+        String fingerprint =
+                keyword
+                        + "\n"
+                        + status
+                        + "\n"
+                        + ordering
+                        + (category == null ? "" : "\n" + category);
         Map<String, Object> params = new HashMap<>();
         params.put(
                 "keyword",
@@ -56,13 +69,17 @@ public class CatalogQueryService {
             where += " AND s.status = :status";
             params.put("status", status.name());
         }
+        if (category != null) {
+            where += " AND p.category = :category";
+            params.put("category", category.name());
+        }
         if (cursor != null && !cursor.isBlank()) {
             Position after = decode(cursor);
             if (!fingerprint.equals(after.fingerprint())
                     || after.id() <= 0
                     || after.price() < 0
                     || after.createdAt() == null) {
-                throw invalid("cursor 는 같은 검색·상태·정렬 조건에서만 사용할 수 있습니다.");
+                throw invalid("cursor 는 같은 검색·상태·카테고리·정렬 조건에서만 사용할 수 있습니다.");
             }
             params.put("id", after.id());
             params.put("createdAt", java.sql.Timestamp.from(after.createdAt()));
@@ -85,7 +102,7 @@ public class CatalogQueryService {
                 };
         List<CatalogRow> rows =
                 jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_id, p.created_at, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
+                        "SELECT p.id, p.name, p.main_image_id, p.category, p.created_at, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
                                 + where
                                 + " ORDER BY "
                                 + order
@@ -99,7 +116,8 @@ public class CatalogQueryService {
                                         rs.getTimestamp("created_at").toInstant(),
                                         rs.getLong("price"),
                                         SalesDisplayStatus.valueOf(rs.getString("status")),
-                                        rs.getInt("available")));
+                                        rs.getInt("available"),
+                                        rs.getString("category")));
         boolean hasNext = rows.size() > size;
         List<CatalogRow> page = rows.subList(0, Math.min(size, rows.size()));
         String next = null;
@@ -118,8 +136,10 @@ public class CatalogQueryService {
                                                 row.price(),
                                                 row.available(),
                                                 row.status(),
-                                                row.status().isPurchasable()
-                                                        && row.available() > 0))
+                                                row.status().isPurchasable() && row.available() > 0,
+                                                row.category() == null
+                                                        ? null
+                                                        : ProductCategory.valueOf(row.category())))
                         .toList(),
                 next,
                 hasNext);
@@ -215,5 +235,6 @@ public class CatalogQueryService {
             Instant createdAt,
             long price,
             SalesDisplayStatus status,
-            int available) {}
+            int available,
+            String category) {}
 }

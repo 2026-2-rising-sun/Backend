@@ -116,7 +116,8 @@ public class SellerProductQueryService {
                 product.getUpdatedAt(),
                 view.status(),
                 view.price(),
-                view.available());
+                view.available(),
+                product.getCategory());
     }
 
     /** 조회 실패면 {@code null} — 호출 측이 모든 항목을 UNKNOWN 으로 표시한다. */

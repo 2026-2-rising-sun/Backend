@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 class ProductSellerMigrationTest {
-    @DisplayName("마이그레이션은 기존 상품을 보존하고 판매자를 임의로 지정하지 않는다")
+    @DisplayName("마이그레이션은 기존 상품을 보존하고 판매자·카테고리를 임의로 지정하지 않는다")
     @Test
     void migrationRetainsExistingProductsWithoutAssigningSeller() throws Exception {
         verify(
@@ -22,7 +22,7 @@ class ProductSellerMigrationTest {
                 "");
     }
 
-    @DisplayName("PostgreSQL 마이그레이션은 기존 상품을 보존하고 판매자를 임의로 지정하지 않는다")
+    @DisplayName("PostgreSQL 마이그레이션은 기존 상품을 보존하고 판매자·카테고리를 임의로 지정하지 않는다")
     @Test
     @Tag("postgres")
     @Tag("migration")
@@ -73,10 +73,11 @@ class ProductSellerMigrationTest {
                 try (var statement = connection.createStatement();
                         var result =
                                 statement.executeQuery(
-                                        "SELECT name, seller_id FROM product WHERE id=1")) {
+                                        "SELECT name, seller_id, category FROM product WHERE id=1")) {
                     assertThat(result.next()).isTrue();
                     assertThat(result.getString("name")).isEqualTo("existing");
                     assertThat(result.getString("seller_id")).isNull();
+                    assertThat(result.getString("category")).isNull();
                     assertThat(result.next()).isFalse();
                 }
             }

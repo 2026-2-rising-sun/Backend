@@ -57,7 +57,12 @@ public class ProductRegistrationService {
         try {
             return productRepository.saveAndFlush(
                     new Product(
-                            name, description, command.mainImageId(), idempotencyKey, sellerId));
+                            name,
+                            description,
+                            command.mainImageId(),
+                            idempotencyKey,
+                            sellerId,
+                            command.category()));
         } catch (DataIntegrityViolationException e) {
             // 같은 키의 동시 요청이 먼저 커밋한 경우. 그 밖의 제약 위반(예: 이미지가 그사이 삭제)은 그대로 던진다.
             return productRepository

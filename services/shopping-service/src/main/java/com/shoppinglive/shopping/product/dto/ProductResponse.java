@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.product.dto;
 
 import com.shoppinglive.shopping.product.entity.Product;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import java.time.Instant;
 
 /**
@@ -14,7 +15,8 @@ public record ProductResponse(
         String mainImageUrl,
         Long version,
         Instant createdAt,
-        String sellerId) {
+        String sellerId,
+        ProductCategory category) {
 
     public static ProductResponse of(Product product, String mainImageUrl) {
         return new ProductResponse(
@@ -25,6 +27,7 @@ public record ProductResponse(
                 mainImageUrl,
                 product.getVersion(),
                 product.getCreatedAt(),
-                product.getSellerId());
+                product.getSellerId(),
+                product.getCategory());
     }
 }

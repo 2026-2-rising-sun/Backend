@@ -1,6 +1,7 @@
 package com.shoppinglive.shopping.product.dto;
 
 import com.shoppinglive.shopping.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 
 /**
  * 공개 상품 상세 응답. 가격·재고는 조회 시점 스냅샷이며 주문 생성 때 Commerce 가 다시 확정한다.
@@ -19,7 +20,8 @@ public record PublicProductDetailResponse(
         SalesDisplayStatus salesStatus,
         int available,
         boolean purchasable,
-        int maxQuantity) {
+        int maxQuantity,
+        ProductCategory category) {
 
     public static PublicProductDetailResponse from(PublicProductDetail detail) {
         return new PublicProductDetailResponse(
@@ -31,6 +33,7 @@ public record PublicProductDetailResponse(
                 detail.salesStatus(),
                 detail.salesInfo().available(),
                 detail.purchasable(),
-                detail.maxQuantity());
+                detail.maxQuantity(),
+                detail.product().getCategory());
     }
 }

@@ -1,5 +1,6 @@
 package com.shoppinglive.shopping.product.dto;
 
+import com.shoppinglive.shopping.product.entity.ProductCategory;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -8,9 +9,10 @@ public record UpdateProductRequest(
         String name,
         String description,
         @Positive(message = "0보다 커야 합니다.") Long mainImageId,
+        ProductCategory category,
         @NotNull(message = "필수 값입니다.") Long version) {
 
     public UpdateProductCommand toCommand() {
-        return new UpdateProductCommand(name, description, mainImageId, version);
+        return new UpdateProductCommand(name, description, mainImageId, category, version);
     }
 }
