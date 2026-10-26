@@ -307,9 +307,10 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
         assertThat(all.path("items").get(0).path("category").isNull()).isTrue();
         mvc.perform(categoryListing("BEAUTY", firstCursor)).andExpect(status().isBadRequest());
         mvc.perform(categoryListing(null, firstCursor)).andExpect(status().isBadRequest());
-        mvc.perform(categoryListing("WRONG", ""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        for (String invalid : List.of("WRONG", "0"))
+            mvc.perform(categoryListing(invalid, ""))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     private MockHttpServletRequestBuilder categoryListing(String category, String cursor) {
