@@ -51,6 +51,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             clearAutomatically = true,
             flushAutomatically = true)
     @Query(
+            "UPDATE Notification n SET n.readAt=:at, n.updatedAt=:at WHERE n.memberId=:member AND n.readAt IS NULL")
+    int markAllReadIfUnread(@Param("member") String member, @Param("at") Instant at);
+
+    @org.springframework.data.jpa.repository.Modifying(
+            clearAutomatically = true,
+            flushAutomatically = true)
+    @Query(
             "UPDATE Notification n SET n.readAt=:at, n.updatedAt=:at WHERE n.id=:id AND n.memberId=:member AND n.readAt IS NULL")
     int markReadIfUnread(
             @Param("id") Long id, @Param("member") String member, @Param("at") Instant at);
