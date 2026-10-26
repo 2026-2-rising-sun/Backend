@@ -15,6 +15,7 @@ public record BroadcastProductViewResponse(
         String name,
         String mainImageUrl,
         Long price,
+        Integer available,
         String status,
         boolean purchasable,
         boolean missing) {
@@ -35,6 +36,7 @@ public record BroadcastProductViewResponse(
                     null,
                     null,
                     null,
+                    null,
                     false,
                     true);
         }
@@ -46,6 +48,7 @@ public record BroadcastProductViewResponse(
                 product.name(),
                 product.mainImageUrl(),
                 sales.price(),
+                sales.available(),
                 sales.status().name(),
                 // 품절은 구매 불가. ON_SALE 도 available 부족이면 Commerce 가 최종 거절한다.
                 sales.status() == com.shoppinglive.live.client.commerce.SalesStatus.ON_SALE

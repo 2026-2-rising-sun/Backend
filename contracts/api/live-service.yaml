@@ -414,6 +414,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BroadcastProductViewEnvelope'
+              example:
+                success: true
+                error: null
+                data:
+                - linkId: 75
+                  position: 0
+                  productId: 1024
+                  salesId: 5501
+                  name: 가을 니트
+                  mainImageUrl: /img/products/1024.png
+                  price: 39000
+                  available: 0
+                  status: ON_SALE
+                  purchasable: false
+                  missing: false
+                - linkId: 76
+                  position: 1
+                  productId: 1025
+                  salesId: 5502
+                  name: null
+                  mainImageUrl: null
+                  price: null
+                  available: null
+                  status: null
+                  purchasable: false
+                  missing: true
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -639,6 +665,7 @@ paths:
                   name: 가을 니트
                   mainImageUrl: /img/products/1024.png
                   price: 39000
+                  available: 5
                   status: ON_SALE
                   purchasable: true
                   missing: false
@@ -649,6 +676,7 @@ paths:
                   name: 가을 코트
                   mainImageUrl: null
                   price: 129000
+                  available: 0
                   status: SOLD_OUT
                   purchasable: false
                   missing: false
@@ -1840,6 +1868,7 @@ components:
       - name
       - mainImageUrl
       - price
+      - available
       - status
       - purchasable
       - missing
@@ -1874,6 +1903,10 @@ components:
           - 'null'
           format: int64
           description: KRW 정수
+        available:
+          type: [integer, 'null']
+          minimum: 0
+          description: 결제 대기 예약분을 제외한 주문 가능 재고. 관리 조회에서 상품 또는 판매정보 누락 시 null이다. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다.
         status:
           type:
           - string
@@ -1886,7 +1919,7 @@ components:
           - null
         purchasable:
           type: boolean
-          description: 품절은 false. 최종 판정은 Commerce 가 다시 한다.
+          description: ON_SALE이고 available이 0보다 클 때만 true. 최종 판정은 Commerce 가 다시 한다.
         missing:
           type: boolean
           description: 정상 조회에서 사라진 연결. 관리 응답에서만 true 가 될 수 있다.

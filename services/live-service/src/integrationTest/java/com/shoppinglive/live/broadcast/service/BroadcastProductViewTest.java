@@ -1,6 +1,8 @@
 package com.shoppinglive.live.broadcast.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,6 +11,11 @@ import com.shoppinglive.live.broadcast.dto.BroadcastInput;
 import com.shoppinglive.live.broadcast.dto.BroadcastProductViewResponse;
 import com.shoppinglive.live.broadcast.entity.Broadcast;
 import com.shoppinglive.live.broadcast.entity.BroadcastProduct;
+import com.shoppinglive.live.client.commerce.SalesClient;
+import com.shoppinglive.live.client.commerce.SalesSnapshot;
+import com.shoppinglive.live.client.commerce.SalesStatus;
+import com.shoppinglive.live.client.shopping.ProductClient;
+import com.shoppinglive.live.client.shopping.ProductSnapshot;
 import com.shoppinglive.live.security.LiveSecuritySupport;
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -72,10 +80,11 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
         assertThat(view.forPublic(broadcast.getId()))
                 .extracting(
                         BroadcastProductViewResponse::status,
+                        BroadcastProductViewResponse::available,
                         BroadcastProductViewResponse::purchasable)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("ON_SALE", true),
-                        org.assertj.core.groups.Tuple.tuple("SOLD_OUT", false));
+                        org.assertj.core.groups.Tuple.tuple("ON_SALE", 5, true),
+                        org.assertj.core.groups.Tuple.tuple("SOLD_OUT", 0, false));
     }
 
     @DisplayName("삭제된 상품은 공개 조회에서 숨기고 관리 조회에서는 missing으로 표시한다")
@@ -94,6 +103,7 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
                 .satisfies(
                         product -> {
                             assertThat(product.missing()).isTrue();
+                            assertThat(product.available()).isNull();
                             assertThat(product.linkId()).isEqualTo(link.getId());
                             assertThat(product.position()).isZero();
                         });
@@ -127,15 +137,106 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
     void httpViewsReturnEnvelope() throws Exception {
         final Broadcast broadcast = register("view-http");
         links.link(broadcast.getId(), 1L, versionOf(broadcast.getId()));
+        links.link(broadcast.getId(), 2L, versionOf(broadcast.getId()));
         mvc.perform(get("/v1/broadcasts/{id}/products", broadcast.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].productId").value(1))
-                .andExpect(jsonPath("$.data[0].salesId").value(101));
+                .andExpect(jsonPath("$.data[0].salesId").value(101))
+                .andExpect(jsonPath("$.data[0].available").value(5))
+                .andExpect(jsonPath("$.data[0].status").value("ON_SALE"))
+                .andExpect(jsonPath("$.data[0].purchasable").value(true))
+                .andExpect(jsonPath("$.data[1].available").value(0))
+                .andExpect(jsonPath("$.data[1].status").value("SOLD_OUT"))
+                .andExpect(jsonPath("$.data[1].purchasable").value(false));
         mvc.perform(
                         get("/v1/seller/broadcasts/{id}/products", broadcast.getId())
                                 .header("Authorization", sellerBearer()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].position").value(0));
+                .andExpect(jsonPath("$.data[0].position").value(0))
+                .andExpect(jsonPath("$.data[0].available").value(5))
+                .andExpect(jsonPath("$.data[1].available").value(0));
+    }
+
+    @Nested
+    @DisplayName("상품·판매정보 경계값 응답")
+    class WhenProductSnapshotsChange {
+        @Autowired BroadcastService broadcasts;
+        @Autowired BroadcastProductService links;
+        @Autowired MockMvc mvc;
+        @MockitoBean ProductClient productClient;
+        @MockitoBean SalesClient salesClient;
+
+        private Broadcast linkedBroadcast(String title) {
+            ProductSnapshot product = new ProductSnapshot(1L, "재고 확인 상품", null);
+            SalesSnapshot sale = new SalesSnapshot(1L, 101L, 10_000L, SalesStatus.ON_SALE, 0);
+            when(productClient.get(1L)).thenReturn(product);
+            when(salesClient.get(1L)).thenReturn(sale);
+            when(productClient.get(List.of(1L))).thenReturn(List.of(product));
+            when(salesClient.get(List.of(1L))).thenReturn(List.of(sale));
+            Broadcast broadcast =
+                    broadcasts.register(
+                            UUID.randomUUID().toString(),
+                            new BroadcastInput(
+                                    title,
+                                    Instant.parse("2026-01-01T00:00:00Z"),
+                                    "arn:aws:ivs:channel/" + title,
+                                    "https://example.live-video.net/" + title));
+            links.link(broadcast.getId(), 1L, broadcasts.get(broadcast.getId()).getVersion());
+            return broadcast;
+        }
+
+        @Test
+        @DisplayName("판매중 재고 0은 공개·관리 JSON에서 상태를 유지하고 구매 불가다")
+        void zeroStockPreservesOnSaleStatusInHttpViews() throws Exception {
+            Broadcast broadcast = linkedBroadcast("view-zero-stock");
+            for (String path :
+                    List.of(
+                            "/v1/broadcasts/{id}/products",
+                            "/v1/seller/broadcasts/{id}/products")) {
+                mvc.perform(get(path, broadcast.getId()).header("Authorization", sellerBearer()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data[0].available").value(0))
+                        .andExpect(jsonPath("$.data[0].status").value("ON_SALE"))
+                        .andExpect(jsonPath("$.data[0].purchasable").value(false))
+                        .andExpect(jsonPath("$.data[0].missing").value(false));
+            }
+        }
+
+        @Test
+        @DisplayName("상품 또는 판매정보 누락은 공개에서 제외하고 관리 JSON에 재고 null을 남긴다")
+        void missingProductOrSalesReturnsNullStockOnlyForSeller() throws Exception {
+            Broadcast broadcast = linkedBroadcast("view-missing-snapshot");
+            for (boolean missingProduct : List.of(true, false)) {
+                when(productClient.get(List.of(1L)))
+                        .thenReturn(
+                                missingProduct
+                                        ? List.of()
+                                        : List.of(new ProductSnapshot(1L, "상품", null)));
+                when(salesClient.get(List.of(1L)))
+                        .thenReturn(
+                                missingProduct
+                                        ? List.of(
+                                                new SalesSnapshot(
+                                                        1L, 101L, 10_000L, SalesStatus.ON_SALE, 5))
+                                        : List.of());
+                mvc.perform(get("/v1/broadcasts/{id}/products", broadcast.getId()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data").isEmpty());
+                mvc.perform(
+                                get("/v1/seller/broadcasts/{id}/products", broadcast.getId())
+                                        .header("Authorization", sellerBearer()))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data[0].linkId").isNumber())
+                        .andExpect(jsonPath("$.data[0].position").value(0))
+                        .andExpect(jsonPath("$.data[0].salesId").value(101))
+                        .andExpect(
+                                jsonPath("$.data[0]")
+                                        .value(org.hamcrest.Matchers.hasKey("available")))
+                        .andExpect(jsonPath("$.data[0].available").value(nullValue()))
+                        .andExpect(jsonPath("$.data[0].purchasable").value(false))
+                        .andExpect(jsonPath("$.data[0].missing").value(true));
+            }
+        }
     }
 
     /** 외부 장애는 빈 목록으로 숨기지 않고 상품 endpoint 전체를 503 으로 만든다. */
@@ -168,7 +269,8 @@ class BroadcastProductViewTest extends LiveSecuritySupport {
                             broadcast.getId());
 
             mvc.perform(get("/v1/broadcasts/{id}/products", broadcast.getId()))
-                    .andExpect(status().isServiceUnavailable());
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.error.code").value("SERVICE_UNAVAILABLE"));
             mvc.perform(get("/v1/broadcasts/{id}", broadcast.getId())).andExpect(status().isOk());
         }
     }

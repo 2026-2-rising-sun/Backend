@@ -84,6 +84,7 @@ public class PublicProductListController {
                 entry.product().getName(),
                 imageUrlResolver.urlOf(entry.product().getMainImageId()),
                 entry.salesInfo().price(),
+                entry.salesInfo().available(),
                 entry.status(),
                 entry.status().isPurchasable() && entry.salesInfo().available() > 0);
     }

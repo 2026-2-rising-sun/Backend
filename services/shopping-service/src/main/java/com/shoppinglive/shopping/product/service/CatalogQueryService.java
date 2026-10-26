@@ -116,6 +116,7 @@ public class CatalogQueryService {
                                                 row.name(),
                                                 images.urlOf(row.imageId()),
                                                 row.price(),
+                                                row.available(),
                                                 row.status(),
                                                 row.status().isPurchasable()
                                                         && row.available() > 0))
