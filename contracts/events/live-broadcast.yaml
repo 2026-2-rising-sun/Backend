@@ -96,19 +96,19 @@ components:
       - title
       - scheduledAt
       properties:
-        broadcastId: &id001
+        broadcastId:
           type: integer
           format: int64
           minimum: 1
           maximum: 9223372036854775807
-        broadcastVersion: &id002
+        broadcastVersion:
           type: integer
           format: int64
           minimum: 0
           maximum: 9223372036854775807
         title:
           type: string
-        scheduledAt: &id003
+        scheduledAt:
           type: string
           format: date-time
     LiveBroadcastStartedPayload:
@@ -121,16 +121,32 @@ components:
       - startedAt
       - productIds
       properties:
-        broadcastId: *id001
-        broadcastVersion: *id002
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        broadcastVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
         title:
           type: string
-        scheduledAt: *id003
-        startedAt: *id003
+        scheduledAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
         productIds:
           type: array
           description: 방송 시작 시점에 공개 가능한 ON_SALE·SOLD_OUT 연결 상품 ID. 노출 순서대로 전달한다.
-          items: *id001
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+            maximum: 9223372036854775807
     LiveBroadcastEndedPayload:
       type: object
       required:
@@ -139,13 +155,25 @@ components:
       - startedAt
       - endedAt
       properties:
-        broadcastId: *id001
-        broadcastVersion: *id002
-        startedAt: *id003
-        endedAt: *id003
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        broadcastVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
         closedPromotionIds:
           type: array
-          items: &id004
+          items:
             type: integer
             format: int64
             minimum: 1
@@ -163,25 +191,36 @@ components:
       - openedAt
       - closesAt
       properties:
-        broadcastId: *id004
-        promotionId: *id004
-        promotionVersion: &id006
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        promotionId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        promotionVersion:
           type: integer
           format: int64
           minimum: 0
           maximum: 9223372036854775807
-        type: &id005
+        type:
           type: string
           minLength: 1
           pattern: \S
-        title: *id005
+        title:
+          type: string
+          minLength: 1
+          pattern: \S
         attributes:
           type: object
           additionalProperties: true
-        openedAt: &id008
+        openedAt:
           type: string
           format: date-time
-        closesAt: &id007
+        closesAt:
           type:
           - string
           - 'null'
@@ -197,17 +236,38 @@ components:
       - openedAt
       - closedAt
       properties:
-        broadcastId: *id004
-        promotionId: *id004
-        promotionVersion: *id006
-        type: *id005
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        promotionId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 9223372036854775807
+        promotionVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9223372036854775807
+        type:
+          type: string
+          minLength: 1
+          pattern: \S
         reason:
           type: string
           minLength: 1
           pattern: \S
           description: SELLER_CLOSED·EXPIRED·BROADCAST_ENDED. 모르는 값도 문자열로 받을 수 있다.
-        openedAt: *id007
-        closedAt: *id008
+        openedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
   messages:
     LiveBroadcastScheduled:
       name: LiveBroadcastScheduled

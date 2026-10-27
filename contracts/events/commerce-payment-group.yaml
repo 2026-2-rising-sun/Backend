@@ -59,7 +59,7 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: &id001
+          aggregateId:
             type: string
             pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
@@ -156,7 +156,9 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: *id001
+          aggregateId:
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
@@ -263,7 +265,9 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: *id001
+          aggregateId:
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
@@ -377,7 +381,9 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: *id001
+          aggregateId:
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
@@ -478,7 +484,9 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: *id001
+          aggregateId:
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
@@ -579,7 +587,9 @@ components:
             const: 1
           source:
             const: commerce-service
-          aggregateId: *id001
+          aggregateId:
+            type: string
+            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
           occurredAt:
             type: string
             format: date-time
