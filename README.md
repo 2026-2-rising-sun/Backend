@@ -19,7 +19,7 @@
 | Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. 기존 주문 묶음·쿠폰·방송 → Notification |
 | Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |
 
-판매정보 조회는 이벤트로 채운 사본(`replica`)이 기본이며 `catalog.sales.source=http`(`CATALOG_SALES_SOURCE=http`)로 CommerceCore 직접 조회로 되돌릴 수 있습니다. 판매정보 이벤트는 DB 커밋 후 직접 발행하고, 상품·쿠폰·방송·프로모션 및 Payment 결과 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다.
+판매정보 조회는 이벤트로 채운 사본(`replica`)이 기본이며 `catalog.sales.source=http`(`CATALOG_SALES_SOURCE=http`)로 CommerceCore 직접 조회로 되돌릴 수 있습니다. 상품·판매·쿠폰·방송·프로모션 및 Payment 결과 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다.
 
 ## 주요 기능
 
@@ -65,7 +65,7 @@ CommerceCore는 영속 전달 요청을 저장한 뒤 Payment 내부 HTTP API에
 
 ### 조회용 사본과 이벤트 발행 경계
 
-Catalog는 상품·판매·쿠폰을 조회용 사본에 저장하며 더 큰 버전만 반영해 중복·역순 이벤트가 최신 값을 덮지 않게 합니다. 상품 최초 version 0도 반영합니다. 상품·쿠폰·방송·프로모션·Payment 결과는 공통 Outbox 릴레이로 발행하며, 기존 판매정보의 커밋 후 직접 발행과는 전달 방식을 구분합니다.
+Catalog는 상품·판매·쿠폰을 조회용 사본에 저장하며 더 큰 버전만 반영해 중복·역순 이벤트가 최신 값을 덮지 않게 합니다. 상품 최초 version 0도 반영합니다. 상품·판매·쿠폰·방송·프로모션·Payment 결과는 공통 Outbox 릴레이로 발행합니다.
 
 ### 여러 Live 인스턴스에서 실시간 이벤트 전달
 
