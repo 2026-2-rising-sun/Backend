@@ -83,7 +83,7 @@ public class PaymentDispatcher {
     @Scheduled(initialDelayString = "PT1S", fixedDelayString = "PT1S")
     public void recover() {
         if (enabled)
-            for (var d : store.due())
+            for (var d : store.due(refundsEnabled))
                 try {
                     dispatch(d);
                 } catch (RuntimeException failure) {
