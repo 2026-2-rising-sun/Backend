@@ -17,11 +17,19 @@ public class RefundIntakeService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final RefundMockEngine engine;
+    private final boolean executionEnabled;
 
-    public RefundIntakeService(JdbcTemplate jdbc, TransactionTemplate tx, RefundMockEngine engine) {
+    public RefundIntakeService(
+            JdbcTemplate jdbc,
+            TransactionTemplate tx,
+            RefundMockEngine engine,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${payment.refunds.execution-enabled:false}")
+                    boolean executionEnabled) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.engine = engine;
+        this.executionEnabled = executionEnabled;
     }
 
     public RefundExecution start(RefundCommand c) {
@@ -53,7 +61,10 @@ public class RefundIntakeService {
                         if (c.amount() > paid || total > paid - c.amount())
                             throw new BusinessException(
                                     ErrorCode.CONFLICT, "누적 환불 금액이 결제 금액을 초과합니다.");
-                        Instant now = Instant.now();
+                        // 선점과 같은 DB 시각을 사용해 JVM 시계가 앞설 때 초기 예약이 지연되지 않게 한다.
+                        Instant now =
+                                jdbc.queryForObject("SELECT CURRENT_TIMESTAMP", Timestamp.class)
+                                        .toInstant();
                         jdbc.update(
                                 "INSERT INTO refund_execution(id,request_id,core_refund_request_id,payment_id,order_id,payment_group_id,reference_number,refund_amount,status,idempotency_key,request_fingerprint,requested_at,created_at,updated_at,next_action_at) VALUES (?,?,?,?,?,?,?,?,'PROCESSING',?,?,?,?,?,?)",
                                 c.coreRefundRequestId(),
@@ -70,7 +81,8 @@ public class RefundIntakeService {
                                 Timestamp.from(now),
                                 Timestamp.from(now),
                                 Timestamp.from(now));
-                        AfterCommit.run(() -> engine.schedule(c.coreRefundRequestId()));
+                        if (executionEnabled)
+                            AfterCommit.run(() -> engine.schedule(c.coreRefundRequestId()));
                         return get(c.coreRefundRequestId());
                     });
         } catch (DataIntegrityViolationException race) {

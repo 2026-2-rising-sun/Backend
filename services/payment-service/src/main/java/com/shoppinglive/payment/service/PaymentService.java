@@ -57,7 +57,12 @@ public class PaymentService {
                         if (existing != null) return existing;
                         var attempt =
                                 new PaymentAttempt(
-                                        command.orderId(), scenario(command), Instant.now());
+                                        command.orderId(),
+                                        scenario(command),
+                                        jdbc.queryForObject(
+                                                        "SELECT CURRENT_TIMESTAMP",
+                                                        java.sql.Timestamp.class)
+                                                .toInstant());
                         attempt.identify(
                                 command.requestId(),
                                 command.paymentId(),

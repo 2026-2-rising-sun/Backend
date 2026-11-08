@@ -14,16 +14,19 @@ public class PaymentDispatcher {
     private final PaymentClient client;
     private final ObjectProvider<PaymentResultHandler> outcomes;
     private final boolean enabled;
+    private final boolean refundsEnabled;
 
     public PaymentDispatcher(
             PaymentDeliveryStore store,
             PaymentClient client,
             ObjectProvider<PaymentResultHandler> outcomes,
-            @Value("${commercecore.payment.delivery-recovery-enabled:true}") boolean enabled) {
+            @Value("${commercecore.payment.delivery-recovery-enabled:true}") boolean enabled,
+            @Value("${commercecore.refunds.execution-enabled:false}") boolean refundsEnabled) {
         this.store = store;
         this.client = client;
         this.outcomes = outcomes;
         this.enabled = enabled;
+        this.refundsEnabled = refundsEnabled;
     }
 
     public PaymentExecution paymentAfterCommit(long id) {
@@ -61,7 +64,7 @@ public class PaymentDispatcher {
     }
 
     public boolean dispatch(PaymentDeliveryStore.Delivery d) {
-        if (d.terminal()) return false;
+        if (d.terminal() || ("REFUND".equals(d.kind()) && !refundsEnabled)) return false;
         try {
             // 같은 원문을 재전달한다. Payment가 requestId 유일키로 응답 유실과 프로세스 중단을 복구한다.
             if ("PAYMENT".equals(d.kind()))

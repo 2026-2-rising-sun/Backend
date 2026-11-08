@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class RefundMockEngine {
     private static final Logger log = LoggerFactory.getLogger(RefundMockEngine.class);
     private final RefundExecutionService executions;
+    private final boolean enabled;
     private final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(
                     2,
@@ -21,11 +22,17 @@ public class RefundMockEngine {
                         return thread;
                     });
 
-    public RefundMockEngine(RefundExecutionService executions) {
+    public RefundMockEngine(
+            RefundExecutionService executions,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${payment.refunds.execution-enabled:false}")
+                    boolean enabled) {
         this.executions = executions;
+        this.enabled = enabled;
     }
 
     public void schedule(long refundRequestId) {
+        if (!enabled) return;
         scheduler.submit(
                 () -> {
                     try {
