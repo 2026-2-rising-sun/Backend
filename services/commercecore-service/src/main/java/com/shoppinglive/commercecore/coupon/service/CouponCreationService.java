@@ -51,7 +51,8 @@ public class CouponCreationService {
                 name, discount, limit, storedStart, storedEnd, storedExpiration, products);
         for (long productId : products) {
             var product =
-                    productLookup.findProduct(productId)
+                    productLookup
+                            .findProduct(productId)
                             .orElseThrow(
                                     () ->
                                             new BusinessException(

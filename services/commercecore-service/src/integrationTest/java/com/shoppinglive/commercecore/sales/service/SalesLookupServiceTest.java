@@ -28,7 +28,8 @@ import org.springframework.boot.test.context.SpringBootTest;
  * sales_stock} 을 이어 붙이는 JPQL 이다. 리포지토리를 mock 으로 바꾸면 정작 확인해야 할 쿼리가 실행되지 않는다.
  */
 @SpringBootTest
-class SalesLookupServiceTest extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class SalesLookupServiceTest
+        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
 
     private static final long ON_SALE_PRODUCT = 9_101L;
     private static final long SOLD_OUT_PRODUCT = 9_102L;

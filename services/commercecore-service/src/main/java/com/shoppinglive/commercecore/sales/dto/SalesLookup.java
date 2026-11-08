@@ -9,8 +9,8 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
  * {@code sales_stock} 두 테이블에 나뉘어 있으므로, 화면이 두 번 묻지 않도록 조회 시점에 한 행으로 합쳐 내보낸다.
  *
  * <p>엔티티가 아니라 record 인 이유: 이 뷰로는 아무것도 수정하지 않는다. 가격 변경은 판매 2, 재고 변경은 {@link
- * com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository} 의 조건부 UPDATE 만 담당한다. 조회용 값을
- * 엔티티로 돌려주면 호출한 쪽에서 상태를 바꿀 수 있는 것처럼 보이므로 일부러 불변 record 로 둔다.
+ * com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository} 의 조건부 UPDATE 만 담당한다. 조회용
+ * 값을 엔티티로 돌려주면 호출한 쪽에서 상태를 바꿀 수 있는 것처럼 보이므로 일부러 불변 record 로 둔다.
  *
  * @param productId Shopping 상품 식별자. 호출자가 요청에 쓴 값과 같다
  * @param salesId 판매정보 식별자

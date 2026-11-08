@@ -32,7 +32,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * BeforeEach} 에서 명시적으로 청소한다.
  */
 @SpringBootTest
-class SalesStockReserveTest extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class SalesStockReserveTest
+        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
 
     private static final int INITIAL_AVAILABLE = 5;
 

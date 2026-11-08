@@ -13,8 +13,9 @@ import org.springframework.data.domain.Persistable;
  * <p>{@code sales_info} 와 1:1 관계이며 shared PK/FK 를 사용한다 ({@code sales_info_id} 가 PK 이자 FK).
  *
  * <p><b>중요:</b> 실제 재고 조정은 이 엔티티의 setter · 도메인 메서드로 하지 않고, {@link
- * com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository} 의 조건부 UPDATE 네이티브 쿼리로만 수행한다.
- * Java {@code if (available >= qty)} check-then-act 갭 에서 초과 판매가 발생하기 때문. 이 클래스의 getter 는 조회·응답 목적만.
+ * com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository} 의 조건부 UPDATE 네이티브 쿼리로만
+ * 수행한다. Java {@code if (available >= qty)} check-then-act 갭 에서 초과 판매가 발생하기 때문. 이 클래스의 getter 는
+ * 조회·응답 목적만.
  *
  * <p>{@link Persistable} 구현 이유: shared PK 라 기본 생성자로 `salesInfoId` 를 세팅하고 save 하면 Spring Data JPA 가
  * UPDATE 로 오해할 수 있다. `isNew()` 를 통해 신규 여부를 명시적으로 알려 INSERT 를 유도한다.
