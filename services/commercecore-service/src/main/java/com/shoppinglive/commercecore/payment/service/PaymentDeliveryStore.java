@@ -53,9 +53,7 @@ public class PaymentDeliveryStore {
                 PaymentStatus.PROCESSING,
                 now,
                 null,
-                now.plus(
-                        (scenario == null ? PaymentScenario.INSTANT_SUCCESS : scenario)
-                                .getDelay()));
+                now);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -147,9 +145,7 @@ public class PaymentDeliveryStore {
                 PaymentStatus.PROCESSING,
                 at,
                 null,
-                at.plus(
-                        (c.scenario() == null ? PaymentScenario.INSTANT_SUCCESS : c.scenario())
-                                .getDelay()));
+                at);
     }
 
     public String key(long id) {
@@ -224,8 +220,17 @@ public class PaymentDeliveryStore {
     }
 
     public void requireSameResult(Delivery d, Object result) {
-        if (!Objects.equals(readTree(d.result()), readTree(json(result))))
+        if (!Objects.equals(comparable(d.result()), comparable(json(result))))
             throw new BusinessException(ErrorCode.CONFLICT, "이미 반영한 확정 결과와 다릅니다.");
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode comparable(String value) {
+        var node = readTree(value);
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+            object.remove("retryCount");
+            object.remove("nextActionAt");
+        }
+        return node;
     }
 
     private com.fasterxml.jackson.databind.JsonNode readTree(String value) {

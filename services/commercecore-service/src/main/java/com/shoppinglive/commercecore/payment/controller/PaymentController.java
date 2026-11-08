@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 결제 REST 컨트롤러.
  *
- * <p>경로: {@code /v1/orders/{orderNumber}/payments}. Infra Ingress 가 {@code /api/commerce/} prefix
- * 제거.
+ * <p>경로: {@code /v1/orders/{orderNumber}/payments}. Infra Ingress 가 {@code /api/commercecore/}
+ * prefix 제거.
  */
 @RestController
 @RequestMapping("/v1/orders/{orderNumber}/payments")

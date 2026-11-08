@@ -14,10 +14,12 @@ public class PaymentClientConfiguration {
             @Value("${commercecore.payment-client.base-url:http://localhost:8086}") String base,
             @Value(
                             "${commercecore.payment-client.service-token:${COMMERCECORE_PAYMENT_SERVICE_TOKEN:}}")
-                    String token) {
+                    String token,
+            @Value("${commercecore.payment-client.connect-timeout:1s}") Duration connectTimeout,
+            @Value("${commercecore.payment-client.read-timeout:3s}") Duration readTimeout) {
         var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(1));
-        factory.setReadTimeout(Duration.ofSeconds(3));
+        factory.setConnectTimeout(connectTimeout);
+        factory.setReadTimeout(readTimeout);
         return new HttpPaymentClient(
                 RestClient.builder()
                         .baseUrl(base)

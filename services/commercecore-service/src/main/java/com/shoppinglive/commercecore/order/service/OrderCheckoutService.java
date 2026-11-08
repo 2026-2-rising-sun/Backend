@@ -50,8 +50,6 @@ public class OrderCheckoutService {
      * @throws BusinessException 수량이 1 미만 (400)
      * @throws SalesNotFoundException 판매정보가 등록되지 않은 상품 (404)
      * @throws ProductNotFoundException Shopping 에 상품이 없음 (404)
-     * @throws com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException Shopping
-     *     일시 장애로 상품명을 확인하지 못함 (503)
      */
     @Transactional(readOnly = true)
     public OrderCheckout preview(Long productId, int quantity) {

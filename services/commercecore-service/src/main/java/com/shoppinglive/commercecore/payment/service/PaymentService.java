@@ -77,7 +77,6 @@ public class PaymentService {
     }
 
     public boolean refresh(Long id) {
-        boolean previous = deliveries.payment(id).status().isConfirmedOutcome();
-        return dispatcher.payment(id).status().isConfirmedOutcome() && !previous;
+        return dispatcher.refresh(id);
     }
 }

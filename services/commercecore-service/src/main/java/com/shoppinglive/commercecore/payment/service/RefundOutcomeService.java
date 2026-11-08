@@ -145,11 +145,12 @@ public class RefundOutcomeService {
                 jdbc.update(
                         """
             UPDATE refund_request
-               SET status=?, resolved_at=CURRENT_TIMESTAMP, result_detail=?, updated_at=CURRENT_TIMESTAMP,
+               SET status=?, resolved_at=?, result_detail=?, updated_at=CURRENT_TIMESTAMP,
                    retry_count=?,next_action_at=?
              WHERE id=? AND status IN ('PROCESSING','UNKNOWN')
             """,
                         outcome.name(),
+                        java.sql.Timestamp.from(result.resolvedAt()),
                         detail,
                         result.retryCount(),
                         java.sql.Timestamp.from(result.nextActionAt()),

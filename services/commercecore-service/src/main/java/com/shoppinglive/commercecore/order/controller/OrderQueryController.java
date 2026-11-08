@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 주문 REST 컨트롤러. 회원 본인 대상 조회·취소 API.
  *
- * <p>컨트롤러 경로는 {@code /v1/...} 로 시작. Infra Ingress 가 {@code /api/commerce/} prefix 를 벗김.
+ * <p>컨트롤러 경로는 {@code /v1/...} 로 시작. Infra Ingress 가 {@code /api/commercecore/} prefix 를 벗김.
  */
 @RestController
 @RequestMapping("/v1/orders")

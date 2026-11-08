@@ -42,7 +42,7 @@ public class PaymentResultHandler {
         this.jdbc = jdbc;
     }
 
-    public void payment(PaymentExecution p) {
+    public boolean payment(PaymentExecution p) {
         require(p != null, "결제 결과가 필요합니다.");
         var d = store.get(p.requestId());
         require("PAYMENT".equals(d.kind()), "결과 종류가 다릅니다.");
@@ -65,15 +65,15 @@ public class PaymentResultHandler {
                 "결제 예정 시각이 올바르지 않습니다.");
         if (d.terminal()) {
             if (p.resolvedAt() != null) store.requireSameResult(d, p);
-            return;
+            return false;
         }
         if (!p.status().isConfirmedOutcome()) {
             tx.executeWithoutResult(t -> store.record(d, p, p.status().name()));
-            return;
+            return false;
         }
-        if (p.paymentGroupId() != null) groups.getObject().applyOutcome(p);
+        if (p.paymentGroupId() != null) return groups.getObject().applyOutcome(p);
         else
-            tx.executeWithoutResult(
+            return tx.execute(
                     t -> {
                         jdbc.queryForObject(
                                 "SELECT id FROM orders WHERE id=? FOR UPDATE",
@@ -82,7 +82,7 @@ public class PaymentResultHandler {
                         var current = store.get(p.requestId());
                         if (current.terminal()) {
                             store.requireSameResult(current, p);
-                            return;
+                            return false;
                         }
                         var order = orders.findById(p.orderId()).orElseThrow();
                         boolean success =
@@ -99,10 +99,11 @@ public class PaymentResultHandler {
                                     != 1) throw new IllegalStateException("예약 재고가 누락되었습니다.");
                         } else sales.restoreReserved(order.getSalesInfoId(), order.getQuantity());
                         store.record(current, p, p.status().name());
+                        return true;
                     });
     }
 
-    public void refund(RefundExecution p) {
+    public boolean refund(RefundExecution p) {
         require(p != null, "환불 결과가 필요합니다.");
         var d = store.get(p.requestId());
         require("REFUND".equals(d.kind()), "결과 종류가 다릅니다.");
@@ -129,9 +130,9 @@ public class PaymentResultHandler {
         times(p.requestedAt(), p.resolvedAt(), terminal);
         if (d.terminal()) {
             if (p.resolvedAt() != null) store.requireSameResult(d, p);
-            return;
+            return false;
         }
-        if (terminal) refunds.apply(p);
+        if (terminal) return refunds.apply(p);
         else
             tx.executeWithoutResult(
                     t -> {
@@ -143,6 +144,7 @@ public class PaymentResultHandler {
                                 java.sql.Timestamp.from(p.nextActionAt()),
                                 p.coreRefundRequestId());
                     });
+        return false;
     }
 
     private static void times(Instant requested, Instant resolved, boolean terminal) {

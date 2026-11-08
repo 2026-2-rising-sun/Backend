@@ -47,28 +47,33 @@ public class PaymentDispatcher {
         return payment(id);
     }
 
+    public boolean refresh(long id) {
+        return dispatch(store.byPayment(id));
+    }
+
     public PaymentExecution payment(long id) {
         dispatch(store.byPayment(id));
         return store.payment(id);
     }
 
-    public void refund(long id) {
-        dispatch(store.byRefund(id));
+    public boolean refund(long id) {
+        return dispatch(store.byRefund(id));
     }
 
-    public void dispatch(PaymentDeliveryStore.Delivery d) {
-        if (d.terminal()) return;
+    public boolean dispatch(PaymentDeliveryStore.Delivery d) {
+        if (d.terminal()) return false;
         try {
             // 같은 원문을 재전달한다. Payment가 requestId 유일키로 응답 유실과 프로세스 중단을 복구한다.
             if ("PAYMENT".equals(d.kind()))
-                outcomes.getObject()
+                return outcomes.getObject()
                         .payment(client.start(store.read(d.command(), PaymentCommand.class)));
             else
-                outcomes.getObject()
+                return outcomes.getObject()
                         .refund(client.refund(store.read(d.command(), RefundCommand.class)));
         } catch (org.springframework.web.client.RestClientException unavailable) {
             store.delay(d);
             log.warn("Payment 전달 재시도 예정: requestId={}", d.requestId());
+            return false;
         }
     }
 
