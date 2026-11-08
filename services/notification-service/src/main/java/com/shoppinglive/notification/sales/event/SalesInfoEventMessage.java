@@ -28,7 +28,8 @@ record SalesInfoEventMessage(
         if (!isSupportedSchemaVersion(root.get("schemaVersion"))) {
             throw invalid("unsupported schemaVersion");
         }
-        if (!SalesInfoEventContract.SOURCE.equals(textOf(root, "source"))) {
+        if (!java.util.Set.of(SalesInfoEventContract.SOURCE, "commerce-service")
+                .contains(textOf(root, "source"))) {
             throw invalid("source must be " + SalesInfoEventContract.SOURCE);
         }
         JsonNode payload = root.get("payload");

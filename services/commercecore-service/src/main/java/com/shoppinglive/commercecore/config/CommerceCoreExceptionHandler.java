@@ -1,15 +1,11 @@
 package com.shoppinglive.commercecore.config;
 
-import com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.web.CorrelationId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,36 +22,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
-public class CommerceExceptionHandler {
-
-    /** 공통 {@link ErrorCode} 에 503 이 없어 이 서비스에서 코드 문자열을 정한다. */
-    public static final String SHOPPING_UNAVAILABLE = "SHOPPING_UNAVAILABLE";
-
-    private static final String SHOPPING_UNAVAILABLE_MESSAGE =
-            "상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
-
-    private static final Logger log = LoggerFactory.getLogger(CommerceExceptionHandler.class);
-
-    /**
-     * Shopping 을 확인하지 못한 요청은 503 으로 돌려준다.
-     *
-     * <p>500 이 아닌 이유: 이쪽 코드가 잘못된 게 아니라 의존 서비스가 잠깐 답을 못 준 상황이고, 재시도하면 성공할 수 있다. 호출하는 화면도 "오류" 가 아니라
-     * "잠시 후 다시" 로 안내해야 한다. "상품이 없음" 은 이 예외가 아니라 404 로 따로 구분한다.
-     */
-    @ExceptionHandler(ShoppingUnavailableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleShoppingUnavailable(
-            ShoppingUnavailableException e) {
-        log.warn("상품 서비스 호출 불가: {}", e.getMessage());
-        ApiResponse<Void> body =
-                new ApiResponse<>(
-                        false,
-                        null,
-                        new ApiResponse.ApiError(
-                                SHOPPING_UNAVAILABLE,
-                                SHOPPING_UNAVAILABLE_MESSAGE,
-                                CorrelationId.current()));
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
-    }
+public class CommerceCoreExceptionHandler {
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(

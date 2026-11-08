@@ -1,9 +1,9 @@
 package com.shoppinglive.commercecore.coupon.service;
 
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.coupon.entity.CouponDefinition;
 import com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher;
 import com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher.Type;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.ResultSet;
@@ -24,18 +24,18 @@ public class CouponManagementService {
 
     private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
-    private final ShoppingClient shopping;
+    private final ProductLookup products;
     private final TransactionTemplate transaction;
     private final TransactionTemplate readTransaction;
 
     public CouponManagementService(
             JdbcTemplate jdbc,
-            ShoppingClient shopping,
+            ProductLookup products,
             PlatformTransactionManager manager,
             CouponDisplayEventPublisher events) {
         this.events = events;
         this.jdbc = jdbc;
-        this.shopping = shopping;
+        this.products = products;
         this.transaction = new TransactionTemplate(manager);
         this.readTransaction = new TransactionTemplate(manager);
         this.readTransaction.setReadOnly(true);
@@ -89,7 +89,7 @@ public class CouponManagementService {
                 name, discount, limit, storedStart, storedEnd, storedExpiration, products);
         for (long productId : products) {
             var product =
-                    shopping.findProduct(productId)
+                    products.findProduct(productId)
                             .orElseThrow(
                                     () ->
                                             new BusinessException(

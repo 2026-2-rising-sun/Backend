@@ -2,8 +2,8 @@ package com.shoppinglive.commercecore.coupon.service;
 
 import static org.assertj.core.api.Assertions.*;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Instant;
@@ -28,22 +28,22 @@ import org.springframework.test.context.jdbc.Sql;
 class CouponManagementReadTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired CouponManagementService management;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;
 
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM coupon_target");
         jdbc.update("DELETE FROM coupon_definition");
-        shopping.clear();
+        products.clear();
     }
 
     @DisplayName("판매자 쿠폰 목록·상세는 대상 상품을 유지하고 다른 판매자의 쿠폰을 제외한다")
     @Test
     void ownListAndDetailPreserveTargetsAndExcludeAnotherSeller() {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
-        shopping.register(new ProductSnapshot(1L, "본인", null, SELLER));
-        shopping.register(new ProductSnapshot(2L, "타인", null, MEMBER_A));
+        products.register(new ProductSnapshot(1L, "본인", null, SELLER));
+        products.register(new ProductSnapshot(2L, "타인", null, MEMBER_A));
         var own = creation.create(SELLER, "본인 쿠폰", 100, 1, start, end, end, List.of(1L));
         var other = creation.create(MEMBER_A, "타인 쿠폰", 100, 1, start, end, end, List.of(2L));
         assertThat(management.list(SELLER, 0, 20).items()).containsExactly(own);

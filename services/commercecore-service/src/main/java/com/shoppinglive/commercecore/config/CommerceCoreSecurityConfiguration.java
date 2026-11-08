@@ -16,7 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 
 @Configuration(proxyBeanMethods = false)
-public class CommerceSecurityConfiguration {
+public class CommerceCoreSecurityConfiguration {
     @Bean
     @Order(1)
     SecurityFilterChain internalSales(
@@ -30,7 +30,9 @@ public class CommerceSecurityConfiguration {
                             return "GET".equals(request.getMethod())
                                     && ("/v1/sales".equals(path)
                                             || "/v1/internal/coupon-snapshots".equals(path)
-                                            || path.startsWith("/v1/internal/coupon-snapshots/"));
+                                            || path.startsWith("/v1/internal/coupon-snapshots/")
+                                            || path.equals("/v1/internal/products")
+                                            || path.startsWith("/v1/internal/products/"));
                         })
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(
@@ -42,12 +44,17 @@ public class CommerceSecurityConfiguration {
                 .authorizeHttpRequests(
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/v1/sales")
-                                        .hasAnyAuthority("SERVICE_shopping", "SERVICE_live")
+                                        .hasAnyAuthority("SERVICE_catalog", "SERVICE_live")
                                         .requestMatchers(
                                                 HttpMethod.GET,
                                                 "/v1/internal/coupon-snapshots",
                                                 "/v1/internal/coupon-snapshots/*")
-                                        .hasAuthority("SERVICE_shopping")
+                                        .hasAuthority("SERVICE_catalog")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/internal/products",
+                                                "/v1/internal/products/**")
+                                        .hasAuthority("SERVICE_live")
                                         .anyRequest()
                                         .denyAll())
                 .addFilterBefore(
@@ -58,16 +65,20 @@ public class CommerceSecurityConfiguration {
 
     @Bean
     @Order(2)
-    SecurityFilterChain memberCommerce(
+    SecurityFilterChain memberCommerceCore(
             HttpSecurity http,
             MemberJwtAuthenticationConverter converter,
             JsonSecurityErrorHandler errors,
             Environment environment)
             throws Exception {
-        boolean scenarios =
+        boolean devImages =
                 environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
                         && environment.getProperty(
-                                "commerce.dev.payment-scenario.enabled", Boolean.class, false);
+                                "commercecore.dev-api.enabled", Boolean.class, false);
+        boolean devScenarios =
+                environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
+                        && environment.getProperty(
+                                "commercecore.dev.payment-scenario.enabled", Boolean.class, false);
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -80,7 +91,9 @@ public class CommerceSecurityConfiguration {
                             auth.requestMatchers(
                                             HttpMethod.GET,
                                             "/actuator/health/liveness",
-                                            "/actuator/health/readiness")
+                                            "/actuator/health/readiness",
+                                            "/v1/product-images/",
+                                            "/v1/product-images/{id}")
                                     .permitAll()
                                     .requestMatchers(
                                             "/v1/orders",
@@ -102,6 +115,11 @@ public class CommerceSecurityConfiguration {
                                     .hasRole("SELLER")
                                     .requestMatchers("/v1/seller/coupons", "/v1/seller/coupons/*")
                                     .hasRole("SELLER")
+                                    .requestMatchers(
+                                            "/v1/seller/products",
+                                            "/v1/seller/products/**",
+                                            "/v1/seller/product-images")
+                                    .hasRole("SELLER")
                                     .requestMatchers("/v1/seller/refunds/**")
                                     .hasRole("SELLER")
                                     .requestMatchers(
@@ -112,7 +130,10 @@ public class CommerceSecurityConfiguration {
                                     .hasRole("SELLER")
                                     .requestMatchers(HttpMethod.GET, "/v1/sales/*/stock")
                                     .hasRole("SELLER");
-                            if (scenarios) {
+                            if (devImages) {
+                                auth.requestMatchers("/v1/dev/product-images").hasRole("SELLER");
+                            }
+                            if (devScenarios) {
                                 auth.requestMatchers("/v1/dev/payment-scenarios/**")
                                         .hasRole("SELLER");
                             }

@@ -3,8 +3,8 @@ package com.shoppinglive.commercecore.coupon.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Instant;
 import java.util.List;
@@ -25,17 +25,17 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class CouponManagementPostgresTest {
     private void verify(java.util.function.Consumer<DataSource> test) {
         String schema = "coupon_management_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         var ds =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                                .getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres"));
         var flyway =
                 Flyway.configure()
                         .dataSource(ds)
@@ -51,8 +51,8 @@ class CouponManagementPostgresTest {
         }
     }
 
-    private ShoppingClient shopping() {
-        ShoppingClient client = mock(ShoppingClient.class);
+    private ProductLookup products() {
+        ProductLookup client = mock(ProductLookup.class);
         for (long id : List.of(1L, 2L)) {
             when(client.findProduct(id))
                     .thenReturn(Optional.of(new ProductSnapshot(id, "상품", null, "seller")));
@@ -67,12 +67,12 @@ class CouponManagementPostgresTest {
                 ds -> {
                     var jdbc = new JdbcTemplate(ds);
                     var tx = new DataSourceTransactionManager(ds);
-                    var shopping = shopping();
+                    var products = products();
                     Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
                     var coupon =
                             new CouponCreationService(
                                             jdbc,
-                                            shopping,
+                                            products,
                                             tx,
                                             org.mockito.Mockito.mock(
                                                     com.shoppinglive.commercecore.coupon.event
@@ -82,7 +82,7 @@ class CouponManagementPostgresTest {
                     var read =
                             new CouponManagementService(
                                     paused,
-                                    shopping,
+                                    products,
                                     tx,
                                     org.mockito.Mockito.mock(
                                             com.shoppinglive.commercecore.coupon.event
@@ -90,7 +90,7 @@ class CouponManagementPostgresTest {
                     var write =
                             new CouponManagementService(
                                     jdbc,
-                                    shopping,
+                                    products,
                                     tx,
                                     org.mockito.Mockito.mock(
                                             com.shoppinglive.commercecore.coupon.event
@@ -133,12 +133,12 @@ class CouponManagementPostgresTest {
                 ds -> {
                     var jdbc = new JdbcTemplate(ds);
                     var tx = new DataSourceTransactionManager(ds);
-                    var shopping = shopping();
+                    var products = products();
                     Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
                     var coupon =
                             new CouponCreationService(
                                             jdbc,
-                                            shopping,
+                                            products,
                                             tx,
                                             org.mockito.Mockito.mock(
                                                     com.shoppinglive.commercecore.coupon.event
@@ -147,7 +147,7 @@ class CouponManagementPostgresTest {
                     var service =
                             new CouponManagementService(
                                     jdbc,
-                                    shopping,
+                                    products,
                                     tx,
                                     org.mockito.Mockito.mock(
                                             com.shoppinglive.commercecore.coupon.event

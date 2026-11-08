@@ -225,7 +225,7 @@ components:
               const: 1
             source:
               type: string
-              const: commercecore-service
+              enum: [commerce-service, commercecore-service]
             aggregateId:
               $ref: '#/components/schemas/SalesInfoKey'
             payload:

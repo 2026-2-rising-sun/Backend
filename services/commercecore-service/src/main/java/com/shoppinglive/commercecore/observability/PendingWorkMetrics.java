@@ -21,10 +21,7 @@ public class PendingWorkMetrics implements AutoCloseable {
     private final Counter failures;
     private static final Map<String, String> CONDITIONS =
             Map.of(
-                    "payment", "payment_attempt WHERE status IN ('PENDING','PROCESSING','UNKNOWN')",
                     "refund", "refund_request WHERE status IN ('PROCESSING','UNKNOWN')",
-                    "refund_retry_exhausted",
-                            "refund_request WHERE status IN ('PROCESSING','UNKNOWN') AND retry_count>=3",
                     "outbox", "event_outbox WHERE published_at IS NULL");
 
     public PendingWorkMetrics(DataSource source, MeterRegistry registry) {

@@ -19,7 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class CouponPreviewPostgresTest {
     private static final String COUPON = "coupon-preview";
     private static final String MEMBER = "member";
@@ -28,13 +28,13 @@ class CouponPreviewPostgresTest {
     @Test
     void validatesOwnedActiveCouponAndTargetAgainstPostgresWithoutReservingIt() {
         String schema = "coupon_preview_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         var dataSource =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                                .getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres"));
         var flyway =
                 Flyway.configure()
                         .dataSource(dataSource)

@@ -2,7 +2,7 @@ package com.shoppinglive.commercecore.observability;
 
 import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
-import com.shoppinglive.commercecore.payment.service.*;
+import com.shoppinglive.commercecore.payment.service.RefundIntakeService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.observability.BusinessTelemetry;
 import io.micrometer.core.instrument.Tags;
@@ -19,10 +19,10 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 100)
 @ConditionalOnProperty(name = "shoppinglive.observability.enabled", havingValue = "true")
-public class CommerceObservation {
+public class CommerceCoreObservation {
     private final BusinessTelemetry telemetry;
 
-    public CommerceObservation(BusinessTelemetry telemetry) {
+    public CommerceCoreObservation(BusinessTelemetry telemetry) {
         this.telemetry = telemetry;
     }
 
@@ -85,55 +85,6 @@ public class CommerceObservation {
                         "groupNumber",
                         result.refund().paymentGroupNumber()));
         return result;
-    }
-
-    @Around(
-            "execution(* com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore.beginInvocation(..)) || execution(* com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore.unknown(..)) || execution(* com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore.complete(..)) || execution(* com.shoppinglive.commercecore.payment.service.RefundRecoveryStore.beginInvocation(..)) || execution(* com.shoppinglive.commercecore.payment.service.RefundRecoveryStore.unknown(..)) || execution(* com.shoppinglive.commercecore.payment.service.RefundOutcomeService.apply(..))")
-    public Object paymentOperation(ProceedingJoinPoint call) throws Throwable {
-        Object lease = call.getArgs()[0];
-        boolean payment = lease instanceof PaymentRecoveryStore.Lease;
-        long id =
-                payment
-                        ? ((PaymentRecoveryStore.Lease) lease).id()
-                        : ((RefundRecoveryStore.Lease) lease).requestId();
-        String name = call.getSignature().getName();
-        String operation = (payment ? "payment_" : "refund_") + name;
-        Map<String, Object> ids = Map.of(payment ? "paymentAttemptId" : "refundRequestId", id);
-        try {
-            Object value = call.proceed();
-            String result;
-            if (value instanceof Optional<?> invocation)
-                result =
-                        invocation.isEmpty()
-                                ? "skipped"
-                                : (((Number) invocation.get()).intValue() == 0
-                                        ? "first_attempt"
-                                        : "retry");
-            else if (Boolean.TRUE.equals(value))
-                result =
-                        name.equals("complete") || name.equals("apply")
-                                ? call.getArgs()[1].toString()
-                                : "unknown";
-            else result = "skipped";
-            if (name.equals("beginInvocation") || name.equals("unknown")) {
-                telemetry.committedAttempt(
-                        "shoppinglive.payment.operations",
-                        Tags.of("operation", operation, "result", result),
-                        ids);
-            } else {
-                telemetry.count(
-                        "shoppinglive.payment.operations",
-                        Tags.of("operation", operation, "result", result),
-                        ids);
-            }
-            return value;
-        } catch (Throwable failure) {
-            telemetry.failure(
-                    "shoppinglive.payment.operations",
-                    Tags.of("operation", operation, "result", "error"),
-                    ids);
-            throw failure;
-        }
     }
 
     @Around(

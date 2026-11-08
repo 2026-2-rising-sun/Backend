@@ -6,15 +6,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -35,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -45,10 +45,10 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
     @Autowired CartItemRepository items;
     @Autowired OrderCreationService creation;
     @Autowired OrderJpaRepository orders;
-    @Autowired PaymentAttemptJpaRepository payments;
+    @Autowired JdbcTemplate jdbc;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired org.springframework.transaction.support.TransactionTemplate transaction;
     private Long salesId;
 
@@ -63,7 +63,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
 
     @AfterEach
     void clean() {
-        payments.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         items.deleteAll();
         stocks.deleteAll();
@@ -179,7 +179,8 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         }
         assertThat(orders.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(payments.count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_delivery_request", Long.class))
+                .isZero();
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
     }
 
@@ -199,7 +200,8 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"scenario\":\"INSTANT_SUCCESS\"}"))
                 .andExpect(status().isForbidden());
-        assertThat(payments.count()).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_delivery_request", Long.class))
+                .isZero();
         assertThat(orders.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
     }

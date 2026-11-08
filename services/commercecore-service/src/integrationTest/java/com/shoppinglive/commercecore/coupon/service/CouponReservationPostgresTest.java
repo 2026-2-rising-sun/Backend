@@ -21,20 +21,20 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class CouponReservationPostgresTest {
     private static final String COUPON = "coupon-reservation";
     private static final String MEMBER = "member";
 
     private void verify(java.util.function.Consumer<Context> test) {
         String schema = "coupon_reservation_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         var dataSource =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                                .getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres"));
         var flyway =
                 Flyway.configure()
                         .dataSource(dataSource)

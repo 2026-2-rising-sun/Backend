@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,21 +39,21 @@ class CouponCreationHttpTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired JdbcTemplate jdbc;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     private final Instant start = Instant.now().plus(Duration.ofDays(1));
 
     @BeforeEach
     void products() {
-        shopping.register(new ProductSnapshot(1L, "본인 상품", null, SELLER));
-        shopping.register(new ProductSnapshot(2L, "다른 상품", null, MEMBER_A));
-        shopping.register(new ProductSnapshot(3L, "미지정 상품", null));
+        products.register(new ProductSnapshot(1L, "본인 상품", null, SELLER));
+        products.register(new ProductSnapshot(2L, "다른 상품", null, MEMBER_A));
+        products.register(new ProductSnapshot(3L, "미지정 상품", null));
     }
 
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM coupon_target");
         jdbc.update("DELETE FROM coupon_definition");
-        shopping.clear();
+        products.clear();
     }
 
     private Map<String, Object> request() {

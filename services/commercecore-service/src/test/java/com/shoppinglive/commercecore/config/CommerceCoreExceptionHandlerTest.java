@@ -19,7 +19,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-class CommerceExceptionHandlerTest {
+class CommerceCoreExceptionHandlerTest {
     @Test
     @DisplayName("낙관적 잠금과 상태 CAS 충돌은 모두 409로 응답한다")
     void mapsOptimisticAndConditionalStateConflictsTo409() throws Exception {
@@ -36,7 +36,7 @@ class CommerceExceptionHandlerTest {
         MockMvc mvc =
                 MockMvcBuilders.standaloneSetup(controller)
                         .setControllerAdvice(
-                                new CommerceExceptionHandler(), new GlobalExceptionHandler())
+                                new CommerceCoreExceptionHandler(), new GlobalExceptionHandler())
                         .build();
         mvc.perform(
                         patch("/v1/sales/1/price")

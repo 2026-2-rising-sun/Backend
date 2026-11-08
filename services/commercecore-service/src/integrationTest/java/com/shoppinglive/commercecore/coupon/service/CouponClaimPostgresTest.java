@@ -23,17 +23,17 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class CouponClaimPostgresTest {
     private void verify(int limit, java.util.function.Consumer<DriverManagerDataSource> test) {
         String schema = "coupon_claim_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         var ds =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                                .getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres"));
         var flyway =
                 Flyway.configure()
                         .dataSource(ds)
@@ -65,8 +65,8 @@ class CouponClaimPostgresTest {
                         new JdbcTemplate(ds),
                         new DataSourceTransactionManager(ds),
                         org.mockito.Mockito.mock(
-                                com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher
-                                        .class));
+                                com.shoppinglive.commercecore.coupon.event
+                                        .CouponDisplayEventPublisher.class));
         var ready = new CountDownLatch(20);
         var go = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(20)) {
@@ -177,8 +177,8 @@ class CouponClaimPostgresTest {
                                                             failing,
                                                             new DataSourceTransactionManager(ds),
                                                             org.mockito.Mockito.mock(
-                                                                    com.shoppinglive.commercecore.coupon
-                                                                            .event
+                                                                    com.shoppinglive.commercecore
+                                                                            .coupon.event
                                                                             .CouponDisplayEventPublisher
                                                                             .class))
                                                     .claim("member", "coupon"))
@@ -193,7 +193,8 @@ class CouponClaimPostgresTest {
                                                     jdbc,
                                                     new DataSourceTransactionManager(ds),
                                                     org.mockito.Mockito.mock(
-                                                            com.shoppinglive.commercecore.coupon.event
+                                                            com.shoppinglive.commercecore.coupon
+                                                                    .event
                                                                     .CouponDisplayEventPublisher
                                                                     .class))
                                             .claim("member", "coupon")

@@ -6,10 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.coupon.dto.CouponDisplaySnapshot;
 import com.shoppinglive.commercecore.coupon.entity.CouponDefinition;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import java.sql.Timestamp;
@@ -36,7 +36,7 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
     @Autowired CouponManagementService management;
     @Autowired CouponClaimService claims;
     @Autowired CouponSnapshotService snapshots;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @Autowired MockMvc mvc;
@@ -65,8 +65,8 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
 
     @BeforeEach
     void products() {
-        shopping.register(new ProductSnapshot(701L, "쿠폰 표시 상품", null, SELLER));
-        shopping.register(new ProductSnapshot(702L, "쿠폰 변경 상품", null, SELLER));
+        products.register(new ProductSnapshot(701L, "쿠폰 표시 상품", null, SELLER));
+        products.register(new ProductSnapshot(702L, "쿠폰 변경 상품", null, SELLER));
     }
 
     @AfterEach
@@ -78,7 +78,7 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
             jdbc.update("DELETE FROM event_outbox WHERE message_key=?", id);
         }
         ids.clear();
-        shopping.clear();
+        products.clear();
     }
 
     private CouponDefinition create(int limit) {
@@ -244,7 +244,7 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
     }
 
     @Test
-    @DisplayName("동기화 API는 Shopping 토큰만 허용하고 페이지·ID 입력을 검사한다")
+    @DisplayName("동기화 API는 Product 토큰만 허용하고 페이지·ID 입력을 검사한다")
     void authenticationAndInputContract() throws Exception {
         String path = "/v1/internal/coupon-snapshots";
         mvc.perform(get(path)).andExpect(status().isUnauthorized());

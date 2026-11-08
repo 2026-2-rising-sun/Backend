@@ -78,6 +78,17 @@ class CommerceNotificationTest {
     }
 
     @Test
+    @DisplayName("서비스 분리 전 결제 결과를 재처리해도 알림은 한 번 저장한다")
+    void acceptsPreviousProducerSource() throws Exception {
+        var envelope = event("PaymentSucceeded", Map.of("paymentId", 1, "paidAmount", 10000));
+        envelope.put("source", "commerce-service");
+        listener.consume(record(envelope, GROUP));
+        listener.consume(record(envelope, GROUP));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification", Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("실패·취소·만료·부분 환불을 구분하고 환불 상세 식별자를 보존한다")
     void terminalResultsAndRefundLink() throws Exception {
         listener.consume(

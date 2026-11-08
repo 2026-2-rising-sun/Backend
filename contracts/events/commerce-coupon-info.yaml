@@ -218,7 +218,7 @@ components:
         schemaVersion:
           const: 1
         source:
-          const: commercecore-service
+          enum: [commerce-service, commercecore-service]
         aggregateId: *id002
         occurredAt:
           type: string

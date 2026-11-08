@@ -4,9 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.coupon.service.CouponCreationService;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class CouponManagementHttpTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -44,14 +44,14 @@ class CouponManagementHttpTest extends CommerceSecurityTestSupport {
     void clean() {
         jdbc.update("DELETE FROM coupon_target");
         jdbc.update("DELETE FROM coupon_definition");
-        shopping.clear();
+        products.clear();
     }
 
     @DisplayName("쿠폰 관리 HTTP 요청은 소유자·버전·역할을 검증한다")
     @Test
     void managementHttpValidatesOwnerVersionAndRole() throws Exception {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
-        shopping.register(new ProductSnapshot(1L, "상품", null, SELLER));
+        products.register(new ProductSnapshot(1L, "상품", null, SELLER));
         var coupon = creation.create(SELLER, "original", 100, 1, start, end, end, List.of(1L));
         mvc.perform(get("/v1/seller/coupons")).andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/seller/coupons").header("Authorization", bearer(MEMBER_A)))

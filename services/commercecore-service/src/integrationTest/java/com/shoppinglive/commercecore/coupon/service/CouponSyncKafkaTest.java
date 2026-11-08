@@ -3,9 +3,9 @@ package com.shoppinglive.commercecore.coupon.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.event.SalesInfoEventContract;
 import com.shoppinglive.commercecore.sales.event.SalesInfoEventType;
 import com.shoppinglive.commercecore.sales.event.SalesInfoSnapshot;
@@ -44,7 +44,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 @EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_KAFKA_SERVERS", matches = ".+")
 class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @Autowired OutboxMessageRepository outbox;
@@ -87,7 +87,7 @@ class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
             }
         }
         long product = UUID.randomUUID().getMostSignificantBits() >>> 1;
-        shopping.register(new ProductSnapshot(product, "직렬화 검증", null, SELLER));
+        products.register(new ProductSnapshot(product, "직렬화 검증", null, SELLER));
         String couponId = null;
         try (var consumer =
                 new KafkaConsumer<String, String>(
@@ -161,7 +161,7 @@ class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
                 jdbc.update("DELETE FROM coupon_definition WHERE id=?", couponId);
                 jdbc.update("DELETE FROM event_outbox WHERE message_key=?", couponId);
             }
-            shopping.clear();
+            products.clear();
         }
     }
 }

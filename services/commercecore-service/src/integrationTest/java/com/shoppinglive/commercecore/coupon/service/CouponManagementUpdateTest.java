@@ -2,8 +2,8 @@ package com.shoppinglive.commercecore.coupon.service;
 
 import static org.assertj.core.api.Assertions.*;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import java.sql.Timestamp;
@@ -31,21 +31,21 @@ import org.springframework.test.context.jdbc.Sql;
 class CouponManagementUpdateTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired CouponManagementService management;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;
 
     @AfterEach
     void clean() {
         jdbc.update("DELETE FROM coupon_target");
         jdbc.update("DELETE FROM coupon_definition");
-        shopping.clear();
+        products.clear();
     }
 
     @DisplayName("버전이 충돌하거나 행사가 시작되면 쿠폰 설정을 변경하지 않는다")
     @Test
     void versionConflictAndEventStartedDoNotChangeSettings() {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
-        shopping.register(new ProductSnapshot(1L, "상품", null, SELLER));
+        products.register(new ProductSnapshot(1L, "상품", null, SELLER));
         var coupon = creation.create(SELLER, "original", 100, 1, start, end, end, List.of(1L));
         var edited =
                 management.update(
@@ -91,7 +91,7 @@ class CouponManagementUpdateTest extends CommerceSecurityTestSupport {
     @Test
     void concurrentUpdatesWithSameVersionHaveExactlyOneWinner() throws Exception {
         Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
-        shopping.register(new ProductSnapshot(1L, "상품", null, SELLER));
+        products.register(new ProductSnapshot(1L, "상품", null, SELLER));
         var coupon = creation.create(SELLER, "original", 100, 1, start, end, end, List.of(1L));
         CountDownLatch ready = new CountDownLatch(2), go = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(2)) {

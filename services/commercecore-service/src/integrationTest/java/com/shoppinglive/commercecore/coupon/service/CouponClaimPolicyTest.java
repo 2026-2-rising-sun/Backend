@@ -57,8 +57,8 @@ class CouponClaimPolicyTest {
                         manager,
                         Clock.fixed(start, ZoneOffset.UTC),
                         org.mockito.Mockito.mock(
-                                com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher
-                                        .class));
+                                com.shoppinglive.commercecore.coupon.event
+                                        .CouponDisplayEventPublisher.class));
         var receipt = atStart.claim("member", "coupon");
         assertThat(receipt.created()).isTrue();
         var atEnd =
@@ -67,8 +67,8 @@ class CouponClaimPolicyTest {
                         manager,
                         Clock.fixed(end, ZoneOffset.UTC),
                         org.mockito.Mockito.mock(
-                                com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher
-                                        .class));
+                                com.shoppinglive.commercecore.coupon.event
+                                        .CouponDisplayEventPublisher.class));
         assertThatThrownBy(() -> atEnd.claim("other", "coupon"))
                 .isInstanceOf(BusinessException.class);
         var replay = atEnd.claim("member", "coupon");
@@ -102,8 +102,8 @@ class CouponClaimPolicyTest {
                         new DataSourceTransactionManager(ds),
                         Clock.fixed(start, ZoneOffset.UTC),
                         org.mockito.Mockito.mock(
-                                com.shoppinglive.commercecore.coupon.event.CouponDisplayEventPublisher
-                                        .class));
+                                com.shoppinglive.commercecore.coupon.event
+                                        .CouponDisplayEventPublisher.class));
         assertThatThrownBy(() -> service.claim("member", "coupon"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThat(jdbc.queryForObject("SELECT issued_count FROM coupon_definition", Integer.class))

@@ -16,7 +16,10 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /** 임시 RSA 키와 실제 운영 검증기·필터를 사용해 인증을 검증한다. */
-@Import(CommerceSecurityTestSupport.SessionTestConfiguration.class)
+@Import({
+    CommerceSecurityTestSupport.SessionTestConfiguration.class,
+    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration.class
+})
 public abstract class CommerceSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
 
@@ -36,7 +39,6 @@ public abstract class CommerceSecurityTestSupport {
                     """
             DELETE FROM payment_group g WHERE NOT EXISTS
                 (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
-            AND NOT EXISTS (SELECT 1 FROM payment_attempt p WHERE p.payment_group_id = g.id)
             """);
         }
     }
@@ -79,7 +81,7 @@ public abstract class CommerceSecurityTestSupport {
         properties.add(
                 "shoppinglive.security.jwt.public-key-set-location",
                 () -> KEY_SET.toUri().toString());
-        properties.add("shoppinglive.security.service-tokens.shopping", () -> SHOPPING_TOKEN);
+        properties.add("shoppinglive.security.service-tokens.catalog", () -> SHOPPING_TOKEN);
         properties.add("shoppinglive.security.service-tokens.live", () -> LIVE_TOKEN);
     }
 

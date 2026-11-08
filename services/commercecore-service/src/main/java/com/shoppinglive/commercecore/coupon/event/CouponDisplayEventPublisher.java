@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class CouponDisplayEventPublisher {
-    public static final String TOPIC = "commerce.coupon-info.v1";
+    public static final String TOPIC = "commercecore.coupon-info.v1";
 
     public enum Type {
         CouponCreated,
@@ -31,7 +31,7 @@ public class CouponDisplayEventPublisher {
     @Transactional(propagation = Propagation.MANDATORY)
     public void issued(String memberId, MemberCoupon coupon) {
         var snapshot = snapshots.get(coupon.couponId());
-        // 기존 Shopping 소비자가 동일 토픽의 표시 사본을 계속 읽을 수 있도록 전체 사본을 유지한다.
+        // 기존 Product 소비자가 동일 토픽의 표시 사본을 계속 읽을 수 있도록 전체 사본을 유지한다.
         var payload = new LinkedHashMap<String, Object>();
         payload.put("couponId", snapshot.couponId());
         payload.put("snapshotVersion", snapshot.snapshotVersion());

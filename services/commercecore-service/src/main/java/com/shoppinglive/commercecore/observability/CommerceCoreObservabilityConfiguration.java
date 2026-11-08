@@ -7,7 +7,7 @@ import org.springframework.context.annotation.*;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "shoppinglive.observability.enabled", havingValue = "true")
-public class CommerceObservabilityConfiguration {
+public class CommerceCoreObservabilityConfiguration {
     @Bean(initMethod = "start", destroyMethod = "close")
     PendingWorkMetrics pendingWorkMetrics(DataSource source, MeterRegistry registry) {
         return new PendingWorkMetrics(source, registry);
