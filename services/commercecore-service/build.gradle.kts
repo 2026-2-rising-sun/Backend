@@ -5,6 +5,8 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")
     testImplementation(testFixtures(project(":common-module")))
+    // 독립 Payment DB·HTTP 경계를 기동하는 통합 테스트 fixture에서만 사용한다.
+    testImplementation(project(":services:payment-service"))
     testImplementation("org.springframework.security:spring-security-test")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
