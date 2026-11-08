@@ -135,6 +135,8 @@ jobs:
         if: steps.changes.outputs.postgres_tasks != '[]'
         env:
           POSTGRES_TASKS: ${{ steps.changes.outputs.postgres_tasks }}
+          LIVE_PG_TEST: '1'
+          LIVE_PG_PORT: '55432'
           CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
           CATALOG_TEST_POSTGRES_USER: postgres
           CATALOG_TEST_POSTGRES_PASSWORD: test

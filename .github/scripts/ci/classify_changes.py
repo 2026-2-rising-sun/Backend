@@ -16,7 +16,7 @@ SPEC = importlib.util.spec_from_file_location(
 API = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(API)
 MIGRATION_SERVICES = SERVICES
-POSTGRES_SERVICES = {"catalog-service", "commercecore-service", "payment-service"}
+POSTGRES_SERVICES = {"catalog-service", "commercecore-service", "payment-service", "live-service"}
 LIVE_PREFIX = "services/live-service/"
 PUBSUB_CALLERS = {"ChatWriteService.java", "BroadcastEndNotifier.java", "BroadcastService.java"}
 

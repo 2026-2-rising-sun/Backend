@@ -300,7 +300,7 @@ class HarnessSelectionTests(unittest.TestCase):
 class ServiceBoundaryTests(unittest.TestCase):
     def test_split_services_select_postgres_business_tests(self):
         """분리된 서비스의 업무 변경은 PostgreSQL 전용 회귀도 선택한다."""
-        for service in ("catalog-service", "commercecore-service", "payment-service"):
+        for service in ("catalog-service", "commercecore-service", "payment-service", "live-service"):
             with self.subTest(service=service):
                 plan = classify([Change(f"services/{service}/src/main/java/Example.java", None, b"class Example {}")])
                 self.assertEqual(plan["gradle_tasks"], [f":services:{service}:build"])

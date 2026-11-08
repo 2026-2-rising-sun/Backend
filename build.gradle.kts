@@ -125,7 +125,7 @@ subprojects {
                 doFirst { check(enabled()) { "$taskName 실행에 필요한 격리된 DB·Redis 환경이 없습니다." } }
             }
         registerExternalTest("migrationTest", "postgres & migration", postgresEnabled)
-        if (prefix in setOf("CATALOG", "COMMERCECORE", "PAYMENT")) {
+        if (prefix in setOf("CATALOG", "COMMERCECORE", "PAYMENT", "LIVE")) {
             registerExternalTest("postgresTest", "postgres & !migration", postgresEnabled)
         }
         registerExternalTest("redisTest", "redis") { System.getenv("${prefix}_REDIS_TEST") == "1" }
