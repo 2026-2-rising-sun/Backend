@@ -11,6 +11,11 @@ spring:
         request.timeout.ms: 5000
   config:
     import: classpath:shoppinglive-resilience-defaults.yml
+  servlet:
+    multipart:
+      # 이미지 검증 한도 5MB보다 크게 두어 서비스가 일관된 입력 오류를 반환한다.
+      max-file-size: 6MB
+      max-request-size: 7MB
   jpa:
     open-in-view: false
     hibernate:
@@ -40,6 +45,8 @@ shoppinglive:
 
 server:
   port: 8083
+  tomcat:
+    max-swallow-size: 10MB
 
 commercecore:
   refunds:

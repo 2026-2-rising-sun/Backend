@@ -40,8 +40,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 
 @SpringBootTest(
         properties =
-                "spring.kafka.bootstrap-servers=${COMMERCE_TEST_KAFKA_SERVERS:localhost:29092}")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_KAFKA_SERVERS", matches = ".+")
+                "spring.kafka.bootstrap-servers=${COMMERCECORE_TEST_KAFKA_SERVERS:localhost:29092}")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_KAFKA_SERVERS", matches = ".+")
 class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired InMemoryProductLookupStub products;
@@ -61,7 +61,7 @@ class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
     @DisplayName("실제 Kafka에서 별도 직렬화기를 사용한 Outbox JSON과 도메인 JSON을 수신한다")
     @Test
     void realKafkaReceivesRawOutboxJsonAndDomainJsonFromSeparateSerializers() throws Exception {
-        String broker = System.getenv("COMMERCE_TEST_KAFKA_SERVERS");
+        String broker = System.getenv("COMMERCECORE_TEST_KAFKA_SERVERS");
         try (var connection = jdbc.getDataSource().getConnection()) {
             if (connection.getMetaData().getDatabaseProductName().equals("H2")
                     && jdbc.queryForList(

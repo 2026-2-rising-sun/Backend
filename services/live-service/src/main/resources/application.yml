@@ -84,7 +84,7 @@ spring:
       port: ${REDIS_PORT:6379}
 # 상품과 판매정보는 로컬 Core 원본을 호출하고 과금되는 IVS만 stub을 쓴다.
 # 상품 조회에는 commercecore(8083)를 띄워야 한다. mock 서버로 바꿀 때는 URL만
-# 바꾸거나 LIVE_PRODUCTS_SHOPPING_URL / LIVE_PRODUCTS_COMMERCE_URL 로 덮는다.
+# 바꾸거나 LIVE_PRODUCTS_COMMERCECORE_URL 로 덮는다.
 # stub 은 local/test 에서만 허용되며 운영 프로파일에서 stub 은 기동 실패다.
 live:
   products:

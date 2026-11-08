@@ -42,10 +42,10 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(
         properties = {
             "shoppinglive.outbox.relay.enabled=true",
-            "spring.kafka.bootstrap-servers=${COMMERCE_TEST_KAFKA_SERVERS:localhost:29092}"
+            "spring.kafka.bootstrap-servers=${COMMERCECORE_TEST_KAFKA_SERVERS:localhost:29092}"
         })
 @AutoConfigureMockMvc
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_KAFKA_SERVERS", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_KAFKA_SERVERS", matches = ".+")
 class SalesInfoEventKafkaTest extends CommerceSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
@@ -57,7 +57,7 @@ class SalesInfoEventKafkaTest extends CommerceSecurityTestSupport {
     @DisplayName("API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다")
     @Test
     void apiChangesPublishContractJsonAndStableKeyToRealKafka() throws Exception {
-        String broker = System.getenv("COMMERCE_TEST_KAFKA_SERVERS");
+        String broker = System.getenv("COMMERCECORE_TEST_KAFKA_SERVERS");
         try (AdminClient admin = AdminClient.create(Map.of("bootstrap.servers", broker))) {
             try {
                 admin.createTopics(
