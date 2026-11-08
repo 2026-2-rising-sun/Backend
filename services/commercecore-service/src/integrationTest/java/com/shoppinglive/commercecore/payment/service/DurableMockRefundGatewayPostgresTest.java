@@ -32,6 +32,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                                 "gateway-replay",
                                 java.util.List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
 
         var first = gateway.execute(request.id(), request.refundAmount());
         var replay =
@@ -58,6 +59,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                                 "gateway-response-lost",
                                 java.util.List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
 
         assertThatThrownBy(
                         () ->
@@ -89,6 +91,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                                 "gateway-no-result",
                                 java.util.List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
 
         assertThatThrownBy(
                         () ->
@@ -114,6 +117,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
                                 "gateway-amount",
                                 java.util.List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         gateway.execute(request.id(), request.refundAmount());
 
         assertThatThrownBy(() -> gateway.execute(request.id(), request.refundAmount() + 1))

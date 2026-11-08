@@ -33,7 +33,7 @@ commercecore:
     results-enabled: false
   refunds:
     api-enabled: false
-    execution-enabled: true
+    execution-enabled: false
   dev:
     payment-scenario:
       enabled: true

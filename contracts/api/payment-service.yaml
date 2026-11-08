@@ -73,9 +73,11 @@ paths:
     post:
       operationId: startRefunds
       summary: Core 영속 요청 멱등 접수
-      description: requestId와 paymentId 또는 coreRefundRequestId는 유일하다. 재전달 내용이 다르면
-        409이며 내용이 같으면 기존 ID/결과를 반환한다. 0원은 PG 호출 없이 Payment 원본 성공과 common Outbox를 같은
-        트랜잭션에 저장한다. UNKNOWN은 실패로 바꾸지 않는다.
+      description: >-
+        requestId와 coreRefundRequestId는 유일하다. 같은 원문 재전달은 기존 ID/결과를 반환하고 내용이 다르면 409다.
+        payment.refunds.execution-enabled=false면 양수·0원 모두 PROCESSING 원본만 영속 접수하고 자동 예약·실행·확정을 하지 않는다.
+        재활성 후 worker가 같은 실행을 복구한다. 활성 상태의 0원 실행은 PG만 생략하고 결과와 common Outbox를 같은 트랜잭션에 기록한다.
+        UNKNOWN은 재시도 예산 소진 뒤에도 실패로 바꾸지 않는다.
       requestBody:
         required: true
         content:

@@ -141,6 +141,16 @@ public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
         return paymentGroups.get(MEMBER_A, created.groupNumber());
     }
 
+    protected void submitRefund(long id) {
+        var delivery = deliveries.byRefund(id);
+        paymentClient.refund(
+                deliveries.read(
+                        delivery.command(),
+                        com.shoppinglive.commercecore.payment.dto.RefundCommand.class));
+    }
+
+    @Autowired protected PaymentClient paymentClient;
+
     protected void makeRefundDue(long requestId) {
         paymentServer.jdbc.update(
                 "UPDATE refund_execution SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",

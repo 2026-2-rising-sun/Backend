@@ -121,6 +121,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
                                 "66666666-6666-4666-8666-666666666666", java.util.Set.of("SELLER"));
         mvc.perform(get("/v1/seller/refunds/{id}", id).header("Authorization", unrelated))
                 .andExpect(status().isNotFound());
+        submitRefund(id);
         refundGateway.execute(id, 25000);
         makeRefundDue(id);
         org.assertj.core.api.Assertions.assertThat(executions.execute(id)).isTrue();

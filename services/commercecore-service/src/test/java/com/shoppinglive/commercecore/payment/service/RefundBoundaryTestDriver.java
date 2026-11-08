@@ -31,7 +31,7 @@ public class RefundBoundaryTestDriver {
     }
 
     public boolean execute(long id, MockRefundScenario scenario) {
-        boolean submitted = dispatcher.refund(id);
+        boolean submitted = submit(id);
         try {
             execution.execute(id, scenario);
         } catch (RuntimeException failure) {
@@ -39,6 +39,16 @@ public class RefundBoundaryTestDriver {
             throw failure;
         }
         return handler.refund(client.refund(id)) || submitted;
+    }
+
+    /** baseline의 명시적 실행 호출처럼 자동 실행 flag와 별개로 테스트가 원문을 직접 제출한다. */
+    public boolean submit(long id) {
+        var d = deliveries.byRefund(id);
+        return handler.refund(
+                client.refund(
+                        deliveries.read(
+                                d.command(),
+                                com.shoppinglive.commercecore.payment.dto.RefundCommand.class)));
     }
 
     public int recoverPending() {

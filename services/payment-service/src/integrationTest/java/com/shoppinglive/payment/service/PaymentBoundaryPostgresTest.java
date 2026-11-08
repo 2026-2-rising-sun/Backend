@@ -58,6 +58,8 @@ class PaymentBoundaryPostgresTest {
     @Autowired PaymentService payments;
     @Autowired RefundIntakeService refunds;
     @Autowired RefundExecutionService executions;
+    @Autowired RefundRecoveryStore refundRecovery;
+    @Autowired org.springframework.transaction.support.TransactionTemplate transaction;
     @MockitoBean MockPaymentEngine engine;
     @MockitoBean RefundMockEngine refundEngine;
     @MockitoSpyBean DurableMockGateway gateway;
@@ -291,6 +293,60 @@ class PaymentBoundaryPostgresTest {
         dueRefund();
         assertThat(executions.execute(1)).isTrue();
         assertThat(refunds.get(1).retryCount()).isEqualTo(3);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(longs = {0, 1000})
+    @DisplayName("Payment 실행 비활성 HTTP 접수는 예약하지 않고 재활성 worker가 기존 요청을 복구한다")
+    void disabledPaymentKeepsRequestsForReactivatedWorker(long paidAmount) {
+        paid(paidAmount);
+        var command = refund(1, paidAmount / 2);
+        var pending =
+                http.post()
+                        .uri("/v1/internal/refunds")
+                        .body(command)
+                        .retrieve()
+                        .body(RefundExecution.class);
+        assertThat(pending.status()).isEqualTo(RefundStatus.PROCESSING);
+        verify(refundEngine, never()).schedule(anyLong());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result", Long.class))
+                .isZero();
+        var enabledIntake = new RefundIntakeService(jdbc, transaction, refundEngine, true);
+        enabledIntake.start(refund(2, paidAmount - paidAmount / 2));
+        verify(refundEngine, times(1)).schedule(2);
+        assertThat(new RefundReconciler(refundRecovery, executions).reconcileDue()).isEqualTo(2);
+        assertThat(refunds.get(1).requestId()).isEqualTo(command.requestId());
+        assertThat(refunds.get(1).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(refunds.get(2).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_refund_result", Long.class))
+                .isEqualTo(paidAmount == 0 ? 0 : 2);
+    }
+
+    @Test
+    @DisplayName("JVM 시각이 DB보다 앞서도 0원 환불 접수는 즉시 선점하고 결과 시각을 보존한다")
+    void initialScheduleDoesNotFollowAnAheadJvmClock() {
+        paid(0);
+        Instant future = Instant.now().plusSeconds(300);
+        try (var clock =
+                org.mockito.Mockito.mockStatic(
+                        Instant.class, org.mockito.Mockito.CALLS_REAL_METHODS)) {
+            clock.when(Instant::now).thenReturn(future);
+            refunds.start(refund(1, 0));
+            assertThat(executions.execute(1)).isTrue();
+            assertThat(refunds.get(1).requestedAt()).isBefore(future);
+            assertThat(refunds.get(1).resolvedAt()).isAfterOrEqualTo(refunds.get(1).requestedAt());
+        }
+    }
+
+    @Test
+    @DisplayName("DB 시각으로 접수한 0원 환불은 대기 없이 연속 선점할 수 있다")
+    void immediatelyClaimsZeroRefundsUsingDatabaseTime() {
+        paid(0);
+        for (long id = 1; id <= 20; id++) {
+            refunds.start(refund(id, 0));
+            assertThat(executions.execute(id)).as("접수 직후 선점 id=%s", id).isTrue();
+        }
+        verifyNoInteractions(refundGateway);
     }
 
     @Test

@@ -73,6 +73,7 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
         var request =
                 refunds.request(MEMBER_A, created.groupNumber(), "kafka-refund", List.of())
                         .refund();
+        submitRefund(request.id());
         assertThat(
                         paymentServer
                                 .context

@@ -302,6 +302,8 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         var second =
                 refunds.request(MEMBER_A, group.groupNumber(), "execute-cap-b", List.of(b.getId()))
                         .refund();
+        submitRefund(first.id());
+        submitRefund(second.id());
         paymentServer.jdbc.update(
                 "UPDATE refund_execution SET refund_amount=24000 WHERE id=?", first.id());
 

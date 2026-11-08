@@ -45,6 +45,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-exhausted",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         for (int call = 0; call < 4; call++) {
             makeRefundDue(request.id());
             assertThat(executions.execute(request.id(), MockRefundScenario.UNKNOWN_BEFORE_RESULT))
@@ -101,6 +102,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-interrupted",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         var abandoned = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(recovery.beginInvocation(abandoned)).contains(0);
         paymentServer.jdbc.update(
@@ -132,6 +134,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-late-result",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         assertThatThrownBy(
                         () ->
                                 gateway.execute(
@@ -166,6 +169,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-stale-apply",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         var old = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         gateway.execute(request.id(), request.refundAmount());
         paymentServer.jdbc.update(
@@ -194,6 +198,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-lock-boundary",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         Long groupId =
                 groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
                         .orElseThrow()
@@ -228,6 +233,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-failure",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         assertThat(executions.execute(request.id(), MockRefundScenario.FAILED)).isTrue();
         assertThat(executions.execute(request.id(), MockRefundScenario.SUCCESS)).isFalse();
         assertThat(retryCount(request.id())).isZero();
@@ -256,6 +262,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                 "recovery-delivery-failure",
                                 List.of(a.getId()))
                         .refund();
+        submitRefund(request.id());
         var firstCall = new java.util.concurrent.atomic.AtomicBoolean(true);
         doAnswer(
                         invocation -> {
