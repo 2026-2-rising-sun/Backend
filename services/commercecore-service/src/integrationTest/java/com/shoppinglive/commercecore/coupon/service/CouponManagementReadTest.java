@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Instant;
 import java.util.List;
@@ -25,7 +25,7 @@ import org.springframework.test.context.jdbc.Sql;
             "/db/migration/V17__coupon_display_snapshot_version.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class CouponManagementReadTest extends CommerceSecurityTestSupport {
+class CouponManagementReadTest extends CommerceCoreSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired CouponManagementService management;
     @Autowired InMemoryProductLookupStub products;

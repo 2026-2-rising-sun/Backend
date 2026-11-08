@@ -17,10 +17,10 @@ import org.springframework.test.context.DynamicPropertySource;
 
 /** 임시 RSA 키와 실제 운영 검증기·필터를 사용해 인증을 검증한다. */
 @Import({
-    CommerceSecurityTestSupport.SessionTestConfiguration.class,
+    CommerceCoreSecurityTestSupport.SessionTestConfiguration.class,
     com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration.class
 })
-public abstract class CommerceSecurityTestSupport {
+public abstract class CommerceCoreSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
 
     @BeforeEach
@@ -58,14 +58,14 @@ public abstract class CommerceSecurityTestSupport {
     protected static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
     protected static final String MEMBER_B = "22222222-2222-4222-8222-222222222222";
     protected static final String SELLER = "33333333-3333-4333-8333-333333333333";
-    protected static final String SHOPPING_TOKEN = "test-inbound-shopping-commerce-credential-32";
+    protected static final String CATALOG_TOKEN = "test-inbound-catalog-commercecore-credential-32";
     protected static final String LIVE_TOKEN = "test-inbound-live-commerce-credential-32";
     protected static final JwtTestTokens TOKENS = new JwtTestTokens();
     private static final Path KEY_SET = keySet();
 
     private static Path keySet() {
         try {
-            Path file = Files.createTempFile("commerce-jwt-test-", ".jwks");
+            Path file = Files.createTempFile("commercecore-jwt-test-", ".jwks");
             Files.writeString(file, TOKENS.publicJwkSet().toString());
             file.toFile().deleteOnExit();
             return file;
@@ -81,7 +81,7 @@ public abstract class CommerceSecurityTestSupport {
         properties.add(
                 "shoppinglive.security.jwt.public-key-set-location",
                 () -> KEY_SET.toUri().toString());
-        properties.add("shoppinglive.security.service-tokens.catalog", () -> SHOPPING_TOKEN);
+        properties.add("shoppinglive.security.service-tokens.catalog", () -> CATALOG_TOKEN);
         properties.add("shoppinglive.security.service-tokens.live", () -> LIVE_TOKEN);
     }
 

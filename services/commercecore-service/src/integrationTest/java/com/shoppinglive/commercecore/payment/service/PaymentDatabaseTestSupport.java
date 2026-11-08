@@ -1,9 +1,9 @@
 package com.shoppinglive.commercecore.payment.service;
 
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import org.springframework.test.context.*;
 
-public abstract class PaymentDatabaseTestSupport extends CommerceSecurityTestSupport {
+public abstract class PaymentDatabaseTestSupport extends CommerceCoreSecurityTestSupport {
     private static final String SCHEMA =
             "core_payment_" + java.util.UUID.randomUUID().toString().replace("-", "");
 

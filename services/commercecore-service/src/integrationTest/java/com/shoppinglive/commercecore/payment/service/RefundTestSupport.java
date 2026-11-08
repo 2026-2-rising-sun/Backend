@@ -14,7 +14,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import com.shoppinglive.payment.service.MockPaymentEngine;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
+public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport {
     private static final String CORE_SCHEMA =
             "core_refund_" + java.util.UUID.randomUUID().toString().replace("-", "");
 

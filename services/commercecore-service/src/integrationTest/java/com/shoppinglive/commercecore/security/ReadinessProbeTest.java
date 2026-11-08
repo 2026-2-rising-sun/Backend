@@ -3,7 +3,7 @@ package com.shoppinglive.commercecore.security;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.zaxxer.hikari.HikariDataSource;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
         })
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ReadinessProbeTest extends CommerceSecurityTestSupport {
+class ReadinessProbeTest extends CommerceCoreSecurityTestSupport {
     @Override
     protected boolean shouldCleanPurchaseFixtures() {
         return false;

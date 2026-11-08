@@ -19,7 +19,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.security.test.JwtTestTokens;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,7 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class MemberCommerceApiTest extends CommerceSecurityTestSupport {
+class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired CartItemRepository items;
@@ -101,7 +101,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         mvc.perform(
                         get("/v1/sales")
                                 .param("productIds", "1")
-                                .header("X-Service-Token", SHOPPING_TOKEN))
+                                .header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isOk());
         mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
         assertThat(orders.count()).isZero();
@@ -322,7 +322,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"productId\":2,\"price\":1000,\"initialStock\":5}"))
                 .andExpect(status().isCreated());
-        mvc.perform(get("/v1/orders").header("X-Service-Token", SHOPPING_TOKEN))
+        mvc.perform(get("/v1/orders").header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -333,7 +333,7 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/v1/sales?productIds=1").header("X-Service-Token", "wrong"))
                 .andExpect(status().isUnauthorized());
-        for (String token : List.of(SHOPPING_TOKEN, LIVE_TOKEN)) {
+        for (String token : List.of(CATALOG_TOKEN, LIVE_TOKEN)) {
             mvc.perform(get("/v1/sales?productIds=1").header("X-Service-Token", token))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].productId").value(1));

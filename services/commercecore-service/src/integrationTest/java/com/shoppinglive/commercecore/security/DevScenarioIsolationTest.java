@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = "commercecore.dev.payment-scenario.enabled=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
-class DevScenarioIsolationTest extends CommerceSecurityTestSupport {
+class DevScenarioIsolationTest extends CommerceCoreSecurityTestSupport {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
 

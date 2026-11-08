@@ -10,7 +10,7 @@ import com.shoppinglive.commercecore.sales.event.SalesInfoEventContract;
 import com.shoppinglive.commercecore.sales.event.SalesInfoEventType;
 import com.shoppinglive.commercecore.sales.event.SalesInfoSnapshot;
 import com.shoppinglive.commercecore.sales.event.SalesInfoStatus;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.OutboxMessageRepository;
 import com.shoppinglive.common.outbox.OutboxProperties;
@@ -42,7 +42,7 @@ import org.springframework.kafka.core.KafkaTemplate;
         properties =
                 "spring.kafka.bootstrap-servers=${COMMERCECORE_TEST_KAFKA_SERVERS:localhost:29092}")
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_KAFKA_SERVERS", matches = ".+")
-class CouponSyncKafkaTest extends CommerceSecurityTestSupport {
+class CouponSyncKafkaTest extends CommerceCoreSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;

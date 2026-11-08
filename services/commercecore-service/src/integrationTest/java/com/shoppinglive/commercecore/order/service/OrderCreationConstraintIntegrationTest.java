@@ -15,7 +15,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
@@ -30,7 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest(
         properties =
                 "spring.datasource.url=jdbc:h2:mem:order_constraints;MODE=PostgreSQL;DB_CLOSE_DELAY=-1")
-class OrderCreationConstraintIntegrationTest extends CommerceSecurityTestSupport {
+class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSupport {
     private static final long PRODUCT_ID = 8401L;
     private static final String COLLIDING_NUMBER = "OD-20261020-000001";
     private static final String NEW_NUMBER = "OD-20261020-000002";

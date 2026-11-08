@@ -33,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 class SalesStockReserveTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final int INITIAL_AVAILABLE = 5;
 

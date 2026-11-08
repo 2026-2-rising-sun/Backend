@@ -33,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 class CartOrderIntegrationTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
     @Autowired
     com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
                     .BoundaryPaymentServer

@@ -26,7 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  */
 @SpringBootTest
 class OrderExpirationSchedulerTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     @Autowired private OrderExpirationScheduler scheduler;
 

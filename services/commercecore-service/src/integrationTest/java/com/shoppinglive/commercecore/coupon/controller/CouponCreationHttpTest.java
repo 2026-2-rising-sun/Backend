@@ -7,7 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
@@ -35,7 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "/db/migration/V17__coupon_display_snapshot_version.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class CouponCreationHttpTest extends CommerceSecurityTestSupport {
+class CouponCreationHttpTest extends CommerceCoreSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired JdbcTemplate jdbc;

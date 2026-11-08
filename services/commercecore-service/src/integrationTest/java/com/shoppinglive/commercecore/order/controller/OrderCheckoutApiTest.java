@@ -47,7 +47,7 @@ import org.springframework.test.web.servlet.ResultActions;
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class OrderCheckoutApiTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final long PRODUCT_ID = 700L;
 

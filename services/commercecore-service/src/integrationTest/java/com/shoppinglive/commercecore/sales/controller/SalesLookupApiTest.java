@@ -33,7 +33,8 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class SalesLookupApiTest extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class SalesLookupApiTest
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final long FIRST_PRODUCT = 9_201L;
     private static final long SECOND_PRODUCT = 9_202L;
@@ -69,7 +70,7 @@ class SalesLookupApiTest extends com.shoppinglive.commercecore.support.CommerceS
     }
 
     private ResultActions lookup(String query) throws Exception {
-        return mockMvc.perform(get("/v1/sales" + query).header("X-Service-Token", SHOPPING_TOKEN));
+        return mockMvc.perform(get("/v1/sales" + query).header("X-Service-Token", CATALOG_TOKEN));
     }
 
     /** Shopping {@code HttpSalesInfoClient} 가 보내는 형태. 쉼표로 이어 붙인 하나의 파라미터다. */

@@ -10,7 +10,7 @@ import com.shoppinglive.commercecore.coupon.dto.CouponDisplaySnapshot;
 import com.shoppinglive.commercecore.coupon.entity.CouponDefinition;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -31,7 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("쿠폰 표시 이벤트와 동기화 API")
-class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
+class CouponSyncIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired CouponManagementService management;
     @Autowired CouponClaimService claims;
@@ -159,7 +159,7 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
                 .isEqualTo(mapper.readTree(mapper.writeValueAsString(snapshots.get(coupon.id()))));
         mvc.perform(
                         get("/v1/internal/coupon-snapshots/" + coupon.id())
-                                .header("X-Service-Token", SHOPPING_TOKEN))
+                                .header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.snapshotVersion").value(3))
                 .andExpect(jsonPath("$.data.productIds[0]").value(702));
@@ -255,14 +255,14 @@ class CouponSyncIntegrationTest extends CommerceSecurityTestSupport {
         mvc.perform(get(path).header("X-Service-Token", "invalid"))
                 .andExpect(status().isUnauthorized());
         for (String value : List.of("0", "101", "abc")) {
-            mvc.perform(get(path).param("size", value).header("X-Service-Token", SHOPPING_TOKEN))
+            mvc.perform(get(path).param("size", value).header("X-Service-Token", CATALOG_TOKEN))
                     .andExpect(status().isBadRequest());
         }
-        mvc.perform(get(path).param("afterId", "").header("X-Service-Token", SHOPPING_TOKEN))
+        mvc.perform(get(path).param("afterId", "").header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get(path + "/" + "x".repeat(37)).header("X-Service-Token", SHOPPING_TOKEN))
+        mvc.perform(get(path + "/" + "x".repeat(37)).header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get(path + "/missing-opaque").header("X-Service-Token", SHOPPING_TOKEN))
+        mvc.perform(get(path + "/missing-opaque").header("X-Service-Token", CATALOG_TOKEN))
                 .andExpect(status().isNotFound());
     }
 

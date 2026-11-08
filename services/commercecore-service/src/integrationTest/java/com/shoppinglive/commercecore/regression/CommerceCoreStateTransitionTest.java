@@ -42,8 +42,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class CommerceStateTransitionTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class CommerceCoreStateTransitionTest
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired OrderExpirationScheduler expiration;

@@ -33,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 커밋 전/롤백 시 예약하지 않고, 커밋 후에만 실제 비동기 결제를 시작하는지 검증한다. */
 @SpringBootTest
 class PaymentSchedulingAfterCommitTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
     @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired PaymentDeliveryStore deliveries;
     @Autowired PaymentBoundaryReconciler boundary;

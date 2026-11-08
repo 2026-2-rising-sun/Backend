@@ -35,7 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 class OrderCancellationConcurrencyTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     @Autowired private OrderService orderService;
 

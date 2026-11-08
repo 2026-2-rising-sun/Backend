@@ -20,7 +20,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 @Tag("postgres")
 @Tag("migration")
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
-class MemberCommerceMigrationPostgresTest {
+class MemberCommerceCoreMigrationPostgresTest {
     private final String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
     private final String user =
             System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres");

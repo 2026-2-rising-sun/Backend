@@ -15,7 +15,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "/db/migration/V6__member_coupons.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class CartCouponPreviewApiTest extends CommerceSecurityTestSupport {
+class CartCouponPreviewApiTest extends CommerceCoreSecurityTestSupport {
     private static final String COUPON_ID = "66666666-6666-4666-8666-666666666666";
 
     @Autowired MockMvc mvc;

@@ -30,7 +30,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  */
 @SpringBootTest
 class SalesStockConcurrencyTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     @Autowired private SalesJpaRepository salesRepository;
 

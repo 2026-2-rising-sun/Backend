@@ -29,7 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  */
 @SpringBootTest
 class SalesLookupServiceTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final long ON_SALE_PRODUCT = 9_101L;
     private static final long SOLD_OUT_PRODUCT = 9_102L;

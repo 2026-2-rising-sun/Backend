@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @SpringBootTest
 @AutoConfigureMockMvc
 class SalesRegistrationApiTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final long REGISTERED_PRODUCT_ID = 900L;
     private static final long UNKNOWN_PRODUCT_ID = 999L;

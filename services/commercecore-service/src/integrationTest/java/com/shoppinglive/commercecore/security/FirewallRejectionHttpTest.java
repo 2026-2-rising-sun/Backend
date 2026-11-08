@@ -9,7 +9,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,7 +32,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
             "server.address=127.0.0.1",
             "spring.datasource.url=jdbc:h2:mem:commerce_firewall;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
         })
-class FirewallRejectionHttpTest extends CommerceSecurityTestSupport {
+class FirewallRejectionHttpTest extends CommerceCoreSecurityTestSupport {
     @LocalServerPort int port;
     @Autowired ObjectMapper mapper;
     @Autowired SalesJpaRepository sales;

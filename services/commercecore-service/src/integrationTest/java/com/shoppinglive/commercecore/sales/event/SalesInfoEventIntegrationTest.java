@@ -21,7 +21,7 @@ import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
 import com.shoppinglive.commercecore.sales.service.SalesRegistrationService;
 import com.shoppinglive.commercecore.sales.service.SalesService;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.EventOutbox;
 import com.shoppinglive.payment.service.MockPaymentEngine;
@@ -46,7 +46,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
-class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
+class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Autowired SalesRegistrationService registration;
     @Autowired SalesService sales;
     @Autowired SalesInfoEventTracker tracker;

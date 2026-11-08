@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.commercecore.coupon.service.CouponCreationService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "/db/migration/V17__coupon_display_snapshot_version.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class CouponManagementHttpTest extends CommerceSecurityTestSupport {
+class CouponManagementHttpTest extends CommerceCoreSecurityTestSupport {
     @Autowired CouponCreationService creation;
     @Autowired InMemoryProductLookupStub products;
     @Autowired JdbcTemplate jdbc;

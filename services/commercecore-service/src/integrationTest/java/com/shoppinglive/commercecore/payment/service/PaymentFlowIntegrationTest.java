@@ -28,7 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 /** Core와 독립 Payment 서버의 HTTP 접수·결과 조회를 연결한다. 예약 콜백을 제어하고 복구를 명시 구동해 주문·재고 반영을 확인한다. */
 @SpringBootTest
 class PaymentFlowIntegrationTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
     @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired PaymentDeliveryStore deliveries;
     @Autowired PaymentBoundaryReconciler boundary;

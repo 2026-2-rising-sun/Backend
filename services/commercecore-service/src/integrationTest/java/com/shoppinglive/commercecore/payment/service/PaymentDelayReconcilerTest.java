@@ -26,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** Core 전달과 Payment 원본을 생성한 뒤 처리 예정 시각을 당겨 콜백 유실·재시작 복구를 확인한다. */
 @SpringBootTest
 class PaymentDelayReconcilerTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     @Autowired private PaymentBoundaryReconciler reconciler;
 

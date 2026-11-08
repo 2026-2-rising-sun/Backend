@@ -32,7 +32,7 @@ public abstract class ProductSecuritySupport {
     }
 
     protected static final JwtTestTokens TOKENS = new JwtTestTokens();
-    public static final String COMMERCE_KEY = "test-commerce-shopping-credential-00000001";
+    public static final String CATALOG_KEY = "test-catalog-commercecore-credential-00000001";
     public static final String LIVE_KEY = "test-live-shopping-credential-000000000001";
     protected static final String OTHER_KEY = "test-member-shopping-credential-0000000001";
     private static final String KEY_FILE = publicKeys();
@@ -52,7 +52,7 @@ public abstract class ProductSecuritySupport {
         properties.add("shoppinglive.security.jwt.issuer", () -> JwtTestTokens.ISSUER);
         properties.add("shoppinglive.security.jwt.audience", () -> JwtTestTokens.AUDIENCE);
         properties.add("shoppinglive.security.jwt.public-key-set-location", () -> KEY_FILE);
-        properties.add("shoppinglive.security.service-tokens.catalog", () -> COMMERCE_KEY);
+        properties.add("shoppinglive.security.service-tokens.catalog", () -> CATALOG_KEY);
         properties.add("shoppinglive.security.service-tokens.live", () -> LIVE_KEY);
         properties.add("shoppinglive.security.service-tokens.member", () -> OTHER_KEY);
     }

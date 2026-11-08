@@ -42,7 +42,7 @@ import org.springframework.boot.test.context.SpringBootTest;
  */
 @SpringBootTest
 class OrderCreationConcurrencyTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     private static final long PRODUCT_ID = 800L;
     private static final int INITIAL_STOCK = 5;

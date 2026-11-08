@@ -29,7 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 class SalesStatusConcurrencyTest
-        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+        extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
 
     @Autowired private SalesJpaRepository salesRepository;
 
