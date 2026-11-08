@@ -11,8 +11,7 @@ import org.springframework.context.annotation.*;
 @ConditionalOnProperty(
         prefix = "shoppinglive.observability",
         name = "enabled",
-        havingValue = "true",
-        matchIfMissing = true)
+        havingValue = "true")
 public class PaymentObservabilityConfiguration {
     @Bean
     PaymentObservation paymentObservation(BusinessTelemetry telemetry) {
