@@ -56,11 +56,11 @@ git diff --check
 |---|---|---|
 | `test` | `src/test` | 실제 실행·캐시 재사용 구분 |
 | `integrationTest` | `src/integrationTest` 중 `postgres`, `redis` 제외 | 조건부 테스트는 스킵될 수 있음 |
-| `postgresTest` | Commerce 통합 테스트 중 `postgres & !migration` | 격리 PostgreSQL 필요, 다른 서비스에는 등록하지 않음 |
+| `postgresTest` | Catalog·CommerceCore·Payment 통합 테스트 중 `postgres & !migration` | 서비스별 격리 PostgreSQL 필요 |
 | `migrationTest` | 통합 테스트 중 `postgres & migration` | 서비스 모듈만 등록, 환경 준비 필요 |
 | `redisTest` | 통합 테스트 중 `redis` | 서비스 모듈만 등록, 환경 준비 필요 |
 
-Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. 다른 서비스에는 전용 작업이 없다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
+Catalog·CommerceCore·Payment의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. CI와 로컬 하네스는 해당 서비스의 업무 변경에 이 작업을 추가로 선택한다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
 
 ## PostgreSQL·Redis 환경
 
@@ -69,7 +69,7 @@ Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다
 | 서비스 | PostgreSQL 선택과 연결 설정 |
 |---|---|
 | Member | `MEMBER_TEST_DB_URL`을 PostgreSQL JDBC URL로 설정하고 `MEMBER_TEST_DB_DRIVER=org.postgresql.Driver`, `MEMBER_TEST_DB_USER`, `MEMBER_TEST_DB_PASSWORD` 지정 |
-| Shopping·Commerce | 각각 `SHOPPING_TEST_POSTGRES_`, `COMMERCE_TEST_POSTGRES_` 접두사의 `URL`, `USER`, `PASSWORD` 사용 |
+| Catalog·CommerceCore·Payment | 각각 `CATALOG_TEST_POSTGRES_`, `COMMERCECORE_TEST_POSTGRES_`, `PAYMENT_TEST_POSTGRES_` 접두사의 `URL`, `USER`, `PASSWORD` 사용 |
 | Notification | `NOTIFICATION_TEST_POSTGRES_URL`, `NOTIFICATION_TEST_DB_DRIVER=org.postgresql.Driver`, `NOTIFICATION_TEST_DB_USER`, `NOTIFICATION_TEST_DB_PASSWORD` 사용 |
 | Live | `LIVE_PG_TEST=1`, `LIVE_PG_PORT`와 [postgres 프로필](../services/live-service/src/integrationTest/resources/application-postgres.yml)의 DB·계정 설정 확인 |
 
@@ -88,13 +88,13 @@ Member·Notification의 일반 통합 테스트도 환경변수로 DB가 바뀔 
 
 ## Kafka와 이벤트 표본
 
-Commerce의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCE_TEST_KAFKA_SERVERS`가 비어 있으면 스킵된다. 격리된 브로커를 준비한 후 해당 환경변수를 설정하고 일반 `integrationTest`에서 선택해 실행한다. 환경변수만 바꾼 재실행은 `--rerun-tasks`로 이전 결과 재사용을 피한다.
+CommerceCore의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCECORE_TEST_KAFKA_SERVERS`가 비어 있으면 스킵된다. 격리된 브로커를 준비한 후 해당 환경변수를 설정하고 일반 `integrationTest`에서 선택해 실행한다. 환경변수만 바꾼 재실행은 `--rerun-tasks`로 이전 결과 재사용을 피한다.
 
 ```bash
 ./gradlew :services:commercecore-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
 ```
 
-Commerce의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Shopping의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
+CommerceCore의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Catalog의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
 
 ## API·이벤트 계약 검사
 
