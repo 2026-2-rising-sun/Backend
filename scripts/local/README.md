@@ -33,6 +33,13 @@ Member local 프로필은 `user@local.test / user`, `seller@local.test / seller`
 
 내부 생성·조회는 Payment `/v1/internal/payments`, `/v1/internal/refunds`를 사용한다. 상품·Payment 결과는 실제 Kafka `localhost:59092`를 통해 전달한다. 기존 판매·쿠폰 토픽은 유지한다. 브라우저의 결제·환불 요청은 Core facade를 거친다.
 
+Live의 실제 Redis 회귀는 실행 중인 앱의 Redis59679와 분리한다.
+
+```sh
+docker compose -f scripts/local/msa-compose.yml --profile tests up -d --wait redis-test
+LIVE_REDIS_TEST=1 LIVE_REDIS_PORT=59680 ./gradlew :services:live-service:redisTest
+```
+
 서비스별 PostgreSQL 업무 회귀는 `CATALOG_TEST_POSTGRES_*`, `COMMERCECORE_TEST_POSTGRES_*`, `PAYMENT_TEST_POSTGRES_*`의 `URL`, `USER`, `PASSWORD`를 지정한 뒤 각 서비스의 `postgresTest`로 실행한다. 기본 검증 DB는 `catalog_test`, `commercecore_test`, `payment_test`다. 병렬 worker는 별도 `catalog_product_test`, `commercecore_product_test`, `commercecore_payment_test`, `payment_execution_test`를 사용한다.
 
 외부 배포에는 새 서비스별 이미지·Deployment·Service·독립 DB/권한/Secret, `/api/catalog`·`/api/commercecore` 라우팅과 내부 Payment 접근을 별도로 반영해야 한다. 이 저장소의 로컬 설정은 Infra 저장소나 배포 환경을 변경하지 않는다.

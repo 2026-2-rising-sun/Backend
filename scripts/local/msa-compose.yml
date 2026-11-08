@@ -24,6 +24,16 @@ services:
       interval: 2s
       timeout: 2s
       retries: 30
+  redis-test:
+    image: redis:7-alpine
+    profiles: [tests]
+    ports:
+      - "127.0.0.1:59680:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
   kafka:
     image: apache/kafka:4.0.0
     environment:
