@@ -35,7 +35,7 @@ import org.springframework.kafka.test.EmbeddedKafkaKraftBroker;
 
 @Tag("postgres")
 @Tag("migration")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OutboxRecoveryPostgresTest {
     private final String schema =
@@ -50,12 +50,12 @@ class OutboxRecoveryPostgresTest {
 
     @BeforeAll
     void startOwnedEnvironment() {
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         source =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv("COMMERCE_TEST_POSTGRES_USER"),
-                        System.getenv("COMMERCE_TEST_POSTGRES_PASSWORD"));
+                        System.getenv("COMMERCECORE_TEST_POSTGRES_USER"),
+                        System.getenv("COMMERCECORE_TEST_POSTGRES_PASSWORD"));
         Flyway.configure()
                 .dataSource(source)
                 .schemas(schema)

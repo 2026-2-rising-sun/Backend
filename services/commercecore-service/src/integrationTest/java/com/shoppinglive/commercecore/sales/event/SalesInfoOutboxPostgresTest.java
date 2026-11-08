@@ -19,14 +19,14 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
     private static final String SCHEMA =
             "sales_outbox_" + UUID.randomUUID().toString().replace("-", "");
 
     private static String databaseUrl() {
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + SCHEMA;
     }
 
@@ -35,10 +35,10 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
         properties.add("spring.datasource.url", SalesInfoOutboxPostgresTest::databaseUrl);
         properties.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         properties.add(
-                "spring.datasource.username", () -> System.getenv("COMMERCE_TEST_POSTGRES_USER"));
+                "spring.datasource.username", () -> System.getenv("COMMERCECORE_TEST_POSTGRES_USER"));
         properties.add(
                 "spring.datasource.password",
-                () -> System.getenv("COMMERCE_TEST_POSTGRES_PASSWORD"));
+                () -> System.getenv("COMMERCECORE_TEST_POSTGRES_PASSWORD"));
         properties.add("spring.flyway.enabled", () -> true);
         properties.add("spring.flyway.schemas", () -> SCHEMA);
         properties.add("spring.flyway.default-schema", () -> SCHEMA);
@@ -50,8 +50,8 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
         var source =
                 new DriverManagerDataSource(
                         databaseUrl(),
-                        System.getenv("COMMERCE_TEST_POSTGRES_USER"),
-                        System.getenv("COMMERCE_TEST_POSTGRES_PASSWORD"));
+                        System.getenv("COMMERCECORE_TEST_POSTGRES_USER"),
+                        System.getenv("COMMERCECORE_TEST_POSTGRES_PASSWORD"));
         Flyway.configure().dataSource(source).schemas(SCHEMA).cleanDisabled(false).load().clean();
     }
 
