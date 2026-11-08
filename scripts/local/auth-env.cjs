@@ -7,39 +7,23 @@ const root = path.resolve(__dirname, '../..');
 const publicKeys = ['MEMBER_JWT_PUBLIC_KEY_SET_LOCATION'];
 const serviceKeys = {
   member: [
-    'MEMBER_JWT_PRIVATE_KEY_LOCATION',
-    'MEMBER_JWT_KEY_ID',
-    'MEMBER_ACCESS_TOKEN_TTL',
-    'MEMBER_REFRESH_TOKEN_TTL',
-    'SHOPPING_MEMBER_SERVICE_TOKEN',
-    'COMMERCE_MEMBER_SERVICE_TOKEN',
-    'LIVE_MEMBER_SERVICE_TOKEN',
-    'NOTIFICATION_MEMBER_SERVICE_TOKEN',
+    'MEMBER_JWT_PRIVATE_KEY_LOCATION', 'MEMBER_JWT_KEY_ID',
+    'MEMBER_ACCESS_TOKEN_TTL', 'MEMBER_REFRESH_TOKEN_TTL',
+    'CATALOG_MEMBER_SERVICE_TOKEN', 'COMMERCECORE_MEMBER_SERVICE_TOKEN',
+    'LIVE_MEMBER_SERVICE_TOKEN', 'NOTIFICATION_MEMBER_SERVICE_TOKEN',
   ],
-  shopping: [
-    'MEMBER_SESSION_BASE_URL',
-    'SHOPPING_MEMBER_SERVICE_TOKEN',
-    'COMMERCE_SHOPPING_SERVICE_TOKEN',
-    'LIVE_SHOPPING_SERVICE_TOKEN',
-    'SHOPPING_COMMERCE_SERVICE_TOKEN',
+  catalog: [
+    'MEMBER_SESSION_BASE_URL', 'CATALOG_MEMBER_SERVICE_TOKEN',
+    'CATALOG_COMMERCECORE_SERVICE_TOKEN',
   ],
-  commerce: [
-    'MEMBER_SESSION_BASE_URL',
-    'COMMERCE_MEMBER_SERVICE_TOKEN',
-    'COMMERCE_SHOPPING_SERVICE_TOKEN',
-    'SHOPPING_COMMERCE_SERVICE_TOKEN',
-    'LIVE_COMMERCE_SERVICE_TOKEN',
+  commercecore: [
+    'MEMBER_SESSION_BASE_URL', 'COMMERCECORE_MEMBER_SERVICE_TOKEN',
+    'CATALOG_COMMERCECORE_SERVICE_TOKEN', 'LIVE_COMMERCECORE_SERVICE_TOKEN',
+    'COMMERCECORE_PAYMENT_SERVICE_TOKEN',
   ],
-  notification: [
-    'MEMBER_SESSION_BASE_URL',
-    'NOTIFICATION_MEMBER_SERVICE_TOKEN',
-  ],
-  live: [
-    'MEMBER_SESSION_BASE_URL',
-    'LIVE_MEMBER_SERVICE_TOKEN',
-    'LIVE_SHOPPING_SERVICE_TOKEN',
-    'LIVE_COMMERCE_SERVICE_TOKEN',
-  ],
+  payment: ['COMMERCECORE_PAYMENT_SERVICE_TOKEN'],
+  notification: ['MEMBER_SESSION_BASE_URL', 'NOTIFICATION_MEMBER_SERVICE_TOKEN'],
+  live: ['MEMBER_SESSION_BASE_URL', 'LIVE_MEMBER_SERVICE_TOKEN', 'LIVE_COMMERCECORE_SERVICE_TOKEN'],
 };
 function duration(value, name) {
   const match = /^P(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value || '');
@@ -135,7 +119,7 @@ function execute(args) {
   const [service, option, envPath, separator, command, ...commandArgs] = args;
   if (!serviceKeys[service] || option !== '--env' || !envPath || separator !== '--' || !command) {
     throw new Error(
-      '사용법: auth-env.cjs exec <member|shopping|commerce|live|notification> --env <env.json> -- <command> [args]',
+      '사용법: auth-env.cjs exec <member|catalog|commercecore|payment|live|notification> --env <env.json> -- <command> [args]',
     );
   }
   let record;
@@ -147,7 +131,7 @@ function execute(args) {
   if (record.purpose !== 'isolated local development only')
     throw new Error('생성된 로컬 인증정보가 필요합니다');
   const env = { ...process.env };
-  for (const name of new Set([...publicKeys, ...Object.values(serviceKeys).flat()]))
+  for (const name of new Set([...publicKeys, ...Object.values(serviceKeys).flat(), ...Object.keys(env).filter((key) => key.endsWith('_SERVICE_TOKEN'))]))
     delete env[name];
   for (const name of [...publicKeys, ...serviceKeys[service]]) {
     if (typeof record.env?.[name] !== 'string' || !record.env[name])

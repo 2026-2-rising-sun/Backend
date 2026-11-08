@@ -81,10 +81,11 @@ jobs:
       - name: Check serialized event samples
         if: steps.changes.outputs.event_samples == 'true'
         run: python .github/scripts/api/check_events.py --samples
-      - name: Start PostgreSQL only for migration checks
-        if: steps.changes.outputs.migration_tasks != '[]'
+      - name: Start PostgreSQL only for selected database checks
+        if: steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]'
         env:
           MIGRATION_SERVICES: ${{ steps.changes.outputs.migration_services }}
+          POSTGRES_SERVICES: ${{ steps.changes.outputs.postgres_services }}
         run: |
           docker run --detach --name ci-migration-postgres \
             --env POSTGRES_PASSWORD=test --publish 127.0.0.1:55432:5432 postgres:16
@@ -96,25 +97,28 @@ jobs:
           docker exec ci-migration-postgres pg_isready --username postgres
           python - <<'PY'
           import json, os, subprocess
-          for service in json.loads(os.environ['MIGRATION_SERVICES']):
+          for service in sorted(set(json.loads(os.environ['MIGRATION_SERVICES']) + json.loads(os.environ['POSTGRES_SERVICES']))):
               database = service.removesuffix('-service') + '_test'
               subprocess.run(['docker', 'exec', 'ci-migration-postgres', 'createdb',
                               '--username', 'postgres', database], check=True)
           PY
       - name: Run migration-tagged PostgreSQL tests
-        if: steps.changes.outputs.migration_tasks != '[]'
+        if: steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]'
         env:
           MIGRATION_TASKS: ${{ steps.changes.outputs.migration_tasks }}
           MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
           MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
           MEMBER_TEST_DB_USER: postgres
           MEMBER_TEST_DB_PASSWORD: test
-          COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
-          COMMERCE_TEST_POSTGRES_USER: postgres
-          COMMERCE_TEST_POSTGRES_PASSWORD: test
-          SHOPPING_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/shopping_test
-          SHOPPING_TEST_POSTGRES_USER: postgres
-          SHOPPING_TEST_POSTGRES_PASSWORD: test
+          PAYMENT_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/payment_test
+          PAYMENT_TEST_POSTGRES_USER: postgres
+          PAYMENT_TEST_POSTGRES_PASSWORD: test
+          COMMERCECORE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commercecore_test
+          COMMERCECORE_TEST_POSTGRES_USER: postgres
+          COMMERCECORE_TEST_POSTGRES_PASSWORD: test
+          CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
+          CATALOG_TEST_POSTGRES_USER: postgres
+          CATALOG_TEST_POSTGRES_PASSWORD: test
           NOTIFICATION_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/notification_test
           NOTIFICATION_TEST_DB_DRIVER: org.postgresql.Driver
           NOTIFICATION_TEST_DB_USER: postgres
@@ -125,6 +129,25 @@ jobs:
           python - <<'PY'
           import json, os, subprocess
           subprocess.run(['./gradlew', *json.loads(os.environ['MIGRATION_TASKS']),
+                          '--no-daemon', '--max-workers=2'], check=True)
+          PY
+      - name: Run PostgreSQL business regression tests
+        if: steps.changes.outputs.postgres_tasks != '[]'
+        env:
+          POSTGRES_TASKS: ${{ steps.changes.outputs.postgres_tasks }}
+          CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
+          CATALOG_TEST_POSTGRES_USER: postgres
+          CATALOG_TEST_POSTGRES_PASSWORD: test
+          COMMERCECORE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commercecore_test
+          COMMERCECORE_TEST_POSTGRES_USER: postgres
+          COMMERCECORE_TEST_POSTGRES_PASSWORD: test
+          PAYMENT_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/payment_test
+          PAYMENT_TEST_POSTGRES_USER: postgres
+          PAYMENT_TEST_POSTGRES_PASSWORD: test
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          subprocess.run(['./gradlew', *json.loads(os.environ['POSTGRES_TASKS']),
                           '--no-daemon', '--max-workers=2'], check=True)
           PY
       - name: Start Redis only for Redis checks
@@ -146,10 +169,10 @@ jobs:
           LIVE_REDIS_PORT: '56379'
           MEMBER_REDIS_TEST: '1'
           MEMBER_REDIS_PORT: '56379'
-          SHOPPING_REDIS_TEST: '1'
-          SHOPPING_REDIS_PORT: '56379'
-          COMMERCE_REDIS_TEST: '1'
-          COMMERCE_REDIS_PORT: '56379'
+          CATALOG_REDIS_TEST: '1'
+          CATALOG_REDIS_PORT: '56379'
+          COMMERCECORE_REDIS_TEST: '1'
+          COMMERCECORE_REDIS_PORT: '56379'
           NOTIFICATION_REDIS_TEST: '1'
           NOTIFICATION_REDIS_PORT: '56379'
         run: |
@@ -159,7 +182,7 @@ jobs:
                           '--no-daemon', '--max-workers=2'], check=True)
           PY
       - name: Stop temporary external services
-        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
+        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
         run: |
           for container in ci-migration-postgres ci-redis; do
             if docker container inspect "$container" >/dev/null 2>&1; then

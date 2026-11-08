@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      # 서비스 5개 x 아키텍처 2개 = 10개 조합을 모두 동시에 돌린다.
+      # 서비스 6개 x 아키텍처 2개 = 12개 조합을 모두 동시에 돌린다.
       #
       # 이전에는 Maven Central 429 를 우려해 2로 묶어 뒀지만, 그 구성에서도 job 하나가
       # amd64/arm64 두 개의 Gradle 프로세스를 동시에 돌렸으므로 실질 동시 요청은 이미 4였다.
@@ -52,12 +52,13 @@ jobs:
       # 끝났고, 대신 3개 웨이브로 나뉘어 전체 시간이 job 하나 시간의 3배가 됐다.
       # 웨이브를 없애면 전체 시간이 가장 느린 job 하나 수준으로 수렴한다.
       # 429 가 다시 보이면 이 값을 낮추는 것이 첫 번째 대응이다.
-      max-parallel: 10
+      max-parallel: 12
       matrix:
         service:
           - member-service
           - catalog-service
           - commercecore-service
+          - payment-service
           - live-service
           - notification-service
         platform: [amd64, arm64]
@@ -125,6 +126,7 @@ jobs:
           - member-service
           - catalog-service
           - commercecore-service
+          - payment-service
           - live-service
           - notification-service
     steps:

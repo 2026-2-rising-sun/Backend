@@ -2,11 +2,11 @@ service:member:
   - changed-files:
       - any-glob-to-any-file: "services/member-service/**"
 
-service:shopping:
+service:catalog:
   - changed-files:
       - any-glob-to-any-file: "services/catalog-service/**"
 
-service:commerce:
+service:commercecore:
   - changed-files:
       - any-glob-to-any-file: "services/commercecore-service/**"
 
@@ -43,3 +43,7 @@ docs:
       - any-glob-to-any-file:
           - "docs/**"
           - "**/README.md"
+
+service:payment:
+  - changed-files:
+      - any-glob-to-any-file: "services/payment-service/**"

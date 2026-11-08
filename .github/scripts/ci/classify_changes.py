@@ -9,13 +9,14 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-SERVICES = ("member-service", "catalog-service", "commercecore-service", "live-service",
+SERVICES = ("member-service", "catalog-service", "commercecore-service", "payment-service", "live-service",
             "notification-service")
 SPEC = importlib.util.spec_from_file_location(
     "api_structure", Path(__file__).resolve().parents[1] / "api/check_structure.py")
 API = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(API)
 MIGRATION_SERVICES = SERVICES
+POSTGRES_SERVICES = {"catalog-service", "commercecore-service", "payment-service"}
 LIVE_PREFIX = "services/live-service/"
 PUBSUB_CALLERS = {"ChatWriteService.java", "BroadcastEndNotifier.java", "BroadcastService.java"}
 
@@ -228,13 +229,15 @@ def classify(changes, full_reason=None):
     tasks = ["build"] if full else (
         [":" + module + ":build" for module in sorted(builds)]
         + [":" + module + ":spotlessCheck" for module in sorted(formats - builds)])
+    postgres = POSTGRES_SERVICES if full else {m.removeprefix("services:") for m in builds} & POSTGRES_SERVICES
+    postgres_tasks = [":services:" + service + ":postgresTest" for service in sorted(postgres)]
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
-    event_samples = full or bool(builds & {"services:commercecore-service", "services:live-service"})
+    event_samples = full or bool(builds & {"services:catalog-service", "services:commercecore-service", "services:payment-service", "services:live-service"})
     return {"gradle_tasks": tasks, "run_tests": full or bool(builds), "api": api,
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
             "migration_tasks": [":services:" + service + ":migrationTest" for service in sorted(migrations)],
-            "redis_tasks": redis_tasks,
+            "redis_tasks": redis_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres),
             **tools, "reasons": reasons}
 
 

@@ -175,7 +175,7 @@ class SelectionTests(unittest.TestCase):
         names = {c["name"] for c in checks}
         self.assertTrue({"classifier", "api_tests", "harness", "workflow", "local-auth",
                          "api", "events", "gradle", "event-samples"} <= names)
-        self.assertTrue(set(plan["migration_tasks"] + plan["redis_tasks"]) <= names)
+        self.assertTrue(set(plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]) <= names)
         self.assertLess([c["name"] for c in checks].index("gradle"),
                         [c["name"] for c in checks].index("event-samples"))
 

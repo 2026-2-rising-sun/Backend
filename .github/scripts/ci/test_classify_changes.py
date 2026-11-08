@@ -297,6 +297,22 @@ class HarnessSelectionTests(unittest.TestCase):
         self.assertIn("unittest discover -s harness", step["run"])
 
 
+class ServiceBoundaryTests(unittest.TestCase):
+    def test_split_services_select_postgres_business_tests(self):
+        """분리된 서비스의 업무 변경은 PostgreSQL 전용 회귀도 선택한다."""
+        for service in ("catalog-service", "commercecore-service", "payment-service"):
+            with self.subTest(service=service):
+                plan = classify([Change(f"services/{service}/src/main/java/Example.java", None, b"class Example {}")])
+                self.assertEqual(plan["gradle_tasks"], [f":services:{service}:build"])
+                self.assertEqual(plan["postgres_tasks"], [f":services:{service}:postgresTest"])
+                self.assertTrue(plan["event_samples"])
+
+    def test_comment_only_change_does_not_select_postgres(self):
+        """주석만 바뀌면 외부 DB를 시작하지 않는다."""
+        plan = classify([Change(JAVA, b"class A {}", "// 설명\nclass A {}".encode())])
+        self.assertEqual(plan["postgres_tasks"], [])
+
+
 class WorkflowTests(unittest.TestCase):
     def test_workflow_can_complete_without_gradle_and_publish_requires_build(self):
         import yaml
@@ -322,9 +338,9 @@ class WorkflowTests(unittest.TestCase):
         steps = ci["jobs"]["build"]["steps"]
         for step in steps:
             if "docker run" in step.get("run", ""):
-                self.assertTrue("migration_tasks != '[]'" in step["if"] or "redis_tasks != '[]'" in step["if"])
+                self.assertTrue("migration_tasks != '[]'" in step["if"] or "postgres_tasks != '[]'" in step["if"] or "redis_tasks != '[]'" in step["if"])
         ordinary = next(i for i, s in enumerate(steps) if s.get("name") == "Run selected Gradle work")
-        postgres = next(i for i, s in enumerate(steps) if s.get("name") == "Start PostgreSQL only for migration checks")
+        postgres = next(i for i, s in enumerate(steps) if s.get("name") == "Start PostgreSQL only for selected database checks")
         self.assertLess(ordinary, postgres)
 
 
