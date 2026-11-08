@@ -1,38 +1,45 @@
 package com.shoppinglive.commercecore.payment.dto;
 
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** 명시적으로 켠 local/test 환경에서만 제공하는 Mock 결제 결과 제어. */
+/** 공개 개발 입력을 전달한다. 시나리오 상태와 선택은 Payment가 소유한다. */
 @Component
 @Profile("(local | test) & !dev & !prod")
 @ConditionalOnProperty(
-        prefix = "commerce.dev.payment-scenario",
+        prefix = "commercecore.dev.payment-scenario",
         name = "enabled",
         havingValue = "true",
         matchIfMissing = false)
 public class DevPaymentScenarioRegistry {
 
-    private final ConcurrentMap<String, PaymentScenario> map = new ConcurrentHashMap<>();
+    private final com.shoppinglive.commercecore.payment.service.PaymentClient client;
+    private final com.shoppinglive.commercecore.order.repository.OrderJpaRepository orders;
 
-    public void set(String orderNumber, PaymentScenario scenario) {
-        map.put(orderNumber, scenario);
+    public DevPaymentScenarioRegistry(
+            com.shoppinglive.commercecore.payment.service.PaymentClient client,
+            com.shoppinglive.commercecore.order.repository.OrderJpaRepository orders) {
+        this.client = client;
+        this.orders = orders;
     }
 
-    public Optional<PaymentScenario> get(String orderNumber) {
-        return Optional.ofNullable(map.get(orderNumber));
+    private String reference(String number) {
+        return orders.findByOrderNumber(number)
+                .map(
+                        o ->
+                                o.getPaymentGroup() == null
+                                        ? number
+                                        : o.getPaymentGroup().getGroupNumber())
+                .orElse(number);
     }
 
-    public void clear(String orderNumber) {
-        map.remove(orderNumber);
+    public void set(String number, PaymentScenario scenario) {
+        client.setScenario(reference(number), scenario);
     }
 
-    public int size() {
-        return map.size();
+    public void clear(String number) {
+        client.clearScenario(reference(number));
     }
 }

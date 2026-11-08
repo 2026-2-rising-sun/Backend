@@ -1,6 +1,5 @@
 package com.shoppinglive.commercecore.payment.dto;
 
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import java.time.Instant;
@@ -15,7 +14,7 @@ public record PaymentAttemptResponse(
         Instant resolvedAt,
         Instant scheduledResolveAt) {
 
-    public static PaymentAttemptResponse from(PaymentAttempt attempt) {
+    public static PaymentAttemptResponse from(PaymentExecution attempt) {
         return new PaymentAttemptResponse(
                 attempt.getId(),
                 attempt.getOrderId(),

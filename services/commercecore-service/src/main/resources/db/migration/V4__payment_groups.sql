@@ -25,14 +25,6 @@ CREATE INDEX ix_payment_group_expiry ON payment_group(status,expires_at,id);
 ALTER TABLE orders ADD COLUMN payment_group_id BIGINT REFERENCES payment_group(id);
 ALTER TABLE orders ADD COLUMN source_cart_item_version BIGINT;
 CREATE INDEX ix_orders_payment_group ON orders(payment_group_id);
-ALTER TABLE payment_attempt ADD COLUMN payment_group_id BIGINT REFERENCES payment_group(id);
-ALTER TABLE payment_attempt ADD COLUMN request_key VARCHAR(64);
-CREATE UNIQUE INDEX uk_payment_attempt_group ON payment_attempt(payment_group_id);
-CREATE TABLE mock_gateway_result (
- attempt_id BIGINT PRIMARY KEY,
- outcome VARCHAR(32) NOT NULL CHECK(outcome IN ('SUCCESS','FAILED','TIMEOUT')),
- authorized_at TIMESTAMP WITH TIME ZONE NOT NULL
-);
 INSERT INTO member_purchase_guard(member_id) SELECT DISTINCT member_id FROM orders;
 
 -- Keep old single orders accessible through the new group APIs. Multiple active
@@ -40,7 +32,6 @@ INSERT INTO member_purchase_guard(member_id) SELECT DISTINCT member_id FROM orde
 INSERT INTO payment_group(group_number,member_id,request_key,fingerprint,total_amount,status,expires_at,payment_id,created_at,updated_at)
  SELECT 'PG-LEGACY-' || o.id,o.member_id,'legacy-order-' || o.id,'legacy',o.total_amount,o.status,
  COALESCE(o.expires_at,o.created_at + INTERVAL '15 minutes'),
- (SELECT p.id FROM payment_attempt p WHERE p.order_id=o.id ORDER BY p.id DESC LIMIT 1),o.created_at,o.updated_at FROM orders o;
+ NULL,o.created_at,o.updated_at FROM orders o;
 UPDATE orders SET payment_group_id=(SELECT g.id FROM payment_group g WHERE g.group_number='PG-LEGACY-' || orders.id);
-UPDATE payment_attempt SET payment_group_id=(SELECT g.id FROM payment_group g WHERE g.payment_id=payment_attempt.id),request_key='legacy-payment-' || order_id WHERE EXISTS (SELECT 1 FROM payment_group g WHERE g.payment_id=payment_attempt.id);
 CREATE UNIQUE INDEX uk_payment_group_active_member ON payment_group(member_id) WHERE status IN ('PENDING_PAYMENT','PAYMENT_CONFIRMING');

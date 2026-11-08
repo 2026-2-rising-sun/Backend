@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 미결제 주문을 만료하고 예약 재고를 복구한다.
  *
- * <p>{@code commerce.order.expiration.duration} 이 지난 결제 전 주문을 자동 만료 처리한다. 60 초마다 실행. 초기 지연 60 초
+ * <p>{@code commercecore.order.expiration.duration} 이 지난 결제 전 주문을 자동 만료 처리한다. 60 초마다 실행. 초기 지연 60 초
  * (테스트 컨텍스트에서 자동 실행되어 데이터 간섭 방지).
  *
  * <p>처리 단위: 한 번에 최대 {@link #BATCH_SIZE} 건. 대량 밀림 시에도 트랜잭션이 지나치게 길어지지 않도록 제한.

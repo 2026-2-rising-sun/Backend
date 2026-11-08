@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Validated
-@ConditionalOnProperty(prefix = "commerce.refunds", name = "api-enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "commercecore.refunds", name = "api-enabled", havingValue = "true")
 public class RefundController {
     private final RefundIntakeService refunds;
     private final ObjectMapper mapper;

@@ -1,7 +1,6 @@
 package com.shoppinglive.commercecore.order.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.coupon.service.CouponPreviewService;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.dto.OrderResponse;
@@ -19,6 +18,7 @@ import com.shoppinglive.commercecore.order.service.PaymentGroupService.GroupResp
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Item;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Quote;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -56,7 +56,7 @@ class PaymentGroupCheckoutService {
     private final CartItemRepository cart;
     private final SalesJpaRepository sales;
     private final SalesStockJpaRepository stock;
-    private final ShoppingClient shopping;
+    private final ProductLookup shopping;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
     private final JdbcTemplate jdbc;
@@ -74,7 +74,7 @@ class PaymentGroupCheckoutService {
             CartItemRepository cart,
             SalesJpaRepository sales,
             SalesStockJpaRepository stock,
-            ShoppingClient shopping,
+            ProductLookup shopping,
             PurchaseGuard guard,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
@@ -83,7 +83,7 @@ class PaymentGroupCheckoutService {
             CouponPreviewService couponPreview,
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents,
-            @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration) {
+            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
         this.groups = groups;
         this.orders = orders;
         this.cart = cart;

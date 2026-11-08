@@ -1,19 +1,17 @@
 package com.shoppinglive.commercecore.payment.service;
 
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.support.AfterCommit;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -42,26 +40,31 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RefundIntakeService {
     private static final Duration REFUND_WINDOW = Duration.ofHours(168);
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final PaymentAttemptJpaRepository attempts;
+    private final PaymentClient attempts;
     private final SalesJpaRepository sales;
-    private final ShoppingClient shopping;
+    private final ProductLookup shopping;
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    private final RefundMockEngine mockRefundEngine;
+    private final PaymentDeliveryStore deliveries;
+    private final PaymentDispatcher dispatcher;
+    private final org.springframework.transaction.support.TransactionTemplate transaction;
     private final boolean executionEnabled;
 
     @Autowired
     public RefundIntakeService(
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
-            PaymentAttemptJpaRepository attempts,
+            PaymentClient attempts,
             SalesJpaRepository sales,
-            ShoppingClient shopping,
+            ProductLookup shopping,
             JdbcTemplate jdbc,
-            RefundMockEngine mockRefundEngine,
-            @Value("${commerce.refunds.execution-enabled:false}") boolean executionEnabled) {
+            PaymentDeliveryStore deliveries,
+            PaymentDispatcher dispatcher,
+            org.springframework.transaction.support.TransactionTemplate transaction,
+            @Value("${commercecore.refunds.execution-enabled:false}") boolean executionEnabled) {
         this(
                 groups,
                 orders,
@@ -70,19 +73,23 @@ public class RefundIntakeService {
                 shopping,
                 jdbc,
                 Clock.systemUTC(),
-                mockRefundEngine,
+                deliveries,
+                dispatcher,
+                transaction,
                 executionEnabled);
     }
 
     RefundIntakeService(
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
-            PaymentAttemptJpaRepository attempts,
+            PaymentClient attempts,
             SalesJpaRepository sales,
-            ShoppingClient shopping,
+            ProductLookup shopping,
             JdbcTemplate jdbc,
             Clock clock,
-            RefundMockEngine mockRefundEngine,
+            PaymentDeliveryStore deliveries,
+            PaymentDispatcher dispatcher,
+            org.springframework.transaction.support.TransactionTemplate transaction,
             boolean executionEnabled) {
         this.groups = groups;
         this.orders = orders;
@@ -91,16 +98,81 @@ public class RefundIntakeService {
         this.shopping = shopping;
         this.jdbc = jdbc;
         this.clock = clock;
-        this.mockRefundEngine = mockRefundEngine;
+        this.deliveries = deliveries;
+        this.dispatcher = dispatcher;
+        this.transaction = transaction;
         this.executionEnabled = executionEnabled;
     }
 
-    @Transactional
     public RequestResult request(
             String memberId,
             String groupNumber,
             String idempotencyKey,
             Collection<Long> requestedCartItemIds) {
+        PaymentGroup owned =
+                groups.findByGroupNumberAndMemberId(groupNumber, memberId)
+                        .orElseThrow(
+                                () ->
+                                        new BusinessException(
+                                                ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
+        if (idempotencyKey == null
+                || idempotencyKey.isBlank()
+                || idempotencyKey.length() > 64
+                || requestedCartItemIds == null
+                || requestedCartItemIds.size() > 100
+                || requestedCartItemIds.stream().anyMatch(id -> id == null || id <= 0)
+                || new HashSet<>(requestedCartItemIds).size() != requestedCartItemIds.size())
+            throw invalid("환불 키와 대상 ID가 올바르지 않습니다.");
+        RequestResult replay =
+                transaction.execute(
+                        t -> {
+                            var existing = findByKey(memberId, idempotencyKey);
+                            if (existing == null) return null;
+                            groups.lockById(owned.getId()).orElseThrow();
+                            if (!Objects.equals(
+                                    existing.fingerprint(),
+                                    fingerprint(
+                                            owned.getId(),
+                                            requestedCartItemIds.stream().sorted().toList())))
+                                throw new BusinessException(
+                                        ErrorCode.CONFLICT,
+                                        "같은 Idempotency-Key에 다른 환불 요청을 사용할 수 없습니다.");
+                            return new RequestResult(load(existing.id(), groupNumber), false);
+                        });
+        if (replay != null) {
+            if (executionEnabled
+                    && (replay.refund().status() == RefundStatus.PROCESSING
+                            || replay.refund().status() == RefundStatus.UNKNOWN))
+                dispatcher.refund(replay.refund().id());
+            return new RequestResult(load(replay.refund().id(), groupNumber), false);
+        }
+        // 원격 조회는 Core 잠금과 DB 트랜잭션 밖에서 끝낸다. 저장 직전 잠금 아래 원결제 참조를 재검증한다.
+        PaymentExecution payment =
+                owned.getPaymentId() == null ? null : attempts.get(owned.getPaymentId());
+        RequestResult result =
+                transaction.execute(
+                        t ->
+                                requestLocked(
+                                        memberId,
+                                        groupNumber,
+                                        idempotencyKey,
+                                        requestedCartItemIds,
+                                        payment));
+        if (executionEnabled
+                && (result.refund().status() == RefundStatus.PROCESSING
+                        || result.refund().status() == RefundStatus.UNKNOWN)) {
+            dispatcher.refund(result.refund().id());
+            return new RequestResult(load(result.refund().id(), groupNumber), result.created());
+        }
+        return result;
+    }
+
+    private RequestResult requestLocked(
+            String memberId,
+            String groupNumber,
+            String idempotencyKey,
+            Collection<Long> requestedCartItemIds,
+            PaymentExecution attempt) {
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 64) {
             throw invalid("Idempotency-Key는 1~64자여야 합니다.");
         }
@@ -127,6 +199,7 @@ public class RefundIntakeService {
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
 
+        entityManager.refresh(group);
         String fingerprint = fingerprint(group.getId(), cartIds);
         ExistingRequest existing = findByKey(memberId, idempotencyKey);
         if (existing != null) {
@@ -134,7 +207,6 @@ public class RefundIntakeService {
                 throw new BusinessException(
                         ErrorCode.CONFLICT, "같은 Idempotency-Key에 다른 환불 요청을 사용할 수 없습니다.");
             }
-            scheduleIfPending(existing.id(), existing.status());
             return new RequestResult(load(existing.id(), groupNumber), false);
         }
 
@@ -148,11 +220,11 @@ public class RefundIntakeService {
                                                 && order.getStatus() != OrderStatus.REFUNDED)) {
             throw new BusinessException(ErrorCode.CONFLICT, "결제 완료된 주문만 환불할 수 있습니다.");
         }
-        PaymentAttempt attempt =
-                group.getPaymentId() == null
-                        ? null
-                        : attempts.findById(group.getPaymentId()).orElse(null);
         if (attempt == null
+                || !Objects.equals(group.getPaymentId(), attempt.paymentId())
+                || !Objects.equals(group.getId(), attempt.paymentGroupId())
+                || !Objects.equals(group.getGroupNumber(), attempt.referenceNumber())
+                || group.getPayableAmount() != attempt.amount()
                 || attempt.getStatus() != PaymentStatus.SUCCESS
                 || attempt.getResolvedAt() == null) {
             throw new BusinessException(ErrorCode.CONFLICT, "성공한 결제 이력을 확인할 수 없습니다.");
@@ -216,7 +288,6 @@ public class RefundIntakeService {
         if (requestId == null) {
             ExistingRequest winner = findByKey(memberId, idempotencyKey);
             if (winner != null && Objects.equals(winner.fingerprint(), fingerprint)) {
-                scheduleIfPending(winner.id(), winner.status());
                 return new RequestResult(load(winner.id(), groupNumber), false);
             }
             throw new BusinessException(
@@ -236,11 +307,16 @@ public class RefundIntakeService {
                     order.getPayableAmount(),
                     Timestamp.from(now));
         }
-        scheduleIfPending(requestId, RefundStatus.PROCESSING);
+        deliveries.refund(
+                requestId,
+                attempt.paymentId(),
+                attempt.orderId(),
+                group.getId(),
+                groupNumber,
+                amount);
         return new RequestResult(load(requestId, groupNumber), true);
     }
 
-    @Transactional(readOnly = true)
     public List<RefundableTarget> refundableTargets(String memberId, String groupNumber) {
         PaymentGroup group =
                 groups.findByGroupNumberAndMemberId(groupNumber, memberId)
@@ -249,10 +325,8 @@ public class RefundIntakeService {
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
-        PaymentAttempt attempt =
-                group.getPaymentId() == null
-                        ? null
-                        : attempts.findById(group.getPaymentId()).orElse(null);
+        PaymentExecution attempt =
+                group.getPaymentId() == null ? null : attempts.get(group.getPaymentId());
         String groupReason = null;
         if (group.getStatus() != OrderStatus.PAID
                 || groupOrders.stream()
@@ -446,18 +520,10 @@ public class RefundIntakeService {
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
-    private void scheduleIfPending(long requestId, RefundStatus status) {
-        if (!executionEnabled
-                || (status != RefundStatus.PROCESSING && status != RefundStatus.UNKNOWN)) {
-            return;
-        }
-        AfterCommit.run(() -> mockRefundEngine.schedule(requestId));
-    }
-
     private RefundView load(long id, String groupNumber) {
         RequestRow request =
                 jdbc.query(
-                        "SELECT payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,GREATEST(next_action_at,lease_until) FROM refund_request WHERE id=?",
+                        "SELECT payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,next_action_at FROM refund_request WHERE id=?",
                         rs ->
                                 rs.next()
                                         ? new RequestRow(
@@ -511,7 +577,7 @@ public class RefundIntakeService {
     private SellerRefundView loadSeller(long id, String sellerId) {
         RequestRow request =
                 jdbc.query(
-                        "SELECT payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,GREATEST(next_action_at,lease_until) FROM refund_request WHERE id=?",
+                        "SELECT payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,next_action_at FROM refund_request WHERE id=?",
                         rs ->
                                 rs.next()
                                         ? new RequestRow(
@@ -580,9 +646,7 @@ public class RefundIntakeService {
             return null;
         }
         return new RecoveryView(
-                request.retryCount(),
-                request.retryCount() == RefundRetryPolicy.MAX_RETRIES,
-                request.nextActionAt());
+                request.retryCount(), request.retryCount() == 3, request.nextActionAt());
     }
 
     private static BusinessException invalid(String message) {

@@ -1,9 +1,9 @@
 package com.shoppinglive.commercecore.order.service;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.order.entity.OrderCheckout;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
@@ -27,12 +27,12 @@ public class OrderCheckoutService {
 
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
-    private final ShoppingClient shoppingClient;
+    private final ProductLookup shoppingClient;
 
     public OrderCheckoutService(
             SalesJpaRepository salesRepository,
             SalesStockJpaRepository salesStockRepository,
-            ShoppingClient shoppingClient) {
+            ProductLookup shoppingClient) {
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
         this.shoppingClient = shoppingClient;
@@ -50,8 +50,8 @@ public class OrderCheckoutService {
      * @throws BusinessException 수량이 1 미만 (400)
      * @throws SalesNotFoundException 판매정보가 등록되지 않은 상품 (404)
      * @throws ProductNotFoundException Shopping 에 상품이 없음 (404)
-     * @throws com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException Shopping 일시
-     *     장애로 상품명을 확인하지 못함 (503)
+     * @throws com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException Shopping
+     *     일시 장애로 상품명을 확인하지 못함 (503)
      */
     @Transactional(readOnly = true)
     public OrderCheckout preview(Long productId, int quantity) {

@@ -1,10 +1,10 @@
 package com.shoppinglive.commercecore.order.service;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.order.entity.CartItem;
 import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.util.List;
@@ -15,9 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CartService {
     private final CartItemRepository items;
-    private final ShoppingClient shopping;
+    private final ProductLookup shopping;
 
-    public CartService(CartItemRepository items, ShoppingClient shopping) {
+    public CartService(CartItemRepository items, ProductLookup shopping) {
         this.items = items;
         this.shopping = shopping;
     }

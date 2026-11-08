@@ -1,0 +1,86 @@
+package com.shoppinglive.commercecore.payment.service;
+
+import com.shoppinglive.commercecore.payment.dto.*;
+import org.slf4j.*;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+@Service
+public class PaymentDispatcher {
+    private static final Logger log = LoggerFactory.getLogger(PaymentDispatcher.class);
+    private final PaymentDeliveryStore store;
+    private final PaymentClient client;
+    private final ObjectProvider<PaymentResultHandler> outcomes;
+    private final boolean enabled;
+
+    public PaymentDispatcher(
+            PaymentDeliveryStore store,
+            PaymentClient client,
+            ObjectProvider<PaymentResultHandler> outcomes,
+            @Value("${commercecore.payment.delivery-recovery-enabled:true}") boolean enabled) {
+        this.store = store;
+        this.client = client;
+        this.outcomes = outcomes;
+        this.enabled = enabled;
+    }
+
+    public PaymentExecution paymentAfterCommit(long id) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) {
+            com.shoppinglive.commercecore.support.AfterCommit.run(
+                    () ->
+                            java.util.concurrent.CompletableFuture.runAsync(
+                                    () -> {
+                                        try {
+                                            payment(id);
+                                        } catch (RuntimeException failure) {
+                                            log.warn(
+                                                    "커밋 후 Payment 전달 실패: paymentId={}",
+                                                    id,
+                                                    failure);
+                                        }
+                                    }));
+            return store.payment(id);
+        }
+        return payment(id);
+    }
+
+    public PaymentExecution payment(long id) {
+        dispatch(store.byPayment(id));
+        return store.payment(id);
+    }
+
+    public void refund(long id) {
+        dispatch(store.byRefund(id));
+    }
+
+    public void dispatch(PaymentDeliveryStore.Delivery d) {
+        if (d.terminal()) return;
+        try {
+            // 같은 원문을 재전달한다. Payment가 requestId 유일키로 응답 유실과 프로세스 중단을 복구한다.
+            if ("PAYMENT".equals(d.kind()))
+                outcomes.getObject()
+                        .payment(client.start(store.read(d.command(), PaymentCommand.class)));
+            else
+                outcomes.getObject()
+                        .refund(client.refund(store.read(d.command(), RefundCommand.class)));
+        } catch (org.springframework.web.client.RestClientException unavailable) {
+            store.delay(d);
+            log.warn("Payment 전달 재시도 예정: requestId={}", d.requestId());
+        }
+    }
+
+    @Scheduled(initialDelayString = "PT1S", fixedDelayString = "PT1S")
+    public void recover() {
+        if (enabled)
+            for (var d : store.due())
+                try {
+                    dispatch(d);
+                } catch (RuntimeException failure) {
+                    store.delay(d);
+                    log.warn("Payment 결과 복구 실패: requestId={}", d.requestId(), failure);
+                }
+    }
+}

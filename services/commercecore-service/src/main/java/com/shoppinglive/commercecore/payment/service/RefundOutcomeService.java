@@ -4,9 +4,9 @@ import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
+import com.shoppinglive.commercecore.payment.dto.RefundExecution;
 import com.shoppinglive.commercecore.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.payment.service.RefundRecoveryStore.Lease;
 import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RefundOutcomeService {
     private final JdbcTemplate jdbc;
+    private final PaymentDeliveryStore deliveries;
     private final PaymentGroupRepository groups;
     private final SalesService sales;
     private final PaymentGroupEventPublisher notificationEvents;
@@ -28,62 +29,49 @@ public class RefundOutcomeService {
 
     public RefundOutcomeService(
             JdbcTemplate jdbc,
+            PaymentDeliveryStore deliveries,
             PaymentGroupRepository groups,
             SalesService sales,
             PaymentGroupEventPublisher notificationEvents) {
         this.jdbc = jdbc;
+        this.deliveries = deliveries;
         this.groups = groups;
         this.sales = sales;
         this.notificationEvents = notificationEvents;
     }
 
     @Transactional
-    public boolean prepare(Lease lease) {
-        return lockAndValidate(lease) != null;
-    }
-
-    @Transactional
-    public boolean apply(Lease lease, MockRefundOutcome outcome) {
-        RefundExecutionRequest request = lockAndValidate(lease);
-        if (request == null) {
+    public boolean apply(RefundExecution result) {
+        PaymentGroup group = groups.lockById(result.paymentGroupId()).orElseThrow();
+        entityManager.refresh(group);
+        var delivery = deliveries.get(result.requestId());
+        if (delivery.terminal()) {
+            deliveries.requireSameResult(delivery, result);
             return false;
         }
-        return applyOutcome(lease, outcome, "Mock 환불 결과: " + outcome);
-    }
-
-    private RefundExecutionRequest lockAndValidate(Lease lease) {
-        PaymentGroup group =
-                groups.lockById(lease.paymentGroupId())
-                        .orElseThrow(
-                                () ->
-                                        new BusinessException(
-                                                ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
-        entityManager.refresh(group);
-        List<RefundExecutionRequest> rows =
+        var requests =
                 jdbc.query(
-                        """
-            SELECT id,payment_group_id,refund_amount,status FROM refund_request
-             WHERE id=? AND lease_token=? AND lease_until > clock_timestamp()
-               AND status IN ('PROCESSING','UNKNOWN') FOR UPDATE
-            """,
+                        "SELECT id,payment_group_id,refund_amount,status FROM refund_request WHERE id=? FOR UPDATE",
                         (rs, row) ->
                                 new RefundExecutionRequest(
                                         rs.getLong(1),
                                         rs.getLong(2),
                                         rs.getLong(3),
                                         RefundStatus.valueOf(rs.getString(4))),
-                        lease.requestId(),
-                        lease.token());
-        if (rows.isEmpty()) {
-            return null;
-        }
-        RefundExecutionRequest request = rows.getFirst();
-        if (request.paymentGroupId() != lease.paymentGroupId()
-                || request.refundAmount() != lease.refundAmount()
-                || !fitsPaymentAmount(group.getPayableAmount(), request)) {
-            throw new BusinessException(ErrorCode.CONFLICT, "결제 금액을 초과하거나 변경된 환불 요청입니다.");
-        }
-        return request;
+                        result.coreRefundRequestId());
+        if (requests.isEmpty()) throw new BusinessException(ErrorCode.CONFLICT, "환불 요청이 없습니다.");
+        var request = requests.getFirst();
+        if (request.paymentGroupId() != result.paymentGroupId()
+                || request.refundAmount() != result.amount()
+                || !fitsPaymentAmount(group.getPayableAmount(), request))
+            throw new BusinessException(ErrorCode.CONFLICT, "환불 요청 대상과 금액이 다릅니다.");
+        boolean applied =
+                applyOutcome(
+                        result,
+                        MockRefundOutcome.valueOf(result.status().name()),
+                        "Mock 환불 결과: " + result.status());
+        deliveries.record(delivery, result, result.status().name());
+        return applied;
     }
 
     private boolean fitsPaymentAmount(long paymentAmount, RefundExecutionRequest current) {
@@ -105,8 +93,8 @@ public class RefundOutcomeService {
         }
     }
 
-    private boolean applyOutcome(Lease lease, MockRefundOutcome outcome, String detail) {
-        long requestId = lease.requestId();
+    private boolean applyOutcome(RefundExecution result, MockRefundOutcome outcome, String detail) {
+        long requestId = result.coreRefundRequestId();
         if (outcome == MockRefundOutcome.SUCCESS) {
             List<RefundTarget> targets =
                     jdbc.query(
@@ -158,19 +146,19 @@ public class RefundOutcomeService {
                         """
             UPDATE refund_request
                SET status=?, resolved_at=CURRENT_TIMESTAMP, result_detail=?, updated_at=CURRENT_TIMESTAMP,
-                   lease_token=NULL,lease_until=NULL
+                   retry_count=?,next_action_at=?
              WHERE id=? AND status IN ('PROCESSING','UNKNOWN')
-               AND lease_token=? AND lease_until > clock_timestamp()
             """,
                         outcome.name(),
                         detail,
-                        requestId,
-                        lease.token());
+                        result.retryCount(),
+                        java.sql.Timestamp.from(result.nextActionAt()),
+                        requestId);
         if (updated != 1) {
-            throw new IllegalStateException("환불 결과 반영 중 실행 권한의 유효 기간이 만료되었습니다.");
+            throw new IllegalStateException("환불 결과 반영 중 요청 상태가 변경되었습니다.");
         }
         if (outcome == MockRefundOutcome.SUCCESS) {
-            notificationEvents.refunded(lease.paymentGroupId(), requestId, lease.refundAmount());
+            notificationEvents.refunded(result.paymentGroupId(), requestId, result.amount());
         }
         return true;
     }

@@ -1,0 +1,334 @@
+openapi: 3.1.0
+info:
+  title: Payment Service 내부 API
+  version: 1.0.0
+  license:
+    name: UNLICENSED
+  description: 브라우저 공개 경로가 없는 독립 결제 실행 서비스. Core가 주문·환불 정책과 공개 facade를 소유한다. 전용 Payment
+    DB의 결제/환불 실행과 결과 Outbox만 소유한다. 결제 ID는 Core 영속 전달 ID이며 Payment PK로 그대로 사용한다. 서비스
+    사이 FK는 없다. 재시도 예산 소진 뒤에도 UNKNOWN 결과 조회는 계속한다.
+servers:
+- url: http://localhost:8086
+security:
+- ServiceToken: []
+paths:
+  /v1/internal/payments:
+    post:
+      operationId: startPayments
+      summary: Core 영속 요청 멱등 접수
+      description: requestId와 paymentId 또는 coreRefundRequestId는 유일하다. 재전달 내용이 다르면
+        409이며 내용이 같으면 기존 ID/결과를 반환한다. 0원은 PG 호출 없이 Payment 원본 성공과 common Outbox를 같은
+        트랜잭션에 저장한다. UNKNOWN은 실패로 바꾸지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCommand'
+      responses:
+        '200':
+          description: 영속된 동일 요청 결과. 성공 DTO는 봉투 없이 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentExecution'
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+  /v1/internal/payments/{paymentId}:
+    get:
+      operationId: getPayments
+      summary: 저장된 실행 결과 조회
+      parameters:
+      - name: paymentId
+        in: path
+        required: true
+        schema: &id001
+          type: integer
+          format: int64
+          minimum: 1
+      responses:
+        '200':
+          description: 영속된 동일 요청 결과. 성공 DTO는 봉투 없이 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentExecution'
+        '404':
+          description: 실행을 찾을 수 없음
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+  /v1/internal/refunds:
+    post:
+      operationId: startRefunds
+      summary: Core 영속 요청 멱등 접수
+      description: requestId와 paymentId 또는 coreRefundRequestId는 유일하다. 재전달 내용이 다르면
+        409이며 내용이 같으면 기존 ID/결과를 반환한다. 0원은 PG 호출 없이 Payment 원본 성공과 common Outbox를 같은
+        트랜잭션에 저장한다. UNKNOWN은 실패로 바꾸지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundCommand'
+      responses:
+        '200':
+          description: 영속된 동일 요청 결과. 성공 DTO는 봉투 없이 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundExecution'
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+  /v1/internal/refunds/{executionId}:
+    get:
+      operationId: getRefunds
+      summary: 저장된 실행 결과 조회
+      parameters:
+      - name: executionId
+        in: path
+        required: true
+        schema: *id001
+      responses:
+        '200':
+          description: 영속된 동일 요청 결과. 성공 DTO는 봉투 없이 반환한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundExecution'
+        '404':
+          description: 실행을 찾을 수 없음
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+  /v1/internal/payment-scenarios/{referenceNumber}:
+    put:
+      operationId: putPaymentScenario
+      summary: 개발용 시나리오 지정
+      description: (local | test) & !dev & !prod 프로필 및 payment.dev.payment-scenario.enabled=true에서만
+        등록된다. Core 공개 facade가 회원 주문 소유권·SELLER를 검증하고 내부 토큰으로 전달한다. registry map과 최초
+        실행 시 시나리오 선택은 Payment가 소유하며 이미 접수한 원문/실행 결과는 바꾸지 않는다.
+      parameters:
+      - name: referenceNumber
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: 반영 완료
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScenarioRequest'
+    delete:
+      operationId: deletePaymentScenario
+      summary: 개발용 시나리오 해제
+      description: (local | test) & !dev & !prod 프로필 및 payment.dev.payment-scenario.enabled=true에서만
+        등록된다. Core 공개 facade가 회원 주문 소유권·SELLER를 검증하고 내부 토큰으로 전달한다. registry map과 최초
+        실행 시 시나리오 선택은 Payment가 소유하며 이미 접수한 원문/실행 결과는 바꾸지 않는다.
+      parameters:
+      - name: referenceNumber
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: 반영 완료
+        '400':
+          description: 입력/UUID 형식 오류
+        '401':
+          description: X-Service-Token 누락·잘못된 토큰
+        '403':
+          description: 호출 서비스 권한 없음
+        '409':
+          description: 같은 requestId/대상 ID에 다른 원문 또는 누적 환불 한도 초과
+components:
+  securitySchemes:
+    ServiceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: COMMERCECORE_PAYMENT_SERVICE_TOKEN으로 인증된 commercecore 호출자만 허용한다.
+  schemas:
+    PaymentCommand:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - paymentId
+      - orderId
+      - referenceNumber
+      - amount
+      properties:
+        requestId: &id002
+          type: string
+          format: uuid
+        paymentId: *id001
+        orderId: *id001
+        paymentGroupId: &id003
+          anyOf:
+          - *id001
+          - type: 'null'
+        referenceNumber: &id004
+          type: string
+          minLength: 1
+          maxLength: 64
+        amount: &id005
+          type: integer
+          format: int64
+          minimum: 0
+        scenario:
+          anyOf:
+          - type: string
+            enum: &id006
+            - INSTANT_SUCCESS
+            - INSTANT_FAIL
+            - DELAYED_SUCCESS
+            - DELAYED_FAIL
+            - SUCCESS_RESPONSE_LOST
+            - FAILURE_RESPONSE_LOST
+            - UNAVAILABLE_BEFORE_RESULT
+          - type: 'null'
+          description: 일반 Core 요청은 null. 개발 시나리오 선택과 registry 상태는 Payment가 소유한다.
+    PaymentExecution:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - paymentId
+      - orderId
+      - paymentGroupId
+      - referenceNumber
+      - amount
+      - scenario
+      - status
+      - requestedAt
+      - resolvedAt
+      - scheduledResolveAt
+      properties:
+        requestId: *id002
+        paymentId: *id001
+        orderId: *id001
+        paymentGroupId: *id003
+        referenceNumber: *id004
+        amount: *id005
+        scenario:
+          type: string
+          enum: *id006
+        status:
+          enum:
+          - PROCESSING
+          - UNKNOWN
+          - SUCCESS
+          - FAILED
+        requestedAt: &id007
+          type: string
+          format: date-time
+        resolvedAt:
+          anyOf:
+          - *id007
+          - type: 'null'
+        scheduledResolveAt: *id007
+    RefundCommand:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - paymentId
+      - orderId
+      - paymentGroupId
+      - referenceNumber
+      - amount
+      - coreRefundRequestId
+      properties:
+        requestId: *id002
+        paymentId: *id001
+        orderId: *id001
+        paymentGroupId: *id001
+        referenceNumber: *id004
+        amount: *id005
+        coreRefundRequestId: *id001
+    RefundExecution:
+      type: object
+      additionalProperties: false
+      required:
+      - requestId
+      - paymentId
+      - orderId
+      - paymentGroupId
+      - referenceNumber
+      - amount
+      - coreRefundRequestId
+      - executionId
+      - status
+      - requestedAt
+      - resolvedAt
+      - retryCount
+      - nextActionAt
+      properties:
+        requestId: *id002
+        paymentId: *id001
+        orderId: *id001
+        paymentGroupId: *id001
+        referenceNumber: *id004
+        amount: *id005
+        coreRefundRequestId: *id001
+        executionId: *id001
+        status:
+          enum:
+          - PROCESSING
+          - UNKNOWN
+          - SUCCESS
+          - FAILED
+        requestedAt: *id007
+        resolvedAt:
+          anyOf:
+          - *id007
+          - type: 'null'
+        retryCount:
+          type: integer
+          minimum: 0
+          maximum: 3
+        nextActionAt: *id007
+    ScenarioRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - scenario
+      properties:
+        scenario:
+          enum: *id006

@@ -1,0 +1,122 @@
+asyncapi: 3.1.0
+info:
+  title: Payment 환불 실행 결과
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  results:
+    address: payment.refund-results.v1
+    description: Kafka key와 aggregateId는 requestId. Payment 실행 확정과 common Outbox append를
+      같은 트랜잭션에 기록한다. Core는 영속 원문과 식별자·대상·금액·상태·시각을 검증해 중복 결과를 멱등 적용한다. 결과 선도착도 requestId로
+      복구한다. Core 로컬 반영 실패는 이벤트를 ack하지 않는다. 기존 알림 토픽은 Core만 생산한다.
+    messages:
+      RefundExecutionResolved:
+        $ref: '#/components/messages/RefundExecutionResolved'
+operations:
+  publishResult:
+    action: send
+    channel:
+      $ref: '#/channels/results'
+    messages:
+    - $ref: '#/channels/results/messages/RefundExecutionResolved'
+components:
+  messages:
+    RefundExecutionResolved:
+      name: RefundExecutionResolved
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: RefundExecutionResolved
+          schemaVersion:
+            const: 1
+          source:
+            const: payment-service
+          aggregateId:
+            type: string
+            format: uuid
+          occurredAt: &id002
+            type: string
+            format: date-time
+          payload:
+            type: object
+            additionalProperties: false
+            required:
+            - requestId
+            - paymentId
+            - orderId
+            - paymentGroupId
+            - referenceNumber
+            - amount
+            - coreRefundRequestId
+            - executionId
+            - status
+            - requestedAt
+            - resolvedAt
+            - retryCount
+            - nextActionAt
+            properties:
+              requestId:
+                type: string
+                format: uuid
+              paymentId: &id001
+                type: integer
+                format: int64
+                minimum: 1
+              orderId: *id001
+              paymentGroupId: *id001
+              referenceNumber:
+                type: string
+                minLength: 1
+                maxLength: 64
+              amount:
+                type: integer
+                format: int64
+                minimum: 0
+              coreRefundRequestId: *id001
+              executionId: *id001
+              status:
+                enum:
+                - SUCCESS
+                - FAILED
+              requestedAt: *id002
+              resolvedAt: *id002
+              retryCount:
+                type: integer
+                minimum: 0
+                maximum: 3
+              nextActionAt: *id002
+      examples:
+      - payload:
+          eventId: b1111111-1111-4111-8111-111111111111
+          eventType: RefundExecutionResolved
+          schemaVersion: 1
+          source: payment-service
+          aggregateId: a1111111-1111-4111-8111-111111111111
+          occurredAt: '2026-11-09T00:00:01Z'
+          payload:
+            requestId: a1111111-1111-4111-8111-111111111111
+            paymentId: 7
+            orderId: 1
+            paymentGroupId: 1
+            referenceNumber: PG-11111111-1111-4111-8111-111111111111
+            amount: 1000
+            status: SUCCESS
+            requestedAt: '2026-11-09T00:00:00Z'
+            resolvedAt: '2026-11-09T00:00:01Z'
+            executionId: 1
+            coreRefundRequestId: 1
+            retryCount: 0
+            nextActionAt: '2026-11-09T00:00:00Z'

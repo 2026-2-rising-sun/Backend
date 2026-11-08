@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: ${PAYMENT_DB_URL}
+    username: ${PAYMENT_DB_USER}
+    password: ${PAYMENT_DB_PASSWORD}
+  kafka:
+    bootstrap-servers: ${PAYMENT_KAFKA_SERVERS}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/payment-migration
+server:
+  port: 8086
+payment:
+  core-service-token: ${COMMERCECORE_PAYMENT_SERVICE_TOKEN}
+  refunds:
+    execution-enabled: true
+shoppinglive:
+  outbox:
+    relay:
+      claim:
+        enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: ${PAYMENT_DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:56432}/payment}
+    username: ${PAYMENT_DB_USER:${POSTGRES_USER:msa}}
+    password: ${PAYMENT_DB_PASSWORD:${POSTGRES_PASSWORD:msa-local-only}}
+  kafka:
+    bootstrap-servers: ${PAYMENT_KAFKA_SERVERS:localhost:${KAFKA_PORT:59092}}

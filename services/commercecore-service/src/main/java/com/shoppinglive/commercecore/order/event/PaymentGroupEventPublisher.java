@@ -52,7 +52,8 @@ public class PaymentGroupEventPublisher {
         payload.putAll(details);
         outbox.append(
                 TOPIC,
-                EventEnvelope.create(type, 1, "commercecore-service", number, Instant.now(), payload));
+                EventEnvelope.create(
+                        type, 1, "commercecore-service", number, Instant.now(), payload));
     }
 
     private static Instant instant(Object value) {

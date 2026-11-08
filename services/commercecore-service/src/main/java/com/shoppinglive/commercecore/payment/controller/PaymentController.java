@@ -1,7 +1,7 @@
 package com.shoppinglive.commercecore.payment.controller;
 
 import com.shoppinglive.commercecore.payment.dto.PaymentAttemptResponse;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -40,7 +40,7 @@ public class PaymentController {
         if (request != null && !request.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "결제 요청에는 결과 선택 필드를 보낼 수 없습니다.");
         }
-        PaymentAttempt attempt = paymentService.startPayment(orderNumber, member.memberId());
+        PaymentExecution attempt = paymentService.startPayment(orderNumber, member.memberId());
         return PaymentAttemptResponse.from(attempt);
     }
 
@@ -50,7 +50,7 @@ public class PaymentController {
             @PathVariable String orderNumber,
             @PathVariable Long paymentId,
             @AuthenticationPrincipal AuthenticatedUser member) {
-        PaymentAttempt attempt =
+        PaymentExecution attempt =
                 paymentService.getPayment(orderNumber, member.memberId(), paymentId);
         return PaymentAttemptResponse.from(attempt);
     }

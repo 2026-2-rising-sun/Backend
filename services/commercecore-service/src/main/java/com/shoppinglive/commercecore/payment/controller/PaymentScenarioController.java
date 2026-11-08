@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/dev/payment-scenarios")
 @Profile("(local | test) & !dev & !prod")
 @ConditionalOnProperty(
-        prefix = "commerce.dev.payment-scenario",
+        prefix = "commercecore.dev.payment-scenario",
         name = "enabled",
         havingValue = "true",
         matchIfMissing = false)

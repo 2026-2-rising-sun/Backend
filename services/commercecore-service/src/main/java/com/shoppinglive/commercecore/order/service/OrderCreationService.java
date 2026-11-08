@@ -1,8 +1,5 @@
 package com.shoppinglive.commercecore.order.service;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.coupon.service.CouponPreviewService;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
@@ -15,6 +12,9 @@ import com.shoppinglive.commercecore.order.exception.OrderAmountMismatchExceptio
 import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -74,7 +74,7 @@ public class OrderCreationService {
     private final OrderJpaRepository orderRepository;
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
-    private final ShoppingClient shoppingClient;
+    private final ProductLookup shoppingClient;
     private final OrderNumberGenerator orderNumberGenerator;
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
@@ -87,7 +87,7 @@ public class OrderCreationService {
             OrderJpaRepository orderRepository,
             SalesJpaRepository salesRepository,
             SalesStockJpaRepository salesStockRepository,
-            ShoppingClient shoppingClient,
+            ProductLookup shoppingClient,
             OrderNumberGenerator orderNumberGenerator,
             CartItemRepository cartItems,
             TransactionTemplate transactionTemplate,
@@ -95,7 +95,7 @@ public class OrderCreationService {
             PaymentGroupService paymentGroups,
             // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
             // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
-            @Value("${commerce.order.expiration.duration:PT15M}") Duration expiration) {
+            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
         this.orderRepository = orderRepository;
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;

@@ -5,9 +5,7 @@ import com.shoppinglive.commercecore.order.dto.OrderResponse;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore.Lease;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -121,12 +119,12 @@ public class PaymentGroupService {
         return checkout.active(member);
     }
 
-    public PaymentAttempt start(String member, String number, String key) {
+    public PaymentExecution start(String member, String number, String key) {
         validateKey(key);
         return lifecycle.start(member, number, key);
     }
 
-    public PaymentAttempt payment(String member, String number, Long id) {
+    public PaymentExecution payment(String member, String number, Long id) {
         return lifecycle.payment(member, number, id);
     }
 
@@ -139,11 +137,11 @@ public class PaymentGroupService {
     }
 
     public boolean resolve(Long id) {
-        return paymentService.getObject().resolvePayment(id);
+        return paymentService.getObject().refresh(id);
     }
 
-    public boolean applyOutcome(Lease lease, PaymentStatus result) {
-        return lifecycle.applyOutcome(lease, result);
+    public boolean applyOutcome(PaymentExecution result) {
+        return lifecycle.applyOutcome(result);
     }
 
     private static void validateKey(String key) {
