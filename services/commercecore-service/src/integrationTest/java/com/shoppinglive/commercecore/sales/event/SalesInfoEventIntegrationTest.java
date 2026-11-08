@@ -96,6 +96,9 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
                             String.class,
                             id)
                     .forEach(scenarios::clear);
+            jdbc.update(
+                    "DELETE FROM payment_delivery_request WHERE order_id IN (SELECT id FROM orders WHERE sales_info_id=?)",
+                    id);
             jdbc.update("DELETE FROM orders WHERE sales_info_id=?", id);
             jdbc.update(
                     "DELETE FROM cart_item WHERE product_id=(SELECT product_id FROM sales_info WHERE id=?)",
