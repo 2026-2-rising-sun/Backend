@@ -27,12 +27,13 @@ public class CommerceCoreSecurityConfiguration {
                             String path =
                                     request.getRequestURI()
                                             .substring(request.getContextPath().length());
-                            return "GET".equals(request.getMethod())
-                                    && ("/v1/sales".equals(path)
-                                            || "/v1/internal/coupon-snapshots".equals(path)
-                                            || path.startsWith("/v1/internal/coupon-snapshots/")
-                                            || path.equals("/v1/internal/products")
-                                            || path.startsWith("/v1/internal/products/"));
+                            return path.equals("/v1/internal/products")
+                                    || path.startsWith("/v1/internal/products/")
+                                    || ("GET".equals(request.getMethod())
+                                            && ("/v1/sales".equals(path)
+                                                    || "/v1/internal/coupon-snapshots".equals(path)
+                                                    || path.startsWith(
+                                                            "/v1/internal/coupon-snapshots/")));
                         })
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(
