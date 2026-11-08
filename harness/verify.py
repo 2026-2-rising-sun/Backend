@@ -134,6 +134,8 @@ def configured_test_database(command, environment):
     tasks = expected_test_tasks(command)
     services = [service for service in CI.SERVICES
                 if any(task.startswith(":services:" + service + ":") for task in tasks)]
+    if "commercecore-service" in services and "payment-service" not in services:
+        services.append("payment-service")
     for service in services:
         prefix = service.removesuffix("-service").upper()
         if any(value and key.startswith(prefix + "_") and "TEST" in key

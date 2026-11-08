@@ -84,8 +84,7 @@ jobs:
       - name: Start PostgreSQL only for selected database checks
         if: steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]'
         env:
-          MIGRATION_SERVICES: ${{ steps.changes.outputs.migration_services }}
-          POSTGRES_SERVICES: ${{ steps.changes.outputs.postgres_services }}
+          DATABASE_SERVICES: ${{ steps.changes.outputs.database_services }}
         run: |
           docker run --detach --name ci-migration-postgres \
             --env POSTGRES_PASSWORD=test --publish 127.0.0.1:55432:5432 postgres:16
@@ -97,7 +96,7 @@ jobs:
           docker exec ci-migration-postgres pg_isready --username postgres
           python - <<'PY'
           import json, os, subprocess
-          for service in sorted(set(json.loads(os.environ['MIGRATION_SERVICES']) + json.loads(os.environ['POSTGRES_SERVICES']))):
+          for service in json.loads(os.environ['DATABASE_SERVICES']):
               database = service.removesuffix('-service') + '_test'
               subprocess.run(['docker', 'exec', 'ci-migration-postgres', 'createdb',
                               '--username', 'postgres', database], check=True)

@@ -231,6 +231,10 @@ def classify(changes, full_reason=None):
         [":" + module + ":build" for module in sorted(builds)]
         + [":" + module + ":spotlessCheck" for module in sorted(formats - builds)])
     postgres = POSTGRES_SERVICES if full else {m.removeprefix("services:") for m in builds} & POSTGRES_SERVICES
+    database_services = set(migrations) | postgres
+    # Core 통합 fixture는 Payment를 독립 DataSource/HTTP 서버로 기동한다.
+    if "commercecore-service" in database_services:
+        database_services.add("payment-service")
     postgres_tasks = [":services:" + service + ":postgresTest" for service in sorted(postgres)]
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
     event_samples = full or bool(builds & {"services:catalog-service", "services:commercecore-service", "services:payment-service", "services:live-service"})
@@ -238,7 +242,7 @@ def classify(changes, full_reason=None):
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
             "migration_tasks": [":services:" + service + ":migrationTest" for service in sorted(migrations)],
-            "redis_tasks": redis_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres),
+            "redis_tasks": redis_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres), "database_services": sorted(database_services),
             **tools, "reasons": reasons}
 
 

@@ -307,6 +307,19 @@ class ServiceBoundaryTests(unittest.TestCase):
                 self.assertEqual(plan["postgres_tasks"], [f":services:{service}:postgresTest"])
                 self.assertTrue(plan["event_samples"])
 
+    def test_core_only_database_checks_provision_payment_fixture_database(self):
+        """Core만 검사해도 독립 Payment fixture DB를 준비하고 Payment 업무 검사는 추가하지 않는다."""
+        for path in (JAVA, "services/commercecore-service/src/main/resources/db/migration/V99__example.sql"):
+            plan = classify([Change(path, None, b"new")])
+            self.assertEqual(plan["database_services"], ["commercecore-service", "payment-service"])
+            self.assertEqual(plan["postgres_tasks"], [":services:commercecore-service:postgresTest"])
+            self.assertNotIn(":services:payment-service:build", plan["gradle_tasks"])
+
+    def test_other_service_does_not_provision_core_fixture_database(self):
+        """다른 서비스 단독 검사는 Core용 독립 DB를 준비하지 않는다."""
+        plan = classify([Change("services/catalog-service/src/main/java/Example.java", None, b"class Example {}")])
+        self.assertEqual(plan["database_services"], ["catalog-service"])
+
     def test_payment_isolated_migration_directory_selects_migration_tests(self):
         """Payment 전용 Flyway 경로의 추가·수정·삭제도 마이그레이션 검사를 선택한다."""
         path = "services/payment-service/src/main/resources/db/payment-migration/V3__outbox_worker_claim.sql"

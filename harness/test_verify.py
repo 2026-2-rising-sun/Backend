@@ -185,6 +185,14 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(plan["harness"])
         self.assertEqual(plan["gradle_tasks"], [])
 
+    def test_core_fixture_payment_database_requires_external_opt_in(self):
+        """Core 실행도 Payment fixture의 외부 DB 설정을 감지한다."""
+        environment = {"PAYMENT_TEST_POSTGRES_URL": "jdbc:postgresql://localhost/payment_test"}
+        self.assertTrue(verify.configured_test_database(
+            ["./gradlew", ":services:commercecore-service:build"], environment))
+        self.assertFalse(verify.configured_test_database(
+            ["./gradlew", ":services:commercecore-service:spotlessCheck"], environment))
+
     def test_external_connection_settings_follow_existing_tasks(self):
         """외부 작업의 서비스별 연결 선택 조건을 구분한다."""
         self.assertTrue(verify.external_ready(":services:member-service:migrationTest",
