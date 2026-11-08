@@ -11,40 +11,23 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  servlet:
-    multipart:
-      # 검증기 한도(shopping.image.max-size, 기본 5MB)보다 조금 크게 둬서 5~6MB 파일은 검증기가
-      # "용량 초과" 안내를 주고, 그보다 큰 요청은 파싱 단계에서 끊는다.
-      max-file-size: 6MB
-      max-request-size: 7MB
-
 server:
   port: 8082
-  tomcat:
-    # 업로드 한도를 넘은 요청도 본문을 끝까지 읽어 연결 리셋 대신 400 응답을 돌려준다 (기본 2MB).
-    max-swallow-size: 10MB
 
-# 나머지 한도(max-size, allowed-types, max-width/height)는 ImageStorageProperties 기본값을 쓴다.
-shopping:
-  image:
-    storage:
-      # 로컬 테스트용 저장소. 기본 위치를 레포 밖에 둬 업로드 이미지가 git 에 추적되지 않게 한다.
-      dir: ${SHOPPING_IMAGE_DIR:${user.home}/.shoppinglive/shopping-images}
-    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:http://localhost:8082}
-  # 비어 있으면 CORS 매핑을 만들지 않는다 (local 프로필에서만 개발 프론트 origin 을 기본 허용).
+catalog:
   cors:
-    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
+    allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:}
   # Commerce 판매정보 연동. base-url 은 프로필별로만 둔다. 기본값을 두면 누락 시 기동을 막는 검사가 무력해진다.
   # timeout·재시도는 공개 목록 한 번의 최악 대기(시도 2회 × (연결 1s + 읽기 1s) + 대기 200ms ≈ 4s)를 기준으로 잡았다.
   sales-client:
     connect-timeout: 1s
     read-timeout: 1s
-    service-token: ${SHOPPING_COMMERCE_SERVICE_TOKEN:}
+    service-token: ${CATALOG_COMMERCECORE_SERVICE_TOKEN:}
   # 판매정보 조회 원본. replica = product_sales 사본을 읽는다(기본), http = Commerce 를 요청마다 호출한다.
   # 기동 때 한 번만 읽으므로 바꾸면 rolling restart 가 필요하다. consume 은 두 모드 모두 계속 돈다.
-  # http 는 되돌리기 스위치다 (SHOPPING_SALES_SOURCE=http). 처음 전환하는 환경은 SHOPPING_SALES_BACKFILL_ENABLED=true 로 한 번 채운다.
+  # http 는 되돌리기 스위치다 (CATALOG_SALES_SOURCE=http). 처음 전환하는 환경은 CATALOG_SALES_BACKFILL_ENABLED=true 로 한 번 채운다.
   sales:
-    source: ${SHOPPING_SALES_SOURCE:replica}
+    source: ${CATALOG_SALES_SOURCE:replica}
   # 쿠폰 replica 동기화 (초기 적재 + 주기 대조). Commerce 주소·token 은 sales-client 설정을 같이 쓴다.
   # 기본은 꺼 둔다. Commerce 를 같이 띄우는 local·dev 프로필에서만 켠다.
   coupons:
@@ -56,16 +39,13 @@ shoppinglive:
   security:
     session:
       base-url: ${MEMBER_SESSION_BASE_URL:}
-      service-token: ${SHOPPING_MEMBER_SERVICE_TOKEN:}
+      service-token: ${CATALOG_MEMBER_SERVICE_TOKEN:}
       connect-timeout: 1s
       read-timeout: 1s
     jwt:
       issuer: shoppinglive-member
       audience: shoppinglive-api
       public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
-    service-tokens:
-      commerce: ${COMMERCE_SHOPPING_SERVICE_TOKEN:}
-      live: ${LIVE_SHOPPING_SERVICE_TOKEN:}
 
 management:
   endpoints:
@@ -92,11 +72,11 @@ logging:
 resilience4j:
   circuitbreaker:
     instances:
-      commerceSales:
+      commercecoreSales:
         base-config: shoppinglive-default
   retry:
     instances:
-      commerceSales:
+      commercecoreSales:
         base-config: shoppinglive-default
         max-attempts: 2
         retry-exceptions:
@@ -112,7 +92,7 @@ spring:
     activate:
       on-profile: local
   datasource:
-    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/shopping
+    url: ${CATALOG_DATASOURCE_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/catalog}
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
   kafka:
@@ -123,11 +103,11 @@ spring:
 
 # 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
 # sales-client.base-url 은 로컬에서 따로 띄운 commercecore-service(server.port 8083)다.
-shopping:
+catalog:
   cors:
-    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+    allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   sales-client:
-    base-url: http://localhost:8083
+    base-url: ${CATALOG_SALES_CLIENT_BASE_URL:http://localhost:8083}
   coupons:
     sync:
       enabled: true
@@ -150,7 +130,7 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:postgresql://postgres:5432/shopping
+    url: ${CATALOG_DATASOURCE_URL:jdbc:postgresql://postgres:5432/catalog}
     username: ${POSTGRES_USER:shoppinglive}
     password: ${POSTGRES_PASSWORD:changeme}
   kafka:
@@ -159,14 +139,9 @@ spring:
     consumer:
       group-id: catalog-service
 
-# Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
-# 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.
-# dev overlay의 Service 이름은 dev-commercecore-service이며 서비스 포트는 8080이다.
-shopping:
-  image:
-    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:/api/shopping}
+catalog:
   sales-client:
-    base-url: http://dev-commercecore-service:8080
+    base-url: ${CATALOG_SALES_CLIENT_BASE_URL:http://dev-commercecore-service:8080}
   coupons:
     sync:
       enabled: true

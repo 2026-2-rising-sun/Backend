@@ -1,16 +1,15 @@
 package com.shoppinglive.catalog.product.service;
 
-import com.shoppinglive.common.core.BusinessException;
-import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.catalog.client.commerce.SalesDisplayStatus;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesInfoClient;
-import com.shoppinglive.catalog.client.commerce.SalesInfoUnavailableException;
+import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoClient;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.product.dto.PublicProductDetail;
 import com.shoppinglive.catalog.product.entity.Product;
 import com.shoppinglive.catalog.product.entity.PurchaseCheck;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
-import com.shoppinglive.catalog.storage.ImageUrlResolver;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import org.springframework.stereotype.Service;
 
 /** 사용자용 공개 상품 상세. 목록·직접 URL·방송 어디서 들어와도 같은 상품 id 로 이 조회를 거쳐 같은 결과를 본다. 읽기 전용이며 재고를 차감·예약하지 않는다. */
@@ -19,15 +18,11 @@ public class PublicProductDetailService {
 
     private final ProductRepository productRepository;
     private final SalesInfoClient salesInfoClient;
-    private final ImageUrlResolver imageUrlResolver;
 
     public PublicProductDetailService(
-            ProductRepository productRepository,
-            SalesInfoClient salesInfoClient,
-            ImageUrlResolver imageUrlResolver) {
+            ProductRepository productRepository, SalesInfoClient salesInfoClient) {
         this.productRepository = productRepository;
         this.salesInfoClient = salesInfoClient;
-        this.imageUrlResolver = imageUrlResolver;
     }
 
     /**
@@ -44,8 +39,7 @@ public class PublicProductDetailService {
         if (!status.isPubliclyVisible()) {
             throw notFound(productId);
         }
-        return new PublicProductDetail(
-                product, imageUrlResolver.urlOf(product.getMainImageId()), salesInfo, status);
+        return new PublicProductDetail(product, product.getMainImageUrl(), salesInfo, status);
     }
 
     /**

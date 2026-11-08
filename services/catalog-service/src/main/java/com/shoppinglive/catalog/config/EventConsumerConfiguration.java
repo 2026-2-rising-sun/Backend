@@ -41,7 +41,7 @@ import org.springframework.util.backoff.FixedBackOff;
 @Configuration(proxyBeanMethods = false)
 class EventConsumerConfiguration {
 
-    static final String DLT_SUFFIX = ".shopping.dlt";
+    static final String DLT_SUFFIX = ".catalog.dlt";
     static final String DLT_MARKER = "EVENT_SENT_TO_DLT";
     private static final int MAX_RETRIES = 5;
     private static final Duration MAX_RETRY_INTERVAL = Duration.ofSeconds(30);
@@ -62,7 +62,7 @@ class EventConsumerConfiguration {
     @Bean
     DefaultErrorHandler eventErrorHandler(
             KafkaOperations<?, ?> kafka,
-            @Value("${shopping.events.consumer.retry-interval:1s}") Duration retryInterval) {
+            @Value("${catalog.events.consumer.retry-interval:1s}") Duration retryInterval) {
         // 원문 key·value 를 그대로 보낸다 (consumer·producer 모두 String). partition 은 Kafka 가 key 로 고른다.
         // 원본 partition 을 그대로 쓰면 DLT partition 수가 원본보다 적을 때 전송이 계속 실패한다. 원본 위치는 header 에 남는다.
         DeadLetterPublishingRecoverer dlt =
@@ -96,6 +96,8 @@ class EventConsumerConfiguration {
         handler.setClassifications(Map.of(), true);
         handler.addNotRetryableExceptions(
                 SalesInfoEventMessage.InvalidMessageException.class,
+                com.shoppinglive.catalog.product.event.ProductInfoEventMessage
+                        .InvalidMessageException.class,
                 CouponInfoEventMessage.InvalidMessageException.class);
         return handler;
     }

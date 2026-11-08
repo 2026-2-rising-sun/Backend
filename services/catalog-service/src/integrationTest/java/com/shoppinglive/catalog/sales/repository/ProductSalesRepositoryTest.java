@@ -2,8 +2,8 @@ package com.shoppinglive.catalog.sales.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ class ProductSalesRepositoryTest {
                         "jdbc:h2:mem:product_sales_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
                         "sa",
                         "");
-        String postgres = System.getenv("SHOPPING_TEST_POSTGRES_URL");
+        String postgres = System.getenv("CATALOG_TEST_POSTGRES_URL");
         if (postgres == null || postgres.isBlank()) {
             return Stream.of(h2);
         }
@@ -50,9 +50,9 @@ class ProductSalesRepositoryTest {
                 new Db(
                         "postgres",
                         postgres,
-                        System.getenv().getOrDefault("SHOPPING_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("CATALOG_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("SHOPPING_TEST_POSTGRES_PASSWORD", "postgres")));
+                                .getOrDefault("CATALOG_TEST_POSTGRES_PASSWORD", "postgres")));
     }
 
     @ParameterizedTest

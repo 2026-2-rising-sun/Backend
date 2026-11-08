@@ -5,8 +5,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import java.util.HashMap;
@@ -43,7 +43,7 @@ class SalesRegistrationApiTest
 
     @Autowired private ObjectMapper objectMapper;
 
-    @Autowired private InMemoryShoppingClientStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub productLookupStub;
 
     @Autowired private SalesJpaRepository salesRepository;
 
@@ -53,15 +53,15 @@ class SalesRegistrationApiTest
     void setUp() {
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
-        shoppingClientStub.register(new ProductSnapshot(REGISTERED_PRODUCT_ID, "테스트 상품", null));
+        productLookupStub.clear();
+        productLookupStub.register(new ProductSnapshot(REGISTERED_PRODUCT_ID, "테스트 상품", null));
     }
 
     @AfterEach
     void tearDown() {
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
+        productLookupStub.clear();
     }
 
     /**
@@ -140,7 +140,7 @@ class SalesRegistrationApiTest
     void allowsRetryAfterMissingProductRegistrationFails() throws Exception {
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10)).andExpect(status().isNotFound());
 
-        shoppingClientStub.register(new ProductSnapshot(UNKNOWN_PRODUCT_ID, "뒤늦게 생긴 상품", null));
+        productLookupStub.register(new ProductSnapshot(UNKNOWN_PRODUCT_ID, "뒤늦게 생긴 상품", null));
 
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10)).andExpect(status().isCreated());
     }

@@ -1,13 +1,13 @@
 package com.shoppinglive.catalog.product.controller;
 
-import com.shoppinglive.common.core.ApiResponse;
-import com.shoppinglive.common.core.BusinessException;
-import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.catalog.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
 import com.shoppinglive.catalog.product.dto.PublicProductListResponse;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
 import com.shoppinglive.catalog.product.service.CatalogQueryService;
 import com.shoppinglive.catalog.product.service.ProductSort;
+import com.shoppinglive.common.core.ApiResponse;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;

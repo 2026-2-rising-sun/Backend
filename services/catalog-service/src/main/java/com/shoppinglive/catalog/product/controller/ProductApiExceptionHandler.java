@@ -3,12 +3,10 @@ package com.shoppinglive.catalog.product.controller;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.web.CorrelationId;
-import com.shoppinglive.catalog.product.service.ProductUpdateService;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -31,18 +29,6 @@ public class ProductApiExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(
             MethodArgumentTypeMismatchException e) {
         return badRequest(e.getName() + " 값의 형식이 올바르지 않습니다.");
-    }
-
-    /** 서비스가 flush 에서 잡지 못한 동시 수정(커밋 시점 충돌)도 덮어쓰기 대신 409 로 알린다. */
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(
-            ObjectOptimisticLockingFailureException e) {
-        return ResponseEntity.status(ErrorCode.CONFLICT.status())
-                .body(
-                        ApiResponse.fail(
-                                ErrorCode.CONFLICT,
-                                ProductUpdateService.CONFLICT_MESSAGE,
-                                CorrelationId.current()));
     }
 
     private static ResponseEntity<ApiResponse<Void>> badRequest(String message) {

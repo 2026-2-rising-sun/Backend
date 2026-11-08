@@ -4,7 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.catalog.security.ShoppingSecuritySupport;
+import com.shoppinglive.catalog.security.CatalogSecuritySupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
         properties =
                 "spring.datasource.url=jdbc:h2:mem:shopping_product_coupon_http;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE")
 @AutoConfigureMockMvc
-class ProductCouponHttpTest extends ShoppingSecuritySupport {
+class ProductCouponHttpTest extends CatalogSecuritySupport {
     @Autowired MockMvc mvc;
 
     @ParameterizedTest

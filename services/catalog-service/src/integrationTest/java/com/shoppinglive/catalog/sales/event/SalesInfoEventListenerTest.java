@@ -10,10 +10,10 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.shoppinglive.common.events.EventEnvelope;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
+import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -154,6 +154,16 @@ class SalesInfoEventListenerTest {
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(metrics.get("shoppinglive.consumer.failures").counter().count()).isEqualTo(1);
         assertThat(metrics.find("shoppinglive.consumer").timer()).isNull();
+    }
+
+    @Test
+    @DisplayName("기존 commerce-service source의 판매 이벤트도 같은 토픽에서 계속 수신한다")
+    void acceptsLegacyCommerceSource() throws Exception {
+        listener.consume(
+                record(
+                        json(event(2, SalesStatus.ON_SALE, 27000))
+                                .replace("commercecore-service", "commerce-service")));
+        assertThat(stored().get(PRODUCT).price()).isEqualTo(27000);
     }
 
     static Stream<Arguments> invalidMessages() {

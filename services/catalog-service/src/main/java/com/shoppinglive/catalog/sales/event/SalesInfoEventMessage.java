@@ -3,8 +3,8 @@ package com.shoppinglive.catalog.sales.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 
 /**
  * 판매정보 이벤트 한 건을 Shopping 자체 모델로 해석하고 검증한다.
@@ -68,7 +68,8 @@ public record SalesInfoEventMessage(
                             textOf(root, "aggregateId"),
                             java.time.Instant.parse(textOf(root, "occurredAt")),
                             payload);
-            if (!"commercecore-service".equals(envelope.source())
+            if (!("commercecore-service".equals(envelope.source())
+                            || "commerce-service".equals(envelope.source()))
                     || !Long.toString(salesId).equals(envelope.aggregateId())) {
                 throw invalid("발행 서비스 또는 판매 식별자가 계약과 일치하지 않습니다.");
             }

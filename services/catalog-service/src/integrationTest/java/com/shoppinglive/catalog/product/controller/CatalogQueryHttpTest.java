@@ -9,21 +9,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.common.security.test.JwtTestTokens;
-import com.shoppinglive.catalog.client.commerce.HttpSalesInfoClient;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
-import com.shoppinglive.catalog.product.entity.Product;
+import com.shoppinglive.catalog.client.commercecore.HttpSalesInfoClient;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
-import com.shoppinglive.catalog.product.entity.ProductImage;
-import com.shoppinglive.catalog.product.repository.ProductImageRepository;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
-import com.shoppinglive.catalog.security.ShoppingSecuritySupport;
-import com.shoppinglive.catalog.storage.ImageFormat;
+import com.shoppinglive.catalog.security.CatalogSecuritySupport;
+import com.shoppinglive.common.security.test.JwtTestTokens;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,11 +35,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
         properties =
                 "spring.datasource.url=jdbc:h2:mem:catalog_query;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE")
 @AutoConfigureMockMvc
-class CatalogQueryHttpTest extends ShoppingSecuritySupport {
+class CatalogQueryHttpTest extends CatalogSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired ProductRepository products;
-    @Autowired ProductImageRepository images;
     @Autowired ProductSalesRepository sales;
     @Autowired JdbcTemplate jdbc;
     @MockitoBean HttpSalesInfoClient commerce;
@@ -52,16 +46,7 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
 
     @BeforeEach
     void prepare() {
-        imageId =
-                images.saveAndFlush(
-                                new ProductImage(
-                                        UUID.randomUUID() + ".png",
-                                        ImageFormat.PNG,
-                                        100,
-                                        10,
-                                        10,
-                                        "fixture.png"))
-                        .getId();
+        imageId = 100L;
     }
 
     @AfterEach
@@ -69,7 +54,6 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
         verifyNoInteractions(commerce);
         jdbc.update("DELETE FROM product_sales");
         products.deleteAll();
-        images.deleteAll();
     }
 
     @Test
@@ -165,64 +149,6 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
         mvc.perform(get("/v1/products").param("sort", "LATEST").param("cursor", "bnVsbA"))
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("sort", "WRONG")).andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("판매자 상태 필터는 다른 판매자 상품을 제외하고 전체 건수와 페이지를 계산한다")
-    void sellerStatusPreservesOwnershipAndTotals() throws Exception {
-        for (int i = 0; i < 5; i++)
-            product("내 품절", 100, SalesStatus.SOLD_OUT, JwtTestTokens.SELLER);
-        product("다른 판매자 품절", 100, SalesStatus.SOLD_OUT, UUID.randomUUID().toString());
-        product("내 판매중", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
-        JsonNode data =
-                mapper.readTree(
-                                mvc.perform(
-                                                get("/v1/seller/products")
-                                                        .header("Authorization", sellerBearer())
-                                                        .param("status", "SOLD_OUT")
-                                                        .param("size", "2")
-                                                        .param("page", "2"))
-                                        .andExpect(status().isOk())
-                                        .andReturn()
-                                        .getResponse()
-                                        .getContentAsString())
-                        .path("data");
-        assertThat(data.path("totalElements").asInt()).isEqualTo(5);
-        assertThat(data.path("totalPages").asInt()).isEqualTo(3);
-        assertThat(data.path("items").size()).isEqualTo(1);
-        mvc.perform(get("/v1/seller/products").param("status", "SOLD_OUT"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(
-                        get("/v1/seller/products")
-                                .header("Authorization", userBearer())
-                                .param("status", "SOLD_OUT"))
-                .andExpect(status().isForbidden());
-        mvc.perform(
-                        get("/v1/seller/products")
-                                .header("Authorization", sellerBearer())
-                                .param("status", "UNKNOWN"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @DisplayName("판매정보 미등록 상태는 사본이 없는 본인 상품만 반환한다")
-    void missingSalesFilterUsesOwnProductsOnly() throws Exception {
-        long id = product("미등록", 0, null, JwtTestTokens.SELLER);
-        product("다른 판매자", 0, null, UUID.randomUUID().toString());
-        JsonNode data =
-                mapper.readTree(
-                                mvc.perform(
-                                                get("/v1/seller/products")
-                                                        .header("Authorization", sellerBearer())
-                                                        .param("status", "NOT_REGISTERED"))
-                                        .andExpect(status().isOk())
-                                        .andReturn()
-                                        .getResponse()
-                                        .getContentAsString())
-                        .path("data");
-        assertThat(data.path("items").size()).isEqualTo(1);
-        assertThat(data.path("items").get(0).path("productId").asLong()).isEqualTo(id);
-        assertThat(data.path("items").get(0).path("price").isNull()).isTrue();
     }
 
     @Test
@@ -360,13 +286,8 @@ class CatalogQueryHttpTest extends ShoppingSecuritySupport {
             ProductCategory category) {
         long id =
                 products.saveAndFlush(
-                                new Product(
-                                        name,
-                                        name,
-                                        imageId,
-                                        UUID.randomUUID().toString(),
-                                        sellerId,
-                                        category))
+                                com.shoppinglive.catalog.product.support.ProductReplicaFixtures
+                                        .product(name, name, imageId, sellerId, category))
                         .getId();
         if (status != null) sales.apply(new SalesInfo(id, id * 10, price, status, 1), 1);
         return id;

@@ -6,21 +6,17 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.shoppinglive.catalog.client.commerce.HttpSalesInfoClient;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesInfoUnavailableException;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
+import com.shoppinglive.catalog.client.commercecore.HttpSalesInfoClient;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.entity.Product;
-import com.shoppinglive.catalog.product.entity.ProductImage;
-import com.shoppinglive.catalog.product.repository.ProductImageRepository;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
-import com.shoppinglive.catalog.security.ShoppingSecuritySupport;
-import com.shoppinglive.catalog.storage.ImageFormat;
+import com.shoppinglive.catalog.security.CatalogSecuritySupport;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -37,11 +33,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
         properties = {
-            "shopping.sales.backfill.enabled=true",
+            "catalog.sales.backfill.enabled=true",
             "spring.datasource.url=jdbc:h2:mem:product_sales_backfill;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;"
                     + "DATABASE_TO_LOWER=TRUE"
         })
-class ProductSalesBackfillTest extends ShoppingSecuritySupport {
+class ProductSalesBackfillTest extends CatalogSecuritySupport {
 
     private static final int CHUNK = 100;
     private static final int PRODUCTS = 250;
@@ -49,7 +45,6 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
 
     @Autowired ProductSalesBackfill backfill;
     @Autowired ProductRepository products;
-    @Autowired ProductImageRepository images;
     @Autowired ProductSalesRepository replica;
     @Autowired JdbcTemplate jdbc;
     @MockitoBean HttpSalesInfoClient commerce;
@@ -64,7 +59,6 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     void clean() {
         jdbc.update("DELETE FROM product_sales");
         products.deleteAll();
-        images.deleteAll();
     }
 
     @Test
@@ -142,26 +136,18 @@ class ProductSalesBackfillTest extends ShoppingSecuritySupport {
     }
 
     private List<Long> createProducts(int count) {
-        long imageId =
-                images.saveAndFlush(
-                                new ProductImage(
-                                        UUID.randomUUID() + ".png",
-                                        ImageFormat.PNG,
-                                        100,
-                                        10,
-                                        10,
-                                        "fixture.png"))
-                        .getId();
+        long imageId = 100L;
         List<Product> saved =
                 products.saveAll(
                         IntStream.range(0, count)
                                 .mapToObj(
                                         i ->
-                                                new Product(
+                                                com.shoppinglive.catalog.product.support
+                                                        .ProductReplicaFixtures.product(
                                                         "product-" + i,
                                                         "description",
                                                         imageId,
-                                                        "backfill-" + i))
+                                                        null))
                                 .toList());
         products.flush();
         return saved.stream().map(Product::getId).sorted().toList();

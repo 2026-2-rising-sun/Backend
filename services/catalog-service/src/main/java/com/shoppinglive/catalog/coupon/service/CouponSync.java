@@ -1,6 +1,6 @@
 package com.shoppinglive.catalog.coupon.service;
 
-import com.shoppinglive.catalog.client.commerce.HttpCouponSnapshotClient;
+import com.shoppinglive.catalog.client.commercecore.HttpCouponSnapshotClient;
 import com.shoppinglive.catalog.coupon.dto.CouponSnapshot;
 import com.shoppinglive.catalog.coupon.repository.CouponDisplayRepository;
 import java.time.Clock;
@@ -42,8 +42,8 @@ public class CouponSync {
 
     // shortcut: Pod 마다 각자 실행한다 (반영이 멱등이라 결과는 같다), 쿠폰 수가 많아 Commerce 부하가 보이면 lock 을 둔다
     @Scheduled(
-            initialDelayString = "${shopping.coupons.sync.initial-delay:10s}",
-            fixedDelayString = "${shopping.coupons.sync.interval:10m}")
+            initialDelayString = "${catalog.coupons.sync.initial-delay:10s}",
+            fixedDelayString = "${catalog.coupons.sync.interval:10m}")
     public void run() {
         try {
             sync();

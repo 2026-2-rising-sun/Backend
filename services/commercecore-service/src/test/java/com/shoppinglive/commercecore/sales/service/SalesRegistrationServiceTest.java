@@ -7,9 +7,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
-import com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -26,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.SimpleTransactionStatus;
@@ -47,7 +47,7 @@ class SalesRegistrationServiceTest {
 
     @Mock private SalesStockJpaRepository salesStockRepository;
 
-    @Mock private ShoppingClient shoppingClient;
+    @Mock private ProductLookup productLookup;
 
     @Mock private TransactionTemplate transactionTemplate;
 
@@ -61,7 +61,7 @@ class SalesRegistrationServiceTest {
                 new SalesRegistrationService(
                         salesRepository,
                         salesStockRepository,
-                        shoppingClient,
+                        productLookup,
                         transactionTemplate,
                         events);
     }
@@ -81,10 +81,10 @@ class SalesRegistrationServiceTest {
 
     /** 등록 시 존재 여부와 알림에 쓸 상품 이름을 함께 확인한다. */
     private void productExists() {
-        given(shoppingClient.findProduct(PRODUCT_ID))
+        given(productLookup.findProduct(PRODUCT_ID))
                 .willReturn(
                         java.util.Optional.of(
-                                new com.shoppinglive.commercecore.client.shopping.ProductSnapshot(
+                                new com.shoppinglive.commercecore.product.dto.ProductSnapshot(
                                         PRODUCT_ID, "상품 이름", null)));
     }
 
@@ -160,7 +160,7 @@ class SalesRegistrationServiceTest {
     @Test
     void rejectsMissingProductWithoutPersistingSale() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
-        given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(java.util.Optional.empty());
+        given(productLookup.findProduct(PRODUCT_ID)).willReturn(java.util.Optional.empty());
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
                 .isInstanceOf(ProductNotFoundException.class);
@@ -170,18 +170,18 @@ class SalesRegistrationServiceTest {
     }
 
     /**
-     * 판매 1 완료 기준: "상품이 없거나 <b>존재 여부를 확인하지 못하면</b> 설정을 완료하지 않는다". Shopping 장애를 "상품 없음" 으로 단정하지 않고
+     * 판매 1 완료 기준: "상품이 없거나 <b>존재 여부를 확인하지 못하면</b> 설정을 완료하지 않는다". 로컬 상품 저장소 장애를 "상품 없음" 으로 단정하지 않고
      * 그대로 전파해, 호출자가 재시도를 안내할 수 있게 한다.
      */
-    @DisplayName("Shopping 장애를 상품 미존재로 단정하지 않고 전파한다")
+    @DisplayName("로컬 상품 저장소 장애를 상품 미존재로 단정하지 않고 전파한다")
     @Test
     void propagatesShoppingOutageWithoutAssumingProductIsMissing() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
-        given(shoppingClient.findProduct(PRODUCT_ID))
-                .willThrow(new ShoppingUnavailableException("shopping timeout"));
+        given(productLookup.findProduct(PRODUCT_ID))
+                .willThrow(new DataAccessResourceFailureException("상품 저장소 연결 실패"));
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
-                .isInstanceOf(ShoppingUnavailableException.class)
+                .isInstanceOf(DataAccessResourceFailureException.class)
                 .isNotInstanceOf(ProductNotFoundException.class);
 
         verify(salesRepository, never()).saveAndFlush(any());
@@ -199,7 +199,7 @@ class SalesRegistrationServiceTest {
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.CONFLICT);
 
-        verify(shoppingClient, never()).findProduct(any());
+        verify(productLookup, never()).findProduct(any());
         verify(salesRepository, never()).saveAndFlush(any());
     }
 
@@ -261,6 +261,6 @@ class SalesRegistrationServiceTest {
                 .isInstanceOf(BusinessException.class);
 
         verify(salesRepository, never()).existsByProductId(any());
-        verify(shoppingClient, never()).findProduct(any());
+        verify(productLookup, never()).findProduct(any());
     }
 }

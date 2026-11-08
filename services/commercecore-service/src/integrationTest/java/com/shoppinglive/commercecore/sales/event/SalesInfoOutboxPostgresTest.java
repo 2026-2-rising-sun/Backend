@@ -60,7 +60,7 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
     void commitsSnapshotAndRollsBackBusinessChangeWhenOutboxFails() {
         long product = UUID.randomUUID().getMostSignificantBits() >>> 1;
         shopping.register(
-                new com.shoppinglive.commercecore.client.shopping.ProductSnapshot(
+                new com.shoppinglive.commercecore.product.dto.ProductSnapshot(
                         product, "Outbox 원자성 검증", null));
         long id = registration.register(product, 1000L, 3).getId();
         fixtureSales.add(id);

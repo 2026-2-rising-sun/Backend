@@ -15,7 +15,7 @@ public class CorsConfig implements WebMvcConfigurer {
 
     private final List<String> allowedOrigins;
 
-    public CorsConfig(@Value("${shopping.cors.allowed-origins:}") List<String> allowedOrigins) {
+    public CorsConfig(@Value("${catalog.cors.allowed-origins:}") List<String> allowedOrigins) {
         this.allowedOrigins =
                 allowedOrigins.stream()
                         .map(String::strip)

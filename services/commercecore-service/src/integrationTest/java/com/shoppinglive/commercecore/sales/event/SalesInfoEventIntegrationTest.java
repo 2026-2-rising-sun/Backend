@@ -6,8 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
@@ -15,8 +13,9 @@ import com.shoppinglive.commercecore.order.service.OrderService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.service.MockPaymentEngine;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
@@ -25,6 +24,7 @@ import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.EventOutbox;
+import com.shoppinglive.payment.service.MockPaymentEngine;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -40,7 +40,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -57,12 +56,12 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
     @Autowired PaymentService payments;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired CartService cart;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
     @Autowired PlatformTransactionManager manager;
     @MockitoSpyBean EventOutbox outbox;
-    @MockitoBean MockPaymentEngine engine;
+    @Autowired MockPaymentEngine engine;
     final List<EventEnvelope<SalesInfoSnapshot>> emitted = new CopyOnWriteArrayList<>();
     final List<Long> fixtureSales = new java.util.ArrayList<>();
 
@@ -97,12 +96,6 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
                             String.class,
                             id)
                     .forEach(scenarios::clear);
-            jdbc.update(
-                    "DELETE FROM mock_gateway_result WHERE attempt_id IN (SELECT p.id FROM payment_attempt p JOIN orders o ON o.id=p.order_id WHERE o.sales_info_id=?)",
-                    id);
-            jdbc.update(
-                    "DELETE FROM payment_attempt WHERE order_id IN (SELECT id FROM orders WHERE sales_info_id=?)",
-                    id);
             jdbc.update("DELETE FROM orders WHERE sales_info_id=?", id);
             jdbc.update(
                     "DELETE FROM cart_item WHERE product_id=(SELECT product_id FROM sales_info WHERE id=?)",
@@ -231,7 +224,7 @@ class SalesInfoEventIntegrationTest extends CommerceSecurityTestSupport {
             scenarios.set(order.getOrderNumber(), scenario);
             emitted.clear();
             var attempt = payments.startPayment(order.getOrderNumber(), member);
-            payments.resolvePayment(attempt.getId());
+            payments.refresh(attempt.getId());
             if (scenario == PaymentScenario.INSTANT_FAIL) {
                 assertThat(emitted)
                         .extracting(EventEnvelope::eventType)

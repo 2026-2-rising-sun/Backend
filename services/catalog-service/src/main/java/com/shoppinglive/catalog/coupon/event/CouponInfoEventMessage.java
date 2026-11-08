@@ -3,8 +3,8 @@ package com.shoppinglive.catalog.coupon.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.catalog.coupon.dto.CouponSnapshot;
+import com.shoppinglive.common.events.EventEnvelope;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -89,7 +89,8 @@ public final class CouponInfoEventMessage {
                             textOf(root, "aggregateId"),
                             Instant.parse(textOf(root, "occurredAt")),
                             root.get("payload"));
-            if (!"commercecore-service".equals(envelope.source())
+            if (!("commercecore-service".equals(envelope.source())
+                            || "commerce-service".equals(envelope.source()))
                     || !couponId.equals(envelope.aggregateId())) {
                 throw invalid("발행 서비스 또는 쿠폰 식별자가 계약과 일치하지 않습니다.");
             }

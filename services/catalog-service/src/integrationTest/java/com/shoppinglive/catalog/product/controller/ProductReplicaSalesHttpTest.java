@@ -1,26 +1,19 @@
 package com.shoppinglive.catalog.product.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.common.security.test.JwtTestTokens;
-import com.shoppinglive.catalog.client.commerce.HttpSalesInfoClient;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
-import com.shoppinglive.catalog.product.entity.Product;
-import com.shoppinglive.catalog.product.entity.ProductImage;
-import com.shoppinglive.catalog.product.repository.ProductImageRepository;
+import com.shoppinglive.catalog.client.commercecore.HttpSalesInfoClient;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
-import com.shoppinglive.catalog.security.ShoppingSecuritySupport;
-import com.shoppinglive.catalog.storage.ImageFormat;
-import java.util.UUID;
+import com.shoppinglive.catalog.security.CatalogSecuritySupport;
+import com.shoppinglive.common.security.test.JwtTestTokens;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,13 +36,12 @@ import org.springframework.test.web.servlet.MockMvc;
         })
 @AutoConfigureMockMvc
 @DisplayName("기본 설정(replica)의 상품 판매정보 조회")
-class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
+class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
 
     private static final long PRICE = 1_500L;
 
     @Autowired MockMvc mvc;
     @Autowired ProductRepository products;
-    @Autowired ProductImageRepository images;
     @Autowired ProductSalesRepository replica;
     @Autowired JdbcTemplate jdbc;
     @MockitoBean HttpSalesInfoClient commerce;
@@ -58,16 +50,7 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
 
     @BeforeEach
     void prepareImage() {
-        imageId =
-                images.saveAndFlush(
-                                new ProductImage(
-                                        UUID.randomUUID() + ".png",
-                                        ImageFormat.PNG,
-                                        100,
-                                        10,
-                                        10,
-                                        "fixture.png"))
-                        .getId();
+        imageId = 100L;
     }
 
     @AfterEach
@@ -75,11 +58,10 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
         verifyNoInteractions(commerce);
         jdbc.update("DELETE FROM product_sales");
         products.deleteAll();
-        images.deleteAll();
     }
 
     @Test
-    @DisplayName("판매 중 상품은 목록·상세·구매 사전확인·판매자 조회 모두 사본의 가격과 재고로 응답한다")
+    @DisplayName("판매 중 상품은 목록·상세·구매 사전확인 모두 사본의 가격과 재고로 응답한다")
     void saleFromReplicaIsServedByAllFourReads() throws Exception {
         long id = product("on-sale");
         sales(id, SalesStatus.ON_SALE, 4);
@@ -100,19 +82,10 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderable").value(true))
                 .andExpect(jsonPath("$.data.unitPrice").value(PRICE));
-        mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
-                .andExpect(jsonPath("$.data.items[0].price").value(PRICE))
-                .andExpect(jsonPath("$.data.items[0].available").value(4));
-        mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.salesStatus").value("ON_SALE"))
-                .andExpect(jsonPath("$.data.available").value(4));
     }
 
     @Test
-    @DisplayName("비공개 행과 사본에 없는 상품은 공개 조회에서 숨고, 판매자 조회에는 각각 PRIVATE·NOT_REGISTERED로 보인다")
+    @DisplayName("비공개 행과 사본에 없는 상품은 공개 조회에서 숨는다")
     void privateAndMissingRowsStayHiddenFromPublicReads() throws Exception {
         long hidden = product("hidden");
         long unregistered = product("unregistered");
@@ -128,25 +101,6 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
             mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
                     .andExpect(status().isNotFound());
         }
-        mvc.perform(get("/v1/seller/products").header("Authorization", sellerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(
-                        jsonPath(
-                                "$.data.items[?(@.name=='hidden')].salesStatus",
-                                contains("PRIVATE")))
-                .andExpect(
-                        jsonPath(
-                                "$.data.items[?(@.name=='unregistered')].salesStatus",
-                                contains("NOT_REGISTERED")))
-                .andExpect(
-                        jsonPath(
-                                "$.data.items[?(@.name=='unregistered')].price",
-                                contains(nullValue())));
-        mvc.perform(
-                        get("/v1/seller/products/{id}", unregistered)
-                                .header("Authorization", sellerBearer()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.salesStatus").value("NOT_REGISTERED"));
     }
 
     @Test
@@ -167,7 +121,8 @@ class ProductReplicaSalesHttpTest extends ShoppingSecuritySupport {
 
     private long product(String name) {
         return products.saveAndFlush(
-                        new Product(name, name, imageId, name + "-key", JwtTestTokens.SELLER))
+                        com.shoppinglive.catalog.product.support.ProductReplicaFixtures.product(
+                                name, name, imageId, JwtTestTokens.SELLER))
                 .getId();
     }
 

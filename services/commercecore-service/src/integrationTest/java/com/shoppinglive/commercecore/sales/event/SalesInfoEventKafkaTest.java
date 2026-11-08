@@ -5,11 +5,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.order.service.OrderService;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
@@ -52,7 +52,7 @@ class SalesInfoEventKafkaTest extends CommerceSecurityTestSupport {
     @Autowired SalesService sales;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
 
     @DisplayName("API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다")
     @Test

@@ -9,9 +9,9 @@ import static org.mockito.Mockito.doAnswer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
-import com.shoppinglive.catalog.security.ShoppingSecuritySupport;
+import com.shoppinglive.catalog.security.CatalogSecuritySupport;
+import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,10 +43,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @SpringBootTest(
         properties = {
             "spring.kafka.listener.auto-startup=true",
-            "shopping.events.consumer.retry-interval=10ms"
+            "catalog.events.consumer.retry-interval=10ms"
         })
 @EmbeddedKafka(partitions = 1, bootstrapServersProperty = "spring.kafka.bootstrap-servers")
-class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
+class SalesInfoEventKafkaTest extends CatalogSecuritySupport {
 
     private static final int FAILURES_BEFORE_RECOVERY = 11;
     private static final long FIRST_PRODUCT = 501L;
@@ -137,7 +137,8 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
         doAnswer(
                         invocation -> {
                             if (invocation
-                                            .<com.shoppinglive.catalog.client.commerce.SalesInfo>
+                                            .<com.shoppinglive.catalog.client.commercecore
+                                                            .SalesInfo>
                                                     getArgument(0)
                                             .productId()
                                     == BUGGY_PRODUCT) {
@@ -174,7 +175,7 @@ class SalesInfoEventKafkaTest extends ShoppingSecuritySupport {
                 new DefaultKafkaConsumerFactory<>(
                                 props, new StringDeserializer(), new StringDeserializer())
                         .createConsumer()) {
-            consumer.subscribe(List.of(SalesInfoEventContract.TOPIC_NAME + ".shopping.dlt"));
+            consumer.subscribe(List.of(SalesInfoEventContract.TOPIC_NAME + ".catalog.dlt"));
             List<String> values = new ArrayList<>();
             await().atMost(Duration.ofSeconds(20))
                     .until(

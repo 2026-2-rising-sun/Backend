@@ -39,8 +39,7 @@ shoppinglive:
 
 live:
   products:
-    shopping-token: ${LIVE_SHOPPING_SERVICE_TOKEN:}
-    commerce-token: ${LIVE_COMMERCE_SERVICE_TOKEN:}
+    commercecore-token: ${LIVE_COMMERCECORE_SERVICE_TOKEN:}
 
 management:
   endpoints:
@@ -83,15 +82,14 @@ spring:
     redis:
       host: localhost
       port: ${REDIS_PORT:6379}
-# 내부 서비스(shopping·commerce)는 로컬에서도 실제로 호출하고, 과금되는 IVS 만 stub 을 쓴다.
-# 상품 조회에는 shopping(8082)·commerce(8083)를 함께 띄워야 한다. mock 서버로 바꿀 때는 URL 만
+# 상품과 판매정보는 로컬 Core 원본을 호출하고 과금되는 IVS만 stub을 쓴다.
+# 상품 조회에는 commercecore(8083)를 띄워야 한다. mock 서버로 바꿀 때는 URL만
 # 바꾸거나 LIVE_PRODUCTS_SHOPPING_URL / LIVE_PRODUCTS_COMMERCE_URL 로 덮는다.
 # stub 은 local/test 에서만 허용되며 운영 프로파일에서 stub 은 기동 실패다.
 live:
   products:
     mode: http
-    shopping-url: http://localhost:8082
-    commerce-url: http://localhost:8083
+    commercecore-url: ${LIVE_PRODUCTS_COMMERCECORE_URL:http://localhost:8083}
   ivs:
     mode: stub
     stub-ready: true
@@ -131,8 +129,7 @@ spring:
 live:
   products:
     mode: http
-    shopping-url: http://dev-catalog-service:8080
-    commerce-url: http://dev-commercecore-service:8080
+    commercecore-url: ${LIVE_PRODUCTS_COMMERCECORE_URL:http://dev-commercecore-service:8080}
 
 shoppinglive:
   security:

@@ -10,7 +10,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.shoppinglive.catalog.client.commerce.HttpCouponSnapshotClient;
+import com.shoppinglive.catalog.client.commercecore.HttpCouponSnapshotClient;
 import com.shoppinglive.catalog.coupon.dto.CouponSnapshot;
 import com.shoppinglive.catalog.coupon.repository.CouponDisplayRepository;
 import java.time.Clock;

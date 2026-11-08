@@ -1,15 +1,12 @@
 package com.shoppinglive.catalog.product.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.common.core.BusinessException;
-import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.catalog.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
 import com.shoppinglive.catalog.product.dto.PublicProductItemResponse;
 import com.shoppinglive.catalog.product.dto.PublicProductListResponse;
-import com.shoppinglive.catalog.product.dto.SellerProductPage;
-import com.shoppinglive.catalog.product.dto.SellerProductSummary;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
-import com.shoppinglive.catalog.storage.ImageUrlResolver;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -27,13 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class CatalogQueryService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
-    private final ImageUrlResolver images;
 
-    public CatalogQueryService(
-            NamedParameterJdbcTemplate jdbc, ObjectMapper mapper, ImageUrlResolver images) {
+    public CatalogQueryService(NamedParameterJdbcTemplate jdbc, ObjectMapper mapper) {
         this.jdbc = jdbc;
         this.mapper = mapper;
-        this.images = images;
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +96,7 @@ public class CatalogQueryService {
                 };
         List<CatalogRow> rows =
                 jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_id, p.category, p.created_at, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
+                        "SELECT p.id, p.name, p.main_image_url, p.category, p.created_at, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
                                 + where
                                 + " ORDER BY "
                                 + order
@@ -112,7 +106,7 @@ public class CatalogQueryService {
                                 new CatalogRow(
                                         rs.getLong("id"),
                                         rs.getString("name"),
-                                        rs.getLong("main_image_id"),
+                                        rs.getString("main_image_url"),
                                         rs.getTimestamp("created_at").toInstant(),
                                         rs.getLong("price"),
                                         SalesDisplayStatus.valueOf(rs.getString("status")),
@@ -132,7 +126,7 @@ public class CatalogQueryService {
                                         new PublicProductItemResponse(
                                                 row.id(),
                                                 row.name(),
-                                                images.urlOf(row.imageId()),
+                                                row.imageUrl(),
                                                 row.price(),
                                                 row.available(),
                                                 row.status(),
@@ -143,52 +137,6 @@ public class CatalogQueryService {
                         .toList(),
                 next,
                 hasNext);
-    }
-
-    @Transactional(readOnly = true)
-    public SellerProductPage sellerList(
-            String sellerId, SalesDisplayStatus status, int page, int size) {
-        if (status == SalesDisplayStatus.UNKNOWN || (long) page * size > Integer.MAX_VALUE) {
-            throw invalid("판매 상태 또는 페이지 범위가 올바르지 않습니다.");
-        }
-        String where =
-                " WHERE p.seller_id = :sellerId AND "
-                        + (status == SalesDisplayStatus.NOT_REGISTERED
-                                ? "s.product_id IS NULL"
-                                : "s.status = :status");
-        Map<String, Object> params =
-                Map.of(
-                        "sellerId",
-                        sellerId,
-                        "status",
-                        status.name(),
-                        "size",
-                        size,
-                        "offset",
-                        (long) page * size);
-        Long total =
-                jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM product p LEFT JOIN product_sales s ON s.product_id = p.id"
-                                + where,
-                        params,
-                        Long.class);
-        List<SellerProductSummary> rows =
-                jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_id, p.created_at, s.price, s.available FROM product p LEFT JOIN product_sales s ON s.product_id = p.id"
-                                + where
-                                + " ORDER BY p.created_at DESC, p.id DESC LIMIT :size OFFSET :offset",
-                        params,
-                        (rs, n) ->
-                                new SellerProductSummary(
-                                        rs.getLong("id"),
-                                        rs.getString("name"),
-                                        images.urlOf(rs.getLong("main_image_id")),
-                                        rs.getTimestamp("created_at").toInstant(),
-                                        status,
-                                        rs.getObject("price", Long.class),
-                                        rs.getObject("available", Integer.class)));
-        long count = Objects.requireNonNull(total);
-        return new SellerProductPage(rows, page, size, count, (int) ((count + size - 1) / size));
     }
 
     private Position decode(String cursor) {
@@ -231,7 +179,7 @@ public class CatalogQueryService {
     private record CatalogRow(
             long id,
             String name,
-            long imageId,
+            String imageUrl,
             Instant createdAt,
             long price,
             SalesDisplayStatus status,

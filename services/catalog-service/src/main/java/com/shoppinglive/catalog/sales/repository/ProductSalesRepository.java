@@ -1,8 +1,8 @@
 package com.shoppinglive.catalog.sales.repository;
 
-import com.shoppinglive.catalog.client.commerce.ProductIds;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesStatus;
+import com.shoppinglive.catalog.client.commercecore.ProductIds;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collection;

@@ -1,8 +1,8 @@
 package com.shoppinglive.catalog.sales.service;
 
-import com.shoppinglive.catalog.client.commerce.HttpSalesInfoClient;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
-import com.shoppinglive.catalog.client.commerce.SalesInfoUnavailableException;
+import com.shoppinglive.catalog.client.commercecore.HttpSalesInfoClient;
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
 import java.util.List;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 /**
  * consume 이 시작되기 전부터 있던 판매정보를 Commerce HTTP 조회로 replica 에 version 0 행으로 채운다.
  *
- * <p>{@code shopping.sales.backfill.enabled=true} 로 기동했을 때만, 애플리케이션 시작 시 한 번 실행한다. 설정이 없으면 이 빈 자체가
+ * <p>{@code catalog.sales.backfill.enabled=true} 로 기동했을 때만, 애플리케이션 시작 시 한 번 실행한다. 설정이 없으면 이 빈 자체가
  * 만들어지지 않는다. 여러 번 실행해도 없는 행만 채운다.
  *
  * <p>상품 id 를 {@value #CHUNK_SIZE} 개씩 나눠 읽는다. 상품 전체를 한 번에 메모리에 올리지 않고, Commerce 조회 한 번이 받는 id
@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
  * 추가돼도 타입이 달라 주입이 모호해지지 않고, backfill 이 replica 를 원본 삼아 자기 빈을 채우는 일도 없다.
  */
 @Component
-@ConditionalOnProperty(prefix = "shopping.sales.backfill", name = "enabled", havingValue = "true")
+@ConditionalOnProperty(prefix = "catalog.sales.backfill", name = "enabled", havingValue = "true")
 public class ProductSalesBackfill implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(ProductSalesBackfill.class);

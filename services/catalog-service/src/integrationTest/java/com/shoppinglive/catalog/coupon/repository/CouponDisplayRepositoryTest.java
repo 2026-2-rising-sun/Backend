@@ -76,7 +76,7 @@ class CouponDisplayRepositoryTest {
                         "jdbc:h2:mem:coupon_display_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
                         "sa",
                         "");
-        String postgres = System.getenv("SHOPPING_TEST_POSTGRES_URL");
+        String postgres = System.getenv("CATALOG_TEST_POSTGRES_URL");
         if (postgres == null || postgres.isBlank()) {
             return Stream.of(h2);
         }
@@ -85,9 +85,9 @@ class CouponDisplayRepositoryTest {
                 new Db(
                         "postgres",
                         postgres,
-                        System.getenv().getOrDefault("SHOPPING_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("CATALOG_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("SHOPPING_TEST_POSTGRES_PASSWORD", "postgres")));
+                                .getOrDefault("CATALOG_TEST_POSTGRES_PASSWORD", "postgres")));
     }
 
     @ParameterizedTest

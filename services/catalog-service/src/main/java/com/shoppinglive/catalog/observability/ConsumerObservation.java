@@ -1,7 +1,7 @@
 package com.shoppinglive.catalog.observability;
 
+import com.shoppinglive.catalog.client.commercecore.SalesInfo;
 import com.shoppinglive.common.observability.BusinessTelemetry;
-import com.shoppinglive.catalog.client.commerce.SalesInfo;
 import io.micrometer.core.instrument.Tags;
 import java.util.Map;
 import org.aspectj.lang.ProceedingJoinPoint;

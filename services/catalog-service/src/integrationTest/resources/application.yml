@@ -5,7 +5,7 @@
 # 실제 Postgres 연동 확인은 local 프로필로 기동해서 한다.
 spring:
   datasource:
-    url: jdbc:h2:mem:shopping;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:mem:catalog;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -23,23 +23,14 @@ spring:
       # 테스트 classpath 에 kafka 가 있어도 broker 에 붙지 않도록 listener 컨테이너를 기동하지 않는다.
       # 임베디드 broker 테스트는 이 값을 true 로 다시 켠다.
       auto-startup: false
-  servlet:
-    multipart:
-      max-file-size: 6MB
-      max-request-size: 7MB
-
-shopping:
-  # main 과 같은 기본값. HTTP 경로를 검증하는 테스트는 shopping.sales.source=http 를 명시한다.
+catalog:
+  # main 과 같은 기본값. HTTP 경로를 검증하는 테스트는 catalog.sales.source=http 를 명시한다.
   sales:
     source: replica
   sales-client:
     service-token: test-shopping-commerce-credential-00000001
     # 실제 Commerce 대신 연결 거절을 재현하는 루프백 주소다. HTTP 장애 계약 테스트는 이 주소로 연결을 시도한다.
     base-url: http://127.0.0.1:1
-  image:
-    storage:
-      # 개발자 PC 의 로컬 이미지 폴더를 테스트가 더럽히지 않도록 임시 폴더를 쓴다.
-      dir: ${java.io.tmpdir}/shopping-images-test
 
 management:
   endpoints:

@@ -1,6 +1,6 @@
 package com.shoppinglive.catalog.product.dto;
 
-import com.shoppinglive.catalog.client.commerce.SalesDisplayStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
 
 /**

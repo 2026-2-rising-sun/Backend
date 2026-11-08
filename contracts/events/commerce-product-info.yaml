@@ -1,0 +1,147 @@
+asyncapi: 3.1.0
+info:
+  title: CommerceCore 상품 snapshot 이벤트 계약
+  version: 1.0.0
+  description: 상품 원본과 common Outbox를 같은 트랜잭션으로 저장하고 Catalog 공개 조회 사본에 비동기 반영한다.
+defaultContentType: application/json
+channels:
+  productInfo:
+    address: commerce.product-info.v1
+    description: Kafka key는 payload.productId의 10진수 문자열이며 aggregateId와 같다. 최초 등록 version은
+      0이다. 실제 기본정보 변경으로 JPA version이 증가할 때 전체 snapshot을 발행한다. Catalog는 행이 없으면 version
+      0을 포함해 저장하고, 기존 행보다 큰 version만 반영해 중복·역순·동시 최초 전달을 처리한다. occurredAt은 이벤트 생성
+      시각, createdAt/updatedAt은 상품 원본 시각이며 순서 비교에 사용하지 않는다. 대표 이미지 1개의 ID/URL을 전달하며
+      파일은 Core가 제공한다. 기존 commerce.sales-info.v1과 commerce.coupon-info.v1 토픽은 유지한다.
+    messages:
+      PRODUCT_INFO_CHANGED:
+        $ref: '#/components/messages/PRODUCT_INFO_CHANGED'
+operations:
+  publishProductInfo:
+    action: send
+    channel:
+      $ref: '#/channels/productInfo'
+    messages:
+    - $ref: '#/channels/productInfo/messages/PRODUCT_INFO_CHANGED'
+components:
+  messages:
+    PRODUCT_INFO_CHANGED:
+      name: PRODUCT_INFO_CHANGED
+      title: 상품 기본정보 전체 snapshot
+      bindings:
+        kafka:
+          key:
+            type: string
+            pattern: ^[1-9][0-9]*$
+          bindingVersion: 0.5.0
+      payload:
+        $ref: '#/components/schemas/ProductInfoEnvelope'
+      examples:
+      - name: 최초등록버전0
+        payload:
+          eventId: 43d9ea3a-6367-45e0-9a31-93d23bb9cb2c
+          eventType: PRODUCT_INFO_CHANGED
+          schemaVersion: 1
+          source: commercecore-service
+          aggregateId: '7'
+          occurredAt: '2026-11-08T00:00:01Z'
+          payload:
+            productId: 7
+            name: 상품
+            description: 상품 설명
+            category: FASHION
+            mainImageId: 10
+            mainImageUrl: /api/commercecore/v1/product-images/10
+            sellerId: 00000000-0000-0000-0000-000000000003
+            version: 0
+            createdAt: '2026-11-08T00:00:00Z'
+            updatedAt: '2026-11-08T00:00:00Z'
+  schemas:
+    ProductInfoEnvelope:
+      type: object
+      required:
+      - eventId
+      - eventType
+      - schemaVersion
+      - source
+      - aggregateId
+      - occurredAt
+      - payload
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        eventType:
+          const: PRODUCT_INFO_CHANGED
+        schemaVersion:
+          const: 1
+        source:
+          const: commercecore-service
+        aggregateId:
+          type: string
+          pattern: ^[1-9][0-9]*$
+        occurredAt:
+          type: string
+          format: date-time
+        payload:
+          $ref: '#/components/schemas/ProductInfoSnapshot'
+    ProductInfoSnapshot:
+      type: object
+      required:
+      - productId
+      - name
+      - description
+      - category
+      - mainImageId
+      - mainImageUrl
+      - sellerId
+      - version
+      - createdAt
+      - updatedAt
+      properties:
+        productId:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        category:
+          type:
+          - string
+          - 'null'
+          enum:
+          - FASHION
+          - BEAUTY
+          - FOOD
+          - LIVING
+          - DIGITAL
+          - KIDS
+          - ETC
+          - null
+        mainImageId:
+          type: integer
+          minimum: 1
+        mainImageUrl:
+          type: string
+          format: uri-reference
+          minLength: 1
+          maxLength: 2048
+        sellerId:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 36
+        version:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
