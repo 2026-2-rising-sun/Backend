@@ -213,7 +213,8 @@ def classify(changes, full_reason=None):
                 action = "full" if module == "common-module" else "service-build"
                 service = module.removeprefix("services:")
                 source_tags = (tags(change.before) | tags(change.after)) if path.endswith(".java") else set()
-                if "/src/main/resources/db/migration/" in path or "migration" in source_tags:
+                if any(folder in path for folder in ("/src/main/resources/db/migration/",
+                                                       "/src/main/resources/db/payment-migration/")) or "migration" in source_tags:
                     migrations.update(MIGRATION_SERVICES if module == "common-module" else [service])
                 if redis_changed(change):
                     redis.update(["live-service"] if module == "common-module" else [service])

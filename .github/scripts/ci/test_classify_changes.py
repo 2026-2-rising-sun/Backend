@@ -307,6 +307,16 @@ class ServiceBoundaryTests(unittest.TestCase):
                 self.assertEqual(plan["postgres_tasks"], [f":services:{service}:postgresTest"])
                 self.assertTrue(plan["event_samples"])
 
+    def test_payment_isolated_migration_directory_selects_migration_tests(self):
+        """Payment 전용 Flyway 경로의 추가·수정·삭제도 마이그레이션 검사를 선택한다."""
+        path = "services/payment-service/src/main/resources/db/payment-migration/V3__outbox_worker_claim.sql"
+        for before, after in ((None, b"CREATE TABLE example(id bigint)"),
+                              (b"old", b"new"), (b"old", None)):
+            with self.subTest(before=before, after=after):
+                plan = classify([Change(path, before, after)])
+                self.assertEqual(plan["migration_tasks"], [":services:payment-service:migrationTest"])
+                self.assertEqual(plan["postgres_tasks"], [":services:payment-service:postgresTest"])
+
     def test_comment_only_change_does_not_select_postgres(self):
         """주석만 바뀌면 외부 DB를 시작하지 않는다."""
         plan = classify([Change(JAVA, b"class A {}", "// 설명\nclass A {}".encode())])
