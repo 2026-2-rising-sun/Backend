@@ -263,12 +263,18 @@ class MemberCommerceApiTest extends CommerceSecurityTestSupport {
         long paymentId = mapper.readTree(paymentBody).get("paymentId").asLong();
         await().atMost(Duration.ofSeconds(10))
                 .untilAsserted(
-                        () ->
-                                assertThat(
-                                                orders.findByOrderNumber(number)
-                                                        .orElseThrow()
-                                                        .getStatus())
-                                        .isEqualTo(OrderStatus.PAID));
+                        () -> {
+                            // 독립 Payment HTTP 결과를 공개 polling 경로로 Core에 반영한다.
+                            mvc.perform(
+                                            get(
+                                                            "/v1/orders/{number}/payments/{id}",
+                                                            number,
+                                                            paymentId)
+                                                    .header("Authorization", bearer(MEMBER_A)))
+                                    .andExpect(status().isOk());
+                            assertThat(orders.findByOrderNumber(number).orElseThrow().getStatus())
+                                    .isEqualTo(OrderStatus.PAID);
+                        });
         mvc.perform(
                         get("/v1/orders/{number}/payments/{id}", number, paymentId)
                                 .header("Authorization", bearer(MEMBER_A)))
