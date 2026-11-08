@@ -6,9 +6,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -38,7 +38,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-class OrderCreationApiTest extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class OrderCreationApiTest
+        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 810L;
     private static final long PRICE = 15_000L;
@@ -48,7 +49,7 @@ class OrderCreationApiTest extends com.shoppinglive.commercecore.support.Commerc
 
     @Autowired private ObjectMapper objectMapper;
 
-    @Autowired private InMemoryShoppingClientStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub shoppingClientStub;
 
     @Autowired private OrderJpaRepository orderRepository;
 

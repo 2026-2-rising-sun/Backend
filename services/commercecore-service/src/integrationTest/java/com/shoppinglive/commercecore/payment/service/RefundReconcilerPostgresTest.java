@@ -8,7 +8,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.service.DurableMockRefundGateway;
+import com.shoppinglive.payment.service.MockRefundScenario;
+import com.shoppinglive.payment.service.RefundMockEngine;
+import com.shoppinglive.payment.service.RefundRecoveryStore;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -20,23 +24,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest(
         properties = {
-            "commerce.refunds.execution-enabled=true",
-            "commerce.refunds.recovery.initial-delay=PT24H"
+            "commercecore.refunds.execution-enabled=true",
+            "commercecore.refunds.recovery.initial-delay=PT24H"
         })
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundReconcilerPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
-    @Autowired RefundReconciler reconciler;
-    @Autowired RefundExecutionService executions;
+    @Autowired RefundBoundaryReconciler reconciler;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired RefundRecoveryStore recovery;
-    @MockitoBean RefundMockEngine mockEngine;
-    @MockitoSpyBean DurableMockRefundGateway gateway;
+    @Autowired RefundMockEngine mockEngine;
+    @Autowired DurableMockRefundGateway gateway;
 
     @DisplayName("메모리 콜백이 없어도 저장된 대기 환불을 복구한다")
     @Test
@@ -78,7 +80,8 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                     pool.submit(
                             () -> {
                                 start.await();
-                                return new RefundReconciler(recovery, executions).reconcileDue();
+                                return new RefundBoundaryReconciler(recovery, executions)
+                                        .reconcileDue();
                             });
             start.countDown();
             assertThat(first.get(15, TimeUnit.SECONDS) + second.get(15, TimeUnit.SECONDS))
@@ -89,7 +92,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 .cumulativeRefundAmount())
                 .isEqualTo(20000L);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -116,12 +119,12 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                         request.refundAmount(),
                                         MockRefundScenario.UNKNOWN_AFTER_RESULT))
                 .isInstanceOf(MockRefundResultUnknownException.class);
-        jdbc.update(
-                "UPDATE refund_request SET lease_until=clock_timestamp()-INTERVAL '1 second',"
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET lease_until=clock_timestamp()-INTERVAL '1 second',"
                         + "requested_at=clock_timestamp()-INTERVAL '10 days' WHERE id=?",
                 request.id());
         org.mockito.Mockito.clearInvocations(gateway);
-        assertThat(new RefundReconciler(recovery, executions).reconcileDue()).isEqualTo(1);
+        assertThat(new RefundBoundaryReconciler(recovery, executions).reconcileDue()).isEqualTo(1);
         verify(gateway, never()).execute(anyLong(), anyLong(), any(MockRefundScenario.class));
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
@@ -134,16 +137,16 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         var request =
                 refunds.request(MEMBER_A, group.groupNumber(), "scan-exhausted", List.of(a.getId()))
                         .refund();
-        jdbc.update(
-                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
                 request.id());
         for (int minute = 0; minute < 3; minute++) {
             makeRefundDue(request.id());
             assertThat(reconciler.reconcileDue()).isZero();
             assertThat(
-                            jdbc.queryForObject(
+                            paymentServer.jdbc.queryForObject(
                                     "SELECT EXTRACT(EPOCH FROM next_action_at-clock_timestamp()) > 55 "
-                                            + "FROM refund_request WHERE id=?",
+                                            + "FROM refund_execution WHERE id=?",
                                     Boolean.class,
                                     request.id()))
                     .isTrue();
@@ -174,8 +177,8 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 "scan-late-result",
                                 List.of(a.getId()))
                         .refund();
-        jdbc.update(
-                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
                 request.id());
         reconciler.reconcileDue();
         gateway.execute(request.id(), request.refundAmount(), MockRefundScenario.FAILED);
@@ -186,8 +189,8 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.FAILED);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT retry_count FROM refund_request WHERE id=?",
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT retry_count FROM refund_execution WHERE id=?",
                                 Integer.class,
                                 request.id()))
                 .isEqualTo(3);
@@ -234,8 +237,8 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 "scan-query-failure",
                                 List.of(a.getId()))
                         .refund();
-        jdbc.update(
-                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
                 request.id());
         org.mockito.Mockito.doThrow(new IllegalStateException("일시적인 조회 실패"))
                 .when(gateway)
@@ -243,9 +246,9 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         assertThat(reconciler.reconcileDue()).isZero();
         verify(gateway, org.mockito.Mockito.times(1)).find(request.id());
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM next_action_at-clock_timestamp()) > 55 "
-                                        + "FROM refund_request WHERE id=?",
+                                        + "FROM refund_execution WHERE id=?",
                                 Boolean.class,
                                 request.id()))
                 .isTrue();
@@ -254,7 +257,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                 .isEqualTo(RefundStatus.UNKNOWN);
     }
 
-    @DisplayName("마지막 실행 재시도 후 반영에 실패해도 1분 뒤 결과 조회만 예약한다")
+    @DisplayName("마지막 PG 재시도 후 Core 반영이 실패해도 Payment 성공과 결과 재적용 경로를 보존한다")
     @Test
     void applicationFailureAfterTheLastExecutionRetryAlsoSchedulesResultOnlyAfterOneMinute() {
         var group = createAndPay();
@@ -282,18 +285,19 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(RuntimeException.class);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT retry_count FROM refund_request WHERE id=?",
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT retry_count FROM refund_execution WHERE id=?",
                                 Integer.class,
                                 request.id()))
                 .isEqualTo(3);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT EXTRACT(EPOCH FROM next_action_at-clock_timestamp()) > 55 "
-                                        + "FROM refund_request WHERE id=?",
-                                Boolean.class,
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT status FROM refund_execution WHERE id=?",
+                                String.class,
                                 request.id()))
-                .isTrue();
+                .isEqualTo("SUCCESS");
+        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+                .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(gateway.find(request.id())).isNotNull();
         assertThat(reconciler.reconcileDue()).isZero();
     }

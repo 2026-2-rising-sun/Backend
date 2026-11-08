@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
 import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.payment.service.MockRefundScenario;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -17,10 +17,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
-    @Autowired RefundExecutionService executions;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
 
     @DisplayName("환불 성공은 대상 주문을 환불 처리하고 판매 재고를 한 번만 복구한다")
     @Test
@@ -48,7 +48,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThatThrownBy(() -> refunds.getSeller(SELLER_B, request.id()))
                 .isInstanceOf(BusinessException.class);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -84,7 +84,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                                                 .getPaymentId())
                                 .orElseThrow()
                                 .getStatus())
-                .isEqualTo(PaymentStatus.SUCCESS);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
     }
 
     @DisplayName("결제 묶음은 모든 주문이 환불된 뒤에만 환불 완료로 변경한다")
@@ -143,7 +143,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(orders.findById(target.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -161,7 +161,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(stocks.findById(target.getSalesInfoId()).orElseThrow().getAvailable())
                 .isEqualTo(5);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -221,7 +221,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.FAILED);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT outcome FROM mock_refund_result WHERE refund_request_id=?",
                                 String.class,
                                 request.id()))
@@ -245,7 +245,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -274,7 +274,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -285,7 +285,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -302,12 +302,13 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         var second =
                 refunds.request(MEMBER_A, group.groupNumber(), "execute-cap-b", List.of(b.getId()))
                         .refund();
-        jdbc.update("UPDATE refund_request SET refund_amount=24000 WHERE id=?", first.id());
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET refund_amount=24000 WHERE id=?", first.id());
 
         assertThatThrownBy(() -> executions.execute(second.id()))
                 .isInstanceOf(BusinessException.class);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 second.id()))
@@ -317,21 +318,17 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
     @DisplayName("0원 환불은 Mock 게이트웨이를 호출하지 않는다")
     @Test
     void zeroAmountRefundDoesNotCallTheMockGateway() {
-        var group = createAndPay();
+        var group = createAndPayWithCoupon(25000);
         var request =
                 refunds.request(MEMBER_A, group.groupNumber(), "execute-zero", List.of(a.getId()))
                         .refund();
-        jdbc.update(
-                "UPDATE refund_target_order SET refund_amount=0 WHERE refund_request_id=?",
-                request.id());
-        jdbc.update("UPDATE refund_request SET refund_amount=0 WHERE id=?", request.id());
-
+        assertThat(request.refundAmount()).isZero();
         assertThat(executions.execute(request.id())).isTrue();
 
         assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))

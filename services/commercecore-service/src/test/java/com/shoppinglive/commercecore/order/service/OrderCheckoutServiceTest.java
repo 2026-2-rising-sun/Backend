@@ -6,11 +6,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.only;
 import static org.mockito.Mockito.verify;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
-import com.shoppinglive.commercecore.client.shopping.ShoppingUnavailableException;
 import com.shoppinglive.commercecore.order.entity.OrderCheckout;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -26,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +38,7 @@ class OrderCheckoutServiceTest {
 
     @Mock private SalesStockJpaRepository salesStockRepository;
 
-    @Mock private ShoppingClient shoppingClient;
+    @Mock private ProductLookup shoppingClient;
 
     private OrderCheckoutService orderCheckoutService;
 
@@ -181,7 +181,7 @@ class OrderCheckoutServiceTest {
     }
 
     @Test
-    @DisplayName("Shopping에 상품이 없으면 주문서 조회는 404로 응답한다")
+    @DisplayName("Core 상품 원본이 없으면 주문서 조회는 404로 응답한다")
     void returns404WhenShoppingProductIsMissing() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
@@ -192,14 +192,14 @@ class OrderCheckoutServiceTest {
 
     /** 상품명을 확인하지 못한 채 주문서를 그리면 무엇을 사는지 모르는 화면이 된다. 장애를 "상품 없음" 으로 단정하지도 않는다. */
     @Test
-    @DisplayName("Shopping 장애를 404로 바꾸지 않고 전파한다")
+    @DisplayName("Core 상품 저장소 장애를 상품 없음으로 바꾸지 않고 전파한다")
     void propagatesShoppingFailureWithoutMappingItTo404() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
         given(shoppingClient.findProduct(PRODUCT_ID))
-                .willThrow(new ShoppingUnavailableException("shopping timeout"));
+                .willThrow(new DataAccessResourceFailureException("shopping timeout"));
 
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 1))
-                .isInstanceOf(ShoppingUnavailableException.class)
+                .isInstanceOf(DataAccessResourceFailureException.class)
                 .isNotInstanceOf(ProductNotFoundException.class);
     }
 

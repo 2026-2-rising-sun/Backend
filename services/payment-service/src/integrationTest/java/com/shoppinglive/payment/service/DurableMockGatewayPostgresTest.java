@@ -1,12 +1,12 @@
-package com.shoppinglive.commercecore.payment.service;
+package com.shoppinglive.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.shoppinglive.commercecore.payment.entity.MockPaymentResultUnknownException;
-import com.shoppinglive.commercecore.payment.entity.MockPaymentResultUnknownException.Reason;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
+import com.shoppinglive.payment.entity.MockPaymentResultUnknownException;
+import com.shoppinglive.payment.entity.MockPaymentResultUnknownException.Reason;
+import com.shoppinglive.payment.entity.PaymentScenario;
+import com.shoppinglive.payment.entity.PaymentStatus;
 import java.sql.Timestamp;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -26,7 +26,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class DurableMockGatewayPostgresTest {
     private Flyway flyway;
     private JdbcTemplate jdbc;
@@ -36,15 +36,15 @@ class DurableMockGatewayPostgresTest {
     @BeforeEach
     void createOwnedSchema() {
         String schema = "payment_gateway_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("PAYMENT_TEST_POSTGRES_URL");
         var source =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
-                        System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_PASSWORD", "postgres"));
         flyway =
                 Flyway.configure()
+                        .locations("classpath:db/payment-migration")
                         .dataSource(source)
                         .schemas(schema)
                         .defaultSchema(schema)
@@ -53,6 +53,13 @@ class DurableMockGatewayPostgresTest {
         flyway.migrate();
         jdbc = new JdbcTemplate(source);
         manager = new DataSourceTransactionManager(source);
+        for (long id = 11; id <= 14; id++)
+            jdbc.update(
+                    "INSERT INTO payment_attempt(id,request_id,payment_id,order_id,reference_number,amount,scenario,status,requested_at,scheduled_resolve_at,created_at,updated_at) VALUES (?,?,?,1,?,10000,'INSTANT_SUCCESS','PROCESSING',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                    id,
+                    UUID.randomUUID().toString(),
+                    id,
+                    "PG-" + id);
         gateway = new DurableMockGateway(jdbc, manager);
     }
 

@@ -3,24 +3,25 @@ package com.shoppinglive.commercecore.payment.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.payment.service.DurableMockGateway;
+import com.shoppinglive.payment.service.MockPaymentEngine;
+import com.shoppinglive.payment.service.PaymentRecoveryStore;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
@@ -33,8 +34,8 @@ import org.springframework.test.context.bean.override.mockito.*;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
-class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
+class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     @Autowired PaymentService service;
     @Autowired PaymentGroupService groups;
     @Autowired PaymentGroupRepository groupRows;
@@ -44,12 +45,13 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     @Autowired OrderJpaRepository orders;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
-    @MockitoBean MockPaymentEngine engine;
-    @MockitoSpyBean DurableMockGateway gateway;
-    @MockitoSpyBean PaymentRecoveryStore recovery;
+    @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
+    @Autowired MockPaymentEngine engine;
+    @Autowired DurableMockGateway gateway;
+    @Autowired PaymentRecoveryStore recovery;
     static final String COUPON = "aaaaaaaa-1111-4111-8111-111111111111";
     long stockId;
 
@@ -76,8 +78,10 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         if (jdbc == null) {
             return;
         }
-        jdbc.update("DELETE FROM mock_gateway_result");
+        paymentServer.jdbc.update("DELETE FROM event_outbox");
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         attempts.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         groupRows.deleteAll();
         jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON);
@@ -90,7 +94,7 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         shopping.clear();
     }
 
-    PaymentAttempt start(PaymentScenario scenario) {
+    PaymentExecution start(PaymentScenario scenario) {
         var item = cart.add(MEMBER_A, 99001L, 1);
         var group =
                 groups.create(
@@ -109,9 +113,8 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     }
 
     void due(long id) {
-        jdbc.update(
-                "UPDATE payment_attempt SET scheduled_resolve_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
-                id);
+        paymentServer.jdbc.update(
+                "UPDATE payment_attempt SET scheduled_resolve_at=clock_timestamp() WHERE id=?", id);
     }
 
     String coupon() {
@@ -132,37 +135,41 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     @Test
     void lostSuccessResponseKeepsReservationsAndExistingApprovalAppliesWithoutRetry() {
         var p = start(PaymentScenario.SUCCESS_RESPONSE_LOST);
-        assertThat(service.resolvePayment(p.getId())).isFalse();
+        assertThat(service.refresh(p.getId())).isFalse();
         held(p.getId());
         assertThat(attempts.findById(p.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.UNKNOWN);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.UNKNOWN);
         due(p.getId());
-        assertThat(service.resolvePayment(p.getId())).isTrue();
+        assertThat(service.refresh(p.getId())).isTrue();
         assertThat(coupon()).isEqualTo("USED");
         assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT retry_count FROM payment_attempt WHERE id=?",
                                 Integer.class,
                                 p.getId()))
                 .isZero();
-        verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
-        assertThat(service.resolvePayment(p.getId())).isFalse();
+        verify(gateway, times(1))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
+        assertThat(service.refresh(p.getId())).isFalse();
     }
 
     @DisplayName("실패 응답이 유실되면 확정 실패를 조회할 때까지 예약을 해제하지 않는다")
     @Test
     void lostFailureResponseDoesNotReleaseUntilAuthoritativeFailureIsRead() {
         var p = start(PaymentScenario.FAILURE_RESPONSE_LOST);
-        assertThat(service.resolvePayment(p.getId())).isFalse();
+        assertThat(service.refresh(p.getId())).isFalse();
         held(p.getId());
         due(p.getId());
-        assertThat(service.resolvePayment(p.getId())).isTrue();
+        assertThat(service.refresh(p.getId())).isTrue();
         assertThat(coupon()).isEqualTo("AVAILABLE");
         assertThat(stocks.findById(stockId).orElseThrow().getAvailable()).isEqualTo(5);
         assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
         assertThat(attempts.findById(p.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.FAILED);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.FAILED);
     }
 
     @DisplayName("실행 네 번이 실패하면 한도를 소진하고 저장소 재생성 후에는 조회만 수행한다")
@@ -171,30 +178,40 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
         for (int i = 0; i < 4; i++) {
             due(p.getId());
-            assertThat(service.resolvePayment(p.getId())).isFalse();
+            assertThat(service.refresh(p.getId())).isFalse();
             held(p.getId());
             assertThat(
-                            jdbc.queryForObject(
+                            paymentServer.jdbc.queryForObject(
                                     "SELECT retry_count FROM payment_attempt WHERE id=?",
                                     Integer.class,
                                     p.getId()))
                     .isEqualTo(i);
             double delta =
-                    jdbc.queryForObject(
+                    paymentServer.jdbc.queryForObject(
                             "SELECT EXTRACT(EPOCH FROM scheduled_resolve_at-clock_timestamp()) FROM payment_attempt WHERE id=?",
                             Double.class,
                             p.getId());
             assertThat(delta).isBetween(-1.0, i == 3 ? 60.0 : (double) (1 << i));
         }
-        verify(gateway, times(4)).authorize(p.getId(), p.getScenario());
+        verify(gateway, times(4))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
         due(p.getId());
-        assertThat(service.resolvePayment(p.getId())).isFalse();
+        assertThat(service.refresh(p.getId())).isFalse();
         held(p.getId());
-        verify(gateway, times(4)).authorize(p.getId(), p.getScenario());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
+        verify(gateway, times(4))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
                 .isZero();
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM scheduled_resolve_at-clock_timestamp()) FROM payment_attempt WHERE id=?",
                                 Double.class,
                                 p.getId()))
@@ -205,18 +222,22 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     @Test
     void queryFailureAtExhaustionKeepsOneMinuteIntervalAndDoesNotExecute() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET status='UNKNOWN',execution_started_at=requested_at,retry_count=3 WHERE id=?",
                 p.getId());
         doThrow(new IllegalStateException("결제 제공자 결과 조회를 사용할 수 없습니다."))
                 .when(gateway)
                 .find(p.getId());
-        assertThatThrownBy(() -> service.resolvePayment(p.getId()))
+        assertThatThrownBy(() -> service.refresh(p.getId()))
                 .isInstanceOf(IllegalStateException.class);
         held(p.getId());
-        verify(gateway, never()).authorize(p.getId(), p.getScenario());
+        verify(gateway, never())
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM scheduled_resolve_at-clock_timestamp()) FROM payment_attempt WHERE id=?",
                                 Double.class,
                                 p.getId()))
@@ -228,20 +249,26 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     void approvalSurvivesBusinessRollbackAndDoesNotConsumeAnotherInvocation() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
         jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", stockId);
-        assertThatThrownBy(() -> service.resolvePayment(p.getId()))
+        assertThatThrownBy(() -> service.refresh(p.getId()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(coupon()).isEqualTo("RESERVED");
         assertThat(orders.findAll())
                 .extracting(o -> o.getStatus().name())
                 .containsOnly("PAYMENT_CONFIRMING");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
                 .isEqualTo(1);
         jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", stockId);
         due(p.getId());
-        assertThat(service.resolvePayment(p.getId())).isTrue();
-        verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
+        assertThat(service.refresh(p.getId())).isTrue();
+        verify(gateway, times(1))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT retry_count FROM payment_attempt WHERE id=?",
                                 Integer.class,
                                 p.getId()))
@@ -255,22 +282,32 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
         doAnswer(
                         inv -> {
-                            jdbc.update(
+                            paymentServer.jdbc.update(
                                     "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                                     p.getId());
                             return inv.callRealMethod();
                         })
                 .when(recovery)
                 .complete(any(), eq("SUCCESS"));
-        assertThatThrownBy(() -> service.resolvePayment(p.getId()))
-                .isInstanceOf(IllegalStateException.class);
+        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentExecutionResolved'",
+                                Long.class))
+                .isZero();
         held(p.getId());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
                 .isEqualTo(1);
         doCallRealMethod().when(recovery).complete(any(), eq("SUCCESS"));
         due(p.getId());
-        assertThat(service.resolvePayment(p.getId())).isTrue();
-        verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
+        assertThat(service.refresh(p.getId())).isTrue();
+        verify(gateway, times(1))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
     }
 
     @DisplayName("실행 중단은 제공자 호출 전에 실행 예산 한 번을 소비한다")
@@ -279,21 +316,25 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
         var lease = recovery.claim(p.getId(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(recovery.beginInvocation(lease)).contains(0);
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 p.getId());
-        assertThat(service.resolvePayment(p.getId())).isFalse();
+        assertThat(service.refresh(p.getId())).isFalse();
         held(p.getId());
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT retry_count FROM payment_attempt WHERE id=?",
                                 Integer.class,
                                 p.getId()))
                 .isEqualTo(1);
-        verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
+        verify(gateway, times(1))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
     }
 
-    @Autowired PaymentDelayReconciler scanner;
+    @Autowired PaymentBoundaryReconciler scanner;
 
     @DisplayName("스캐너는 만료된 처리 임대를 복구하고 저장된 승인을 한 번만 반영한다")
     @Test
@@ -301,18 +342,24 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
         var lease = recovery.claim(p.getId(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(recovery.beginInvocation(lease)).contains(0);
-        gateway.authorize(p.getId(), p.getScenario());
+        gateway.authorize(
+                p.getId(),
+                com.shoppinglive.payment.entity.PaymentScenario.valueOf(p.getScenario().name()));
         assertThat(scanner.reconcileOverdue()).isZero();
         held(p.getId());
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 p.getId());
         assertThat(scanner.reconcileOverdue()).isEqualTo(1);
         assertThat(scanner.reconcileOverdue()).isZero();
-        verify(gateway, times(1)).authorize(p.getId(), p.getScenario());
+        verify(gateway, times(1))
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
         assertThat(coupon()).isEqualTo("USED");
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT retry_count FROM payment_attempt WHERE id=?",
                                 Integer.class,
                                 p.getId()))
@@ -323,14 +370,18 @@ class PaymentRecoveryPostgresTest extends CommerceSecurityTestSupport {
     @Test
     void scannerAtExhaustionQueriesWithoutNewAuthorizationAndSchedulesOneMinute() {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET status='UNKNOWN',execution_started_at=requested_at,retry_count=3 WHERE id=?",
                 p.getId());
         assertThat(scanner.reconcileOverdue()).isZero();
         held(p.getId());
-        verify(gateway, never()).authorize(p.getId(), p.getScenario());
+        verify(gateway, never())
+                .authorize(
+                        p.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                p.getScenario().name()));
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM scheduled_resolve_at-clock_timestamp()) FROM payment_attempt WHERE id=?",
                                 Double.class,
                                 p.getId()))

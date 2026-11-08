@@ -1,10 +1,10 @@
-package com.shoppinglive.commercecore.payment.service;
+package com.shoppinglive.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.payment.service.RefundRecoveryStore.Lease;
+import com.shoppinglive.payment.entity.RefundStatus;
+import com.shoppinglive.payment.service.RefundRecoveryStore.Lease;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class RefundRecoveryStorePostgresTest {
     private static final Duration LEASE = Duration.ofMinutes(1);
     private Flyway flyway;
@@ -38,45 +38,43 @@ class RefundRecoveryStorePostgresTest {
     @BeforeEach
     void migrateLegacyRequestsInOwnedSchema() {
         String schema = "refund_recovery_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("PAYMENT_TEST_POSTGRES_URL");
         var source =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
-                        System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_PASSWORD", "postgres"));
         flyway =
                 Flyway.configure()
+                        .locations("classpath:db/payment-migration")
                         .dataSource(source)
                         .schemas(schema)
                         .defaultSchema(schema)
                         .cleanDisabled(false)
                         .load();
         Flyway.configure()
+                .locations("classpath:db/payment-migration")
                 .dataSource(source)
                 .schemas(schema)
                 .defaultSchema(schema)
-                .target("13")
                 .load()
                 .migrate();
         jdbc = new JdbcTemplate(source);
         manager = new DataSourceTransactionManager(source);
         jdbc.update(
-                """
-            INSERT INTO payment_group(id,group_number,member_id,request_key,fingerprint,total_amount,payable_amount,
-                status,expires_at,created_at,updated_at)
-            VALUES (1,'lease-group','member','group-key','fingerprint',10000,10000,'PAID',
-                CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
-            """);
+                "INSERT INTO payment_attempt(id,request_id,payment_id,order_id,reference_number,amount,scenario,status,requested_at,scheduled_resolve_at,created_at,updated_at) VALUES (1,?,1,1,'PG',10000,'INSTANT_SUCCESS','SUCCESS',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                UUID.randomUUID().toString());
         for (int id = 1; id <= 4; id++) {
             String status = List.of("PROCESSING", "UNKNOWN", "SUCCESS", "FAILED").get(id - 1);
             jdbc.update(
                     """
-                INSERT INTO refund_request(id,payment_group_id,member_id,idempotency_key,request_fingerprint,
+                INSERT INTO refund_execution(id,request_id,core_refund_request_id,payment_id,order_id,payment_group_id,reference_number,idempotency_key,request_fingerprint,
                     refund_amount,status,requested_at,created_at,updated_at)
-                VALUES (?,1,'member',?, ?,2500,?,CURRENT_TIMESTAMP-INTERVAL '10 days',
+                VALUES (?,?,?,1,1,1,'PG',?, ?,2500,?,CURRENT_TIMESTAMP-INTERVAL '10 days',
                     CURRENT_TIMESTAMP-INTERVAL '10 days',CURRENT_TIMESTAMP-INTERVAL '10 days')
                 """,
+                    id,
+                    UUID.randomUUID().toString(),
                     id,
                     "key-" + id,
                     "fingerprint-" + id,
@@ -84,8 +82,9 @@ class RefundRecoveryStorePostgresTest {
         }
         originalUpdatedAt =
                 jdbc.queryForObject(
-                        "SELECT updated_at FROM refund_request WHERE id=2", Timestamp.class);
-        flyway.migrate();
+                        "SELECT updated_at FROM refund_execution WHERE id=2", Timestamp.class);
+        jdbc.update(
+                "UPDATE refund_execution SET execution_started_at=requested_at WHERE status IN ('UNKNOWN','SUCCESS','FAILED')");
         store = new RefundRecoveryStore(jdbc, manager);
     }
 
@@ -102,31 +101,34 @@ class RefundRecoveryStorePostgresTest {
     void migrationPreservesLegacyBusinessDataAndConstrainsRecoveryMetadata() {
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT updated_at FROM refund_request WHERE id=2",
+                                "SELECT updated_at FROM refund_execution WHERE id=2",
                                 Timestamp.class))
                 .isEqualTo(originalUpdatedAt);
-        assertThat(jdbc.queryForList("SELECT status FROM refund_request ORDER BY id", String.class))
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT status FROM refund_execution ORDER BY id", String.class))
                 .containsExactly("PROCESSING", "UNKNOWN", "SUCCESS", "FAILED");
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT execution_started_at=requested_at FROM refund_request WHERE id=2",
+                                "SELECT execution_started_at=requested_at FROM refund_execution WHERE id=2",
                                 Boolean.class))
                 .isTrue();
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT execution_started_at IS NULL FROM refund_request WHERE id=1",
+                                "SELECT execution_started_at IS NULL FROM refund_execution WHERE id=1",
                                 Boolean.class))
                 .isTrue();
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT SUM(retry_count) FROM refund_request", Integer.class))
+                                "SELECT SUM(retry_count) FROM refund_execution", Integer.class))
                 .isZero();
-        assertThatThrownBy(() -> jdbc.update("UPDATE refund_request SET retry_count=4 WHERE id=1"))
+        assertThatThrownBy(
+                        () -> jdbc.update("UPDATE refund_execution SET retry_count=4 WHERE id=1"))
                 .isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(
                         () ->
                                 jdbc.update(
-                                        "UPDATE refund_request SET lease_token='orphan' WHERE id=1"))
+                                        "UPDATE refund_execution SET lease_token='orphan' WHERE id=1"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -159,7 +161,7 @@ class RefundRecoveryStorePostgresTest {
         assertThat(store.claim(2, LEASE)).isEmpty();
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT status FROM refund_request WHERE id=2", String.class))
+                                "SELECT status FROM refund_execution WHERE id=2", String.class))
                 .isEqualTo("UNKNOWN");
     }
 
@@ -176,7 +178,7 @@ class RefundRecoveryStorePostgresTest {
                                             .executeWithoutResult(
                                                     tx -> {
                                                         jdbc.queryForObject(
-                                                                "SELECT id FROM refund_request WHERE id=1 FOR UPDATE",
+                                                                "SELECT id FROM refund_execution WHERE id=1 FOR UPDATE",
                                                                 Long.class);
                                                         locked.countDown();
                                                         try {
@@ -246,7 +248,8 @@ class RefundRecoveryStorePostgresTest {
                         });
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT lease_token FROM refund_request WHERE id=2", String.class))
+                                "SELECT lease_token FROM refund_execution WHERE id=2",
+                                String.class))
                 .isEqualTo(lease.token());
         var recreated = new RefundRecoveryStore(jdbc, manager);
         assertThat(recreated.claim(2, LEASE)).isEmpty();
@@ -259,7 +262,7 @@ class RefundRecoveryStorePostgresTest {
 
     private void expire(long requestId) {
         jdbc.update(
-                "UPDATE refund_request SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
+                "UPDATE refund_execution SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 requestId);
     }
 }

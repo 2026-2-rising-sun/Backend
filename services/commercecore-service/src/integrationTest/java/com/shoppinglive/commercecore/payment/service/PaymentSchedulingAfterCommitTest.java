@@ -13,12 +13,13 @@ import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.payment.service.MockPaymentEngine;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
@@ -27,18 +28,21 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 커밋 전/롤백 시 예약하지 않고, 커밋 후에만 실제 비동기 결제를 시작하는지 검증한다. */
 @SpringBootTest
 class PaymentSchedulingAfterCommitTest
         extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+    @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
+    @Autowired PaymentDeliveryStore deliveries;
+    @Autowired PaymentBoundaryReconciler boundary;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private static final long PRODUCT_ID = 510L;
     private static final String ORDER_NUMBER = "OD-COMMIT-1";
 
-    @MockitoSpyBean private MockPaymentEngine mockPaymentEngine;
+    @Autowired private MockPaymentEngine mockPaymentEngine;
 
     @Autowired private DevPaymentScenarioRegistry devRegistry;
 
@@ -58,6 +62,7 @@ class PaymentSchedulingAfterCommitTest
 
     @BeforeEach
     void setUp() {
+        paymentServer.reset();
         clean();
         clearInvocations(mockPaymentEngine);
 
@@ -85,7 +90,9 @@ class PaymentSchedulingAfterCommitTest
     }
 
     private void clean() {
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         paymentAttemptRepository.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
@@ -101,6 +108,7 @@ class PaymentSchedulingAfterCommitTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order order =
                                     orderRepository.findByOrderNumber(ORDER_NUMBER).orElseThrow();
                             assertThat(order.getStatus())
@@ -123,6 +131,7 @@ class PaymentSchedulingAfterCommitTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order order =
                                     orderRepository.findByOrderNumber(ORDER_NUMBER).orElseThrow();
                             assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
@@ -138,13 +147,12 @@ class PaymentSchedulingAfterCommitTest
     @DisplayName("트랜잭션이 롤백되면 결제 처리를 예약하지 않는다")
     @Test
     void doesNotSchedulePaymentWhenTransactionRollsBack() {
+        devRegistry.set(ORDER_NUMBER, PaymentScenario.INSTANT_SUCCESS);
         try {
             transactionTemplate.executeWithoutResult(
                     status -> {
                         startPaymentWithScenario(
-                                ORDER_NUMBER,
-                                "11111111-1111-4111-8111-111111111111",
-                                PaymentScenario.INSTANT_SUCCESS);
+                                ORDER_NUMBER, "11111111-1111-4111-8111-111111111111", null);
                         throw new IllegalStateException("의도적 롤백");
                     });
         } catch (IllegalStateException expected) {
@@ -162,16 +170,18 @@ class PaymentSchedulingAfterCommitTest
 
     /** 바깥 트랜잭션 안에서는 예약 호출이 없고, 반환 후 커밋된 시점에는 한 번 호출됐음을 확인한다. */
     private void startPaymentInsideLongTransaction(PaymentScenario scenario) {
+        devRegistry.set(ORDER_NUMBER, scenario);
         transactionTemplate.executeWithoutResult(
                 status -> {
                     startPaymentWithScenario(
-                            ORDER_NUMBER, "11111111-1111-4111-8111-111111111111", scenario);
+                            ORDER_NUMBER, "11111111-1111-4111-8111-111111111111", null);
                     verify(mockPaymentEngine, never()).schedule(anyLong(), any());
                 });
-        verify(mockPaymentEngine).schedule(anyLong(), any());
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> verify(mockPaymentEngine).schedule(anyLong(), any()));
     }
 
-    private com.shoppinglive.commercecore.payment.entity.PaymentAttempt startPaymentWithScenario(
+    private com.shoppinglive.commercecore.payment.dto.PaymentExecution startPaymentWithScenario(
             String number, String memberId, PaymentScenario scenario) {
         if (scenario != null) {
             devRegistry.set(number, scenario);

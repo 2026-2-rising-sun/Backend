@@ -16,10 +16,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundExecutionConcurrencyPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
-    @Autowired RefundExecutionService executions;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
 
     @DisplayName("환불 요청 하나를 동시에 실행해도 게이트웨이 결과 하나만 생성한다")
     @Test
@@ -54,7 +54,7 @@ class RefundExecutionConcurrencyPostgresTest extends RefundTestSupport {
         }
 
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))

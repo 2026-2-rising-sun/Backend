@@ -6,10 +6,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -39,7 +39,7 @@ class OrderCreationConstraintIntegrationTest extends CommerceSecurityTestSupport
     @Autowired private OrderJpaRepository orders;
     @Autowired private SalesJpaRepository sales;
     @Autowired private SalesStockJpaRepository stocks;
-    @Autowired private InMemoryShoppingClientStub shopping;
+    @Autowired private InMemoryProductLookupStub shopping;
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean private OrderNumberGenerator numbers;
     private Long salesId;

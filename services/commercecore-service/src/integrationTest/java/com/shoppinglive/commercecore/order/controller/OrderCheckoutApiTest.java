@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -46,13 +46,14 @@ import org.springframework.test.web.servlet.ResultActions;
             "/db/migration/V6__member_coupons.sql"
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
-class OrderCheckoutApiTest extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+class OrderCheckoutApiTest
+        extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
 
     private static final long PRODUCT_ID = 700L;
 
     @Autowired private MockMvc mockMvc;
 
-    @Autowired private InMemoryShoppingClientStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub shoppingClientStub;
 
     @Autowired private SalesJpaRepository salesRepository;
 
@@ -64,8 +65,7 @@ class OrderCheckoutApiTest extends com.shoppinglive.commercecore.support.Commerc
 
     @Autowired private com.shoppinglive.commercecore.order.repository.PaymentGroupRepository groups;
 
-    @Autowired
-    private com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository payments;
+    @Autowired private com.shoppinglive.payment.repository.PaymentAttemptJpaRepository payments;
 
     private static final String COUPON_ID = "44444444-4444-4444-8444-444444444444";
 

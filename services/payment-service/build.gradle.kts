@@ -23,3 +23,5 @@ dependencies {
 }
 
 tasks.named<Jar>("jar") { enabled = true }
+
+tasks.named<Test>("test") { outputs.dir(layout.buildDirectory.dir("contract-samples")) }

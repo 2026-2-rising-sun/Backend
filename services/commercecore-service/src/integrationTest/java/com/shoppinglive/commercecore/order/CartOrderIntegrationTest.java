@@ -3,8 +3,6 @@ package com.shoppinglive.commercecore.order;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
@@ -12,13 +10,15 @@ import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -34,6 +34,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 class CartOrderIntegrationTest
         extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+    @Autowired
+    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
+                    .BoundaryPaymentServer
+            paymentServer;
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
     private static final String MEMBER_B = "22222222-2222-4222-8222-222222222222";
     @Autowired CartService cart;
@@ -43,7 +49,7 @@ class CartOrderIntegrationTest
     @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired TransactionTemplate transaction;
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentService paymentService;
     private Long salesId;
@@ -59,7 +65,9 @@ class CartOrderIntegrationTest
 
     @AfterEach
     void clean() {
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         payments.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         items.deleteAll();
         stocks.deleteAll();
@@ -87,11 +95,12 @@ class CartOrderIntegrationTest
         assertThat(replay.order().getId()).isEqualTo(first.order().getId());
         assertThat(orders.count()).isEqualTo(1);
         assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
-        paymentService.startPayment(first.order().getOrderNumber(), MEMBER_A);
+        var payment = paymentService.startPayment(first.order().getOrderNumber(), MEMBER_A);
         org.awaitility.Awaitility.await()
                 .atMost(java.time.Duration.ofSeconds(10))
                 .untilAsserted(
                         () -> {
+                            paymentService.refresh(payment.paymentId());
                             assertThat(
                                             orders.findById(first.order().getId())
                                                     .orElseThrow()

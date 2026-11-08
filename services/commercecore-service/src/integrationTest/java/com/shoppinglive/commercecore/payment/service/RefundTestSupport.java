@@ -1,7 +1,5 @@
 package com.shoppinglive.commercecore.payment.service;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.entity.CartItem;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
@@ -9,13 +7,16 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.payment.service.MockPaymentEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,29 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
+    private static final String CORE_SCHEMA =
+            "core_refund_" + java.util.UUID.randomUUID().toString().replace("-", "");
+
+    @org.springframework.test.context.DynamicPropertySource
+    static void refundDatabase(
+            org.springframework.test.context.DynamicPropertyRegistry properties) {
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
+        if (url == null || url.isBlank()) return;
+        properties.add(
+                "spring.datasource.url",
+                () -> url + (url.contains("?") ? "&" : "?") + "currentSchema=" + CORE_SCHEMA);
+        properties.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        properties.add(
+                "spring.datasource.username",
+                () -> System.getenv("COMMERCECORE_TEST_POSTGRES_USER"));
+        properties.add(
+                "spring.datasource.password",
+                () -> System.getenv("COMMERCECORE_TEST_POSTGRES_PASSWORD"));
+        properties.add("spring.flyway.enabled", () -> true);
+        properties.add("spring.flyway.schemas", () -> CORE_SCHEMA);
+        properties.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+    }
+
     protected static final String SELLER_B = "44444444-4444-4444-8444-444444444444";
     protected static final String REFUND_COUPON = "55555555-5555-4555-8555-555555555555";
     @Autowired protected PaymentGroupService paymentGroups;
@@ -33,8 +57,11 @@ public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
     @Autowired protected PaymentAttemptJpaRepository attempts;
     @Autowired protected SalesJpaRepository sales;
     @Autowired protected SalesStockJpaRepository stocks;
-    @Autowired protected InMemoryShoppingClientStub shopping;
+    @Autowired protected InMemoryProductLookupStub shopping;
     @Autowired protected JdbcTemplate jdbc;
+    @Autowired protected PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
+    @Autowired protected PaymentDeliveryStore deliveries;
+    @Autowired protected PaymentDispatcher dispatcher;
     @MockitoBean protected MockPaymentEngine engine;
     protected CartItem a;
     protected CartItem b;
@@ -42,6 +69,7 @@ public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
     @BeforeEach
     void seedRefundFixtures() {
         cleanRefundFixtures();
+        paymentServer.reset();
         shopping.register(new ProductSnapshot(81001L, "A", null, SELLER));
         shopping.register(new ProductSnapshot(81002L, "B", null, SELLER_B));
         Long salesA = sales.saveAndFlush(new Sales(81001L, 10000L, SalesStatus.ON_SALE)).getId();
@@ -57,10 +85,13 @@ public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
         if (jdbc == null) {
             return;
         }
-        jdbc.update("DELETE FROM mock_refund_result");
+        jdbc.update("DELETE FROM event_outbox");
+        paymentServer.jdbc.update("DELETE FROM mock_refund_result");
+        paymentServer.jdbc.update("DELETE FROM refund_execution");
+        jdbc.update("DELETE FROM payment_delivery_request");
         jdbc.update("DELETE FROM refund_target_order");
         jdbc.update("DELETE FROM refund_request");
-        jdbc.update("DELETE FROM mock_gateway_result");
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         if (attempts != null) {
             attempts.deleteAll();
         }
@@ -111,22 +142,27 @@ public abstract class RefundTestSupport extends CommerceSecurityTestSupport {
     }
 
     protected void makeRefundDue(long requestId) {
-        jdbc.update(
-                "UPDATE refund_request SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 requestId);
     }
 
     protected PaymentGroupService.GroupResponse createAndPayWithCoupon() {
+        return createAndPayWithCoupon(1000);
+    }
+
+    protected PaymentGroupService.GroupResponse createAndPayWithCoupon(long discount) {
         var now = java.time.Instant.now();
         jdbc.update(
                 """
             INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,
                 starts_at,ends_at,expires_at,created_at)
-            VALUES (?,?,?,1000,1,1,?,?,?,?)
+            VALUES (?,?,?,?,1,1,?,?,?,?)
             """,
                 REFUND_COUPON,
                 SELLER,
                 "환불 테스트 쿠폰",
+                discount,
                 java.sql.Timestamp.from(now.minusSeconds(60)),
                 java.sql.Timestamp.from(now.plusSeconds(3600)),
                 java.sql.Timestamp.from(now.plusSeconds(7200)),

@@ -5,15 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Clock;
@@ -30,10 +29,10 @@ import org.springframework.jdbc.core.RowMapper;
 class RefundableTargetsTest {
     private final PaymentGroupRepository groups = mock(PaymentGroupRepository.class);
     private final OrderJpaRepository orders = mock(OrderJpaRepository.class);
-    private final PaymentAttemptJpaRepository attempts = mock(PaymentAttemptJpaRepository.class);
+    private final PaymentClient attempts = mock(PaymentClient.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final PaymentGroup group = mock(PaymentGroup.class);
-    private final PaymentAttempt payment = mock(PaymentAttempt.class);
+    private final PaymentExecution payment = mock(PaymentExecution.class);
     private final Instant now = Instant.parse("2026-10-17T00:00:00Z");
     private final RefundIntakeService service =
             new RefundIntakeService(
@@ -41,10 +40,12 @@ class RefundableTargetsTest {
                     orders,
                     attempts,
                     mock(SalesJpaRepository.class),
-                    mock(ShoppingClient.class),
+                    mock(ProductLookup.class),
                     jdbc,
                     Clock.fixed(now, ZoneOffset.UTC),
-                    mock(RefundMockEngine.class),
+                    mock(PaymentDeliveryStore.class),
+                    mock(PaymentDispatcher.class),
+                    mock(org.springframework.transaction.support.TransactionTemplate.class),
                     false);
 
     @BeforeEach
@@ -53,7 +54,7 @@ class RefundableTargetsTest {
         when(group.getId()).thenReturn(10L);
         when(group.getPaymentId()).thenReturn(20L);
         when(group.getStatus()).thenReturn(OrderStatus.PAID);
-        when(attempts.findById(20L)).thenReturn(Optional.of(payment));
+        when(attempts.get(20L)).thenReturn(payment);
         when(payment.getStatus()).thenReturn(PaymentStatus.SUCCESS);
         when(payment.getResolvedAt()).thenReturn(now.minusSeconds(60));
         when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<Long>>any(), eq(10L)))

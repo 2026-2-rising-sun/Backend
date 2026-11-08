@@ -10,8 +10,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.*;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
@@ -21,17 +19,18 @@ import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
-import com.shoppinglive.commercecore.payment.service.MockPaymentEngine;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.support.CommerceSecurityTestSupport;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.payment.service.MockPaymentEngine;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -48,7 +47,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -56,7 +54,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = "shoppinglive.observability.enabled=true")
 @org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability
 @AutoConfigureMockMvc
-class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
+class PaymentGroupIntegrationTest
+        extends com.shoppinglive.commercecore.payment.service.PaymentDatabaseTestSupport {
     @Autowired io.micrometer.core.instrument.MeterRegistry metrics;
     @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
@@ -70,12 +69,18 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @MockitoSpyBean SalesStockJpaRepository stocks;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
-    @MockitoSpyBean com.shoppinglive.commercecore.payment.service.DurableMockGateway gateway;
+
+    @Autowired
+    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
+                    .BoundaryPaymentServer
+            paymentServer;
+
+    @Autowired com.shoppinglive.payment.service.DurableMockGateway gateway;
     // 예약된 콜백과 경쟁하지 않도록 직접 결과를 확정하고 각 커밋 단계를 검증한다.
-    @MockitoBean MockPaymentEngine engine;
+    @Autowired MockPaymentEngine engine;
     private Long salesA;
     private Long salesB;
     private CartItem a;
@@ -86,6 +91,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
     @BeforeEach
     void seed() {
         clean();
+        paymentServer.reset();
         shopping.register(new ProductSnapshot(1L, "A", null));
         shopping.register(new ProductSnapshot(2L, "B", null));
         shopping.register(new ProductSnapshot(3L, "미선택", null));
@@ -103,8 +109,9 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         if (groups != null) {
             groups.findAll().forEach(group -> scenarios.clear(group.getGroupNumber()));
         }
-        jdbc.update("DELETE FROM mock_gateway_result");
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         payments.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         groups.deleteAll();
         items.deleteAll();
@@ -568,13 +575,14 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
 
         var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
 
-        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
         assertThat(couponStatus()).isEqualTo("RESERVED");
         assertThat(service.get(MEMBER_A, created.getPaymentGroup().getGroupNumber()).status())
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
     }
 
-    private com.shoppinglive.commercecore.order.dto.OrderCreationResult singleCouponOrder(String key) {
+    private com.shoppinglive.commercecore.order.dto.OrderCreationResult singleCouponOrder(
+            String key) {
         return singleCreation.create(
                 new CreateOrderCommand(
                         1L, 1, "회원", "01012345678", MEMBER_A, 10000L, null, null, COUPON_ID),
@@ -774,14 +782,18 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         var replay = service.start(MEMBER_A, group.groupNumber(), "payment-key");
         assertThat(replay.getId()).isEqualTo(first.getId());
         assertThat(payments.count()).isEqualTo(1);
-        verify(engine, times(1)).schedule(first.getId(), PaymentScenario.INSTANT_SUCCESS);
+        verify(engine, times(1))
+                .schedule(
+                        first.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.INSTANT_SUCCESS);
         assertThatThrownBy(() -> service.start(MEMBER_A, group.groupNumber(), "other-key"))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> service.cancel(MEMBER_A, group.groupNumber()))
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> service.payment(MEMBER_B, group.groupNumber(), first.getId()))
                 .isInstanceOf(BusinessException.class);
-        assertThat(service.resolve(first.getId())).isTrue();
+        assertThat(replay.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(service.resolve(first.getId())).isFalse();
         assertThat(service.resolve(first.getId())).isFalse();
         assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
         assertThat(orders.findAll())
@@ -817,14 +829,18 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                         .group();
         scenarios.set(group.groupNumber(), finalScenario);
         var attempt = service.start(MEMBER_A, group.groupNumber(), "unknown-payment");
-        doReturn(PaymentStatus.TIMEOUT)
+        doReturn(com.shoppinglive.payment.entity.PaymentStatus.TIMEOUT)
                 .when(gateway)
-                .authorize(attempt.getId(), attempt.getScenario());
+                .authorize(
+                        attempt.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                attempt.getScenario().name()));
 
         assertThat(service.resolve(attempt.getId())).isFalse();
         assertThat(service.resolve(attempt.getId())).isFalse();
         var unknown = payments.findById(attempt.getId()).orElseThrow();
-        assertThat(unknown.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(unknown.getStatus())
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.UNKNOWN);
         assertThat(unknown.getResolvedAt()).isNull();
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
@@ -845,21 +861,29 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         // 이후 확인된 최종 결과도 같은 결제 시도와 실제 영속 Mock 게이트웨이를 통해 반영한다.
         org.mockito.Mockito.doCallRealMethod()
                 .when(gateway)
-                .authorize(attempt.getId(), attempt.getScenario());
-        jdbc.update(
+                .authorize(
+                        attempt.getId(),
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                attempt.getScenario().name()));
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 attempt.getId());
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(service.resolve(attempt.getId())).isFalse();
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(finalScenario.getOutcome());
+                .isEqualTo(
+                        com.shoppinglive.payment.entity.PaymentStatus.valueOf(
+                                com.shoppinglive.payment.entity.PaymentScenario.valueOf(
+                                                finalScenario.name())
+                                        .getOutcome()
+                                        .name()));
         boolean success = finalScenario == PaymentScenario.INSTANT_SUCCESS;
         assertThat(couponStatus()).isEqualTo(success ? "USED" : "AVAILABLE");
         assertThat(items.count()).isEqualTo(success ? 1 : 3);
         stock(salesA, success ? 8 : 10, 0);
         stock(salesB, success ? 9 : 10, 0);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
                                 Integer.class,
                                 attempt.getId()))
@@ -877,7 +901,7 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
                 .isEqualTo(OrderStatus.FAILED);
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.FAILED);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.FAILED);
         assertThat(orders.findAll())
                 .extracting(order -> order.getStatus())
                 .containsOnly(OrderStatus.FAILED);
@@ -897,19 +921,21 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
         assertThatThrownBy(() -> service.resolve(attempt.getId()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
                                 Integer.class,
                                 attempt.getId()))
                 .isEqualTo(1);
         Instant approval =
-                jdbc.queryForObject(
+                paymentServer
+                        .jdbc
+                        .queryForObject(
                                 "SELECT authorized_at FROM mock_gateway_result WHERE attempt_id=?",
                                 Timestamp.class,
                                 attempt.getId())
                         .toInstant();
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT outcome FROM mock_gateway_result WHERE attempt_id=?",
                                 String.class,
                                 attempt.getId()))
@@ -920,23 +946,25 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                 .extracting(order -> order.getStatus())
                 .containsOnly(OrderStatus.PAYMENT_CONFIRMING);
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.PROCESSING);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
         assertThat(items.count()).isEqualTo(3);
         stock(salesA, 8, 2);
         jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesB);
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 attempt.getId());
         assertThat(service.resolve(attempt.getId())).isTrue();
         assertThat(service.resolve(attempt.getId())).isFalse();
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
                                 Integer.class,
                                 attempt.getId()))
                 .isEqualTo(1);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer
+                                .jdbc
+                                .queryForObject(
                                         "SELECT authorized_at FROM mock_gateway_result WHERE attempt_id=?",
                                         Timestamp.class,
                                         attempt.getId())
@@ -1094,7 +1122,9 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                                     .isEqualTo(ErrorCode.CONFLICT);
                         });
         assertThat(items.count()).isEqualTo(3);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
                 .isZero();
         if (accepted.contains("start")) {
             assertThat(service.get(MEMBER_A, group.groupNumber()).status())
@@ -1104,8 +1134,11 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                     .containsOnly(OrderStatus.PAYMENT_CONFIRMING);
             assertThat(payments.count()).isEqualTo(1);
             var attempt = payments.findAll().getFirst();
-            assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
-            verify(engine, times(1)).schedule(attempt.getId(), PaymentScenario.INSTANT_SUCCESS);
+            assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
+            verify(engine, times(1))
+                    .schedule(
+                            attempt.getId(),
+                            com.shoppinglive.payment.entity.PaymentScenario.INSTANT_SUCCESS);
             stock(salesA, 8, 2);
             stock(salesB, 9, 1);
         } else {
@@ -1160,15 +1193,15 @@ class PaymentGroupIntegrationTest extends CommerceSecurityTestSupport {
                 .containsOnly(OrderStatus.PAID);
         assertThat(payments.count()).isEqualTo(1);
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(PaymentStatus.SUCCESS);
+                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
                                 Integer.class,
                                 attempt.getId()))
                 .isEqualTo(1);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT outcome FROM mock_gateway_result WHERE attempt_id=?",
                                 String.class,
                                 attempt.getId()))

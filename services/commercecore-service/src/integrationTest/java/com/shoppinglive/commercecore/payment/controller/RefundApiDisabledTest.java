@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
         properties = {
-            "commerce.refunds.api-enabled=false",
-            "commerce.refunds.execution-enabled=false"
+            "commercecore.refunds.api-enabled=false",
+            "commercecore.refunds.execution-enabled=false"
         })
 @AutoConfigureMockMvc
 class RefundApiDisabledTest extends CommerceSecurityTestSupport {

@@ -1,4 +1,4 @@
-package com.shoppinglive.commercecore.payment.service;
+package com.shoppinglive.payment.service;
 
 import static org.assertj.core.api.Assertions.*;
 

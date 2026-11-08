@@ -17,6 +17,7 @@ import com.shoppinglive.common.outbox.EventOutbox;
 import com.shoppinglive.common.outbox.OutboxMessageRepository;
 import com.shoppinglive.common.outbox.OutboxProperties;
 import com.shoppinglive.common.outbox.OutboxRelay;
+import com.shoppinglive.payment.service.PaymentRecoveryStore;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,26 +30,22 @@ import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 실제 PostgreSQL 마이그레이션과 별도 스키마에서 업무 변경·이벤트 기록을 함께 검증한다. */
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 @EmbeddedKafka(
         partitions = 1,
         topics = {"commerce.payment-group.v1", "commerce.coupon-info.v1"})
@@ -59,7 +56,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
     private static final String COUPON = "event-coupon";
     @Autowired ObjectMapper mapper;
     @Autowired RefundIntakeService refunds;
-    @Autowired RefundExecutionService executions;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired CouponClaimService coupons;
     @Autowired OrderCreationService singleCreation;
     @Autowired DevPaymentScenarioRegistry scenarios;
@@ -73,41 +70,8 @@ class NotificationEventPostgresTest extends RefundTestSupport {
     KafkaTemplate<String, String> kafka;
 
     private static String databaseUrl() {
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         return url + (url.contains("?") ? "&" : "?") + "currentSchema=" + SCHEMA;
-    }
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry properties) {
-        properties.add("spring.datasource.url", NotificationEventPostgresTest::databaseUrl);
-        properties.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        properties.add(
-                "spring.datasource.username",
-                () -> System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"));
-        properties.add(
-                "spring.datasource.password",
-                () -> System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
-        properties.add("spring.flyway.enabled", () -> true);
-        properties.add("spring.flyway.schemas", () -> SCHEMA);
-        properties.add("spring.flyway.default-schema", () -> SCHEMA);
-        properties.add("spring.jpa.hibernate.ddl-auto", () -> "none");
-    }
-
-    @AfterAll
-    static void dropOwnedSchema() {
-        var source =
-                new DriverManagerDataSource(
-                        databaseUrl(),
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
-                        System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
-        Flyway.configure()
-                .dataSource(source)
-                .schemas(SCHEMA)
-                .defaultSchema(SCHEMA)
-                .cleanDisabled(false)
-                .load()
-                .clean();
     }
 
     @BeforeEach
@@ -179,17 +143,18 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         var group = create("lease");
         var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "lease-pay");
         var stale = recovery.claim(payment.getId(), Duration.ofMinutes(1)).orElseThrow();
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET lease_token=? WHERE id=?",
                 UUID.randomUUID().toString(),
                 payment.getId());
         assertThat(
-                        paymentGroups.applyOutcome(
-                                stale,
-                                com.shoppinglive.commercecore.payment.entity.PaymentStatus.SUCCESS))
+                        paymentServer
+                                .context
+                                .getBean(com.shoppinglive.payment.service.PaymentService.class)
+                                .resolveClaimed(stale))
                 .isFalse();
         assertThat(events("PaymentSucceeded")).isEmpty();
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 payment.getId());
         var go = new CountDownLatch(1);
@@ -281,7 +246,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         assertThat(paymentGroups.resolve(payment.getId())).isFalse();
         assertThat(events("PaymentSucceeded")).isEmpty();
         assertThat(events("PaymentFailed")).isEmpty();
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 payment.getId());
         assertThat(paymentGroups.resolve(payment.getId())).isTrue();
@@ -405,7 +370,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
                 .isEqualTo("PAYMENT_CONFIRMING");
         assertThat(events("PaymentSucceeded")).isEmpty();
         reset(outboxTarget());
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 payment.getId());
         assertThat(paymentGroups.resolve(payment.getId())).isTrue();

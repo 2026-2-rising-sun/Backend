@@ -2,12 +2,12 @@ package com.shoppinglive.commercecore.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -56,7 +56,7 @@ class OrderCreationConcurrencyTest
 
     @Autowired private SalesStockJpaRepository salesStockRepository;
 
-    @Autowired private InMemoryShoppingClientStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub shoppingClientStub;
 
     private Long salesId;
 

@@ -19,13 +19,13 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 /** 각 테스트는 폐기 가능한 전용 스키마를 사용하며 기존 애플리케이션의 스키마나 DB를 정리하지 않는다. */
 @Tag("postgres")
 @Tag("migration")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class MemberCommerceMigrationPostgresTest {
-    private final String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+    private final String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
     private final String user =
-            System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres");
+            System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres");
     private final String password =
-            System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres");
+            System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres");
     private String schema;
     private Connection connection;
 
@@ -135,36 +135,28 @@ class MemberCommerceMigrationPostgresTest {
                         });
     }
 
-    @DisplayName("결제 묶음 마이그레이션은 기존 주문과 최근 결제 시도를 연결한다")
+    @DisplayName("결제 묶음은 주문을 연결하고 Payment 원본 대신 전달 요청 참조를 보관한다")
     @Test
-    void paymentGroupMigrationBackfillsLegacyOrderAndLatestAttempt() throws Exception {
+    void paymentGroupLinksOrdersWithoutPaymentExecutionTables() throws Exception {
         migration("3").migrate();
         sale();
         memberOrder(1, "11111111-1111-4111-8111-111111111111", "legacy-member-order");
-        sql(
-                "INSERT INTO payment_attempt (id,order_id,scenario,status,requested_at,created_at,updated_at) "
-                        + "VALUES (1,1,'INSTANT_FAIL','FAILED',now(),now(),now()),(2,1,'DELAYED_SUCCESS','PROCESSING',now(),now(),now())");
         sql(
                 "UPDATE orders SET status='PAYMENT_CONFIRMING',expires_at=now()+interval '5 minutes' WHERE id=1");
         migration(null).migrate();
         assertThat(
                         count(
-                                "SELECT count(*) FROM payment_group WHERE group_number='PG-LEGACY-1' "
-                                        + "AND total_amount=1000 AND status='PAYMENT_CONFIRMING' AND payment_id=2"))
+                                "SELECT count(*) FROM payment_group WHERE group_number='PG-LEGACY-1' AND total_amount=1000 AND status='PAYMENT_CONFIRMING' AND payment_id IS NULL"))
                 .isEqualTo(1);
         assertThat(
                         count(
                                 "SELECT count(*) FROM orders o JOIN payment_group g ON o.payment_group_id=g.id WHERE o.id=1"))
                 .isEqualTo(1);
-        assertThat(
-                        count(
-                                "SELECT count(*) FROM payment_attempt p JOIN payment_group g ON p.payment_group_id=g.id WHERE p.id=2"))
-                .isEqualTo(1);
-        assertThat(
-                        count(
-                                "SELECT count(*) FROM payment_attempt WHERE id=1 AND payment_group_id IS NULL"))
-                .isEqualTo(1);
         assertThat(count("SELECT count(*) FROM member_purchase_guard")).isEqualTo(1);
+        assertThat(
+                        count(
+                                "SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('payment_attempt','mock_gateway_result','refund_execution','mock_refund_result')"))
+                .isZero();
     }
 
     @DisplayName("기존 활성 주문이 여러 개면 주문·예약을 변경하지 않고 마이그레이션을 중단한다")
@@ -216,92 +208,57 @@ class MemberCommerceMigrationPostgresTest {
                 .isInstanceOf(java.sql.SQLException.class);
     }
 
-    @DisplayName("미확정 결제 마이그레이션은 기존 상태를 보존하고 미확정 결과를 허용한다")
+    @DisplayName("영속 전달 원문은 요청 UUID와 결제 참조 중복을 막고 주문 FK를 유지한다")
     @Test
-    void unknownPaymentMigrationPreservesLegacyStatusesAndPermitsUnconfirmedResult()
-            throws Exception {
-        migration("11").migrate();
-        sale();
-        memberOrderWithDiscountSnapshot(1, "11111111-1111-4111-8111-111111111111", "status-legacy");
-        String[] legacyStatuses = {"PENDING", "PROCESSING", "SUCCESS", "FAILED", "TIMEOUT"};
-        for (int i = 0; i < legacyStatuses.length; i++) {
-            sql(
-                    "INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
-                            + "VALUES("
-                            + (i + 1)
-                            + ",1,'INSTANT_SUCCESS','"
-                            + legacyStatuses[i]
-                            + "',now(),now(),now())");
-        }
-        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET status='UNKNOWN' WHERE id=2"))
-                .isInstanceOf(java.sql.SQLException.class);
-
+    void deliveryRequestUniquenessAndLocalOrderForeignKey() throws Exception {
         migration(null).migrate();
-
-        for (int i = 0; i < legacyStatuses.length; i++) {
-            assertThat(
-                            count(
-                                    "SELECT count(*) FROM payment_attempt WHERE id="
-                                            + (i + 1)
-                                            + " AND status='"
-                                            + legacyStatuses[i]
-                                            + "'"))
-                    .isEqualTo(1);
-        }
-        sql("UPDATE payment_attempt SET status='UNKNOWN' WHERE id=2");
+        sale();
+        memberOrderWithDiscountSnapshot(
+                1, "11111111-1111-4111-8111-111111111111", "delivery-order");
+        String request = UUID.randomUUID().toString();
+        sql(
+                "INSERT INTO payment_delivery_request(request_id,kind,order_id,reference_number,amount,request_key,payment_id,command,status,requested_at,next_action_at) VALUES ('"
+                        + request
+                        + "','PAYMENT',1,'OD',1000,'key',1,'{}','UNKNOWN',now(),now())");
+        assertThatThrownBy(
+                        () ->
+                                sql(
+                                        "INSERT INTO payment_delivery_request(request_id,kind,order_id,reference_number,amount,request_key,payment_id,command,status,requested_at,next_action_at) VALUES ('"
+                                                + request
+                                                + "','PAYMENT',1,'OD',1000,'key2',2,'{}','PROCESSING',now(),now())"))
+                .isInstanceOf(SQLException.class);
+        assertThatThrownBy(
+                        () ->
+                                sql(
+                                        "INSERT INTO payment_delivery_request(request_id,kind,order_id,reference_number,amount,request_key,payment_id,command,status,requested_at,next_action_at) VALUES ('"
+                                                + UUID.randomUUID()
+                                                + "','PAYMENT',1,'OD',1000,'key3',1,'{}','PROCESSING',now(),now())"))
+                .isInstanceOf(SQLException.class);
+        assertThatThrownBy(
+                        () ->
+                                sql(
+                                        "UPDATE payment_delivery_request SET order_id=999 WHERE request_id='"
+                                                + request
+                                                + "'"))
+                .isInstanceOf(SQLException.class);
         assertThat(
                         count(
-                                "SELECT count(*) FROM payment_attempt WHERE id=2 AND status='UNKNOWN' AND resolved_at IS NULL"))
-                .isEqualTo(1);
-        assertThatThrownBy(() -> sql("UPDATE payment_attempt SET status='NOT_A_STATUS' WHERE id=2"))
-                .isInstanceOf(java.sql.SQLException.class);
-        assertThat(
-                        count(
-                                "SELECT count(*) FROM orders WHERE status='PENDING_PAYMENT' AND payable_amount=1000"))
+                                "SELECT count(*) FROM payment_delivery_request WHERE status='UNKNOWN' AND amount=1000"))
                 .isEqualTo(1);
     }
 
-    @DisplayName("복구 시나리오 마이그레이션은 기존 시도를 보존하고 전송 장애 시나리오를 허용한다")
+    @DisplayName("Core 환불은 정책·대상과 결과 사본을 보관하고 실행권은 보관하지 않는다")
     @Test
-    void recoveryScenariosMigrationPreservesExistingAttemptsAndAllowsTransportFailureFixtures()
-            throws Exception {
-        migration("12").migrate();
-        sale();
-        memberOrderWithDiscountSnapshot(
-                1, "11111111-1111-4111-8111-111111111111", "recovery-scenario-legacy");
-        sql(
-                "INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
-                        + "VALUES(1,1,'DELAYED_SUCCESS','PROCESSING',now(),now(),now())");
-        assertThatThrownBy(
-                        () ->
-                                sql(
-                                        "UPDATE payment_attempt SET scenario='SUCCESS_RESPONSE_LOST' WHERE id=1"))
-                .isInstanceOf(java.sql.SQLException.class);
-
+    void refundProjectionHasNoExecutionLeaseOrProviderResult() throws Exception {
         migration(null).migrate();
-
         assertThat(
                         count(
-                                "SELECT count(*) FROM payment_attempt WHERE id=1 AND scenario='DELAYED_SUCCESS' AND status='PROCESSING'"))
-                .isEqualTo(1);
-        String[] newScenarios = {
-            "SUCCESS_RESPONSE_LOST", "FAILURE_RESPONSE_LOST", "UNAVAILABLE_BEFORE_RESULT"
-        };
-        for (int i = 0; i < newScenarios.length; i++) {
-            sql(
-                    "INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,created_at,updated_at) "
-                            + "VALUES("
-                            + (i + 2)
-                            + ",1,'"
-                            + newScenarios[i]
-                            + "','PROCESSING',now(),now(),now())");
-        }
-        assertThat(count("SELECT count(*) FROM payment_attempt")).isEqualTo(4);
-        assertThatThrownBy(
-                        () ->
-                                sql(
-                                        "UPDATE payment_attempt SET scenario='INVALID_SCENARIO' WHERE id=1"))
-                .isInstanceOf(java.sql.SQLException.class);
+                                "SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='refund_request' AND column_name IN ('lease_token','lease_until','execution_started_at')"))
+                .isZero();
+        assertThat(
+                        count(
+                                "SELECT count(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('refund_request','refund_target_order','payment_delivery_request','event_outbox')"))
+                .isEqualTo(4);
     }
 
     private void sale() throws Exception {

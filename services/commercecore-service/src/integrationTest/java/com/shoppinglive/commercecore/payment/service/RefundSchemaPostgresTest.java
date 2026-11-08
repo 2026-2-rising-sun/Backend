@@ -15,18 +15,18 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Tag("postgres")
 @Tag("migration")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundSchemaPostgresTest {
 
     private void verify(Consumer<JdbcTemplate> test) {
         String schema = "refund_schema_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
         var dataSource =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres"),
                         System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                                .getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres"));
         var flyway =
                 Flyway.configure()
                         .dataSource(dataSource)

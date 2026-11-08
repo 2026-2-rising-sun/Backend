@@ -11,9 +11,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import com.shoppinglive.commercecore.client.shopping.ProductNotFoundException;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
-import com.shoppinglive.commercecore.client.shopping.ShoppingClient;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
 import com.shoppinglive.commercecore.order.entity.Order;
@@ -22,6 +19,9 @@ import com.shoppinglive.commercecore.order.exception.OrderAmountMismatchExceptio
 import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException;
 import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
@@ -65,7 +65,7 @@ class OrderCreationServiceTest {
 
     @Mock private SalesStockJpaRepository salesStockRepository;
 
-    @Mock private ShoppingClient shoppingClient;
+    @Mock private ProductLookup shoppingClient;
 
     @Mock private OrderNumberGenerator orderNumberGenerator;
 
@@ -582,8 +582,10 @@ class OrderCreationServiceTest {
     @DisplayName("상품 조회 중 장바구니가 변경되면 주문을 생성하거나 재고를 예약하지 않는다")
     void cartChangedDuringShoppingLookupDoesNotCreateOrReserveOrder() {
         String member = "11111111-1111-4111-8111-111111111111";
-        var snapshot = new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
-        var changed = new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
+        var snapshot =
+                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
+        var changed =
+                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
         ReflectionTestUtils.setField(snapshot, "version", 0L);
         ReflectionTestUtils.setField(changed, "version", 1L);
         given(cartItems.findByIdAndMemberId(1L, member)).willReturn(Optional.of(snapshot));
@@ -596,8 +598,8 @@ class OrderCreationServiceTest {
                                 orderCreationService.createFromCart(
                                         member,
                                         1L,
-                                        new com.shoppinglive.commercecore.order.dto.CartOrderCommand(
-                                                "회원", "01012345678", PRICE),
+                                        new com.shoppinglive.commercecore.order.dto
+                                                .CartOrderCommand("회원", "01012345678", PRICE),
                                         "cart-key"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).errorCode())

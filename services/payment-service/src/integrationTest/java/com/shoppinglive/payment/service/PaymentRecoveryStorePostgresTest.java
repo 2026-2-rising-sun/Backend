@@ -1,4 +1,4 @@
-package com.shoppinglive.commercecore.payment.service;
+package com.shoppinglive.payment.service;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -18,7 +18,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class PaymentRecoveryStorePostgresTest {
     private Flyway flyway;
     private JdbcTemplate jdbc;
@@ -29,45 +29,44 @@ class PaymentRecoveryStorePostgresTest {
     @BeforeEach
     void setup() {
         String schema = "payment_recovery_" + UUID.randomUUID().toString().replace("-", "");
-        String url = System.getenv("COMMERCE_TEST_POSTGRES_URL");
+        String url = System.getenv("PAYMENT_TEST_POSTGRES_URL");
         var source =
                 new DriverManagerDataSource(
                         url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
-                        System.getenv().getOrDefault("COMMERCE_TEST_POSTGRES_USER", "postgres"),
-                        System.getenv()
-                                .getOrDefault("COMMERCE_TEST_POSTGRES_PASSWORD", "postgres"));
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_USER", "postgres"),
+                        System.getenv().getOrDefault("PAYMENT_TEST_POSTGRES_PASSWORD", "postgres"));
         flyway =
                 Flyway.configure()
+                        .locations("classpath:db/payment-migration")
                         .dataSource(source)
                         .schemas(schema)
                         .defaultSchema(schema)
                         .cleanDisabled(false)
                         .load();
         Flyway.configure()
+                .locations("classpath:db/payment-migration")
                 .dataSource(source)
                 .schemas(schema)
                 .defaultSchema(schema)
-                .target("13")
                 .load()
                 .migrate();
         jdbc = new JdbcTemplate(source);
         manager = new DataSourceTransactionManager(source);
-        jdbc.update(
-                "INSERT INTO sales_info(id,product_id,price,status,created_at,updated_at) VALUES(1,1,10000,'ON_SALE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-        jdbc.update(
-                "INSERT INTO orders(id,order_number,sales_info_id,quantity,unit_price,total_amount,status,buyer_name,buyer_phone,product_name_snapshot,member_id,payable_amount,created_at,updated_at) VALUES(1,'store-order',1,1,10000,10000,'PAYMENT_CONFIRMING','member','010','product','member',10000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
         String[] statuses = {"PROCESSING", "UNKNOWN", "SUCCESS", "PENDING"};
         for (int i = 0; i < 4; i++) {
             insert(i + 1, statuses[i]);
         }
-        flyway.migrate();
+        jdbc.update(
+                "UPDATE payment_attempt SET execution_started_at=requested_at WHERE status IN ('PROCESSING','UNKNOWN','SUCCESS')");
         insert(5, "PROCESSING");
         store = new PaymentRecoveryStore(jdbc, manager);
     }
 
     void insert(long id, String status) {
         jdbc.update(
-                "INSERT INTO payment_attempt(id,order_id,scenario,status,requested_at,scheduled_resolve_at,created_at,updated_at) VALUES(?,1,'INSTANT_SUCCESS',?,CURRENT_TIMESTAMP-INTERVAL '8 days',CURRENT_TIMESTAMP-INTERVAL '1 second',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                "INSERT INTO payment_attempt(id,request_id,payment_id,order_id,reference_number,amount,scenario,status,requested_at,scheduled_resolve_at,created_at,updated_at) VALUES(?,?,?,1,'PG',10000,'INSTANT_SUCCESS',?,CURRENT_TIMESTAMP-INTERVAL '8 days',CURRENT_TIMESTAMP-INTERVAL '1 second',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                id,
+                UUID.randomUUID().toString(),
                 id,
                 status);
     }
@@ -225,14 +224,16 @@ class PaymentRecoveryStorePostgresTest {
         assertThat(store.claim(4, LEASE)).isEmpty();
     }
 
-    @DisplayName("업무 저장이 롤백되면 복구 완료 표시도 함께 롤백된다")
+    @DisplayName("결과 Outbox 저장이 롤백되면 복구 완료 표시도 함께 롤백된다")
     @Test
     void completionRollsBackTogetherWithBusinessWrite() {
         var lease = store.claim(5, LEASE).orElseThrow();
         new TransactionTemplate(manager)
                 .executeWithoutResult(
                         tx -> {
-                            jdbc.update("UPDATE orders SET status='PAID' WHERE id=1");
+                            jdbc.update(
+                                    "INSERT INTO event_outbox(event_id,event_type,topic,message_key,payload,created_at) VALUES (?,'PaymentExecutionResolved','payment.execution-results.v1','request','{}',CURRENT_TIMESTAMP)",
+                                    UUID.randomUUID().toString());
                             assertThat(store.complete(lease, "SUCCESS")).isTrue();
                             tx.setRollbackOnly();
                         });
@@ -240,8 +241,7 @@ class PaymentRecoveryStorePostgresTest {
                         jdbc.queryForObject(
                                 "SELECT status FROM payment_attempt WHERE id=5", String.class))
                 .isEqualTo("PROCESSING");
-        assertThat(jdbc.queryForObject("SELECT status FROM orders WHERE id=1", String.class))
-                .isEqualTo("PAYMENT_CONFIRMING");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM event_outbox", Long.class)).isZero();
         assertThat(store.owns(lease)).isTrue();
     }
 }

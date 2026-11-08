@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doAnswer;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.common.core.BusinessException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -26,10 +26,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundIntakeServicePostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
-    @MockitoSpyBean InMemoryShoppingClientStub shoppingSpy;
+    @MockitoSpyBean InMemoryProductLookupStub shoppingSpy;
 
     @DisplayName("선택한 장바구니 항목의 주문 전액을 환불하고 재요청은 기존 결과를 반환한다")
     @Test
@@ -140,7 +140,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                         .orElseThrow()
                         .getId();
         Long paymentId = groups.findById(groupId).orElseThrow().getPaymentId();
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET resolved_at = CURRENT_TIMESTAMP - INTERVAL '168 hours 1 second' WHERE id=?",
                 paymentId);
         assertThatThrownBy(

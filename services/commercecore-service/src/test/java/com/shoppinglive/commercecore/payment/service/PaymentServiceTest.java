@@ -1,273 +1,218 @@
 package com.shoppinglive.commercecore.payment.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.order.service.OrderService;
-import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.exception.OrderNotEligibleForPaymentException;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
+import com.shoppinglive.commercecore.order.service.PaymentGroupService;
+import com.shoppinglive.commercecore.payment.dto.*;
+import com.shoppinglive.commercecore.payment.entity.*;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.common.core.*;
 import java.time.Instant;
 import java.util.Optional;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.*;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
+    @Mock PaymentDeliveryStore store;
+    @Mock ObjectProvider<PaymentGroupService> groups;
+    @Mock RefundOutcomeService refunds;
+    @Mock TransactionTemplate tx;
+    @Mock OrderJpaRepository orders;
+    @Mock SalesStockJpaRepository stock;
+    @Mock SalesService sales;
+    @Mock JdbcTemplate jdbc;
+    PaymentResultHandler handler;
+    final String requestId = "11111111-1111-4111-8111-111111111111";
+    final Instant at = Instant.parse("2026-11-09T00:00:00Z");
+    final PaymentDeliveryStore.Delivery pending =
+            new PaymentDeliveryStore.Delivery(
+                    7, requestId, "PAYMENT", "command", null, "PROCESSING");
 
-    @Mock private OrderService orderService;
-
-    @Mock private OrderJpaRepository orderRepository;
-
-    @Mock private PaymentAttemptJpaRepository paymentAttemptRepository;
-
-    @Mock private SalesStockJpaRepository salesStockRepository;
-
-    @Mock private SalesService salesService;
-
-    @Mock private MockPaymentEngine mockPaymentEngine;
-
-    @Mock
-    private org.springframework.beans.factory.ObjectProvider<DevPaymentScenarioRegistry>
-            devRegistryProvider;
-
-    @Mock private org.springframework.transaction.support.TransactionTemplate transaction;
-
-    @Mock private com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore recovery;
-    @Mock private com.shoppinglive.commercecore.payment.service.DurableMockGateway gateway;
-    @Mock private PaymentRetryPolicy retryPolicy;
-
-    @InjectMocks private PaymentService paymentService;
-
-    @SuppressWarnings("unchecked")
-    private void executeTransactionInline() {
-        given(transaction.execute(any()))
-                .willAnswer(
-                        invocation ->
-                                ((org.springframework.transaction.support.TransactionCallback<
-                                                        Object>)
-                                                invocation.getArgument(0))
-                                        .doInTransaction(
-                                                new org.springframework.transaction.support
-                                                        .SimpleTransactionStatus()));
+    @BeforeEach
+    void setup() {
+        handler = new PaymentResultHandler(store, groups, refunds, tx, orders, stock, sales, jdbc);
     }
 
-    private Order sampleOrder() {
-        Order order =
-                new Order(
-                        "OD-PAY-1",
-                        10L,
-                        1,
-                        10_000L,
-                        "홍길동",
-                        "010-1234-5678",
-                        "11111111-1111-4111-8111-111111111111",
-                        "테스트",
-                        null,
-                        Instant.now().plusSeconds(900));
-        ReflectionTestUtils.setField(order, "id", 1L);
+    PaymentExecution result(PaymentStatus status) {
+        return new PaymentExecution(
+                requestId,
+                7L,
+                1L,
+                null,
+                "OD",
+                1000,
+                PaymentScenario.INSTANT_SUCCESS,
+                status,
+                at,
+                status.isConfirmedOutcome() ? at.plusSeconds(1) : null,
+                at);
+    }
+
+    void request() {
+        when(store.get(requestId)).thenReturn(pending);
+        when(store.read("command", PaymentCommand.class))
+                .thenReturn(new PaymentCommand(requestId, 7L, 1L, null, "OD", 1000, null));
+    }
+
+    void transaction() {
+        org.mockito.Mockito.lenient()
+                .doAnswer(
+                        i -> {
+                            ((java.util.function.Consumer<
+                                                    org.springframework.transaction
+                                                            .TransactionStatus>)
+                                            i.getArgument(0))
+                                    .accept(new SimpleTransactionStatus());
+                            return null;
+                        })
+                .when(tx)
+                .executeWithoutResult(any());
+        org.mockito.Mockito.lenient()
+                .when(tx.execute(any()))
+                .thenAnswer(
+                        i ->
+                                ((org.springframework.transaction.support.TransactionCallback<
+                                                        Object>)
+                                                i.getArgument(0))
+                                        .doInTransaction(new SimpleTransactionStatus()));
+    }
+
+    Order order() {
+        Order order = mock(Order.class);
+        when(order.getId()).thenReturn(1L);
+        when(order.getSalesInfoId()).thenReturn(10L);
+        when(order.getQuantity()).thenReturn(1);
+        when(orders.findById(1L)).thenReturn(Optional.of(order));
         return order;
     }
 
-    private PaymentAttempt sampleAttempt(PaymentScenario scenario, PaymentStatus status) {
-        PaymentAttempt attempt = new PaymentAttempt(1L, scenario, Instant.now());
-        ReflectionTestUtils.setField(attempt, "id", 100L);
-        ReflectionTestUtils.setField(attempt, "status", status);
-        if (status.isUnconfirmed()) {
-            var lease =
-                    new com.shoppinglive.commercecore.payment.service.PaymentRecoveryStore.Lease(
-                            100L, scenario, 0, null, "token", Instant.now().plusSeconds(60));
-            org.mockito.Mockito.lenient()
-                    .when(recovery.claim(eq(100L), any()))
-                    .thenReturn(Optional.of(lease));
-            org.mockito.Mockito.lenient()
-                    .when(recovery.beginInvocation(lease))
-                    .thenReturn(Optional.of(0));
-            org.mockito.Mockito.lenient().when(recovery.owns(lease)).thenReturn(true);
-            org.mockito.Mockito.lenient()
-                    .when(recovery.complete(eq(lease), any()))
-                    .thenReturn(true);
-            org.mockito.Mockito.lenient()
-                    .when(gateway.authorize(100L, scenario))
-                    .thenAnswer(inv -> scenario.getOutcome());
-            org.mockito.Mockito.lenient()
-                    .when(retryPolicy.afterUnknown(0))
-                    .thenReturn(java.time.Duration.ZERO);
-        }
-        return attempt;
-    }
-
-    // ----- startPayment (결제 1) -----
-
     @Test
-    @DisplayName("결제 시작에 성공하면 시도를 저장하고 엔진에 처리를 예약한다")
-    void storesPaymentAndSchedulesEngineAfterSuccessfulStart() {
-        Order order = sampleOrder();
-        given(
-                        orderService.findByOrderNumberAndMemberId(
-                                "OD-PAY-1", "11111111-1111-4111-8111-111111111111"))
-                .willReturn(order);
-        given(
-                        orderRepository.transitionStatus(
-                                order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"))
-                .willReturn(1);
-        given(paymentAttemptRepository.save(any(PaymentAttempt.class)))
-                .willAnswer(
-                        inv -> {
-                            PaymentAttempt a = inv.getArgument(0);
-                            ReflectionTestUtils.setField(a, "id", 100L);
-                            return a;
-                        });
-
-        paymentService.startPayment("OD-PAY-1", "11111111-1111-4111-8111-111111111111");
-
-        verify(mockPaymentEngine).schedule(eq(100L), eq(PaymentScenario.INSTANT_SUCCESS));
+    @DisplayName("단건 성공 결과는 주문을 완료하고 예약 재고를 소진한다")
+    void successfulResultConsumesReservedStock() {
+        request();
+        transaction();
+        order();
+        when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).thenReturn(1);
+        when(stock.consumeReserved(10L, 1)).thenReturn(1);
+        handler.payment(result(PaymentStatus.SUCCESS));
+        verify(stock).consumeReserved(10L, 1);
+        verify(sales, never()).restoreReserved(any(), anyInt());
+        verify(store).record(pending, result(PaymentStatus.SUCCESS), "SUCCESS");
     }
 
     @Test
-    @DisplayName("주문 상태 전이에 실패하면 결제 시작을 거절한다")
-    void rejectsPaymentStartWhenOrderTransitionFails() {
-        Order order = sampleOrder();
-        given(
-                        orderService.findByOrderNumberAndMemberId(
-                                "OD-PAY-1", "11111111-1111-4111-8111-111111111111"))
-                .willReturn(order);
-        given(
-                        orderRepository.transitionStatus(
-                                order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"))
-                .willReturn(0);
-
-        assertThatThrownBy(
-                        () ->
-                                paymentService.startPayment(
-                                        "OD-PAY-1", "11111111-1111-4111-8111-111111111111"))
-                .isInstanceOf(OrderNotEligibleForPaymentException.class);
+    @DisplayName("단건 실패 결과는 주문을 실패 처리하고 예약 재고를 복구한다")
+    void failedResultRestoresStock() {
+        request();
+        transaction();
+        order();
+        when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).thenReturn(1);
+        handler.payment(result(PaymentStatus.FAILED));
+        verify(sales).restoreReserved(10L, 1);
+        verifyNoInteractions(stock);
     }
 
-    // ----- resolvePayment (결제 2) -----
+    @Test
+    @DisplayName("이미 반영한 결과는 주문과 재고를 다시 변경하지 않는다")
+    void ignoresDuplicateTerminalResult() {
+        request();
+        var done =
+                new PaymentDeliveryStore.Delivery(
+                        7, requestId, "PAYMENT", "command", "result", "SUCCESS");
+        when(store.get(requestId)).thenReturn(done);
+        handler.payment(result(PaymentStatus.SUCCESS));
+        verify(store).requireSameResult(done, result(PaymentStatus.SUCCESS));
+        verifyNoInteractions(orders, stock, sales);
+    }
+
+    @Test
+    @DisplayName("조건부 주문 전이에 실패하면 결과 적용을 롤백하고 재고를 변경하지 않는다")
+    void failsWhenOrderTransitionDoesNotMatch() {
+        request();
+        transaction();
+        Order order = mock(Order.class);
+        when(order.getId()).thenReturn(1L);
+        when(orders.findById(1L)).thenReturn(Optional.of(order));
+        assertThatThrownBy(() -> handler.payment(result(PaymentStatus.SUCCESS)))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(stock, sales);
+        verify(store, never()).record(any(), any(), anyString());
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(
             value = PaymentStatus.class,
             names = {"PROCESSING", "UNKNOWN"})
-    void resolvePayment_SUCCESS_시나리오면_PAID_전이_consumeReserved(PaymentStatus initialStatus) {
-        executeTransactionInline();
-        PaymentAttempt attempt = sampleAttempt(PaymentScenario.INSTANT_SUCCESS, initialStatus);
-        Order order = sampleOrder();
-        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).willReturn(1);
-        given(salesStockRepository.consumeReserved(order.getSalesInfoId(), 1)).willReturn(1);
-        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
-
-        paymentService.resolvePayment(100L);
-
-        verify(orderRepository).transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID");
-        verify(salesStockRepository).consumeReserved(order.getSalesInfoId(), 1);
-        verify(salesService, never()).restoreReserved(any(), any(Integer.class));
+    @DisplayName("미확정 결과는 주문 실패나 예약 재고 복구를 만들지 않는다")
+    void unconfirmedResultRetainsBusinessReservations(PaymentStatus status) {
+        request();
+        transaction();
+        handler.payment(result(status));
+        verifyNoInteractions(orders, stock, sales);
+        verify(store).record(pending, result(status), status.name());
     }
 
     @Test
-    @DisplayName("결제 실패 결과는 FAILED로 전이하고 예약 재고를 복구한다")
-    void marksFailedPaymentAndRestoresReservedStock() {
-        executeTransactionInline();
-        PaymentAttempt attempt =
-                sampleAttempt(PaymentScenario.INSTANT_FAIL, PaymentStatus.PROCESSING);
-        Order order = sampleOrder();
-        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(orderRepository.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).willReturn(1);
-        given(orderRepository.findById(1L)).willReturn(Optional.of(order));
-
-        paymentService.resolvePayment(100L);
-
-        verify(orderRepository).transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED");
-        verify(salesService).restoreReserved(order.getSalesInfoId(), 1);
-        verify(salesStockRepository, never()).consumeReserved(any(), any(Integer.class));
+    @DisplayName("호환성 PENDING 상태를 새 실행 결과로 적용하지 않는다")
+    void rejectsCompatibilityPendingResult() {
+        request();
+        assertThatThrownBy(() -> handler.payment(result(PaymentStatus.PENDING)))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(orders, stock, sales);
     }
 
     @Test
-    @DisplayName("이미 최종 상태인 결제 결과는 중복 반영하지 않는다")
-    void ignoresPaymentResolutionAfterTerminalState() {
-        PaymentAttempt attempt =
-                sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.SUCCESS);
-        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-
-        paymentService.resolvePayment(100L);
-
-        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
-        verify(orderRepository, never()).transitionStatus(any(), any(), any());
+    @DisplayName("저장된 전달 요청이 없으면 결과를 적용하지 않는다")
+    void missingRequestDoesNotAffectOrders() {
+        when(store.get(requestId)).thenThrow(new BusinessException(ErrorCode.CONFLICT));
+        assertThatThrownBy(() -> handler.payment(result(PaymentStatus.SUCCESS)))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(orders, stock, sales);
     }
 
     @Test
-    @DisplayName("결제 조건부 UPDATE에 실패하면 후속 처리를 생략한다")
-    void skipsFollowUpWhenConditionalPaymentUpdateFails() {
-        executeTransactionInline();
-        PaymentAttempt attempt =
-                sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
-        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-        given(recovery.owns(any())).willReturn(false);
-
-        paymentService.resolvePayment(100L);
-
-        verify(orderRepository, never()).transitionStatus(any(), any(), any());
-        verify(salesStockRepository, never()).consumeReserved(any(), any(Integer.class));
+    @DisplayName("결과가 먼저 반영된 뒤 도착한 미확정 HTTP 응답은 무시한다")
+    void ignoresLateProcessingAfterEarlyResult() {
+        request();
+        var done =
+                new PaymentDeliveryStore.Delivery(
+                        7, requestId, "PAYMENT", "command", "result", "SUCCESS");
+        when(store.get(requestId)).thenReturn(done);
+        handler.payment(result(PaymentStatus.PROCESSING));
+        verify(store, never()).requireSameResult(any(), any());
+        verifyNoInteractions(orders, stock, sales);
     }
 
     @Test
-    @DisplayName("확정되지 않은 결제 결과로 주문을 실패시키거나 재고를 복구하지 않는다")
-    void unconfirmedLegacyOutcomeNeverFailsOrderOrReleasesStock() {
-        PaymentAttempt attempt =
-                sampleAttempt(PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PROCESSING);
-        PaymentScenario uncertain = org.mockito.Mockito.mock(PaymentScenario.class);
-
-        given(gateway.authorize(100L, PaymentScenario.INSTANT_SUCCESS))
-                .willReturn(PaymentStatus.TIMEOUT);
-        given(paymentAttemptRepository.findById(100L)).willReturn(Optional.of(attempt));
-
-        assertThat(paymentService.resolvePayment(100L)).isFalse();
-
-        verify(recovery).unknown(any(), eq(java.time.Duration.ZERO));
-        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
-        verify(orderRepository, never()).transitionStatus(any(), any(), any());
-        verify(salesService, never()).restoreReserved(any(), any(Integer.class));
-    }
-
-    @Test
-    @DisplayName("호환성 대기 상태의 결제는 제출하거나 확정하지 않는다")
-    void compatibilityPendingIsNotSubmittedOrResolved() {
-        given(paymentAttemptRepository.findById(100L))
-                .willReturn(
-                        Optional.of(
-                                sampleAttempt(
-                                        PaymentScenario.INSTANT_SUCCESS, PaymentStatus.PENDING)));
-        assertThat(paymentService.resolvePayment(100L)).isFalse();
-        verify(transaction, never()).execute(any());
-        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
-    }
-
-    @Test
-    @DisplayName("결제 시도가 없으면 결과 반영을 생략한다")
-    void ignoresResolutionWhenPaymentAttemptIsMissing() {
-        given(paymentAttemptRepository.findById(999L)).willReturn(Optional.empty());
-
-        paymentService.resolvePayment(999L);
-
-        verify(paymentAttemptRepository, never()).resolveIfUnconfirmed(any(), any());
+    @DisplayName("결제 결과 금액이 전달 원문과 다르면 적용하지 않는다")
+    void mismatchingAmountIsRejected() {
+        request();
+        var p = result(PaymentStatus.SUCCESS);
+        var wrong =
+                new PaymentExecution(
+                        p.requestId(),
+                        p.paymentId(),
+                        p.orderId(),
+                        p.paymentGroupId(),
+                        p.referenceNumber(),
+                        999,
+                        p.scenario(),
+                        p.status(),
+                        p.requestedAt(),
+                        p.resolvedAt(),
+                        p.scheduledResolveAt());
+        assertThatThrownBy(() -> handler.payment(wrong)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(orders, stock, sales);
     }
 }

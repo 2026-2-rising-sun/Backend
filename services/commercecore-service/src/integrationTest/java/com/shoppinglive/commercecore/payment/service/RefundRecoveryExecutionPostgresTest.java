@@ -7,9 +7,13 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
-import com.shoppinglive.commercecore.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.entity.MockRefundOutcome;
+import com.shoppinglive.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.service.DurableMockRefundGateway;
+import com.shoppinglive.payment.service.MockRefundScenario;
+import com.shoppinglive.payment.service.RefundRecoveryStore;
+import com.shoppinglive.payment.service.RefundRetryPolicy;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -18,18 +22,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
-    @Autowired RefundExecutionService executions;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired RefundRecoveryStore recovery;
-    @Autowired RefundOutcomeService outcomes;
-    @MockitoSpyBean DurableMockRefundGateway gateway;
+    @Autowired com.shoppinglive.payment.service.RefundOutcomeService outcomes;
+    @Autowired DurableMockRefundGateway gateway;
 
     @DisplayName("최초 실행과 세 번의 재시도로 한도를 소진해도 새 금전 실패나 재고 복구를 만들지 않는다")
     @Test
@@ -52,14 +55,15 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
         }
         makeRefundDue(request.id());
         var recreated =
-                new RefundExecutionService(recovery, gateway, outcomes, new RefundRetryPolicy());
+                new com.shoppinglive.payment.service.RefundExecutionService(
+                        recovery, gateway, outcomes, new RefundRetryPolicy());
         assertThat(recreated.execute(request.id(), MockRefundScenario.SUCCESS)).isFalse();
         assertThat(retryCount(request.id())).isEqualTo(3);
         assertThat(gateway.find(request.id())).isNull();
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM next_action_at-clock_timestamp()) > 55 "
-                                        + "FROM refund_request WHERE id=?",
+                                        + "FROM refund_execution WHERE id=?",
                                 Boolean.class,
                                 request.id()))
                 .isTrue();
@@ -99,11 +103,11 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                         .refund();
         var abandoned = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(recovery.beginInvocation(abandoned)).contains(0);
-        jdbc.update(
-                "UPDATE refund_request SET requested_at=clock_timestamp()-INTERVAL '10 days',"
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET requested_at=clock_timestamp()-INTERVAL '10 days',"
                         + "lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 request.id());
-        jdbc.update(
+        paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET resolved_at=clock_timestamp()-INTERVAL '10 days' WHERE payment_group_id=?",
                 abandoned.paymentGroupId());
 
@@ -135,8 +139,8 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                                         request.refundAmount(),
                                         MockRefundScenario.UNKNOWN_AFTER_RESULT))
                 .isInstanceOf(MockRefundResultUnknownException.class);
-        jdbc.update(
-                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at WHERE id=?",
                 request.id());
         var original = gateway.find(request.id());
 
@@ -144,8 +148,8 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
         assertThat(retryCount(request.id())).isEqualTo(3);
         assertThat(gateway.find(request.id())).isEqualTo(original);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT lease_token IS NULL AND lease_until IS NULL FROM refund_request WHERE id=?",
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT lease_token IS NULL AND lease_until IS NULL FROM refund_execution WHERE id=?",
                                 Boolean.class,
                                 request.id()))
                 .isTrue();
@@ -164,8 +168,8 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                         .refund();
         var old = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         gateway.execute(request.id(), request.refundAmount());
-        jdbc.update(
-                "UPDATE refund_request SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
+        paymentServer.jdbc.update(
+                "UPDATE refund_execution SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 request.id());
         var current = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(outcomes.apply(old, MockRefundOutcome.SUCCESS)).isFalse();
@@ -229,16 +233,16 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
         assertThat(retryCount(request.id())).isZero();
         assertThat(gateway.find(request.id()).outcome()).isEqualTo(MockRefundOutcome.FAILED);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT lease_token IS NULL AND lease_until IS NULL FROM refund_request WHERE id=?",
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT lease_token IS NULL AND lease_until IS NULL FROM refund_execution WHERE id=?",
                                 Boolean.class,
                                 request.id()))
                 .isTrue();
     }
 
     private int retryCount(long id) {
-        return jdbc.queryForObject(
-                "SELECT retry_count FROM refund_request WHERE id=?", Integer.class, id);
+        return paymentServer.jdbc.queryForObject(
+                "SELECT retry_count FROM refund_execution WHERE id=?", Integer.class, id);
     }
 
     @DisplayName("예상하지 못한 전송 실패도 미확정 상태와 같은 요청의 실행 예산을 유지한다")

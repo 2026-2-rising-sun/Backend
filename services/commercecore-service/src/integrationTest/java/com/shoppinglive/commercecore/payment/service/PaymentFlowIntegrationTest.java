@@ -7,15 +7,15 @@ import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
+import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
@@ -25,18 +25,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-/**
- * 결제 시작 → Mock 엔진 → 결과 확정 → DB · 재고 반영까지 e2e.
- *
- * <p>Awaitility 로 async 완료를 폴링. INSTANT · DELAYED · dev 레지스트리 지정 케이스.
- *
- * <p><b>대기 시간이 10 초인 이유:</b> 원래 2 초였는데 CI 에서 첫 비동기 결제가 2.2 초 걸려 빌드가 깨졌다. 스레드풀 생성·JIT 워밍업·첫 DB 쓰기가
- * 한꺼번에 몰리는 클래스의 첫 테스트라 느린 러너에서는 2 초를 넘길 수 있다. Awaitility 는 조건이 충족되면 즉시 빠져나오므로 상한을 늘려도 정상 경로는 그대로
- * 빠르다 — 느릴 때 더 기다려줄 뿐이다.
- */
+/** Core와 독립 Payment 서버의 HTTP 접수·결과 조회를 연결한다. 예약 콜백을 제어하고 복구를 명시 구동해 주문·재고 반영을 확인한다. */
 @SpringBootTest
 class PaymentFlowIntegrationTest
         extends com.shoppinglive.commercecore.support.CommerceSecurityTestSupport {
+    @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
+    @Autowired PaymentDeliveryStore deliveries;
+    @Autowired PaymentBoundaryReconciler boundary;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Autowired private PaymentService paymentService;
 
@@ -55,7 +51,10 @@ class PaymentFlowIntegrationTest
 
     @BeforeEach
     void setUp() {
+        paymentServer.reset();
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         paymentAttemptRepository.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
@@ -82,7 +81,9 @@ class PaymentFlowIntegrationTest
 
     @AfterEach
     void tearDown() {
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         paymentAttemptRepository.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
@@ -101,6 +102,7 @@ class PaymentFlowIntegrationTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
                             SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
@@ -120,6 +122,7 @@ class PaymentFlowIntegrationTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
                             SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
@@ -132,7 +135,7 @@ class PaymentFlowIntegrationTest
     @DisplayName("DELAYED_SUCCESS 결제는 지연 후 PAID로 확정한다")
     @Test
     void confirmsDelayedSuccessAfterDelay() {
-        PaymentAttempt attempt =
+        PaymentExecution attempt =
                 startPaymentWithScenario(
                         orderNumber,
                         "11111111-1111-4111-8111-111111111111",
@@ -145,6 +148,7 @@ class PaymentFlowIntegrationTest
                 .pollDelay(Duration.ofMillis(100))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
                         });
@@ -161,6 +165,7 @@ class PaymentFlowIntegrationTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
                         });
@@ -180,12 +185,13 @@ class PaymentFlowIntegrationTest
                 .pollDelay(Duration.ofMillis(50))
                 .untilAsserted(
                         () -> {
+                            boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
                         });
     }
 
-    private com.shoppinglive.commercecore.payment.entity.PaymentAttempt startPaymentWithScenario(
+    private com.shoppinglive.commercecore.payment.dto.PaymentExecution startPaymentWithScenario(
             String number, String memberId, PaymentScenario scenario) {
         if (scenario != null) {
             devRegistry.set(number, scenario);

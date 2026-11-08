@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.shoppinglive.commercecore.client.shopping.InMemoryShoppingClientStub;
-import com.shoppinglive.commercecore.client.shopping.ProductSnapshot;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
@@ -14,17 +12,18 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.order.service.OrderExpirationScheduler;
 import com.shoppinglive.commercecore.order.service.OrderService;
-import com.shoppinglive.commercecore.payment.entity.PaymentAttempt;
 import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.repository.PaymentAttemptJpaRepository;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,14 +53,22 @@ class CommerceStateTransitionTest
     com.shoppinglive.commercecore.order.service.PaymentGroupExpirationScheduler groupExpiration;
 
     @Autowired PaymentService payments;
+    @Autowired com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry scenarios;
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
     @Autowired SalesService sales;
     @Autowired OrderJpaRepository orderRepository;
     @Autowired PaymentAttemptJpaRepository paymentRepository;
     @Autowired SalesJpaRepository salesRepository;
     @Autowired SalesStockJpaRepository stockRepository;
-    @Autowired InMemoryShoppingClientStub shopping;
+    @Autowired InMemoryProductLookupStub shopping;
     @Autowired TransactionTemplate transaction;
     @Autowired JdbcTemplate jdbc;
+
+    @Autowired
+    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
+                    .BoundaryPaymentServer
+            paymentServer;
+
     @Autowired MockMvc mvc;
     private Long salesId;
 
@@ -75,7 +82,9 @@ class CommerceStateTransitionTest
 
     @AfterEach
     void clean() {
+        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
         paymentRepository.deleteAll();
+        jdbc.update("DELETE FROM payment_delivery_request");
         orderRepository.deleteAll();
         stockRepository.deleteAll();
         salesRepository.deleteAll();
@@ -108,18 +117,10 @@ class CommerceStateTransitionTest
                 groupExpiration.run();
             }
             case "fail" -> {
-                transaction.executeWithoutResult(
-                        tx ->
-                                orderRepository.transitionStatus(
-                                        order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"));
-                PaymentAttempt attempt =
-                        paymentRepository.save(
-                                new PaymentAttempt(
-                                        order.getId(),
-                                        PaymentScenario.INSTANT_FAIL,
-                                        Instant.now()));
-                assertThat(payments.resolvePayment(attempt.getId())).isTrue();
-                assertThat(payments.resolvePayment(attempt.getId())).isFalse();
+                scenarios.set(order.getOrderNumber(), PaymentScenario.INSTANT_FAIL);
+                var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
+                assertThat(payments.refresh(attempt.getId())).isTrue();
+                assertThat(payments.refresh(attempt.getId())).isFalse();
             }
             default -> throw new IllegalArgumentException(path);
         }
@@ -177,17 +178,18 @@ class CommerceStateTransitionTest
             names = {"INSTANT_SUCCESS", "INSTANT_FAIL"})
     void rollsBackPaymentAndOrderConfirmationWhenStockUpdateFails(PaymentScenario scenario) {
         Order order = create();
-        transaction.executeWithoutResult(
-                tx ->
-                        orderRepository.transitionStatus(
-                                order.getId(), "PENDING_PAYMENT", "PAYMENT_CONFIRMING"));
-        PaymentAttempt attempt =
-                paymentRepository.save(new PaymentAttempt(order.getId(), scenario, Instant.now()));
+        scenarios.set(order.getOrderNumber(), scenario);
+        var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
         jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
-        assertThatThrownBy(() -> payments.resolvePayment(attempt.getId()))
+        assertThatThrownBy(() -> payments.refresh(attempt.getId()))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(paymentRepository.findById(attempt.getId()).orElseThrow().getStatus())
+        assertThat(deliveries.payment(attempt.getId()).status())
                 .isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(paymentRepository.findById(attempt.getId()).orElseThrow().getStatus().name())
+                .isEqualTo(
+                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(scenario.name())
+                                .getOutcome()
+                                .name());
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
     }

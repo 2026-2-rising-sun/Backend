@@ -3,8 +3,10 @@ package com.shoppinglive.commercecore.payment.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.shoppinglive.commercecore.payment.entity.MockRefundOutcome;
-import com.shoppinglive.commercecore.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.entity.MockRefundOutcome;
+import com.shoppinglive.payment.exception.MockRefundResultUnknownException;
+import com.shoppinglive.payment.service.DurableMockRefundGateway;
+import com.shoppinglive.payment.service.MockRefundScenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -14,7 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
     @Autowired DurableMockRefundGateway gateway;
@@ -38,7 +40,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
         assertThat(first.outcome()).isEqualTo(MockRefundOutcome.SUCCESS);
         assertThat(replay).isEqualTo(first);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))
@@ -69,7 +71,7 @@ class DurableMockRefundGatewayPostgresTest extends RefundTestSupport {
 
         assertThat(replay.outcome()).isEqualTo(MockRefundOutcome.SUCCESS);
         assertThat(
-                        jdbc.queryForObject(
+                        paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",
                                 Integer.class,
                                 request.id()))

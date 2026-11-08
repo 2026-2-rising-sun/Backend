@@ -15,14 +15,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "commerce.refunds.api-enabled=true")
+@SpringBootTest(properties = "commercecore.refunds.api-enabled=true")
 @Tag("postgres")
-@EnabledIfEnvironmentVariable(named = "COMMERCE_TEST_POSTGRES_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 @AutoConfigureMockMvc
 class RefundApiPostgresTest extends RefundTestSupport {
     @Autowired MockMvc mvc;
-    @Autowired com.shoppinglive.commercecore.payment.service.RefundExecutionService executions;
-    @Autowired com.shoppinglive.commercecore.payment.service.DurableMockRefundGateway refundGateway;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
+    @Autowired com.shoppinglive.payment.service.DurableMockRefundGateway refundGateway;
 
     @DisplayName("회원과 판매자는 각자에게 속한 환불 정보만 조회한다")
     @Test
@@ -91,7 +91,7 @@ class RefundApiPostgresTest extends RefundTestSupport {
                         .path("id")
                         .asLong();
         jdbc.update(
-                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,execution_started_at=requested_at,"
+                "UPDATE refund_request SET status='UNKNOWN',retry_count=3,"
                         + "next_action_at=clock_timestamp()+INTERVAL '1 minute' WHERE id=?",
                 id);
 
