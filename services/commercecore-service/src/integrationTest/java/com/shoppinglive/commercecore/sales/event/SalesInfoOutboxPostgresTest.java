@@ -35,7 +35,8 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
         properties.add("spring.datasource.url", SalesInfoOutboxPostgresTest::databaseUrl);
         properties.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         properties.add(
-                "spring.datasource.username", () -> System.getenv("COMMERCECORE_TEST_POSTGRES_USER"));
+                "spring.datasource.username",
+                () -> System.getenv("COMMERCECORE_TEST_POSTGRES_USER"));
         properties.add(
                 "spring.datasource.password",
                 () -> System.getenv("COMMERCECORE_TEST_POSTGRES_PASSWORD"));
