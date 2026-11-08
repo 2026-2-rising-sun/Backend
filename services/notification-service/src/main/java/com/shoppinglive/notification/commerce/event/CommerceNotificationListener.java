@@ -50,7 +50,7 @@ public class CommerceNotificationListener {
             String type = text(root, "eventType");
             boolean coupon = record.topic().equals("commerce.coupon-info.v1");
             if (coupon ? !type.equals("CouponIssued") : !GROUP_RESULTS.contains(type)) return null;
-            if (!text(root, "source").equals("commerce-service")
+            if (!text(root, "source").equals("commercecore-service")
                     || !root.path("schemaVersion").isIntegralNumber()
                     || root.path("schemaVersion").intValue() != 1)
                 throw invalid("지원하지 않는 이벤트 봉투입니다");

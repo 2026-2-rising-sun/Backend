@@ -2246,7 +2246,7 @@ components:
       required: [success, data, error]
       properties:
         success: {const: true}
-        data: {$ref: './commerce-service.yaml#/components/schemas/MemberCoupon'}
+        data: {$ref: './commercecore-service.yaml#/components/schemas/MemberCoupon'}
         error: {type: 'null'}
     PromotionAttributes:
       type: object

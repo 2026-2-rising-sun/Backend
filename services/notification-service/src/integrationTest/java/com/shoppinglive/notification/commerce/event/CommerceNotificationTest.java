@@ -239,7 +239,7 @@ class CommerceNotificationTest {
                         "schemaVersion",
                         1,
                         "source",
-                        "commerce-service",
+                        "commercecore-service",
                         "aggregateId",
                         GROUP,
                         "occurredAt",

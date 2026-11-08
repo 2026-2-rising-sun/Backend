@@ -131,8 +131,8 @@ spring:
 live:
   products:
     mode: http
-    shopping-url: http://dev-shopping-service:8080
-    commerce-url: http://dev-commerce-service:8080
+    shopping-url: http://dev-catalog-service:8080
+    commerce-url: http://dev-commercecore-service:8080
 
 shoppinglive:
   security:

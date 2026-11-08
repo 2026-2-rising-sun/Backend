@@ -67,7 +67,7 @@ components:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb1'
             eventType: SalesRegistered
             schemaVersion: 1
-            source: commerce-service
+            source: commercecore-service
             aggregateId: '9001'
             occurredAt: '2026-10-14T09:00:00Z'
             payload:
@@ -98,7 +98,7 @@ components:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb2'
             eventType: PriceChanged
             schemaVersion: 1
-            source: commerce-service
+            source: commercecore-service
             aggregateId: '9001'
             occurredAt: '2026-10-14T09:01:00Z'
             payload:
@@ -129,7 +129,7 @@ components:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb3'
             eventType: InventoryChanged
             schemaVersion: 1
-            source: commerce-service
+            source: commercecore-service
             aggregateId: '9001'
             occurredAt: '2026-10-14T09:02:00Z'
             payload:
@@ -160,7 +160,7 @@ components:
             eventId: '74b623b8-90ee-4f65-919c-d9ad2ea46fb4'
             eventType: SalesStatusChanged
             schemaVersion: 1
-            source: commerce-service
+            source: commercecore-service
             aggregateId: '9001'
             occurredAt: '2026-10-14T09:03:00Z'
             payload:
@@ -225,7 +225,7 @@ components:
               const: 1
             source:
               type: string
-              const: commerce-service
+              const: commercecore-service
             aggregateId:
               $ref: '#/components/schemas/SalesInfoKey'
             payload:

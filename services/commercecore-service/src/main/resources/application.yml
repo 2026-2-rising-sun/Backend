@@ -1,0 +1,142 @@
+spring:
+  application:
+    name: commercecore-service
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        max.block.ms: 1000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+  config:
+    import: classpath:shoppinglive-resilience-defaults.yml
+  jpa:
+    open-in-view: false
+    # 스키마는 Flyway 가 소유한다. Hibernate 는 엔티티 매핑이 실제 스키마와 맞는지 검증만.
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+shoppinglive:
+  outbox:
+    relay:
+      claim:
+        enabled: true
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:}
+      service-token: ${COMMERCE_MEMBER_SERVICE_TOKEN:}
+      connect-timeout: 1s
+      read-timeout: 1s
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      shopping: ${SHOPPING_COMMERCE_SERVICE_TOKEN}
+      live: ${LIVE_COMMERCE_SERVICE_TOKEN}
+
+server:
+  port: 8083
+
+# 애플리케이션 도메인 설정.
+commerce:
+  refunds:
+    api-enabled: true
+    execution-enabled: true
+  order:
+    # 결제 없이 방치된 주문의 자동 만료 유효시간. 팀 합의 시점에 최종 값 결정.
+    expiration:
+      duration: PT15M
+  shopping-client:
+    # 항상 HTTP를 사용하며 base-url은 프로필 또는 환경변수로 반드시 지정한다.
+    connect-timeout: 1s
+    read-timeout: 1s
+    service-token: ${COMMERCE_SHOPPING_SERVICE_TOKEN:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      group:
+        readiness:
+          include: readinessState,db
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+# GET 재시도는 최대 두 번. 404·계약 위반·열린 서킷은 재시도하지 않는다.
+resilience4j:
+  circuitbreaker:
+    instances:
+      shoppingProducts:
+        base-config: shoppinglive-default
+  retry:
+    instances:
+      shoppingProducts:
+        base-config: shoppinglive-default
+        max-attempts: 2
+        retry-exceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+
+---
+# 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
+# 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.
+spring:
+  config:
+    activate:
+      on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/commerce
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+# Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
+# 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
+
+commerce:
+  shopping-client:
+    base-url: http://localhost:8082
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://localhost:8081}
+
+---
+# k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.
+# 호스트는 같은 네임스페이스의 Service 이름이고 포트는 클러스터 내부 표준 포트다.
+# 자격증명은 지금 Secret 의 값과 같은 기본값을 쓰고, Deployment 가 Secret 을 주입하기 시작하면
+# 환경변수가 그대로 이 자리를 덮는다.
+spring:
+  config:
+    activate:
+      on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
+  datasource:
+    url: jdbc:postgresql://postgres:5432/commerce
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+commerce:
+  shopping-client:
+    base-url: http://dev-catalog-service:8080
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://dev-member-service:8080}

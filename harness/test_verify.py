@@ -235,11 +235,11 @@ class ExecutionTests(unittest.TestCase):
             self.assertTrue(verify.configured_test_database(command, os.environ))
             self.assertEqual(self.run_checks([check])[0]["status"], "not-run")
             self.assertFalse(verify.configured_test_database(
-                ["./gradlew", ":services:shopping-service:build"], os.environ))
+                ["./gradlew", ":services:catalog-service:build"], os.environ))
             self.assertTrue(verify.configured_test_database(["./gradlew", "build"], os.environ))
             self.assertFalse(verify.configured_test_database(
                 ["./gradlew", ":services:member-service:spotlessCheck",
-                 ":services:shopping-service:build"], os.environ))
+                 ":services:catalog-service:build"], os.environ))
 
     def test_failed_generation_does_not_validate_stale_samples(self):
         """표본 생성에 실패하면 기존 표본 검사로 성공을 만들지 않는다."""

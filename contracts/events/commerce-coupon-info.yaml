@@ -78,7 +78,7 @@ components:
           eventId: 74b623b8-90ee-4f65-919c-d9ad2ea46fc1
           eventType: CouponCreated
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: coupon-opaque-id
           occurredAt: '2026-10-14T09:00:00Z'
           payload:
@@ -111,7 +111,7 @@ components:
           eventId: 74b623b8-90ee-4f65-919c-d9ad2ea46fc2
           eventType: CouponUpdated
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: coupon-opaque-id
           occurredAt: '2026-10-14T09:00:00Z'
           payload:
@@ -142,7 +142,7 @@ components:
           eventId: 74b623b8-90ee-4f65-919c-d9ad2ea46fc3
           eventType: CouponSoldOut
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: coupon-opaque-id
           occurredAt: '2026-10-15T10:00:00Z'
           payload:
@@ -175,7 +175,7 @@ components:
           eventId: 74b623b8-90ee-4f65-919c-d9ad2ea46fc1
           eventType: CouponIssued
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: coupon-opaque-id
           occurredAt: '2026-10-14T09:00:00Z'
           payload:
@@ -218,7 +218,7 @@ components:
         schemaVersion:
           const: 1
         source:
-          const: commerce-service
+          const: commercecore-service
         aggregateId: *id002
         occurredAt:
           type: string

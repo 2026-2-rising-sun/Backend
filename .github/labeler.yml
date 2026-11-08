@@ -4,11 +4,11 @@ service:member:
 
 service:shopping:
   - changed-files:
-      - any-glob-to-any-file: "services/shopping-service/**"
+      - any-glob-to-any-file: "services/catalog-service/**"
 
 service:commerce:
   - changed-files:
-      - any-glob-to-any-file: "services/commerce-service/**"
+      - any-glob-to-any-file: "services/commercecore-service/**"
 
 service:live:
   - changed-files:

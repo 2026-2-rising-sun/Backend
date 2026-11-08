@@ -1,0 +1,177 @@
+spring:
+  application:
+    name: catalog-service
+  config:
+    import: classpath:shoppinglive-resilience-defaults.yml
+  jpa:
+    # 스키마는 Flyway 가 소유한다. Hibernate 는 엔티티 매핑이 실제 스키마와 맞는지 검증만.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      # 검증기 한도(shopping.image.max-size, 기본 5MB)보다 조금 크게 둬서 5~6MB 파일은 검증기가
+      # "용량 초과" 안내를 주고, 그보다 큰 요청은 파싱 단계에서 끊는다.
+      max-file-size: 6MB
+      max-request-size: 7MB
+
+server:
+  port: 8082
+  tomcat:
+    # 업로드 한도를 넘은 요청도 본문을 끝까지 읽어 연결 리셋 대신 400 응답을 돌려준다 (기본 2MB).
+    max-swallow-size: 10MB
+
+# 나머지 한도(max-size, allowed-types, max-width/height)는 ImageStorageProperties 기본값을 쓴다.
+shopping:
+  image:
+    storage:
+      # 로컬 테스트용 저장소. 기본 위치를 레포 밖에 둬 업로드 이미지가 git 에 추적되지 않게 한다.
+      dir: ${SHOPPING_IMAGE_DIR:${user.home}/.shoppinglive/shopping-images}
+    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:http://localhost:8082}
+  # 비어 있으면 CORS 매핑을 만들지 않는다 (local 프로필에서만 개발 프론트 origin 을 기본 허용).
+  cors:
+    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:}
+  # Commerce 판매정보 연동. base-url 은 프로필별로만 둔다. 기본값을 두면 누락 시 기동을 막는 검사가 무력해진다.
+  # timeout·재시도는 공개 목록 한 번의 최악 대기(시도 2회 × (연결 1s + 읽기 1s) + 대기 200ms ≈ 4s)를 기준으로 잡았다.
+  sales-client:
+    connect-timeout: 1s
+    read-timeout: 1s
+    service-token: ${SHOPPING_COMMERCE_SERVICE_TOKEN:}
+  # 판매정보 조회 원본. replica = product_sales 사본을 읽는다(기본), http = Commerce 를 요청마다 호출한다.
+  # 기동 때 한 번만 읽으므로 바꾸면 rolling restart 가 필요하다. consume 은 두 모드 모두 계속 돈다.
+  # http 는 되돌리기 스위치다 (SHOPPING_SALES_SOURCE=http). 처음 전환하는 환경은 SHOPPING_SALES_BACKFILL_ENABLED=true 로 한 번 채운다.
+  sales:
+    source: ${SHOPPING_SALES_SOURCE:replica}
+  # 쿠폰 replica 동기화 (초기 적재 + 주기 대조). Commerce 주소·token 은 sales-client 설정을 같이 쓴다.
+  # 기본은 꺼 둔다. Commerce 를 같이 띄우는 local·dev 프로필에서만 켠다.
+  coupons:
+    sync:
+      enabled: false
+      interval: 10m
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:}
+      service-token: ${SHOPPING_MEMBER_SERVICE_TOKEN:}
+      connect-timeout: 1s
+      read-timeout: 1s
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      commerce: ${COMMERCE_SHOPPING_SERVICE_TOKEN:}
+      live: ${LIVE_SHOPPING_SERVICE_TOKEN:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+# http 모드 HttpSalesInfoClient 의 resilience 인스턴스. 값은 이 서비스의 shoppinglive-resilience-defaults.yml을 따른다.
+# retry-exceptions 는 base-config 목록에 합쳐지지 않고 통째로 덮어쓰므로 기본 목록을 다시 적는다.
+# RestClient 는 I/O 오류(연결 거부·read timeout)를 ResourceAccessException 으로 감싸므로 추가해야 재시도된다.
+resilience4j:
+  circuitbreaker:
+    instances:
+      commerceSales:
+        base-config: shoppinglive-default
+  retry:
+    instances:
+      commerceSales:
+        base-config: shoppinglive-default
+        max-attempts: 2
+        retry-exceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+
+---
+# 접속 정보는 Infra 레포 local/docker-compose.yml 과 같은 환경변수·기본값을 쓴다.
+# 값을 바꾸려면 Infra 의 local/.env 와 여기를 함께 고쳐야 한다.
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/shopping
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+  kafka:
+    # 호스트에서는 EXTERNAL 리스너로 붙는다 (컨테이너 내부용 9092 아님).
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
+    consumer:
+      group-id: catalog-service
+
+# 개발 프론트 dev 서버 (Next.js 3000, Vite 5173).
+# sales-client.base-url 은 로컬에서 따로 띄운 commercecore-service(server.port 8083)다.
+shopping:
+  cors:
+    allowed-origins: ${SHOPPING_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+  sales-client:
+    base-url: http://localhost:8083
+  coupons:
+    sync:
+      enabled: true
+
+# Redis(localhost:6379)도 로컬 스택에 떠 있지만 아직 이 서비스가 쓰지 않아 설정하지 않는다.
+# 캐시/세션이 필요해지는 시점에 spring-boot-starter-data-redis 와 함께 추가한다.
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://localhost:8081}
+
+---
+# k8s dev 네임스페이스. local 과 같은 미들웨어를 Infra 레포 k8s/overlays/dev/datatier 가 pod 로 띄운다.
+# 호스트는 같은 네임스페이스의 Service 이름이고 포트는 클러스터 내부 표준 포트다.
+# 자격증명은 지금 Secret 의 값과 같은 기본값을 쓰고, Deployment 가 Secret 을 주입하기 시작하면
+# 환경변수가 그대로 이 자리를 덮는다.
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://postgres:5432/shopping
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+  kafka:
+    # 클러스터 안에서는 브로커의 PLAINTEXT 리스너로 바로 붙는다 (local 의 EXTERNAL 29092 아님).
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: catalog-service
+
+# Ingress 가 /api/shopping 을 떼고 이 서비스로 넘기므로 같은 호스트의 프론트는 상대 경로로 받는다.
+# 프론트가 다른 호스트에 있으면 SHOPPING_IMAGE_PUBLIC_BASE_URL 에 절대 URL 을 넣는다.
+# dev overlay의 Service 이름은 dev-commercecore-service이며 서비스 포트는 8080이다.
+shopping:
+  image:
+    public-base-url: ${SHOPPING_IMAGE_PUBLIC_BASE_URL:/api/shopping}
+  sales-client:
+    base-url: http://dev-commercecore-service:8080
+  coupons:
+    sync:
+      enabled: true
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://dev-member-service:8080}

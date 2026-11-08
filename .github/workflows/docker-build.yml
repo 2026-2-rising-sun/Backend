@@ -56,8 +56,8 @@ jobs:
       matrix:
         service:
           - member-service
-          - shopping-service
-          - commerce-service
+          - catalog-service
+          - commercecore-service
           - live-service
           - notification-service
         platform: [amd64, arm64]
@@ -123,8 +123,8 @@ jobs:
       matrix:
         service:
           - member-service
-          - shopping-service
-          - commerce-service
+          - catalog-service
+          - commercecore-service
           - live-service
           - notification-service
     steps:

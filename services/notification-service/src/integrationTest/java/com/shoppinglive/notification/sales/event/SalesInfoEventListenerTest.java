@@ -97,7 +97,7 @@ class SalesInfoEventListenerTest {
                                 listener.consume(
                                         record(
                                                 snapshot(1, "SOLD_OUT")
-                                                        .replace("commerce-service", "x"))))
+                                                        .replace("commercecore-service", "x"))))
                 .isInstanceOf(InvalidEventMessageException.class);
         // 메시지 key 가 payload 의 판매 ID 와 다르면 파티션이 흩어져 순서가 깨진 것이다.
         assertThatThrownBy(
@@ -142,7 +142,7 @@ class SalesInfoEventListenerTest {
         return "{\"eventId\":\""
                 + EVENT_ID
                 + "\",\"eventType\":\"SalesStatusChanged\",\"schemaVersion\":1,"
-                + "\"source\":\"commerce-service\",\"aggregateId\":\""
+                + "\"source\":\"commercecore-service\",\"aggregateId\":\""
                 + SALES
                 + "\",\"occurredAt\":\"2026-10-15T00:00:00Z\",\"payload\":{\"salesId\":"
                 + SALES

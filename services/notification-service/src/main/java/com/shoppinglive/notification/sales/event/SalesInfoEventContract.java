@@ -11,7 +11,7 @@ package com.shoppinglive.notification.sales.event;
 public final class SalesInfoEventContract {
 
     public static final String TOPIC_NAME = "commerce.sales-info.v1";
-    public static final String SOURCE = "commerce-service";
+    public static final String SOURCE = "commercecore-service";
     public static final int SCHEMA_VERSION = 1;
 
     /** 판매 중. 품절에서 이 상태로 바뀌면 재입고다. */

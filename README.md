@@ -30,8 +30,8 @@
 | 서비스 | 책임 | 구현된 기능 |
 |---|---|---|
 | [Member](services/member-service) | 회원·인증·세션 | 회원가입, 로그인, JWT 발급, Refresh Token 교체, 로그아웃, 회원정보 수정·탈퇴, 세션 폐기·확인 |
-| [Shopping](services/shopping-service) | 상품 기본정보·이미지 | 상품 등록·수정, 공개·판매자 상품 조회, 이미지 업로드·조회, 서비스용 상품 스냅샷, 판매정보 이벤트 수신·사본 저장 |
-| [Commerce](services/commerce-service) | 판매·재고·거래 | 판매·재고 관리, 장바구니, 단건·여러 상품 주문, 결제 묶음, 정액 쿠폰 생성·수령·예약·사용, 주문 취소, 결제·환불 및 결과 재확인 |
+| [Shopping](services/catalog-service) | 상품 기본정보·이미지 | 상품 등록·수정, 공개·판매자 상품 조회, 이미지 업로드·조회, 서비스용 상품 스냅샷, 판매정보 이벤트 수신·사본 저장 |
+| [Commerce](services/commercecore-service) | 판매·재고·거래 | 판매·재고 관리, 장바구니, 단건·여러 상품 주문, 결제 묶음, 정액 쿠폰 생성·수령·예약·사용, 주문 취소, 결제·환불 및 결과 재확인 |
 | [Live](services/live-service) | 방송·실시간 참여 | 방송 등록·시작·종료, 방송 상품 연결·정렬, 프로모션 생성·열기·닫기, 채팅, 회원별 좋아요, SSE |
 | [Notification](services/notification-service) | 내 알림함 | 커서 기반 알림 목록, 안 읽은 알림 개수, 본인 알림 읽음 처리 |
 

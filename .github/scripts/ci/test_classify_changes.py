@@ -5,7 +5,7 @@ import unittest
 
 from classify_changes import Change, classify, comments_only, diff_changes, event_plan
 
-JAVA = "services/commerce-service/src/main/java/example/Example.java"
+JAVA = "services/commercecore-service/src/main/java/example/Example.java"
 CONTROLLER = b'@RestController class Example { @GetMapping("/orders") void get() {} }'
 
 
@@ -30,7 +30,7 @@ class ClassificationTests(unittest.TestCase):
                       b'class Example {\n int a = 1;\n} '):
             with self.subTest(after=after):
                 plan = classify([Change(JAVA, before, after)])
-                self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:spotlessCheck"])
+                self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:spotlessCheck"])
                 self.assertFalse(plan["run_tests"])
                 self.assertFalse(plan["api"])
 
@@ -49,7 +49,7 @@ class ClassificationTests(unittest.TestCase):
         for before, after in pairs:
             with self.subTest(after=after):
                 plan = classify([Change(JAVA, before, after)])
-                self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+                self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_added_deleted_and_mode_changed_java_are_not_comment_only(self):
         for change in (Change(JAVA, None, b"//new"), Change(JAVA, b"//old", None),
@@ -64,13 +64,13 @@ class ClassificationTests(unittest.TestCase):
             Change("services/live-service/src/test/java/Example.java", b'class Example {}',
                    b'// comment\nclass Example {}'),
         ])
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build",
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build",
                          ":services:member-service:build", ":services:live-service:spotlessCheck"])
 
     def test_same_module_format_is_covered_by_build(self):
         plan = classify([Change(JAVA, b'class Example {}', b'// comment\nclass Example {}'),
-                         Change("services/commerce-service/build.gradle.kts", b"a", b"b")])
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+                         Change("services/commercecore-service/build.gradle.kts", b"a", b"b")])
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_common_comments_only_format_but_code_changes_build_everything(self):
         path = "common-module/src/main/java/Example.java"
@@ -128,12 +128,12 @@ class ClassificationTests(unittest.TestCase):
         self.assertTrue(event_plan(Path("."), "unknown", {})["run_tests"])
 
     def test_migration_add_modify_delete_only_selects_changed_service(self):
-        path = "services/commerce-service/src/main/resources/db/migration/V99__example.sql"
+        path = "services/commercecore-service/src/main/resources/db/migration/V99__example.sql"
         for before, after in ((None, b"CREATE TABLE example(id bigint)"),
                               (b"old", b"new"), (b"old", None)):
             with self.subTest(before=before, after=after):
                 plan = classify([Change(path, before, after)])
-                self.assertEqual(plan["migration_tasks"], [":services:commerce-service:migrationTest"])
+                self.assertEqual(plan["migration_tasks"], [":services:commercecore-service:migrationTest"])
                 self.assertEqual(plan["redis_tasks"], [])
 
     def test_unrelated_service_code_does_not_start_external_services(self):
@@ -156,7 +156,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertFalse(plan["run_tests"])
 
     def test_event_checks_follow_producer_builds_and_shared_changes(self):
-        for service in ("commerce-service", "live-service"):
+        for service in ("commercecore-service", "live-service"):
             plan = classify([Change("services/" + service + "/src/main/java/Example.java",
                                     b'class Example {}', b'class Example { int value; }')])
             self.assertTrue(plan["events"])
@@ -239,7 +239,7 @@ class GitDiffTests(unittest.TestCase):
         (self.root / old_path).unlink()
         head = self.commit(JAVA, "class Example {}")
         plan = classify(diff_changes(self.root, base, head))
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build",
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build",
                                               ":services:member-service:build"])
 
     def test_push_uses_before_after_and_new_branch_falls_back(self):
@@ -253,7 +253,7 @@ class GitDiffTests(unittest.TestCase):
         base = self.commit("README.md", "old")
         self.commit(JAVA, "class Example {}")
         plan = event_plan(self.root, "pull_request", {"pull_request": {"base": {"sha": base}}})
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_file_permission_change_is_not_skipped(self):
         base = self.commit(JAVA, "class Example {}")

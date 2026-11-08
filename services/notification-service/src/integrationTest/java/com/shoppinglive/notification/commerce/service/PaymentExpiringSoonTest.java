@@ -296,7 +296,7 @@ class PaymentExpiringSoonTest {
                   "eventId": "%s",
                   "eventType": "%s",
                   "schemaVersion": 1,
-                  "source": "commerce-service",
+                  "source": "commercecore-service",
                   "aggregateId": "%s",
                   "occurredAt": "2026-10-20T11:45:00Z",
                   "payload": {

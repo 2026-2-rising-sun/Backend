@@ -76,7 +76,7 @@ Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다
 환경을 준비한 뒤 대상 서비스의 작업을 실행한다. 아래 명령만으로 환경이 생성되지는 않는다.
 
 ```bash
-./gradlew :services:commerce-service:postgresTest --tests '*NotificationEventPostgresTest'
+./gradlew :services:commercecore-service:postgresTest --tests '*NotificationEventPostgresTest'
 ./gradlew :services:member-service:migrationTest
 LIVE_PG_TEST=1 ./gradlew :services:live-service:migrationTest
 LIVE_REDIS_TEST=1 ./gradlew :services:live-service:redisTest
@@ -91,7 +91,7 @@ Member·Notification의 일반 통합 테스트도 환경변수로 DB가 바뀔 
 Commerce의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCE_TEST_KAFKA_SERVERS`가 비어 있으면 스킵된다. 격리된 브로커를 준비한 후 해당 환경변수를 설정하고 일반 `integrationTest`에서 선택해 실행한다. 환경변수만 바꾼 재실행은 `--rerun-tasks`로 이전 결과 재사용을 피한다.
 
 ```bash
-./gradlew :services:commerce-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
+./gradlew :services:commercecore-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
 ```
 
 Commerce의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Shopping의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
@@ -112,7 +112,7 @@ API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한�
 이벤트 직렬화 표본까지 확인하려면 현재 코드로 표본을 먼저 생성한다.
 
 ```bash
-./gradlew :services:commerce-service:test --tests '*EventContractTest' :services:live-service:test --tests '*EventContractTest' --rerun-tasks
+./gradlew :services:commercecore-service:test --tests '*EventContractTest' :services:live-service:test --tests '*EventContractTest' --rerun-tasks
 .venv-api/bin/python .github/scripts/api/check_events.py --samples
 ```
 

@@ -9,7 +9,7 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-SERVICES = ("member-service", "shopping-service", "commerce-service", "live-service",
+SERVICES = ("member-service", "catalog-service", "commercecore-service", "live-service",
             "notification-service")
 SPEC = importlib.util.spec_from_file_location(
     "api_structure", Path(__file__).resolve().parents[1] / "api/check_structure.py")
@@ -229,7 +229,7 @@ def classify(changes, full_reason=None):
         [":" + module + ":build" for module in sorted(builds)]
         + [":" + module + ":spotlessCheck" for module in sorted(formats - builds)])
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
-    event_samples = full or bool(builds & {"services:commerce-service", "services:live-service"})
+    event_samples = full or bool(builds & {"services:commercecore-service", "services:live-service"})
     return {"gradle_tasks": tasks, "run_tests": full or bool(builds), "api": api,
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
