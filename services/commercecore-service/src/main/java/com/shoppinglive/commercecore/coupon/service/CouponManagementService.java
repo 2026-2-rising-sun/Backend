@@ -24,18 +24,18 @@ public class CouponManagementService {
 
     private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
-    private final ProductLookup products;
+    private final ProductLookup productLookup;
     private final TransactionTemplate transaction;
     private final TransactionTemplate readTransaction;
 
     public CouponManagementService(
             JdbcTemplate jdbc,
-            ProductLookup products,
+            ProductLookup productLookup,
             PlatformTransactionManager manager,
             CouponDisplayEventPublisher events) {
         this.events = events;
         this.jdbc = jdbc;
-        this.products = products;
+        this.productLookup = productLookup;
         this.transaction = new TransactionTemplate(manager);
         this.readTransaction = new TransactionTemplate(manager);
         this.readTransaction.setReadOnly(true);
@@ -89,7 +89,7 @@ public class CouponManagementService {
                 name, discount, limit, storedStart, storedEnd, storedExpiration, products);
         for (long productId : products) {
             var product =
-                    products.findProduct(productId)
+                    productLookup.findProduct(productId)
                             .orElseThrow(
                                     () ->
                                             new BusinessException(

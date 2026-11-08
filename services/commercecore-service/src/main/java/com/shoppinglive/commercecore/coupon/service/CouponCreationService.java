@@ -20,17 +20,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class CouponCreationService {
     private final CouponDisplayEventPublisher events;
     private final JdbcTemplate jdbc;
-    private final ProductLookup products;
+    private final ProductLookup productLookup;
     private final TransactionTemplate transaction;
 
     public CouponCreationService(
             JdbcTemplate jdbc,
-            ProductLookup products,
+            ProductLookup productLookup,
             PlatformTransactionManager manager,
             CouponDisplayEventPublisher events) {
         this.events = events;
         this.jdbc = jdbc;
-        this.products = products;
+        this.productLookup = productLookup;
         this.transaction = new TransactionTemplate(manager);
     }
 
@@ -51,7 +51,7 @@ public class CouponCreationService {
                 name, discount, limit, storedStart, storedEnd, storedExpiration, products);
         for (long productId : products) {
             var product =
-                    products.findProduct(productId)
+                    productLookup.findProduct(productId)
                             .orElseThrow(
                                     () ->
                                             new BusinessException(
