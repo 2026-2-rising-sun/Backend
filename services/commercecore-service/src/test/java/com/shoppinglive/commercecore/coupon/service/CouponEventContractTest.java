@@ -1,5 +1,7 @@
 package com.shoppinglive.commercecore.coupon.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.shoppinglive.commercecore.coupon.dto.CouponDisplaySnapshot;
@@ -17,6 +19,7 @@ class CouponEventContractTest {
     @DisplayName("실제 쿠폰 봉투·스냅샷 직렬화 표본을 YAML 검사에 제공한다")
     @Test
     void exportsSerializedCouponEnvelopeAndSnapshotForYamlValidation() throws Exception {
+        assertThat(CouponDisplayEventPublisher.TOPIC).isEqualTo("commerce.coupon-info.v1");
         var mapper =
                 new ObjectMapper()
                         .findAndRegisterModules()

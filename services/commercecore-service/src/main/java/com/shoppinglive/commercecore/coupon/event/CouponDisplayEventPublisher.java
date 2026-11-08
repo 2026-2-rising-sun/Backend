@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class CouponDisplayEventPublisher {
-    public static final String TOPIC = "commercecore.coupon-info.v1";
+    public static final String TOPIC = "commerce.coupon-info.v1";
 
     public enum Type {
         CouponCreated,
