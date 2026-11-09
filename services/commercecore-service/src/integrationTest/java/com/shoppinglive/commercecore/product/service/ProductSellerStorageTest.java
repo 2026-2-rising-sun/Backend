@@ -1,0 +1,143 @@
+package com.shoppinglive.commercecore.product.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.product.entity.Product;
+import com.shoppinglive.commercecore.product.entity.ProductImage;
+import com.shoppinglive.commercecore.product.repository.ProductImageRepository;
+import com.shoppinglive.commercecore.product.repository.ProductRepository;
+import com.shoppinglive.commercecore.product.support.ProductSecuritySupport;
+import com.shoppinglive.commercecore.storage.ImageFormat;
+import com.shoppinglive.common.security.test.JwtTestTokens;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest(
+        classes = com.shoppinglive.commercecore.product.support.ProductHttpTestApplication.class,
+        properties =
+                "spring.datasource.url=jdbc:h2:mem:product_seller_storage;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE")
+@AutoConfigureMockMvc
+class ProductSellerStorageTest extends ProductSecuritySupport {
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper mapper;
+    @Autowired ProductRepository products;
+    @Autowired ProductImageRepository images;
+    private long imageId;
+
+    @BeforeEach
+    void image() {
+        imageId =
+                images.saveAndFlush(
+                                new ProductImage(
+                                        UUID.randomUUID() + ".png",
+                                        ImageFormat.PNG,
+                                        100,
+                                        10,
+                                        10,
+                                        "fixture.png"))
+                        .getId();
+    }
+
+    @AfterEach
+    void clean() {
+        products.deleteAll();
+        images.deleteAll();
+    }
+
+    @DisplayName("상품 등록은 인증된 판매자를 저장하고 소유자를 반환한다")
+    @Test
+    void registrationStoresAuthenticatedSellerAndReturnsOwner() throws Exception {
+        JsonNode result = register("owner-key");
+        long id = result.path("productId").asLong();
+        assertThat(products.findById(id).orElseThrow().getSellerId())
+                .isEqualTo(JwtTestTokens.SELLER);
+        assertThat(result.path("sellerId").asText()).isEqualTo(JwtTestTokens.SELLER);
+    }
+
+    @DisplayName("다른 판매자는 본인 소유가 아닌 상품을 재등록·수정할 수 없다")
+    @Test
+    void anotherSellerCannotReplayOrModifyOwnedProduct() throws Exception {
+        JsonNode result = register("shared-key");
+        String other = "Bearer " + TOKENS.token(JwtTestTokens.MEMBER_A, Set.of("SELLER"));
+        mvc.perform(
+                        post("/v1/seller/products")
+                                .header("Authorization", other)
+                                .header("X-Idempotency-Key", "shared-key")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of(
+                                                        "name",
+                                                        "other",
+                                                        "description",
+                                                        "other",
+                                                        "mainImageId",
+                                                        imageId))))
+                .andExpect(status().isConflict());
+        mvc.perform(
+                        patch("/v1/seller/products/{id}", result.path("productId").asLong())
+                                .header("Authorization", other)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of(
+                                                        "name",
+                                                        "changed",
+                                                        "version",
+                                                        result.path("version").asLong()))))
+                .andExpect(status().isForbidden());
+        assertThat(products.count()).isEqualTo(1);
+        assertThat(products.findAll().getFirst().getName()).isEqualTo("owned");
+    }
+
+    @DisplayName("기존 소유자 없는 상품은 소유자를 만들지 않고 조회를 허용한다")
+    @Test
+    void existingUnassignedProductStaysReadableWithoutInventingOwner() throws Exception {
+        Product legacy =
+                products.saveAndFlush(new Product("legacy", "legacy", imageId, "legacy-key"));
+        mvc.perform(
+                        get("/v1/internal/products/{id}", legacy.getId())
+                                .header("X-Service-Token", LIVE_KEY))
+                .andExpect(status().isOk());
+        assertThat(products.findById(legacy.getId()).orElseThrow().getSellerId()).isNull();
+    }
+
+    private JsonNode register(String key) throws Exception {
+        String result =
+                mvc.perform(
+                                post("/v1/seller/products")
+                                        .header("Authorization", sellerBearer())
+                                        .header("X-Idempotency-Key", key)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "name",
+                                                                "owned",
+                                                                "description",
+                                                                "owned",
+                                                                "mainImageId",
+                                                                imageId))))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        return mapper.readTree(result).path("data");
+    }
+}

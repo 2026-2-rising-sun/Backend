@@ -1,0 +1,22 @@
+package com.shoppinglive.commercecore.product.dto;
+
+import com.shoppinglive.commercecore.product.entity.ProductCategory;
+import java.time.Instant;
+
+/**
+ * 관리용 상품 상세. {@code version} 은 기본정보 수정 요청의 낙관적 락 값으로 되돌려 보낸다. price·available 은 {@link
+ * SellerProductSummary} 와 같은 규칙으로 {@code null} 일 수 있다.
+ */
+public record SellerProductDetail(
+        Long productId,
+        String name,
+        String description,
+        Long mainImageId,
+        String mainImageUrl,
+        Long version,
+        Instant createdAt,
+        Instant updatedAt,
+        SalesDisplayStatus salesStatus,
+        Long price,
+        Integer available,
+        ProductCategory category) {}

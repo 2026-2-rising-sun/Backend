@@ -1,13 +1,13 @@
 package com.shoppinglive.live.client;
 
 import com.shoppinglive.common.web.ServiceRestClientFactory;
-import com.shoppinglive.live.client.commerce.HttpSalesClient;
-import com.shoppinglive.live.client.commerce.SalesClient;
-import com.shoppinglive.live.client.commerce.SalesSnapshot;
-import com.shoppinglive.live.client.commerce.SalesStatus;
-import com.shoppinglive.live.client.shopping.HttpProductClient;
-import com.shoppinglive.live.client.shopping.ProductClient;
-import com.shoppinglive.live.client.shopping.ProductSnapshot;
+import com.shoppinglive.live.client.commercecore.HttpProductClient;
+import com.shoppinglive.live.client.commercecore.HttpSalesClient;
+import com.shoppinglive.live.client.commercecore.ProductClient;
+import com.shoppinglive.live.client.commercecore.ProductSnapshot;
+import com.shoppinglive.live.client.commercecore.SalesClient;
+import com.shoppinglive.live.client.commercecore.SalesSnapshot;
+import com.shoppinglive.live.client.commercecore.SalesStatus;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -29,12 +29,7 @@ import org.springframework.web.client.RestClient;
 public class ProductClientsConfiguration {
 
     @ConfigurationProperties("live.products")
-    public record Properties(
-            String mode,
-            String shoppingUrl,
-            String commerceUrl,
-            String shoppingToken,
-            String commerceToken) {}
+    public record Properties(String mode, String commercecoreUrl, String commercecoreToken) {}
 
     private record StubProduct(long id, long salesId, long price, SalesStatus status, int stock) {}
 
@@ -57,7 +52,10 @@ public class ProductClientsConfiguration {
         return switch (mode(properties, environment)) {
             case "http" ->
                     new HttpProductClient(
-                            http(builder, properties.shoppingUrl(), properties.shoppingToken()));
+                            http(
+                                    builder,
+                                    properties.commercecoreUrl(),
+                                    properties.commercecoreToken()));
             case "stub" ->
                     ids ->
                             ids.stream()
@@ -67,7 +65,7 @@ public class ProductClientsConfiguration {
             default ->
                     ids -> {
                         throw new ProductLookupException(
-                                "shopping", ProductLookupException.Reason.UNAVAILABLE);
+                                "commercecore", ProductLookupException.Reason.UNAVAILABLE);
                     };
         };
     }
@@ -80,7 +78,10 @@ public class ProductClientsConfiguration {
         return switch (mode(properties, environment)) {
             case "http" ->
                     new HttpSalesClient(
-                            http(builder, properties.commerceUrl(), properties.commerceToken()));
+                            http(
+                                    builder,
+                                    properties.commercecoreUrl(),
+                                    properties.commercecoreToken()));
             case "stub" ->
                     ids ->
                             ids.stream()
@@ -90,7 +91,7 @@ public class ProductClientsConfiguration {
             default ->
                     ids -> {
                         throw new ProductLookupException(
-                                "commerce", ProductLookupException.Reason.UNAVAILABLE);
+                                "commercecore", ProductLookupException.Reason.UNAVAILABLE);
                     };
         };
     }

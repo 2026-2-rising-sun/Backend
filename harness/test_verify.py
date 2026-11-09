@@ -175,7 +175,7 @@ class SelectionTests(unittest.TestCase):
         names = {c["name"] for c in checks}
         self.assertTrue({"classifier", "api_tests", "harness", "workflow", "local-auth",
                          "api", "events", "gradle", "event-samples"} <= names)
-        self.assertTrue(set(plan["migration_tasks"] + plan["redis_tasks"]) <= names)
+        self.assertTrue(set(plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]) <= names)
         self.assertLess([c["name"] for c in checks].index("gradle"),
                         [c["name"] for c in checks].index("event-samples"))
 
@@ -184,6 +184,14 @@ class SelectionTests(unittest.TestCase):
         plan = verify.CI.classify([verify.CI.Change("harness/verify.py", None, b"code")])
         self.assertTrue(plan["harness"])
         self.assertEqual(plan["gradle_tasks"], [])
+
+    def test_core_fixture_payment_database_requires_external_opt_in(self):
+        """Core 실행도 Payment fixture의 외부 DB 설정을 감지한다."""
+        environment = {"PAYMENT_TEST_POSTGRES_URL": "jdbc:postgresql://localhost/payment_test"}
+        self.assertTrue(verify.configured_test_database(
+            ["./gradlew", ":services:commercecore-service:build"], environment))
+        self.assertFalse(verify.configured_test_database(
+            ["./gradlew", ":services:commercecore-service:spotlessCheck"], environment))
 
     def test_external_connection_settings_follow_existing_tasks(self):
         """외부 작업의 서비스별 연결 선택 조건을 구분한다."""
@@ -235,11 +243,11 @@ class ExecutionTests(unittest.TestCase):
             self.assertTrue(verify.configured_test_database(command, os.environ))
             self.assertEqual(self.run_checks([check])[0]["status"], "not-run")
             self.assertFalse(verify.configured_test_database(
-                ["./gradlew", ":services:shopping-service:build"], os.environ))
+                ["./gradlew", ":services:catalog-service:build"], os.environ))
             self.assertTrue(verify.configured_test_database(["./gradlew", "build"], os.environ))
             self.assertFalse(verify.configured_test_database(
                 ["./gradlew", ":services:member-service:spotlessCheck",
-                 ":services:shopping-service:build"], os.environ))
+                 ":services:catalog-service:build"], os.environ))
 
     def test_failed_generation_does_not_validate_stale_samples(self):
         """표본 생성에 실패하면 기존 표본 검사로 성공을 만들지 않는다."""

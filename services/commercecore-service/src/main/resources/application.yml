@@ -1,0 +1,124 @@
+spring:
+  application:
+    name: commercecore-service
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        max.block.ms: 1000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+  config:
+    import: classpath:shoppinglive-resilience-defaults.yml
+  servlet:
+    multipart:
+      # 이미지 검증 한도 5MB보다 크게 두어 서비스가 일관된 입력 오류를 반환한다.
+      max-file-size: 6MB
+      max-request-size: 7MB
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+shoppinglive:
+  outbox:
+    relay:
+      claim:
+        enabled: true
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:}
+      service-token: ${COMMERCECORE_MEMBER_SERVICE_TOKEN:}
+      connect-timeout: 1s
+      read-timeout: 1s
+    jwt:
+      issuer: shoppinglive-member
+      audience: shoppinglive-api
+      public-key-set-location: ${MEMBER_JWT_PUBLIC_KEY_SET_LOCATION}
+    service-tokens:
+      catalog: ${CATALOG_COMMERCECORE_SERVICE_TOKEN}
+      live: ${LIVE_COMMERCECORE_SERVICE_TOKEN}
+
+server:
+  port: 8083
+  tomcat:
+    max-swallow-size: 10MB
+
+commercecore:
+  refunds:
+    api-enabled: true
+    execution-enabled: true
+  order:
+    expiration:
+      duration: PT15M
+  image:
+    storage:
+      dir: ${COMMERCECORE_IMAGE_DIR:${user.home}/.shoppinglive/commercecore-images}
+    public-base-url: ${COMMERCECORE_IMAGE_PUBLIC_BASE_URL:/api/commercecore}
+  payment-client:
+    base-url: ${COMMERCECORE_PAYMENT_BASE_URL:http://localhost:8086}
+    service-token: ${COMMERCECORE_PAYMENT_SERVICE_TOKEN:}
+    connect-timeout: 1s
+    read-timeout: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      group:
+        readiness:
+          include: readinessState,db
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+---
+# 새 서비스의 빈 전용 DB만 사용한다. 기존 commerce DB로 자동 연결하지 않는다.
+spring:
+  config:
+    activate:
+      on-profile: local
+  kafka:
+    bootstrap-servers: localhost:${KAFKA_PORT:59092}
+  datasource:
+    url: ${COMMERCECORE_DATABASE_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:56432}/commercecore}
+    username: ${POSTGRES_USER:msa}
+    password: ${POSTGRES_PASSWORD:msa-local-only}
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://localhost:8081}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  kafka:
+    bootstrap-servers: kafka:9092
+  datasource:
+    url: ${COMMERCECORE_DATABASE_URL:jdbc:postgresql://postgres:5432/commercecore}
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
+
+commercecore:
+  payment-client:
+    base-url: ${COMMERCECORE_PAYMENT_BASE_URL:http://dev-payment-service:8080}
+
+shoppinglive:
+  security:
+    session:
+      base-url: ${MEMBER_SESSION_BASE_URL:http://dev-member-service:8080}

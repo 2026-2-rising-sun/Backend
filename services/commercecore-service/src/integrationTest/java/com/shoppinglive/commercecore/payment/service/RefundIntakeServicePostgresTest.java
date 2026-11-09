@@ -1,0 +1,247 @@
+package com.shoppinglive.commercecore.payment.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.doAnswer;
+
+import com.shoppinglive.commercecore.order.entity.OrderStatus;
+import com.shoppinglive.commercecore.order.service.PaymentGroupService;
+import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
+import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
+import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
+import com.shoppinglive.common.core.BusinessException;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+@SpringBootTest
+@Tag("postgres")
+@EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
+class RefundIntakeServicePostgresTest extends RefundTestSupport {
+    @Autowired RefundIntakeService refunds;
+    @MockitoSpyBean InMemoryProductLookupStub shoppingSpy;
+
+    @DisplayName("선택한 장바구니 항목의 주문 전액을 환불하고 재요청은 기존 결과를 반환한다")
+    @Test
+    void selectedCartItemRefundUsesItsFullOrderAmountAndIdempotentReplay() {
+        var group = createAndPay();
+        var result =
+                refunds.request(MEMBER_A, group.groupNumber(), "refund-a", List.of(a.getId()))
+                        .refund();
+        assertThat(result.refundAmount()).isEqualTo(20000L);
+        assertThat(result.targets()).hasSize(1);
+        assertThat(result.targets().getFirst().cartItemId()).isEqualTo(a.getId());
+        assertThat(result.targets().getFirst().quantity()).isEqualTo(2);
+        assertThat(result.targets().getFirst().refundAmount()).isEqualTo(20000L);
+
+        var replay = refunds.request(MEMBER_A, group.groupNumber(), "refund-a", List.of(a.getId()));
+        assertThat(replay.created()).isFalse();
+        assertThat(replay.refund().id()).isEqualTo(result.id());
+        assertThatThrownBy(
+                        () ->
+                                refunds.request(
+                                        MEMBER_A,
+                                        group.groupNumber(),
+                                        "refund-a",
+                                        List.of(b.getId())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(
+                        orders.findByPaymentGroupIdOrderByIdAsc(
+                                groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
+                                        .orElseThrow()
+                                        .getId()))
+                .extracting(order -> order.getStatus())
+                .containsOnly(OrderStatus.PAID);
+    }
+
+    @DisplayName("서비스의 빈 ID 목록은 전체 환불이며 알 수 없거나 중복된 ID는 거절한다")
+    @Test
+    void emptyCartIdListMeansWholeGroupAndUnknownOrDuplicateIdsAreRejected() {
+        var group = createAndPay();
+        var result =
+                refunds.request(MEMBER_A, group.groupNumber(), "refund-all", List.of()).refund();
+        assertThat(result.refundAmount()).isEqualTo(25000L);
+        assertThat(result.targets()).hasSize(2);
+
+        assertThatThrownBy(
+                        () ->
+                                refunds.request(
+                                        MEMBER_A,
+                                        group.groupNumber(),
+                                        "refund-missing",
+                                        List.of(999999L)))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(
+                        () ->
+                                refunds.request(
+                                        MEMBER_A,
+                                        group.groupNumber(),
+                                        "refund-duplicate",
+                                        List.of(a.getId(), a.getId())))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @DisplayName("멱등 키가 달라도 대상 주문이 겹치는 환불은 거절한다")
+    @Test
+    void overlappingTargetsAreRejectedAcrossDifferentIdempotencyKeys() {
+        var group = createAndPay();
+        refunds.request(MEMBER_A, group.groupNumber(), "refund-whole-first", List.of());
+
+        assertThatThrownBy(
+                        () ->
+                                refunds.request(
+                                        MEMBER_A,
+                                        group.groupNumber(),
+                                        "refund-partial-after-whole",
+                                        List.of(a.getId())))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).errorCode())
+                .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+    }
+
+    @DisplayName("확정 실패한 환불 대상은 환불 기한 안에 다시 요청할 수 있다")
+    @Test
+    void confirmedFailedRefundTargetCanBeRequestedAgainWithinRefundWindow() {
+        var group = createAndPay();
+        var failed =
+                refunds.request(
+                                MEMBER_A,
+                                group.groupNumber(),
+                                "refund-failed-first",
+                                List.of(a.getId()))
+                        .refund();
+        jdbc.update("UPDATE refund_request SET status='FAILED' WHERE id=?", failed.id());
+
+        var retry =
+                refunds.request(
+                        MEMBER_A, group.groupNumber(), "refund-failed-retry", List.of(a.getId()));
+
+        assertThat(retry.created()).isTrue();
+        assertThat(retry.refund().targets()).hasSize(1);
+        assertThat(retry.refund().targets().getFirst().cartItemId()).isEqualTo(a.getId());
+    }
+
+    @DisplayName("환불 접수는 결제 후 168시간 미만일 때만 허용한다")
+    @Test
+    void refundWindowIsStrictlyLessThan168Hours() {
+        var group = createAndPay();
+        Long groupId =
+                groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
+                        .orElseThrow()
+                        .getId();
+        Long paymentId = groups.findById(groupId).orElseThrow().getPaymentId();
+        paymentServer.jdbc.update(
+                "UPDATE payment_attempt SET resolved_at = CURRENT_TIMESTAMP - INTERVAL '168 hours 1 second' WHERE id=?",
+                paymentId);
+        assertThatThrownBy(
+                        () ->
+                                refunds.request(
+                                        MEMBER_A,
+                                        group.groupNumber(),
+                                        "refund-expired",
+                                        List.of(a.getId())))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @DisplayName("판매자가 없는 기존 상품도 환불할 수 있다")
+    @Test
+    void legacyProductWithoutSellerCanStillBeRefunded() {
+        var group = createAndPay();
+        productLookup.register(new ProductSnapshot(81001L, "A", null, null));
+
+        var result =
+                refunds.request(
+                                MEMBER_A,
+                                group.groupNumber(),
+                                "refund-legacy-owner",
+                                List.of(a.getId()))
+                        .refund();
+
+        assertThat(result.refundAmount()).isEqualTo(20000L);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT seller_id_snapshot FROM refund_target_order WHERE refund_request_id=?",
+                                String.class,
+                                result.id()))
+                .isNull();
+    }
+
+    @DisplayName("같은 회원 키로 여러 묶음에 동시 요청하면 유일성 오류 대신 충돌을 반환한다")
+    @Test
+    void concurrentSameMemberKeyAcrossGroupsReturnsConflictInsteadOfUniqueViolation()
+            throws Exception {
+        var firstGroup = createAndPay();
+        var anotherItem = cart.add(MEMBER_A, 81001L, 1);
+        var secondGroup =
+                paymentGroups
+                        .create(
+                                MEMBER_A,
+                                List.of(
+                                        new PaymentGroupService.Selection(
+                                                anotherItem.getId(), anotherItem.getVersion())),
+                                "구매자",
+                                "01012345678",
+                                10000L,
+                                "refund-order-second")
+                        .group();
+        var secondAttempt =
+                paymentGroups.start(MEMBER_A, secondGroup.groupNumber(), "refund-payment-second");
+        if (secondAttempt.getStatus() != PaymentStatus.SUCCESS) {
+            dispatcher.dispatch(deliveries.byPayment(secondAttempt.getId()));
+        }
+
+        CountDownLatch bothAtProductLookup = new CountDownLatch(2);
+        AtomicInteger calls = new AtomicInteger();
+        doAnswer(
+                        invocation -> {
+                            if (calls.incrementAndGet() <= 2) {
+                                bothAtProductLookup.countDown();
+                                if (!bothAtProductLookup.await(10, TimeUnit.SECONDS)) {
+                                    throw new IllegalStateException("동시 환불 요청이 상품 조회에 도달하지 못했습니다.");
+                                }
+                            }
+                            return invocation.callRealMethod();
+                        })
+                .when(shoppingSpy)
+                .findProducts(anyCollection());
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> requestOutcome(firstGroup.groupNumber(), a.getId()));
+            var second =
+                    executor.submit(
+                            () -> requestOutcome(secondGroup.groupNumber(), anotherItem.getId()));
+            var outcomes =
+                    List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS));
+            assertThat(
+                            outcomes.stream()
+                                    .filter(RefundIntakeService.RequestResult.class::isInstance))
+                    .hasSize(1);
+            assertThat(outcomes.stream().filter(BusinessException.class::isInstance)).hasSize(1);
+            assertThat(
+                            outcomes.stream()
+                                    .filter(BusinessException.class::isInstance)
+                                    .map(BusinessException.class::cast)
+                                    .map(BusinessException::errorCode))
+                    .containsOnly(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+        }
+    }
+
+    private Object requestOutcome(String groupNumber, Long cartItemId) {
+        try {
+            return refunds.request(
+                    MEMBER_A, groupNumber, "refund-cross-group-key", List.of(cartItemId));
+        } catch (BusinessException exception) {
+            return exception;
+        }
+    }
+}

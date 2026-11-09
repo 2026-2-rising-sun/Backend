@@ -41,7 +41,7 @@ test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기
     const tokens = Object.entries(env)
       .filter(([key]) => key.endsWith('_SERVICE_TOKEN'))
       .map(([, value]) => value);
-    assert.equal(new Set(tokens).size, 8);
+    assert.equal(new Set(tokens).size, 7);
     assert.equal(env.MEMBER_SESSION_BASE_URL, 'http://localhost:8081');
     assert.equal(run(args).status, 1);
     assert.equal(fs.readFileSync(envPath, 'utf8'), saved);
@@ -49,7 +49,7 @@ test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기
     const child = run(
       [
         'exec',
-        'commerce',
+        'commercecore',
         '--env',
         envPath,
         '--',
@@ -57,15 +57,15 @@ test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기
         '-e',
         `
       const a=require('node:assert/strict');
-      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','MEMBER_JWT_KEY_ID','MEMBER_ACCESS_TOKEN_TTL','MEMBER_REFRESH_TOKEN_TTL','LIVE_SHOPPING_SERVICE_TOKEN','SHOPPING_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
-      for (const key of ['MEMBER_JWT_PUBLIC_KEY_SET_LOCATION','MEMBER_SESSION_BASE_URL','COMMERCE_MEMBER_SERVICE_TOKEN','COMMERCE_SHOPPING_SERVICE_TOKEN','SHOPPING_COMMERCE_SERVICE_TOKEN','LIVE_COMMERCE_SERVICE_TOKEN']) a.ok(process.env[key]);
+      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','MEMBER_JWT_KEY_ID','MEMBER_ACCESS_TOKEN_TTL','MEMBER_REFRESH_TOKEN_TTL','UNUSED_CATALOG_SERVICE_TOKEN','CATALOG_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
+      for (const key of ['MEMBER_JWT_PUBLIC_KEY_SET_LOCATION','MEMBER_SESSION_BASE_URL','COMMERCECORE_MEMBER_SERVICE_TOKEN','COMMERCECORE_PAYMENT_SERVICE_TOKEN','CATALOG_COMMERCECORE_SERVICE_TOKEN','LIVE_COMMERCECORE_SERVICE_TOKEN']) a.ok(process.env[key]);
     `,
       ],
       {
         ...process.env,
         MEMBER_JWT_PRIVATE_KEY_LOCATION: 'ambient-private-secret',
-        LIVE_SHOPPING_SERVICE_TOKEN: 'ambient-other-service-secret',
-        SHOPPING_MEMBER_SERVICE_TOKEN: 'ambient-member-caller-secret',
+        UNUSED_CATALOG_SERVICE_TOKEN: 'ambient-other-service-secret',
+        CATALOG_MEMBER_SERVICE_TOKEN: 'ambient-member-caller-secret',
       },
     );
     assert.equal(child.status, 0, child.stderr);
@@ -80,14 +80,14 @@ test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기
         '-e',
         `
       const a=require('node:assert/strict');
-      for (const key of ['MEMBER_SESSION_BASE_URL','SHOPPING_COMMERCE_SERVICE_TOKEN','COMMERCE_SHOPPING_SERVICE_TOKEN','LIVE_SHOPPING_SERVICE_TOKEN','LIVE_COMMERCE_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
-      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','SHOPPING_MEMBER_SERVICE_TOKEN','COMMERCE_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.ok(process.env[key]);
+      for (const key of ['MEMBER_SESSION_BASE_URL','CATALOG_COMMERCECORE_SERVICE_TOKEN','COMMERCECORE_PAYMENT_SERVICE_TOKEN','UNUSED_CATALOG_SERVICE_TOKEN','LIVE_COMMERCECORE_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
+      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','CATALOG_MEMBER_SERVICE_TOKEN','COMMERCECORE_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.ok(process.env[key]);
     `,
       ],
       {
         ...process.env,
         MEMBER_SESSION_BASE_URL: 'http://untrusted.invalid',
-        SHOPPING_COMMERCE_SERVICE_TOKEN: 'ambient-other-target-secret',
+        CATALOG_COMMERCECORE_SERVICE_TOKEN: 'ambient-other-target-secret',
       },
     );
     assert.equal(member.status, 0, member.stderr);
@@ -96,7 +96,7 @@ test('로컬 키가 일치하고 TTL 누락·오류와 인증정보 덮어쓰기
       a.ok(process.env.NOTIFICATION_MEMBER_SERVICE_TOKEN);
       a.ok(process.env.MEMBER_SESSION_BASE_URL);
       a.ok(process.env.MEMBER_JWT_PUBLIC_KEY_SET_LOCATION);
-      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','SHOPPING_MEMBER_SERVICE_TOKEN','COMMERCE_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
+      for (const key of ['MEMBER_JWT_PRIVATE_KEY_LOCATION','CATALOG_MEMBER_SERVICE_TOKEN','COMMERCECORE_MEMBER_SERVICE_TOKEN','LIVE_MEMBER_SERVICE_TOKEN']) a.equal(process.env[key],undefined);
     `]);
     assert.equal(notification.status, 0, notification.stderr);
   } finally {
@@ -111,7 +111,7 @@ test('잘못된 인증정보 JSON 원문은 진단 출력에 포함하지 않는
     fs.writeFileSync(file, '{"secret":"sensitive-config-fragment",BROKEN}', { mode: 0o600 });
     const result = run([
       'exec',
-      'commerce',
+      'commercecore',
       '--env',
       file,
       '--',

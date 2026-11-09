@@ -24,7 +24,7 @@
 
 - staged와 작업 트리가 다르면 둘 다 검사 선택에 반영하지만 실제 실행 대상은 작업 트리다. 이 결과로 서로 다른 staged 내용까지 검증했다고 보고하지 않는다.
 - 기준 ref는 자동 fetch하지 않는다. 원격 최신성은 [동기화 절차](workflow/README.md#시작과-동기화)에서 확인한다. 잘못된 ref나 충돌은 준비 실패다.
-- 기본은 선택된 일반 검사만 실행한다. 선택된 외부 검사가 있으면 `--external`과 서비스별 환경 조건이 갖춰지기 전까지 미실행으로 남긴다. 테스트 대상 서비스에 DB URL 환경변수가 주입돼 있으면 일반 빌드·테스트도 `--external`이 필요하다. 테스트를 실행하지 않는 `spotlessCheck`는 이 제한을 받지 않는다. 인프라나 자격증명을 자동 생성하지 않는다.
+- 기본은 선택된 일반 검사만 실행한다. 선택된 외부 검사가 있으면 `--external`과 서비스별 환경 조건이 갖춰지기 전까지 미실행으로 남긴다. 테스트 대상 서비스에 DB URL 환경변수가 주입돼 있으면 일반 빌드·테스트도 `--external`이 필요하다. Core 테스트는 독립 Payment fixture의 `PAYMENT_TEST_POSTGRES_URL`도 외부 DB 설정으로 감지한다. 테스트를 실행하지 않는 `spotlessCheck`는 이 제한을 받지 않는다. 인프라나 자격증명을 자동 생성하지 않는다.
 - 결과와 명령별 로그는 무시되는 `build/harness/`에 저장하고 최신 결과 파일을 덮어쓴다. 종료 코드는 `0` 정상(변경 없음·자동 검사 대상 없음 포함), `1` 실패, `2` 미완료(미실행·스킵·0건·검사 중 diff 변경)다. 검사 대상 없음은 테스트 통과가 아니다.
 - Gradle XML에서 실패·스킵·건수와 작업의 `UP-TO-DATE`·`FROM-CACHE`·`NO-SOURCE`를 구분한다. 빌드는 대상 모듈의 `test`·`integrationTest` 작업 결과를 모두 확인하며, 작업 출력이나 필요한 XML이 빠지면 종료 코드가 0이어도 미완료다. 조건부 Kafka 스킵도 미완료로 표시한다. 원래 테스트가 없는 단위 작업의 NO-SOURCE는 그대로 보고한다.
 - 현재 diff와 실행 결과를 묶어 기록하며 검사 중 소스가 바뀌면 미완료로 표시한다. 이후 소스 변경의 유효성을 보장하는 인증서가 아니므로 최종 diff가 바뀌면 필요한 검사를 다시 선택한다.
@@ -56,11 +56,11 @@ git diff --check
 |---|---|---|
 | `test` | `src/test` | 실제 실행·캐시 재사용 구분 |
 | `integrationTest` | `src/integrationTest` 중 `postgres`, `redis` 제외 | 조건부 테스트는 스킵될 수 있음 |
-| `postgresTest` | Commerce 통합 테스트 중 `postgres & !migration` | 격리 PostgreSQL 필요, 다른 서비스에는 등록하지 않음 |
+| `postgresTest` | Catalog·CommerceCore·Payment·Live 통합 테스트 중 `postgres & !migration` | 서비스별 격리 PostgreSQL 필요 |
 | `migrationTest` | 통합 테스트 중 `postgres & migration` | 서비스 모듈만 등록, 환경 준비 필요 |
 | `redisTest` | 통합 테스트 중 `redis` | 서비스 모듈만 등록, 환경 준비 필요 |
 
-Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. 다른 서비스에는 전용 작업이 없다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
+Catalog·CommerceCore·Payment·Live의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. CI와 로컬 하네스는 해당 서비스의 업무 변경에 이 작업을 추가로 선택한다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
 
 ## PostgreSQL·Redis 환경
 
@@ -69,14 +69,14 @@ Commerce의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다
 | 서비스 | PostgreSQL 선택과 연결 설정 |
 |---|---|
 | Member | `MEMBER_TEST_DB_URL`을 PostgreSQL JDBC URL로 설정하고 `MEMBER_TEST_DB_DRIVER=org.postgresql.Driver`, `MEMBER_TEST_DB_USER`, `MEMBER_TEST_DB_PASSWORD` 지정 |
-| Shopping·Commerce | 각각 `SHOPPING_TEST_POSTGRES_`, `COMMERCE_TEST_POSTGRES_` 접두사의 `URL`, `USER`, `PASSWORD` 사용 |
+| Catalog·CommerceCore·Payment | 각각 `CATALOG_TEST_POSTGRES_`, `COMMERCECORE_TEST_POSTGRES_`, `PAYMENT_TEST_POSTGRES_` 접두사의 `URL`, `USER`, `PASSWORD` 사용 |
 | Notification | `NOTIFICATION_TEST_POSTGRES_URL`, `NOTIFICATION_TEST_DB_DRIVER=org.postgresql.Driver`, `NOTIFICATION_TEST_DB_USER`, `NOTIFICATION_TEST_DB_PASSWORD` 사용 |
 | Live | `LIVE_PG_TEST=1`, `LIVE_PG_PORT`와 [postgres 프로필](../services/live-service/src/integrationTest/resources/application-postgres.yml)의 DB·계정 설정 확인 |
 
 환경을 준비한 뒤 대상 서비스의 작업을 실행한다. 아래 명령만으로 환경이 생성되지는 않는다.
 
 ```bash
-./gradlew :services:commerce-service:postgresTest --tests '*NotificationEventPostgresTest'
+./gradlew :services:commercecore-service:postgresTest --tests '*NotificationEventPostgresTest'
 ./gradlew :services:member-service:migrationTest
 LIVE_PG_TEST=1 ./gradlew :services:live-service:migrationTest
 LIVE_REDIS_TEST=1 ./gradlew :services:live-service:redisTest
@@ -88,13 +88,13 @@ Member·Notification의 일반 통합 테스트도 환경변수로 DB가 바뀔 
 
 ## Kafka와 이벤트 표본
 
-Commerce의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCE_TEST_KAFKA_SERVERS`가 비어 있으면 스킵된다. 격리된 브로커를 준비한 후 해당 환경변수를 설정하고 일반 `integrationTest`에서 선택해 실행한다. 환경변수만 바꾼 재실행은 `--rerun-tasks`로 이전 결과 재사용을 피한다.
+CommerceCore의 `SalesInfoEventKafkaTest`, `CouponSyncKafkaTest`는 `COMMERCECORE_TEST_KAFKA_SERVERS`가 비어 있으면 스킵된다. 격리된 브로커를 준비한 후 해당 환경변수를 설정하고 일반 `integrationTest`에서 선택해 실행한다. 환경변수만 바꾼 재실행은 `--rerun-tasks`로 이전 결과 재사용을 피한다.
 
 ```bash
-./gradlew :services:commerce-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
+./gradlew :services:commercecore-service:integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks
 ```
 
-Commerce의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Shopping의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
+CommerceCore의 `SalesInfoMainConfigurationKafkaTest`는 main YAML을 직접 읽어 EmbeddedKafka 전송과 중복 설정 오류 재현을 검사하며 기본 `integrationTest`에서 항상 실행된다. Catalog의 `SalesInfoEventKafkaTest`도 EmbeddedKafka를 사용하고 일반 `integrationTest`에 포함된다. 전용 `kafka` 태그나 `kafkaTest` 작업은 없다. 브로커 기반 검증과 동일 JVM의 EmbeddedKafka 검증을 구분한다.
 
 ## API·이벤트 계약 검사
 
@@ -112,7 +112,7 @@ API 정적 검사는 직접 선언한 Spring MVC 경로·메서드를 비교한�
 이벤트 직렬화 표본까지 확인하려면 현재 코드로 표본을 먼저 생성한다.
 
 ```bash
-./gradlew :services:commerce-service:test --tests '*EventContractTest' :services:live-service:test --tests '*EventContractTest' --rerun-tasks
+./gradlew :services:commercecore-service:test --tests '*EventContractTest' :services:live-service:test --tests '*EventContractTest' --rerun-tasks
 .venv-api/bin/python .github/scripts/api/check_events.py --samples
 ```
 

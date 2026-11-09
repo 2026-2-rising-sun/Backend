@@ -6,13 +6,13 @@
 
 | 대상 | 형식 | 예시 |
 |---|---|---|
-| 이슈 | `[TYPE][scope] 한국어 작업 제목` | `[REFACTOR][commerce] 주문 생성 책임 정리` |
+| 이슈 | `[TYPE][scope] 한국어 작업 제목` | `[REFACTOR][commercecore] 주문 생성 책임 정리` |
 | 브랜치 | `type/#번호-영문-slug` | `refactor/#240-order-creation` |
-| PR | `type(scope): 한국어 변경 내용 (#번호)` | `refactor(commerce): 주문 생성 책임 정리 (#240)` |
-| 커밋 | `type(scope): 한국어 변경 내용` | `refactor(commerce): 주문 금액 계산 분리` |
+| PR | `type(scope): 한국어 변경 내용 (#번호)` | `refactor(commercecore): 주문 생성 책임 정리 (#240)` |
+| 커밋 | `type(scope): 한국어 변경 내용` | `refactor(commercecore): 주문 금액 계산 분리` |
 
 - 타입은 `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `build`, `ci`, `perf`, `revert`. 이슈는 대문자를 사용하며 버그 타입은 기존 이슈 관례인 `BUG`를 쓴다.
-- scope는 `shopping`, `commerce`, `live`, `member`, `notification`, `common`, `infra`. 여러 서비스의 공통 변경과 하네스 변경은 `common`을 사용한다.
+- scope는 `catalog`, `commercecore`, `payment`, `live`, `member`, `notification`, `common`, `infra`. 여러 서비스의 공통 변경과 하네스 변경은 `common`을 사용한다.
 - 브랜치 slug는 영어 소문자와 하이픈을 사용한다. 이슈가 연결된 작업은 브랜치·PR의 이슈 번호를 일치시킨다.
 - 브랜치 slug는 쉬운 영어로 작업 대상이나 목적이 드러나게 짧게 쓴다. slug는 하이픈으로 구분한 영어 단어를 최대 5개까지 사용하되, 의미가 전달되는 범위에서 적은 단어를 권장한다. 타입과 이슈 번호는 단어 수에 포함하지 않는다. 이슈 제목 전체·구현 세부·불필요한 서비스명이나 날짜를 붙이지 않는다. 글자 수를 맞추기 위한 알아보기 어려운 축약도 피한다.
 - 작업을 구분하기 어려운 포괄적인 이름과 긴 나열은 피한다. 구분에 꼭 필요한 단어만 추가한다.

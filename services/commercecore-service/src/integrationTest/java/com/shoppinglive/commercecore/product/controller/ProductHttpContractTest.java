@@ -1,0 +1,322 @@
+package com.shoppinglive.commercecore.product.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.product.entity.ProductImage;
+import com.shoppinglive.commercecore.product.repository.ProductImageRepository;
+import com.shoppinglive.commercecore.product.repository.ProductRepository;
+import com.shoppinglive.commercecore.product.support.ProductSecuritySupport;
+import com.shoppinglive.commercecore.storage.ImageFormat;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.LongStream;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.util.UriComponentsBuilder;
+
+@SpringBootTest(
+        classes = com.shoppinglive.commercecore.product.support.ProductHttpTestApplication.class,
+        properties = {
+            // 판매정보 장애 계약은 되돌리기 스위치인 http 경로에서 유지한다.
+            "catalog.sales.source=http",
+            "spring.datasource.url=jdbc:h2:mem:shopping_http_contracts;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
+        })
+@AutoConfigureMockMvc
+@DisplayName("Shopping 실제 HTTP 핵심 계약")
+class ProductHttpContractTest extends ProductSecuritySupport {
+    @Autowired MockMvc mvc;
+    @Autowired ObjectMapper mapper;
+    @Autowired ProductRepository products;
+    @Autowired ProductImageRepository images;
+    @Autowired JdbcTemplate jdbc;
+
+    private long imageId;
+
+    @BeforeEach
+    void prepareImageMetadata() {
+        imageId =
+                images.saveAndFlush(
+                                new ProductImage(
+                                        UUID.randomUUID() + ".png",
+                                        ImageFormat.PNG,
+                                        100,
+                                        10,
+                                        10,
+                                        "fixture.png"))
+                        .getId();
+    }
+
+    @AfterEach
+    void cleanFixtures() {
+        products.deleteAll();
+        images.deleteAll();
+    }
+
+    @Test
+    @DisplayName("상품 등록과 같은 멱등 키 재전송은 동일한 상품 하나를 반환한다")
+    void registrationAndReplayReturnOneProduct() throws Exception {
+        JsonNode first = register();
+        JsonNode replay = register();
+
+        assertThat(first.path("name").asText()).isEqualTo("상품");
+        assertThat(first.path("mainImageId").asLong()).isEqualTo(imageId);
+        assertThat(replay.path("productId").asLong()).isEqualTo(first.path("productId").asLong());
+        assertThat(products.count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("내부 벌크 조회는 쉼표·반복·혼합 ids를 지원하고 중복 제거 후 100개까지 조회한다")
+    void internalLookupDoesNotDependOnSalesPublication() throws Exception {
+        long id = register().path("productId").asLong();
+
+        List<List<String>> queries =
+                List.of(
+                        List.of(id + "," + id + "," + Long.MAX_VALUE),
+                        List.of(
+                                String.valueOf(id),
+                                String.valueOf(id),
+                                String.valueOf(Long.MAX_VALUE)),
+                        List.of(id + "," + id, String.valueOf(Long.MAX_VALUE)),
+                        Collections.nCopies(101, String.valueOf(id)),
+                        Stream.concat(
+                                        Stream.of(String.valueOf(id)),
+                                        LongStream.range(1, 100)
+                                                .mapToObj(
+                                                        offset ->
+                                                                String.valueOf(
+                                                                        Long.MAX_VALUE - offset)))
+                                .toList());
+
+        for (List<String> ids : queries) {
+            // Live HttpProductClient도 Collection을 queryParam에 전달하여 반복 파라미터를 만든다.
+            var uri =
+                    UriComponentsBuilder.fromPath("/v1/internal/products")
+                            .queryParam("ids", ids)
+                            .build()
+                            .toUri();
+            mvc.perform(get(uri).header("X-Service-Token", LIVE_KEY))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data", hasSize(1)))
+                    .andExpect(jsonPath("$.data[0].id").value(id))
+                    .andExpect(jsonPath("$.data[0].name").value("상품"));
+        }
+    }
+
+    @Test
+    @DisplayName("내부 벌크 조회의 누락·빈 ids·잘못된 숫자·중복 제거 후 100개 초과는 400이다")
+    void invalidInternalLookupIdsReturnBadRequest() throws Exception {
+        List<List<String>> invalidQueries =
+                List.of(
+                        List.of(),
+                        List.of(""),
+                        List.of(" "),
+                        List.of(",,", " "),
+                        List.of("1", "invalid"),
+                        List.of("1.5"),
+                        List.of("9223372036854775808"),
+                        LongStream.rangeClosed(1, 101).mapToObj(String::valueOf).toList());
+
+        for (List<String> ids : invalidQueries) {
+            var request = get("/v1/internal/products");
+            if (!ids.isEmpty()) {
+                request.param("ids", ids.toArray(String[]::new));
+            }
+            mvc.perform(request.header("X-Service-Token", LIVE_KEY))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
+    }
+
+    @Test
+    @DisplayName("깨진 JSON은 400 INVALID_REQUEST이며 상품을 만들지 않는다")
+    void malformedJsonReturnsBadRequestWithoutMutation() throws Exception {
+        mvc.perform(
+                        post("/v1/seller/products")
+                                .header("Authorization", sellerBearer())
+                                .header("X-Idempotency-Key", "malformed")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        assertThat(products.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("없는 상품의 내부 단건 조회는 404 NOT_FOUND다")
+    void missingProductReturnsNotFound() throws Exception {
+        mvc.perform(
+                        get("/v1/internal/products/{id}", Long.MAX_VALUE)
+                                .header("X-Service-Token", LIVE_KEY))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("수정 후 이전 version을 재사용하면 409이며 먼저 저장한 값을 보존한다")
+    void staleVersionCannotOverwriteUpdatedProduct() throws Exception {
+        JsonNode registered = register();
+        long id = registered.path("productId").asLong();
+        long originalVersion = registered.path("version").asLong();
+
+        String updated =
+                mvc.perform(
+                                patch("/v1/seller/products/{id}", id)
+                                        .header("Authorization", sellerBearer())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "name",
+                                                                "먼저 수정",
+                                                                "version",
+                                                                originalVersion))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.name").value("먼저 수정"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        long updatedVersion = mapper.readTree(updated).path("data").path("version").asLong();
+        assertThat(updatedVersion).isGreaterThan(originalVersion);
+
+        mvc.perform(
+                        patch("/v1/seller/products/{id}", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of(
+                                                        "name",
+                                                        "오래된 수정",
+                                                        "version",
+                                                        originalVersion))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("CONFLICT"));
+        var saved = products.findById(id).orElseThrow();
+        assertThat(saved.getName()).isEqualTo("먼저 수정");
+        assertThat(saved.getVersion()).isEqualTo(updatedVersion);
+    }
+
+    @Test
+    @DisplayName("카테고리는 생략하면 미분류(null), 수정에서 생략하면 유지되고 목록에 없는 값·순번은 400이다")
+    void categoryIsOptionalKeptOnPartialUpdateAndValidated() throws Exception {
+        JsonNode registered = register();
+        assertThat(registered.path("category").isNull()).isTrue();
+        long id = registered.path("productId").asLong();
+
+        // 순번(0)·순번 문자열("0")이 FASHION 으로 저장되지 않아야 한다.
+        for (Object invalid : List.of("WRONG", 0, "0", "fashion")) {
+            mvc.perform(
+                            post("/v1/seller/products")
+                                    .header("Authorization", sellerBearer())
+                                    .header("X-Idempotency-Key", "invalid-category")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            mapper.writeValueAsString(
+                                                    Map.of(
+                                                            "name",
+                                                            "상품",
+                                                            "description",
+                                                            "상품 설명",
+                                                            "mainImageId",
+                                                            imageId,
+                                                            "category",
+                                                            invalid))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
+        assertThat(products.findByIdempotencyKey("invalid-category")).isEmpty();
+
+        String classified =
+                mvc.perform(
+                                patch("/v1/seller/products/{id}", id)
+                                        .header("Authorization", sellerBearer())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "category",
+                                                                "BEAUTY",
+                                                                "version",
+                                                                registered
+                                                                        .path("version")
+                                                                        .asLong()))))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.category").value("BEAUTY"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        long version = mapper.readTree(classified).path("data").path("version").asLong();
+        mvc.perform(
+                        patch("/v1/seller/products/{id}", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        mapper.writeValueAsString(
+                                                Map.of("name", "이름만 수정", "version", version))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value("BEAUTY"));
+        for (Object invalid : List.of("WRONG", 1, "1")) {
+            mvc.perform(
+                            patch("/v1/seller/products/{id}", id)
+                                    .header("Authorization", sellerBearer())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            mapper.writeValueAsString(
+                                                    Map.of(
+                                                            "category",
+                                                            invalid,
+                                                            "version",
+                                                            version))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
+        mvc.perform(get("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.category").value("BEAUTY"));
+    }
+
+    private JsonNode register() throws Exception {
+        String response =
+                mvc.perform(
+                                post("/v1/seller/products")
+                                        .header("Authorization", sellerBearer())
+                                        .header("X-Idempotency-Key", "product-http-contract")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                mapper.writeValueAsString(
+                                                        Map.of(
+                                                                "name",
+                                                                "상품",
+                                                                "description",
+                                                                "상품 설명",
+                                                                "mainImageId",
+                                                                imageId))))
+                        .andExpect(status().isCreated())
+                        .andExpect(jsonPath("$.success").value(true))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        return mapper.readTree(response).path("data");
+    }
+}

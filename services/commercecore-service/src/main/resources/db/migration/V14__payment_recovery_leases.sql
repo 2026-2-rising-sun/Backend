@@ -1,0 +1,1 @@
+-- 결제 실행 스키마는 빈 전용 payment-service DB가 소유한다.

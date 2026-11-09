@@ -1,7 +1,7 @@
 package com.shoppinglive.live.broadcast.dto;
 
-import com.shoppinglive.live.client.commerce.SalesSnapshot;
-import com.shoppinglive.live.client.shopping.ProductSnapshot;
+import com.shoppinglive.live.client.commercecore.ProductSnapshot;
+import com.shoppinglive.live.client.commercecore.SalesSnapshot;
 
 /**
  * 방송 상품 조회 응답. FE 는 productId/salesId 를 그대로 일반 주문 흐름에 전달한다. Live 전용 주문 API 는 없고 최종 가격·재고 판정은
@@ -51,7 +51,7 @@ public record BroadcastProductViewResponse(
                 sales.available(),
                 sales.status().name(),
                 // 품절은 구매 불가. ON_SALE 도 available 부족이면 Commerce 가 최종 거절한다.
-                sales.status() == com.shoppinglive.live.client.commerce.SalesStatus.ON_SALE
+                sales.status() == com.shoppinglive.live.client.commercecore.SalesStatus.ON_SALE
                         && sales.available() > 0,
                 false);
     }

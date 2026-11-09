@@ -99,7 +99,7 @@ def commands_for(plan):
         add("gradle", ["./gradlew", *plan["gradle_tasks"], *options])
     if plan["event_samples"]:
         add("event-samples", [sys.executable, ".github/scripts/api/check_events.py", "--samples"])
-    for task in plan["migration_tasks"] + plan["redis_tasks"]:
+    for task in plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]:
         add(task, ["./gradlew", task, *options], task)
     return checks
 
@@ -125,7 +125,7 @@ def expected_test_tasks(command):
             modules = [module] if module else (
                 [":common-module"] + [":services:" + service for service in CI.SERVICES])
             expected.update(m + ":" + t for m in modules for t in ("test", "integrationTest"))
-        elif task in ("test", "integrationTest", "migrationTest", "redisTest"):
+        elif task in ("test", "integrationTest", "migrationTest", "postgresTest", "redisTest"):
             expected.add(argument)
     return expected
 
@@ -134,6 +134,8 @@ def configured_test_database(command, environment):
     tasks = expected_test_tasks(command)
     services = [service for service in CI.SERVICES
                 if any(task.startswith(":services:" + service + ":") for task in tasks)]
+    if "commercecore-service" in services and "payment-service" not in services:
+        services.append("payment-service")
     for service in services:
         prefix = service.removesuffix("-service").upper()
         if any(value and key.startswith(prefix + "_") and "TEST" in key
@@ -145,7 +147,7 @@ def configured_test_database(command, environment):
 
 def test_results(root, output):
     results = []
-    for match in re.finditer(r"^> Task (:(?:[\w-]+:)*)(test|integrationTest|migrationTest|redisTest)(?=\s|$)([^\n]*)", output, re.M):
+    for match in re.finditer(r"^> Task (:(?:[\w-]+:)*)(test|integrationTest|migrationTest|postgresTest|redisTest)(?=\s|$)([^\n]*)", output, re.M):
         module, task, state = match.groups()
         folder = root.joinpath(*module.strip(":").split(":"), "build", "test-results", task)
         counts = dict(tests=0, failures=0, errors=0, skipped=0)

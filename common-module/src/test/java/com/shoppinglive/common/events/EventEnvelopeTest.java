@@ -26,7 +26,7 @@ class EventEnvelopeTest {
                 EventEnvelope.create(
                         "OrderPaid",
                         1,
-                        "commerce-service",
+                        "commercecore-service",
                         "42",
                         time,
                         Map.of("orderId", "42", "unused", "extra"));
@@ -35,7 +35,7 @@ class EventEnvelopeTest {
                 mapper.readValue(
                         mapper.writeValueAsBytes(event),
                         new TypeReference<EventEnvelope<PartialPayload>>() {});
-        assertThat(received.source()).isEqualTo("commerce-service");
+        assertThat(received.source()).isEqualTo("commercecore-service");
         assertThat(received.aggregateId()).isEqualTo("42");
         assertThat(received.occurredAt()).isEqualTo(time);
         assertThat(received.payload().orderId()).isEqualTo("42");

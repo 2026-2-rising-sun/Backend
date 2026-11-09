@@ -1,0 +1,151 @@
+package com.shoppinglive.commercecore.config;
+
+import com.shoppinglive.common.security.JsonSecurityErrorHandler;
+import com.shoppinglive.common.security.MemberJwtAuthenticationConverter;
+import com.shoppinglive.common.security.ServiceCallerTokenValidator;
+import com.shoppinglive.common.security.ServiceTokenAuthenticationFilter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+
+@Configuration(proxyBeanMethods = false)
+public class CommerceCoreSecurityConfiguration {
+    @Bean
+    @Order(1)
+    SecurityFilterChain internalSales(
+            HttpSecurity http, ServiceCallerTokenValidator callers, JsonSecurityErrorHandler errors)
+            throws Exception {
+        return http.securityMatcher(
+                        request -> {
+                            String path =
+                                    request.getRequestURI()
+                                            .substring(request.getContextPath().length());
+                            return path.equals("/v1/internal/products")
+                                    || path.startsWith("/v1/internal/products/")
+                                    || ("GET".equals(request.getMethod())
+                                            && ("/v1/sales".equals(path)
+                                                    || "/v1/internal/coupon-snapshots".equals(path)
+                                                    || path.startsWith(
+                                                            "/v1/internal/coupon-snapshots/")));
+                        })
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(
+                        handler ->
+                                handler.authenticationEntryPoint(errors)
+                                        .accessDeniedHandler(errors))
+                .authorizeHttpRequests(
+                        auth ->
+                                auth.requestMatchers(HttpMethod.GET, "/v1/sales")
+                                        .hasAnyAuthority("SERVICE_catalog", "SERVICE_live")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/internal/coupon-snapshots",
+                                                "/v1/internal/coupon-snapshots/*")
+                                        .hasAuthority("SERVICE_catalog")
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/v1/internal/products",
+                                                "/v1/internal/products/**")
+                                        .hasAuthority("SERVICE_live")
+                                        .anyRequest()
+                                        .denyAll())
+                .addFilterBefore(
+                        new ServiceTokenAuthenticationFilter(callers, errors),
+                        AnonymousAuthenticationFilter.class)
+                .build();
+    }
+
+    @Bean
+    @Order(2)
+    SecurityFilterChain memberCommerceCore(
+            HttpSecurity http,
+            MemberJwtAuthenticationConverter converter,
+            JsonSecurityErrorHandler errors,
+            Environment environment)
+            throws Exception {
+        boolean devImages =
+                environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
+                        && environment.getProperty(
+                                "commercecore.dev-api.enabled", Boolean.class, false);
+        boolean devScenarios =
+                environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
+                        && environment.getProperty(
+                                "commercecore.dev.payment-scenario.enabled", Boolean.class, false);
+        return http.csrf(csrf -> csrf.disable())
+                .sessionManagement(
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(
+                        handler ->
+                                handler.authenticationEntryPoint(errors)
+                                        .accessDeniedHandler(errors))
+                .authorizeHttpRequests(
+                        auth -> {
+                            auth.requestMatchers(
+                                            HttpMethod.GET,
+                                            "/actuator/health/liveness",
+                                            "/actuator/health/readiness",
+                                            "/v1/product-images/",
+                                            "/v1/product-images/{id}")
+                                    .permitAll()
+                                    .requestMatchers(
+                                            "/v1/orders",
+                                            "/v1/orders/**",
+                                            "/v1/cart/items",
+                                            "/v1/cart/items/**",
+                                            "/v1/cart/checkout",
+                                            "/v1/cart/orders",
+                                            "/v1/payment-groups/**")
+                                    .hasAnyRole("USER", "SELLER")
+                                    .requestMatchers(HttpMethod.POST, "/v1/sales")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(
+                                            HttpMethod.GET, "/v1/coupons", "/v1/me/coupons")
+                                    .hasAnyRole("USER", "SELLER")
+                                    .requestMatchers(HttpMethod.POST, "/v1/coupons/*/claims")
+                                    .hasAnyRole("USER", "SELLER")
+                                    .requestMatchers(HttpMethod.POST, "/v1/seller/coupons")
+                                    .hasRole("SELLER")
+                                    .requestMatchers("/v1/seller/coupons", "/v1/seller/coupons/*")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(
+                                            "/v1/seller/products",
+                                            "/v1/seller/products/**",
+                                            "/v1/seller/product-images")
+                                    .hasRole("SELLER")
+                                    .requestMatchers("/v1/seller/refunds/**")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(
+                                            HttpMethod.PATCH,
+                                            "/v1/sales/*/price",
+                                            "/v1/sales/*/stock",
+                                            "/v1/sales/*/status")
+                                    .hasRole("SELLER")
+                                    .requestMatchers(HttpMethod.GET, "/v1/sales/*/stock")
+                                    .hasRole("SELLER");
+                            if (devImages) {
+                                auth.requestMatchers("/v1/dev/product-images").hasRole("SELLER");
+                            }
+                            if (devScenarios) {
+                                auth.requestMatchers("/v1/dev/payment-scenarios/**")
+                                        .hasRole("SELLER");
+                            }
+                            auth.anyRequest().denyAll();
+                        })
+                .oauth2ResourceServer(
+                        oauth ->
+                                oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter))
+                                        .authenticationEntryPoint(errors)
+                                        .accessDeniedHandler(errors)
+                                        .withObjectPostProcessor(errors.bearerFailureHandler()))
+                .build();
+    }
+}

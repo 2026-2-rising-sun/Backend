@@ -58,7 +58,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: &id001
             type: string
             pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
@@ -120,7 +120,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: PaymentGroupCreated
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
@@ -155,7 +155,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: *id001
           occurredAt:
             type: string
@@ -225,7 +225,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: PaymentSucceeded
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
@@ -262,7 +262,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: *id001
           occurredAt:
             type: string
@@ -338,7 +338,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: PaymentFailed
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
@@ -376,7 +376,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: *id001
           occurredAt:
             type: string
@@ -441,7 +441,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: OrderCancelled
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
@@ -477,7 +477,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: *id001
           occurredAt:
             type: string
@@ -542,7 +542,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: OrderExpired
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
@@ -578,7 +578,7 @@ components:
           schemaVersion:
             const: 1
           source:
-            const: commerce-service
+            enum: [commerce-service, commercecore-service]
           aggregateId: *id001
           occurredAt:
             type: string
@@ -653,7 +653,7 @@ components:
           eventId: 33333333-3333-4333-8333-333333333333
           eventType: RefundCompleted
           schemaVersion: 1
-          source: commerce-service
+          source: commercecore-service
           aggregateId: PG-11111111-1111-4111-8111-111111111111
           occurredAt: '2026-10-17T00:00:00Z'
           payload:
