@@ -114,8 +114,19 @@ public class RefundQueryService {
                                 () ->
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
-        List<Long> ids = repository.requestIds(group.getId());
-        return ids.stream().map(id -> load(id, groupNumber)).toList();
+        List<RequestRow> requests = repository.requests(group.getId());
+        if (requests.isEmpty()) return List.of();
+        Map<Long, List<RefundTarget>> targets = repository.targetsForGroup(group.getId());
+        Map<Long, Long> cumulative = repository.cumulativeAmounts(List.of(group.getId()));
+        return requests.stream()
+                .map(
+                        request ->
+                                refundView(
+                                        request,
+                                        groupNumber,
+                                        targets.getOrDefault(request.id(), List.of()),
+                                        cumulative.getOrDefault(request.groupId(), 0L)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -138,8 +149,20 @@ public class RefundQueryService {
         if (page < 0 || size < 1 || size > 100) {
             throw invalid("page는 0 이상, size는 1~100이어야 합니다.");
         }
-        List<Long> ids = repository.sellerRequestIds(sellerId, size, (long) page * size);
-        return ids.stream().map(id -> loadSeller(id, sellerId)).toList();
+        List<RequestRow> requests = repository.sellerRequests(sellerId, size, (long) page * size);
+        if (requests.isEmpty()) return List.of();
+        List<Long> ids = requests.stream().map(RequestRow::id).toList();
+        List<Long> groupIds = requests.stream().map(RequestRow::groupId).distinct().toList();
+        Map<Long, List<RefundTarget>> targets = repository.sellerTargetsByRequestIds(ids, sellerId);
+        Map<Long, Long> cumulative = repository.sellerCumulativeAmounts(groupIds, sellerId);
+        return requests.stream()
+                .map(
+                        request ->
+                                sellerView(
+                                        request,
+                                        targets.getOrDefault(request.id(), List.of()),
+                                        cumulative.getOrDefault(request.groupId(), 0L)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -158,8 +181,13 @@ public class RefundQueryService {
         }
         long cumulative = repository.cumulativeAmount(request.groupId());
         List<RefundTarget> targets = repository.targets(id);
+        return refundView(request, groupNumber, targets, cumulative);
+    }
+
+    private static RefundView refundView(
+            RequestRow request, String groupNumber, List<RefundTarget> targets, long cumulative) {
         return new RefundView(
-                id,
+                request.id(),
                 groupNumber,
                 request.amount(),
                 cumulative,
@@ -176,6 +204,12 @@ public class RefundQueryService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "환불 요청을 찾을 수 없습니다.");
         }
         List<RefundTarget> targets = repository.sellerTargets(id, sellerId);
+        Long cumulative = repository.sellerCumulativeAmount(request.groupId(), sellerId);
+        return sellerView(request, targets, cumulative == null ? 0L : cumulative);
+    }
+
+    private static SellerRefundView sellerView(
+            RequestRow request, List<RefundTarget> targets, long cumulative) {
         long sellerAmount = 0;
         try {
             for (RefundTarget target : targets) {
@@ -184,11 +218,10 @@ public class RefundQueryService {
         } catch (ArithmeticException overflow) {
             throw new BusinessException(ErrorCode.CONFLICT, "환불 금액 범위를 초과했습니다.");
         }
-        Long cumulative = repository.sellerCumulativeAmount(request.groupId(), sellerId);
         return new SellerRefundView(
-                id,
+                request.id(),
                 sellerAmount,
-                cumulative == null ? 0L : cumulative,
+                cumulative,
                 request.status(),
                 request.requestedAt(),
                 request.resolvedAt(),

@@ -179,7 +179,7 @@ class RefundQueryPostgresTest extends RefundTestSupport {
             jdbc.setDataSource(original);
             statistics.setStatisticsEnabled(statisticsEnabled);
         }
-        int expected = 1 + 3 * count;
+        int expected = count == 0 ? 1 : 3;
         System.out.printf(
                 "환불 목록 SQL: seller=%s, rows=%d, queries=%d, expected=%d%n",
                 seller, count, counting.sql.size(), expected);
@@ -234,8 +234,8 @@ class RefundQueryPostgresTest extends RefundTestSupport {
     @DisplayName("환불이 없는 목록은 비어 있고 처리 중 복구 정보와 부분 환불 응답을 유지한다")
     void preservesEmptyListAndRecoveryResponse() {
         var group = createAndPay();
-        assertThat(queries.list(MEMBER_A, group.groupNumber())).isEmpty();
-        assertThat(queries.listSeller(SELLER, 0, 100)).isEmpty();
+        assertThat(measured(0, false, () -> queries.list(MEMBER_A, group.groupNumber()))).isEmpty();
+        assertThat(measured(0, true, () -> queries.listSeller(SELLER, 0, 100))).isEmpty();
         var refund =
                 intake.request(MEMBER_A, group.groupNumber(), "partial", List.of(a.getId()))
                         .refund();
@@ -282,7 +282,9 @@ class RefundQueryPostgresTest extends RefundTestSupport {
         var order =
                 new com.shoppinglive.commercecore.order.entity.Order(
                         "OD-query-second",
-                        sales.findAll().getFirst().getId(),
+                        orders.findByPaymentGroupIdOrderByIdAsc(first.groupId())
+                                .getFirst()
+                                .getSalesInfoId(),
                         1,
                         7000L,
                         "구매자",
@@ -295,12 +297,33 @@ class RefundQueryPostgresTest extends RefundTestSupport {
         order = orders.saveAndFlush(order);
         long id = insertRequest(group.getId(), "second-success", "SUCCESS", 7000L, Instant.now());
         addTarget(id, order.getId(), 81001L, SELLER, 7000L);
-        var page = queries.listSeller(SELLER, 0, 100);
+        var page = measured(2, true, () -> queries.listSeller(SELLER, 0, 100));
         assertThat(page).hasSize(2);
         assertThat(page.getFirst().id()).isEqualTo(id);
         assertThat(page.getFirst().cumulativeRefundAmount()).isEqualTo(7000L);
         assertThat(page.get(1).id()).isEqualTo(first.requestIds().getFirst());
         assertThat(page.get(1).cumulativeRefundAmount()).isEqualTo(20000L);
+        assertNotFound(
+                () -> queries.get(MEMBER_A, group.getGroupNumber(), first.requestIds().getFirst()));
+    }
+
+    @Test
+    @DisplayName("구매자 목록은 접수 시각 역순이며 시각이 같을 때 ID 역순을 유지한다")
+    void keepsRequestedTimeOrderAndIdTieBreaker() {
+        History history = history(4, false);
+        Instant at = Instant.parse("2099-01-01T00:00:00Z");
+        jdbc.update(
+                "UPDATE refund_request SET requested_at=? WHERE id IN (?,?)",
+                Timestamp.from(at),
+                history.requestIds().get(0),
+                history.requestIds().get(1));
+        assertThat(queries.list(MEMBER_A, history.groupNumber()))
+                .extracting(RefundView::id)
+                .containsExactly(
+                        history.requestIds().get(1),
+                        history.requestIds().get(0),
+                        history.requestIds().get(3),
+                        history.requestIds().get(2));
     }
 
     private void assertNotFound(Runnable action) {
