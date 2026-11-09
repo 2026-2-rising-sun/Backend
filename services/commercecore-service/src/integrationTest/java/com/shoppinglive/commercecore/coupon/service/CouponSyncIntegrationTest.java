@@ -59,6 +59,13 @@ class CouponSyncIntegrationTest extends CommerceCoreSecurityTestSupport {
                                             "db/migration/V17__coupon_display_snapshot_version.sql"))
                             .execute(jdbc.getDataSource());
                 }
+                if (jdbc.queryForList(
+                                "SELECT column_name FROM information_schema.columns WHERE table_name='MEMBER_COUPON'")
+                        .isEmpty()) {
+                    new ResourceDatabasePopulator(
+                                    new ClassPathResource("db/migration/V6__member_coupons.sql"))
+                            .execute(jdbc.getDataSource());
+                }
             }
         }
     }
