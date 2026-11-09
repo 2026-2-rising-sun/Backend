@@ -36,6 +36,8 @@ import org.springframework.test.context.bean.override.mockito.*;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired PaymentService service;
     @Autowired PaymentGroupService groups;
     @Autowired PaymentGroupRepository groupRows;
@@ -135,12 +137,12 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     @Test
     void lostSuccessResponseKeepsReservationsAndExistingApprovalAppliesWithoutRetry() {
         var p = start(PaymentScenario.SUCCESS_RESPONSE_LOST);
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
         held(p.getId());
         assertThat(attempts.findById(p.getId()).orElseThrow().getStatus())
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.UNKNOWN);
         due(p.getId());
-        assertThat(service.refresh(p.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         assertThat(coupon()).isEqualTo("USED");
         assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
         assertThat(
@@ -154,17 +156,17 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                         p.getId(),
                         com.shoppinglive.payment.entity.PaymentScenario.valueOf(
                                 p.getScenario().name()));
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
     }
 
     @DisplayName("실패 응답이 유실되면 확정 실패를 조회할 때까지 예약을 해제하지 않는다")
     @Test
     void lostFailureResponseDoesNotReleaseUntilAuthoritativeFailureIsRead() {
         var p = start(PaymentScenario.FAILURE_RESPONSE_LOST);
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
         held(p.getId());
         due(p.getId());
-        assertThat(service.refresh(p.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         assertThat(coupon()).isEqualTo("AVAILABLE");
         assertThat(stocks.findById(stockId).orElseThrow().getAvailable()).isEqualTo(5);
         assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
@@ -178,7 +180,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         var p = start(PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
         for (int i = 0; i < 4; i++) {
             due(p.getId());
-            assertThat(service.refresh(p.getId())).isFalse();
+            assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
             held(p.getId());
             assertThat(
                             paymentServer.jdbc.queryForObject(
@@ -199,7 +201,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                         com.shoppinglive.payment.entity.PaymentScenario.valueOf(
                                 p.getScenario().name()));
         due(p.getId());
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
         held(p.getId());
         verify(gateway, times(4))
                 .authorize(
@@ -228,7 +230,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         doThrow(new IllegalStateException("결제 제공자 결과 조회를 사용할 수 없습니다."))
                 .when(gateway)
                 .find(p.getId());
-        assertThatThrownBy(() -> service.refresh(p.getId()))
+        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(p.getId())))
                 .isInstanceOf(IllegalStateException.class);
         held(p.getId());
         verify(gateway, never())
@@ -249,7 +251,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     void approvalSurvivesBusinessRollbackAndDoesNotConsumeAnotherInvocation() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
         jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", stockId);
-        assertThatThrownBy(() -> service.refresh(p.getId()))
+        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(p.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(coupon()).isEqualTo("RESERVED");
         assertThat(orders.findAll())
@@ -261,7 +263,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                 .isEqualTo(1);
         jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", stockId);
         due(p.getId());
-        assertThat(service.refresh(p.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         verify(gateway, times(1))
                 .authorize(
                         p.getId(),
@@ -289,7 +291,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                         })
                 .when(recovery)
                 .complete(any(), eq("SUCCESS"));
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
         assertThat(
                         paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentExecutionResolved'",
@@ -302,7 +304,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                 .isEqualTo(1);
         doCallRealMethod().when(recovery).complete(any(), eq("SUCCESS"));
         due(p.getId());
-        assertThat(service.refresh(p.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         verify(gateway, times(1))
                 .authorize(
                         p.getId(),
@@ -319,7 +321,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 p.getId());
-        assertThat(service.refresh(p.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isFalse();
         held(p.getId());
         assertThat(
                         paymentServer.jdbc.queryForObject(

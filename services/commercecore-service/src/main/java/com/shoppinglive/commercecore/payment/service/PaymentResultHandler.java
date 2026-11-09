@@ -1,44 +1,31 @@
 package com.shoppinglive.commercecore.payment.service;
 
-import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.order.service.PaymentGroupService;
+import com.shoppinglive.commercecore.order.service.OrderPaymentOutcomeService;
 import com.shoppinglive.commercecore.payment.dto.*;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.*;
 import java.time.Instant;
 import java.util.Objects;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class PaymentResultHandler {
     private final PaymentDeliveryStore store;
-    private final ObjectProvider<PaymentGroupService> groups;
+    private final OrderPaymentOutcomeService orderOutcomes;
     private final RefundOutcomeService refunds;
     private final TransactionTemplate tx;
-    private final OrderJpaRepository orders;
-    private final SalesStockJpaRepository stock;
-    private final SalesService sales;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public PaymentResultHandler(
             PaymentDeliveryStore store,
-            ObjectProvider<PaymentGroupService> groups,
+            OrderPaymentOutcomeService orderOutcomes,
             RefundOutcomeService refunds,
             TransactionTemplate tx,
-            OrderJpaRepository orders,
-            SalesStockJpaRepository stock,
-            SalesService sales,
             org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.store = store;
-        this.groups = groups;
+        this.orderOutcomes = orderOutcomes;
         this.refunds = refunds;
         this.tx = tx;
-        this.orders = orders;
-        this.stock = stock;
-        this.sales = sales;
         this.jdbc = jdbc;
     }
 
@@ -71,36 +58,7 @@ public class PaymentResultHandler {
             tx.executeWithoutResult(t -> store.record(d, p, p.status().name()));
             return false;
         }
-        if (p.paymentGroupId() != null) return groups.getObject().applyOutcome(p);
-        else
-            return tx.execute(
-                    t -> {
-                        jdbc.queryForObject(
-                                "SELECT id FROM orders WHERE id=? FOR UPDATE",
-                                Long.class,
-                                p.orderId());
-                        var current = store.get(p.requestId());
-                        if (current.terminal()) {
-                            store.requireSameResult(current, p);
-                            return false;
-                        }
-                        var order = orders.findById(p.orderId()).orElseThrow();
-                        boolean success =
-                                p.status()
-                                        == com.shoppinglive.commercecore.payment.entity
-                                                .PaymentStatus.SUCCESS;
-                        if (orders.transitionStatus(
-                                        order.getId(),
-                                        "PAYMENT_CONFIRMING",
-                                        success ? "PAID" : "FAILED")
-                                != 1) throw new IllegalStateException("단건 결제 주문 상태가 다릅니다.");
-                        if (success) {
-                            if (stock.consumeReserved(order.getSalesInfoId(), order.getQuantity())
-                                    != 1) throw new IllegalStateException("예약 재고가 누락되었습니다.");
-                        } else sales.restoreReserved(order.getSalesInfoId(), order.getQuantity());
-                        store.record(current, p, p.status().name());
-                        return true;
-                    });
+        return orderOutcomes.apply(p);
     }
 
     public boolean refund(RefundExecution p) {

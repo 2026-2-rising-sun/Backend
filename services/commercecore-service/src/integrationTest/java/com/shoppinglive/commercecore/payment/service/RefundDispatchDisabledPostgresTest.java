@@ -68,13 +68,7 @@ class RefundDispatchDisabledPostgresTest extends RefundTestSupport {
                                 "SELECT status FROM refund_request WHERE id=?", String.class, id))
                 .isEqualTo("PROCESSING");
         // 재활성된 relay는 새 UUID를 만들지 않고 이미 저장한 요청을 그대로 전송한다.
-        var enabled =
-                new PaymentDispatcher(
-                        deliveries,
-                        client,
-                        context.getBeanProvider(PaymentResultHandler.class),
-                        true,
-                        true);
+        var enabled = new PaymentDispatcher(deliveries, client, handler, true, true);
         enabled.recover();
         assertThat(deliveries.byRefund(id).requestId()).isEqualTo(accepted.requestId());
         assertThat(
@@ -157,13 +151,7 @@ class RefundDispatchDisabledPostgresTest extends RefundTestSupport {
                 .start(any());
         var pending = paymentGroups.start(MEMBER_B, later.groupNumber(), "later-payment");
         doCallRealMethod().when(client).start(any());
-        var relay =
-                new PaymentDispatcher(
-                        deliveries,
-                        client,
-                        context.getBeanProvider(PaymentResultHandler.class),
-                        true,
-                        false);
+        var relay = new PaymentDispatcher(deliveries, client, handler, true, false);
         for (int i = 0; i < 2; i++) {
             jdbc.update(
                     "UPDATE payment_delivery_request SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE kind='PAYMENT' AND payment_id=?",

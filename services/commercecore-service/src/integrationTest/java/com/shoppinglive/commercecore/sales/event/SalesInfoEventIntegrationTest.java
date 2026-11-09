@@ -47,6 +47,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired SalesRegistrationService registration;
     @Autowired SalesService sales;
     @Autowired SalesInfoEventTracker tracker;
@@ -227,7 +229,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
             scenarios.set(order.getOrderNumber(), scenario);
             emitted.clear();
             var attempt = payments.startPayment(order.getOrderNumber(), member);
-            payments.refresh(attempt.getId());
+            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
             if (scenario == PaymentScenario.INSTANT_FAIL) {
                 assertThat(emitted)
                         .extracting(EventEnvelope::eventType)

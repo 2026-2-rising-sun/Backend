@@ -2,7 +2,6 @@ package com.shoppinglive.commercecore.payment.service;
 
 import com.shoppinglive.commercecore.payment.dto.*;
 import org.slf4j.*;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,14 +11,14 @@ public class PaymentDispatcher {
     private static final Logger log = LoggerFactory.getLogger(PaymentDispatcher.class);
     private final PaymentDeliveryStore store;
     private final PaymentClient client;
-    private final ObjectProvider<PaymentResultHandler> outcomes;
+    private final PaymentResultHandler outcomes;
     private final boolean enabled;
     private final boolean refundsEnabled;
 
     public PaymentDispatcher(
             PaymentDeliveryStore store,
             PaymentClient client,
-            ObjectProvider<PaymentResultHandler> outcomes,
+            PaymentResultHandler outcomes,
             @Value("${commercecore.payment.delivery-recovery-enabled:true}") boolean enabled,
             @Value("${commercecore.refunds.execution-enabled:false}") boolean refundsEnabled) {
         this.store = store;
@@ -50,10 +49,6 @@ public class PaymentDispatcher {
         return payment(id);
     }
 
-    public boolean refresh(long id) {
-        return dispatch(store.byPayment(id));
-    }
-
     public PaymentExecution payment(long id) {
         dispatch(store.byPayment(id));
         return store.payment(id);
@@ -68,11 +63,10 @@ public class PaymentDispatcher {
         try {
             // 같은 원문을 재전달한다. Payment가 requestId 유일키로 응답 유실과 프로세스 중단을 복구한다.
             if ("PAYMENT".equals(d.kind()))
-                return outcomes.getObject()
-                        .payment(client.start(store.read(d.command(), PaymentCommand.class)));
+                return outcomes.payment(
+                        client.start(store.read(d.command(), PaymentCommand.class)));
             else
-                return outcomes.getObject()
-                        .refund(client.refund(store.read(d.command(), RefundCommand.class)));
+                return outcomes.refund(client.refund(store.read(d.command(), RefundCommand.class)));
         } catch (org.springframework.web.client.RestClientException unavailable) {
             store.delay(d);
             log.warn("Payment 전달 재시도 예정: requestId={}", d.requestId());

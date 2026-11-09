@@ -197,7 +197,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
         var secondAttempt =
                 paymentGroups.start(MEMBER_A, secondGroup.groupNumber(), "refund-payment-second");
         if (secondAttempt.getStatus() != PaymentStatus.SUCCESS) {
-            paymentGroups.resolve(secondAttempt.getId());
+            dispatcher.dispatch(deliveries.byPayment(secondAttempt.getId()));
         }
 
         CountDownLatch bothAtProductLookup = new CountDownLatch(2);

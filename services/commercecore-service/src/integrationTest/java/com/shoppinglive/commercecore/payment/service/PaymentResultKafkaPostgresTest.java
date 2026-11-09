@@ -2,6 +2,7 @@ package com.shoppinglive.commercecore.payment.service;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.*;
 
 import java.time.Duration;
 import java.util.List;
@@ -24,6 +25,12 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
     KafkaTemplate<String, String> kafka;
 
     @Autowired RefundIntakeService refunds;
+    @Autowired PaymentResultHandler handler;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(
+            name = "boundaryPaymentClient")
+    PaymentClient clientSpy;
+
     @Autowired PaymentClient client;
 
     @Test
@@ -105,6 +112,74 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
                             assertThat(stock.getAvailable()).isEqualTo(5);
                             assertThat(stock.getReserved()).isZero();
                         });
+    }
+
+    @Test
+    @DisplayName("Kafka 결과가 HTTP 응답보다 먼저 도착해도 늦은 미확정 응답과 중복 결과를 한 번만 반영한다")
+    void kafkaResultBeforeHttpResponseIsAppliedOnce() {
+        var created =
+                paymentGroups
+                        .create(
+                                MEMBER_A,
+                                List.of(
+                                        new com.shoppinglive.commercecore.order.service
+                                                .PaymentGroupService.Selection(
+                                                a.getId(), a.getVersion())),
+                                "구매자",
+                                "01012345678",
+                                20000,
+                                "early-kafka-order")
+                        .group();
+        doAnswer(
+                        invocation -> {
+                            assertThat(
+                                            org.springframework.transaction.support
+                                                    .TransactionSynchronizationManager
+                                                    .isActualTransactionActive())
+                                    .isFalse();
+                            var pending =
+                                    (com.shoppinglive.commercecore.payment.dto.PaymentExecution)
+                                            invocation.callRealMethod();
+                            assertThat(
+                                            paymentServer
+                                                    .context
+                                                    .getBean(
+                                                            com.shoppinglive.payment.service
+                                                                    .PaymentService.class)
+                                                    .resolvePayment(pending.paymentId()))
+                                    .isTrue();
+                            send(
+                                    "PaymentExecutionResolved",
+                                    "payment.execution-results.v1",
+                                    pending.requestId());
+                            await().atMost(Duration.ofSeconds(20))
+                                    .untilAsserted(
+                                            () ->
+                                                    assertThat(
+                                                                    paymentGroups
+                                                                            .get(
+                                                                                    MEMBER_A,
+                                                                                    created
+                                                                                            .groupNumber())
+                                                                            .status()
+                                                                            .name())
+                                                            .isEqualTo("PAID"));
+                            return pending;
+                        })
+                .when(clientSpy)
+                .start(any());
+        var result = paymentGroups.start(MEMBER_A, created.groupNumber(), "early-kafka-pay");
+        assertThat(result.status().name()).isEqualTo("SUCCESS");
+        assertThat(handler.payment(clientSpy.get(result.paymentId()))).isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentSucceeded'",
+                                Long.class))
+                .isEqualTo(1);
+        var order = orders.findByPaymentGroupIdOrderByIdAsc(result.paymentGroupId()).getFirst();
+        assertThat(stocks.findById(order.getSalesInfoId()).orElseThrow().getAvailable())
+                .isEqualTo(3);
+        assertThat(stocks.findById(order.getSalesInfoId()).orElseThrow().getReserved()).isZero();
     }
 
     void send(String event, String topic, String key) throws Exception {

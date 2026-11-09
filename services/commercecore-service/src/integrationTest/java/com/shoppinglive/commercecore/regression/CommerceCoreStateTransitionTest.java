@@ -44,6 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 class CommerceCoreStateTransitionTest
         extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired OrderExpirationScheduler expiration;
@@ -119,8 +120,8 @@ class CommerceCoreStateTransitionTest
             case "fail" -> {
                 scenarios.set(order.getOrderNumber(), PaymentScenario.INSTANT_FAIL);
                 var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
-                assertThat(payments.refresh(attempt.getId())).isTrue();
-                assertThat(payments.refresh(attempt.getId())).isFalse();
+                assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
+                assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
             }
             default -> throw new IllegalArgumentException(path);
         }
@@ -181,7 +182,7 @@ class CommerceCoreStateTransitionTest
         scenarios.set(order.getOrderNumber(), scenario);
         var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
         jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
-        assertThatThrownBy(() -> payments.refresh(attempt.getId()))
+        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(deliveries.payment(attempt.getId()).status())
                 .isEqualTo(PaymentStatus.PROCESSING);

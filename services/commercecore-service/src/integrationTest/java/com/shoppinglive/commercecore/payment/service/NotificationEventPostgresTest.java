@@ -167,8 +167,9 @@ class NotificationEventPostgresTest extends RefundTestSupport {
                                             pool.submit(
                                                     () -> {
                                                         go.await();
-                                                        return paymentGroups.resolve(
-                                                                payment.getId());
+                                                        return dispatcher.dispatch(
+                                                                deliveries.byPayment(
+                                                                        payment.getId()));
                                                     }))
                             .toList();
             go.countDown();
@@ -244,14 +245,14 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         var group = create("unknown");
         scenarios.set(group.groupNumber(), PaymentScenario.SUCCESS_RESPONSE_LOST);
         var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "payment");
-        assertThat(paymentGroups.resolve(payment.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isFalse();
         assertThat(events("PaymentSucceeded")).isEmpty();
         assertThat(events("PaymentFailed")).isEmpty();
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 payment.getId());
-        assertThat(paymentGroups.resolve(payment.getId())).isTrue();
-        assertThat(paymentGroups.resolve(payment.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isFalse();
         assertThat(events("PaymentSucceeded"))
                 .singleElement()
                 .satisfies(
@@ -269,8 +270,8 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         var failed = create("failed");
         scenarios.set(failed.groupNumber(), PaymentScenario.INSTANT_FAIL);
         var payment = paymentGroups.start(MEMBER_A, failed.groupNumber(), "failed-pay");
-        assertThat(paymentGroups.resolve(payment.getId())).isTrue();
-        paymentGroups.resolve(payment.getId());
+        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
+        dispatcher.dispatch(deliveries.byPayment(payment.getId()));
         assertThat(events("PaymentFailed"))
                 .singleElement()
                 .satisfies(
@@ -365,7 +366,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         var group = create("rollback-pay");
         var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "payment");
         failAfterRecording("PaymentSucceeded");
-        assertThatThrownBy(() -> paymentGroups.resolve(payment.getId()))
+        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(payment.getId())))
                 .isInstanceOf(RuntimeException.class);
         assertThat(paymentGroups.get(MEMBER_A, group.groupNumber()).status().name())
                 .isEqualTo("PAYMENT_CONFIRMING");
@@ -374,7 +375,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 payment.getId());
-        assertThat(paymentGroups.resolve(payment.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
         var request =
                 refunds.request(MEMBER_A, group.groupNumber(), "refund", List.of(a.getId()))
                         .refund();

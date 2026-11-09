@@ -6,7 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.order.service.PaymentGroupService;
+import com.shoppinglive.commercecore.order.service.OrderPaymentOutcomeService;
 import com.shoppinglive.commercecore.payment.dto.*;
 import com.shoppinglive.commercecore.payment.entity.*;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
@@ -18,20 +18,24 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.*;
 
 @ExtendWith(MockitoExtension.class)
-class PaymentServiceTest {
+class PaymentResultHandlerTest {
     @Mock PaymentDeliveryStore store;
-    @Mock ObjectProvider<PaymentGroupService> groups;
     @Mock RefundOutcomeService refunds;
     @Mock TransactionTemplate tx;
     @Mock OrderJpaRepository orders;
     @Mock SalesStockJpaRepository stock;
     @Mock SalesService sales;
     @Mock JdbcTemplate jdbc;
+    @Mock com.shoppinglive.commercecore.order.repository.PaymentGroupRepository groups;
+    @Mock com.shoppinglive.commercecore.order.repository.CartItemRepository cart;
+    @Mock com.shoppinglive.commercecore.sales.repository.SalesJpaRepository salesRepository;
+    @Mock com.shoppinglive.commercecore.order.service.PurchaseGuard guard;
+    @Mock com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons;
+    @Mock com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher events;
     PaymentResultHandler handler;
     final String requestId = "11111111-1111-4111-8111-111111111111";
     final Instant at = Instant.parse("2026-11-09T00:00:00Z");
@@ -41,7 +45,21 @@ class PaymentServiceTest {
 
     @BeforeEach
     void setup() {
-        handler = new PaymentResultHandler(store, groups, refunds, tx, orders, stock, sales, jdbc);
+        var orderOutcomes =
+                new OrderPaymentOutcomeService(
+                        groups,
+                        orders,
+                        cart,
+                        salesRepository,
+                        stock,
+                        sales,
+                        store,
+                        guard,
+                        tx,
+                        jdbc,
+                        coupons,
+                        events);
+        handler = new PaymentResultHandler(store, orderOutcomes, refunds, tx, jdbc);
     }
 
     PaymentExecution result(PaymentStatus status) {

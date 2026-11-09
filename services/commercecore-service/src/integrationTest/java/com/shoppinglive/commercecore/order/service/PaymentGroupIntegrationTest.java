@@ -56,6 +56,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class PaymentGroupIntegrationTest
         extends com.shoppinglive.commercecore.payment.service.PaymentDatabaseTestSupport {
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired io.micrometer.core.instrument.MeterRegistry metrics;
     @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
@@ -309,7 +311,7 @@ class PaymentGroupIntegrationTest
                 elapsed,
                 COUPON_ID);
         var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
-        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
         assertThat(couponStatus()).isEqualTo("USED");
     }
 
@@ -495,7 +497,7 @@ class PaymentGroupIntegrationTest
                         .group();
         scenarios.set(failedGroup.groupNumber(), PaymentScenario.INSTANT_FAIL);
         var attempt = service.start(MEMBER_A, failedGroup.groupNumber(), "coupon-failure-payment");
-        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
@@ -515,7 +517,7 @@ class PaymentGroupIntegrationTest
 
         scenarios.set(order.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_SUCCESS);
         var attempt = singlePayments.startPayment(order.getOrderNumber(), MEMBER_A);
-        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
         assertThat(couponStatus()).isEqualTo("USED");
         assertThat(orders.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);
@@ -542,7 +544,7 @@ class PaymentGroupIntegrationTest
         var failed = singleCouponOrder("single-coupon-failure").order();
         scenarios.set(failed.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_FAIL);
         var attempt = singlePayments.startPayment(failed.getOrderNumber(), MEMBER_A);
-        assertThat(service.resolve(attempt.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
         stock(salesA, 10, 0);
     }
@@ -793,8 +795,8 @@ class PaymentGroupIntegrationTest
         assertThatThrownBy(() -> service.payment(MEMBER_B, group.groupNumber(), first.getId()))
                 .isInstanceOf(BusinessException.class);
         assertThat(replay.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(service.resolve(first.getId())).isFalse();
-        assertThat(service.resolve(first.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(first.getId()))).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(first.getId()))).isFalse();
         assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
         assertThat(orders.findAll())
                 .extracting(order -> order.getStatus())
@@ -836,8 +838,8 @@ class PaymentGroupIntegrationTest
                         com.shoppinglive.payment.entity.PaymentScenario.valueOf(
                                 attempt.getScenario().name()));
 
-        assertThat(service.resolve(attempt.getId())).isFalse();
-        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         var unknown = payments.findById(attempt.getId()).orElseThrow();
         assertThat(unknown.getStatus())
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.UNKNOWN);
@@ -868,8 +870,8 @@ class PaymentGroupIntegrationTest
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 attempt.getId());
-        assertThat(service.resolve(attempt.getId())).isTrue();
-        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
                 .isEqualTo(
                         com.shoppinglive.payment.entity.PaymentStatus.valueOf(
@@ -896,8 +898,8 @@ class PaymentGroupIntegrationTest
         var group = create("failure").group();
         scenarios.set(group.groupNumber(), PaymentScenario.INSTANT_FAIL);
         var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-key");
-        assertThat(service.resolve(attempt.getId())).isTrue();
-        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
                 .isEqualTo(OrderStatus.FAILED);
         assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
@@ -918,7 +920,7 @@ class PaymentGroupIntegrationTest
         var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-key");
         // A를 먼저 반영한 뒤 B를 잘못된 상태로 만들어 A의 재고 소비와 삭제 이후 트랜잭션을 실패시킨다.
         jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", salesB);
-        assertThatThrownBy(() -> service.resolve(attempt.getId()))
+        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -953,8 +955,8 @@ class PaymentGroupIntegrationTest
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 attempt.getId());
-        assertThat(service.resolve(attempt.getId())).isTrue();
-        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         assertThat(
                         paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
@@ -1173,7 +1175,8 @@ class PaymentGroupIntegrationTest
                             try {
                                 ready.countDown();
                                 start.await();
-                                results.add(service.resolve(attempt.getId()));
+                                results.add(
+                                        dispatcher.dispatch(deliveries.byPayment(attempt.getId())));
                             } catch (Throwable failure) {
                                 failures.add(failure);
                             } finally {
@@ -1209,7 +1212,7 @@ class PaymentGroupIntegrationTest
         assertThat(items.findAll()).extracting(CartItem::getId).containsExactly(unselected.getId());
         stock(salesA, 8, 0);
         stock(salesB, 9, 0);
-        assertThat(service.resolve(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         stock(salesA, 8, 0);
         stock(salesB, 9, 0);
     }

@@ -219,9 +219,9 @@ class PaymentDelayReconcilerTest
         PaymentExecution attempt =
                 insertProcessingAttempt(
                         PaymentScenario.INSTANT_SUCCESS, Instant.now().minusSeconds(10));
-        assertThat(paymentService.refresh(attempt.getId())).isTrue();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
         // 이미 완료된 결제는 뒤늦게 실행된 프로세스 내부 콜백이 다시 처리할 수 없다.
-        assertThat(paymentService.refresh(attempt.getId())).isFalse();
+        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         assertThat(reconciler.reconcileOverdue()).isZero();
         assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
     }

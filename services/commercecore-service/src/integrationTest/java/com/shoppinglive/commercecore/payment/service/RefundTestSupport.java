@@ -136,7 +136,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
                         .group();
         var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-payment");
         if (attempt.getStatus() != PaymentStatus.SUCCESS) {
-            paymentGroups.resolve(attempt.getId());
+            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
         }
         return paymentGroups.get(MEMBER_A, created.groupNumber());
     }
@@ -211,7 +211,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
                         .group();
         var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-coupon-payment");
         if (attempt.getStatus() != PaymentStatus.SUCCESS) {
-            paymentGroups.resolve(attempt.getId());
+            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
         }
         return paymentGroups.get(MEMBER_A, created.groupNumber());
     }

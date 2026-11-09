@@ -75,8 +75,4 @@ public class PaymentService {
             throw new PaymentNotFoundException("해당 주문의 결제를 찾을 수 없습니다.");
         return dispatcher.payment(id);
     }
-
-    public boolean refresh(Long id) {
-        return dispatcher.refresh(id);
-    }
 }

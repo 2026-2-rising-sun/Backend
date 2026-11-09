@@ -34,6 +34,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest
 class CartOrderIntegrationTest
         extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
+    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
+
     @Autowired
     com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
                     .BoundaryPaymentServer
@@ -100,7 +103,7 @@ class CartOrderIntegrationTest
                 .atMost(java.time.Duration.ofSeconds(10))
                 .untilAsserted(
                         () -> {
-                            paymentService.refresh(payment.paymentId());
+                            dispatcher.dispatch(deliveries.byPayment(payment.paymentId()));
                             assertThat(
                                             orders.findById(first.order().getId())
                                                     .orElseThrow()

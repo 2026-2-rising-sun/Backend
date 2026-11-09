@@ -6,13 +6,11 @@ import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
-import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -52,15 +50,11 @@ public class PaymentGroupService {
 
     private final PaymentGroupCheckoutService checkout;
     private final PaymentGroupLifecycleService lifecycle;
-    private final ObjectProvider<PaymentService> paymentService;
 
     public PaymentGroupService(
-            PaymentGroupCheckoutService checkout,
-            PaymentGroupLifecycleService lifecycle,
-            ObjectProvider<PaymentService> paymentService) {
+            PaymentGroupCheckoutService checkout, PaymentGroupLifecycleService lifecycle) {
         this.checkout = checkout;
         this.lifecycle = lifecycle;
-        this.paymentService = paymentService;
     }
 
     public Quote preview(String member, List<Selection> selections) {
@@ -134,14 +128,6 @@ public class PaymentGroupService {
 
     public boolean expire(Long groupId) {
         return lifecycle.expire(groupId);
-    }
-
-    public boolean resolve(Long id) {
-        return paymentService.getObject().refresh(id);
-    }
-
-    public boolean applyOutcome(PaymentExecution result) {
-        return lifecycle.applyOutcome(result);
     }
 
     private static void validateKey(String key) {
