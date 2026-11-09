@@ -19,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundExecutionConcurrencyPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
+    @Autowired RefundQueryService queries;
     @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
 
     @DisplayName("환불 요청 하나를 동시에 실행해도 게이트웨이 결과 하나만 생성한다")
@@ -59,7 +60,7 @@ class RefundExecutionConcurrencyPostgresTest extends RefundTestSupport {
                                 Integer.class,
                                 request.id()))
                 .isEqualTo(1);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 }

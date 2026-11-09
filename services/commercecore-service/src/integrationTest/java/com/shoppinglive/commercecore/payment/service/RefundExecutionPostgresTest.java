@@ -20,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
+    @Autowired RefundQueryService queries;
     @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
 
     @DisplayName("환불 성공은 대상 주문을 환불 처리하고 판매 재고를 한 번만 복구한다")
@@ -37,15 +38,15 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(executions.execute(request.id())).isFalse();
 
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(
-                        refunds.get(MEMBER_A, group.groupNumber(), request.id())
+                        queries.get(MEMBER_A, group.groupNumber(), request.id())
                                 .cumulativeRefundAmount())
                 .isEqualTo(20000L);
-        assertThat(refunds.getSeller(SELLER, request.id()).cumulativeRefundAmount())
+        assertThat(queries.getSeller(SELLER, request.id()).cumulativeRefundAmount())
                 .isEqualTo(20000L);
-        assertThatThrownBy(() -> refunds.getSeller(SELLER_B, request.id()))
+        assertThatThrownBy(() -> queries.getSeller(SELLER_B, request.id()))
                 .isInstanceOf(BusinessException.class);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -138,7 +139,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
 
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(RuntimeException.class);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.PROCESSING);
         assertThat(orders.findById(target.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);
@@ -154,7 +155,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                 target.getSalesInfoId());
         makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(orders.findById(target.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.REFUNDED);
@@ -218,7 +219,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(executions.execute(request.id(), MockRefundScenario.FAILED)).isTrue();
         assertThat(executions.execute(request.id())).isFalse();
 
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.FAILED);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -242,7 +243,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
 
         assertThat(executions.execute(request.id(), MockRefundScenario.UNKNOWN_BEFORE_RESULT))
                 .isFalse();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -253,7 +254,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
 
         makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
@@ -271,7 +272,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
 
         assertThat(executions.execute(request.id(), MockRefundScenario.UNKNOWN_AFTER_RESULT))
                 .isFalse();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -282,7 +283,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
 
         makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -327,7 +328,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(request.refundAmount()).isZero();
         assertThat(executions.execute(request.id())).isTrue();
 
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(
                         paymentServer.jdbc.queryForObject(

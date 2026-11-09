@@ -7,9 +7,11 @@ import com.fasterxml.jackson.annotation.Nulls;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.payment.dto.RefundView;
+import com.shoppinglive.commercecore.payment.dto.RefundableTarget;
+import com.shoppinglive.commercecore.payment.dto.SellerRefundView;
 import com.shoppinglive.commercecore.payment.service.RefundIntakeService;
-import com.shoppinglive.commercecore.payment.service.RefundIntakeService.RefundView;
-import com.shoppinglive.commercecore.payment.service.RefundIntakeService.SellerRefundView;
+import com.shoppinglive.commercecore.payment.service.RefundQueryService;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -36,9 +38,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class RefundController {
     private final RefundIntakeService refunds;
     private final ObjectMapper mapper;
+    private final RefundQueryService queries;
 
-    public RefundController(RefundIntakeService refunds, ObjectMapper mapper) {
+    public RefundController(
+            RefundIntakeService refunds, RefundQueryService queries, ObjectMapper mapper) {
         this.refunds = refunds;
+        this.queries = queries;
         this.mapper = mapper;
     }
 
@@ -90,15 +95,15 @@ public class RefundController {
     }
 
     @GetMapping("/v1/payment-groups/{number}/refundable-targets")
-    public ApiResponse<List<RefundIntakeService.RefundableTarget>> refundableTargets(
+    public ApiResponse<List<RefundableTarget>> refundableTargets(
             @AuthenticationPrincipal AuthenticatedUser member, @PathVariable String number) {
-        return ApiResponse.ok(refunds.refundableTargets(member.memberId(), number));
+        return ApiResponse.ok(queries.refundableTargets(member.memberId(), number));
     }
 
     @GetMapping("/v1/payment-groups/{number}/refunds")
     public ApiResponse<List<RefundView>> list(
             @AuthenticationPrincipal AuthenticatedUser member, @PathVariable String number) {
-        return ApiResponse.ok(refunds.list(member.memberId(), number));
+        return ApiResponse.ok(queries.list(member.memberId(), number));
     }
 
     @GetMapping("/v1/payment-groups/{number}/refunds/{id}")
@@ -106,7 +111,7 @@ public class RefundController {
             @AuthenticationPrincipal AuthenticatedUser member,
             @PathVariable String number,
             @PathVariable long id) {
-        return ApiResponse.ok(refunds.get(member.memberId(), number, id));
+        return ApiResponse.ok(queries.get(member.memberId(), number, id));
     }
 
     @GetMapping("/v1/seller/refunds")
@@ -114,12 +119,12 @@ public class RefundController {
             @AuthenticationPrincipal AuthenticatedUser seller,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok(refunds.listSeller(seller.memberId(), page, size));
+        return ApiResponse.ok(queries.listSeller(seller.memberId(), page, size));
     }
 
     @GetMapping("/v1/seller/refunds/{id}")
     public ApiResponse<SellerRefundView> getSeller(
             @AuthenticationPrincipal AuthenticatedUser seller, @PathVariable long id) {
-        return ApiResponse.ok(refunds.getSeller(seller.memberId(), id));
+        return ApiResponse.ok(queries.getSeller(seller.memberId(), id));
     }
 }

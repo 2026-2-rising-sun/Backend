@@ -12,8 +12,6 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Clock;
 import java.time.Instant;
@@ -34,19 +32,14 @@ class RefundableTargetsTest {
     private final PaymentGroup group = mock(PaymentGroup.class);
     private final PaymentExecution payment = mock(PaymentExecution.class);
     private final Instant now = Instant.parse("2026-10-17T00:00:00Z");
-    private final RefundIntakeService service =
-            new RefundIntakeService(
+    private final RefundQueryService service =
+            new RefundQueryService(
                     groups,
                     orders,
                     attempts,
-                    mock(SalesJpaRepository.class),
-                    mock(ProductLookup.class),
-                    jdbc,
-                    Clock.fixed(now, ZoneOffset.UTC),
-                    mock(PaymentDeliveryStore.class),
-                    mock(PaymentDispatcher.class),
-                    mock(org.springframework.transaction.support.TransactionTemplate.class),
-                    false);
+                    new com.shoppinglive.commercecore.payment.repository.RefundQueryRepository(
+                            jdbc),
+                    Clock.fixed(now, ZoneOffset.UTC));
 
     @BeforeEach
     void setUp() {

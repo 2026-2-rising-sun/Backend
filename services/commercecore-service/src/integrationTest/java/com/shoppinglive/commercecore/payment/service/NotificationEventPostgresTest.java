@@ -56,6 +56,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
     private static final String COUPON = "event-coupon";
     @Autowired ObjectMapper mapper;
     @Autowired RefundIntakeService refunds;
+    @Autowired RefundQueryService queries;
     @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired CouponClaimService coupons;
     @Autowired OrderCreationService singleCreation;
@@ -381,7 +382,7 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(RuntimeException.class);
         assertThat(events("RefundCompleted")).isEmpty();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status().name())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status().name())
                 .isEqualTo("PROCESSING");
         reset(outboxTarget());
         makeRefundDue(request.id());

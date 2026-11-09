@@ -34,6 +34,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundReconcilerPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
+    @Autowired RefundQueryService queries;
     @Autowired RefundBoundaryReconciler reconciler;
     @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired RefundRecoveryStore recovery;
@@ -52,7 +53,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 List.of(a.getId()))
                         .refund();
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(reconciler.reconcileDue()).isZero();
     }
@@ -88,7 +89,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                     .isEqualTo(1);
         }
         assertThat(
-                        refunds.get(MEMBER_A, group.groupNumber(), request.id())
+                        queries.get(MEMBER_A, group.groupNumber(), request.id())
                                 .cumulativeRefundAmount())
                 .isEqualTo(20000L);
         assertThat(
@@ -126,7 +127,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         org.mockito.Mockito.clearInvocations(gateway);
         assertThat(new RefundBoundaryReconciler(recovery, executions).reconcileDue()).isEqualTo(1);
         verify(gateway, never()).execute(anyLong(), anyLong(), any(MockRefundScenario.class));
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
@@ -156,7 +157,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
             verify(gateway, never()).find(anyLong());
         }
         verify(gateway, never()).execute(anyLong(), anyLong(), any(MockRefundScenario.class));
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(
                         jdbc.queryForObject(
@@ -186,7 +187,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
         makeRefundDue(request.id());
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
         verify(gateway, never()).execute(anyLong(), anyLong(), any(MockRefundScenario.class));
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.FAILED);
         assertThat(
                         paymentServer.jdbc.queryForObject(
@@ -215,14 +216,14 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                         .getSalesInfoId();
         jdbc.update("UPDATE sales_stock SET available=2147483647 WHERE sales_info_id=?", salesId);
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), first.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), first.id()).status())
                 .isEqualTo(RefundStatus.PROCESSING);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), second.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), second.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         jdbc.update("UPDATE sales_stock SET available=3 WHERE sales_info_id=?", salesId);
         makeRefundDue(first.id());
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), first.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), first.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
@@ -253,7 +254,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 request.id()))
                 .isTrue();
         verify(gateway, never()).execute(anyLong(), anyLong(), any(MockRefundScenario.class));
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
     }
 
@@ -296,7 +297,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                 String.class,
                                 request.id()))
                 .isEqualTo("SUCCESS");
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(gateway.find(request.id())).isNotNull();
         assertThat(reconciler.reconcileDue()).isZero();

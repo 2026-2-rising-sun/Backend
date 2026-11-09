@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
     @Autowired RefundIntakeService refunds;
+    @Autowired RefundQueryService queries;
     @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired RefundRecoveryStore recovery;
     @Autowired com.shoppinglive.payment.service.RefundOutcomeService outcomes;
@@ -51,7 +52,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
             assertThat(executions.execute(request.id(), MockRefundScenario.UNKNOWN_BEFORE_RESULT))
                     .isFalse();
             assertThat(retryCount(request.id())).isEqualTo(call);
-            assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+            assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                     .isEqualTo(RefundStatus.UNKNOWN);
         }
         makeRefundDue(request.id());
@@ -119,7 +120,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
         makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(retryCount(request.id())).isEqualTo(2);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
     }
 
@@ -177,12 +178,12 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 request.id());
         var current = recovery.claim(request.id(), Duration.ofMinutes(1)).orElseThrow();
         assertThat(outcomes.apply(old, MockRefundOutcome.SUCCESS)).isFalse();
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.PROCESSING);
         assertThat(executions.executeClaimed(current, MockRefundScenario.SUCCESS)).isTrue();
         assertThat(outcomes.apply(old, MockRefundOutcome.SUCCESS)).isFalse();
         assertThat(
-                        refunds.get(MEMBER_A, group.groupNumber(), request.id())
+                        queries.get(MEMBER_A, group.groupNumber(), request.id())
                                 .cumulativeRefundAmount())
                 .isEqualTo(20000L);
     }
@@ -276,7 +277,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
 
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(refunds.get(MEMBER_A, group.groupNumber(), request.id()).status())
+        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.UNKNOWN);
         assertThat(retryCount(request.id())).isZero();
         assertThat(gateway.find(request.id())).isNull();

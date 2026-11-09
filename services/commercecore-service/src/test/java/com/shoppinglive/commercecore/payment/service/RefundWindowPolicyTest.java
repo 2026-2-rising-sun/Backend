@@ -16,8 +16,8 @@ class RefundWindowPolicyTest {
         Instant paidAt = Instant.parse("2026-10-01T12:00:00Z");
         Instant cutoff = paidAt.plus(WINDOW);
 
-        assertThat(RefundIntakeService.isRefundWindowOpen(cutoff.minusNanos(1), paidAt)).isTrue();
-        assertThat(RefundIntakeService.isRefundWindowOpen(cutoff, paidAt)).isFalse();
-        assertThat(RefundIntakeService.isRefundWindowOpen(cutoff.plusNanos(1), paidAt)).isFalse();
+        assertThat(RefundWindowPolicy.isOpen(cutoff.minusNanos(1), paidAt)).isTrue();
+        assertThat(RefundWindowPolicy.isOpen(cutoff, paidAt)).isFalse();
+        assertThat(RefundWindowPolicy.isOpen(cutoff.plusNanos(1), paidAt)).isFalse();
     }
 }
