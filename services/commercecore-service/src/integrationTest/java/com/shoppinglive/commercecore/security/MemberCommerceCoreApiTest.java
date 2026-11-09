@@ -48,15 +48,15 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
     @Autowired JdbcTemplate jdbc;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired org.springframework.transaction.support.TransactionTemplate transaction;
     private Long salesId;
 
     @BeforeEach
     void seed() {
         clean();
-        shopping.register(new ProductSnapshot(1L, "상품", null));
-        shopping.register(new ProductSnapshot(2L, "새 상품", null));
+        productLookup.register(new ProductSnapshot(1L, "상품", null));
+        productLookup.register(new ProductSnapshot(2L, "새 상품", null));
         salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.save(new SalesStock(salesId, 10, 0));
     }
@@ -68,7 +68,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
         items.deleteAll();
         stocks.deleteAll();
         sales.deleteAll();
-        shopping.clear();
+        productLookup.clear();
     }
 
     private Order order(String member) {

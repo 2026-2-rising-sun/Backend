@@ -47,7 +47,7 @@ public class RefundIntakeService {
     private final OrderJpaRepository orders;
     private final PaymentClient attempts;
     private final SalesJpaRepository sales;
-    private final ProductLookup shopping;
+    private final ProductLookup productLookup;
     private final JdbcTemplate jdbc;
     private final Clock clock;
     private final PaymentDeliveryStore deliveries;
@@ -61,7 +61,7 @@ public class RefundIntakeService {
             OrderJpaRepository orders,
             PaymentClient attempts,
             SalesJpaRepository sales,
-            ProductLookup shopping,
+            ProductLookup productLookup,
             JdbcTemplate jdbc,
             RefundQueryService queries,
             RefundQueryRepository repository,
@@ -74,7 +74,7 @@ public class RefundIntakeService {
                 orders,
                 attempts,
                 sales,
-                shopping,
+                productLookup,
                 jdbc,
                 queries,
                 repository,
@@ -90,7 +90,7 @@ public class RefundIntakeService {
             OrderJpaRepository orders,
             PaymentClient attempts,
             SalesJpaRepository sales,
-            ProductLookup shopping,
+            ProductLookup productLookup,
             JdbcTemplate jdbc,
             RefundQueryService queries,
             RefundQueryRepository repository,
@@ -103,7 +103,7 @@ public class RefundIntakeService {
         this.orders = orders;
         this.attempts = attempts;
         this.sales = sales;
-        this.shopping = shopping;
+        this.productLookup = productLookup;
         this.jdbc = jdbc;
         this.queries = queries;
         this.repository = repository;
@@ -291,7 +291,7 @@ public class RefundIntakeService {
             throw new BusinessException(ErrorCode.CONFLICT, "주문 상품 스냅샷을 확인할 수 없습니다.");
         }
         Map<Long, String> sellerIds = new HashMap<>();
-        for (ProductSnapshot product : shopping.findProducts(productIds.values())) {
+        for (ProductSnapshot product : productLookup.findProducts(productIds.values())) {
             sellerIds.put(product.id(), product.sellerId());
         }
 

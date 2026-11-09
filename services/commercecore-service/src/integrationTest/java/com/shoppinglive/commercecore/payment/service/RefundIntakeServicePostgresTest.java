@@ -157,7 +157,7 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
     @Test
     void legacyProductWithoutSellerCanStillBeRefunded() {
         var group = createAndPay();
-        shopping.register(new ProductSnapshot(81001L, "A", null, null));
+        productLookup.register(new ProductSnapshot(81001L, "A", null, null));
 
         var result =
                 refunds.request(

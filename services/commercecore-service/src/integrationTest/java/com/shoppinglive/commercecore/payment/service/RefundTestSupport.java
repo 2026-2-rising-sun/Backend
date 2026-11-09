@@ -57,7 +57,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
     @Autowired protected PaymentAttemptJpaRepository attempts;
     @Autowired protected SalesJpaRepository sales;
     @Autowired protected SalesStockJpaRepository stocks;
-    @Autowired protected InMemoryProductLookupStub shopping;
+    @Autowired protected InMemoryProductLookupStub productLookup;
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired protected PaymentDeliveryStore deliveries;
@@ -70,8 +70,8 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
     void seedRefundFixtures() {
         cleanRefundFixtures();
         paymentServer.reset();
-        shopping.register(new ProductSnapshot(81001L, "A", null, SELLER));
-        shopping.register(new ProductSnapshot(81002L, "B", null, SELLER_B));
+        productLookup.register(new ProductSnapshot(81001L, "A", null, SELLER));
+        productLookup.register(new ProductSnapshot(81002L, "B", null, SELLER_B));
         Long salesA = sales.saveAndFlush(new Sales(81001L, 10000L, SalesStatus.ON_SALE)).getId();
         Long salesB = sales.saveAndFlush(new Sales(81002L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 5, 0));
@@ -114,8 +114,8 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
             sales.deleteAll();
         }
         jdbc.update("DELETE FROM member_purchase_guard");
-        if (shopping != null) {
-            shopping.clear();
+        if (productLookup != null) {
+            productLookup.clear();
         }
     }
 

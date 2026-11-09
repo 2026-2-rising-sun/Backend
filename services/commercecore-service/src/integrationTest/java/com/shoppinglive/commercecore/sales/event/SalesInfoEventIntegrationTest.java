@@ -58,7 +58,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Autowired PaymentService payments;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired CartService cart;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
     @Autowired PlatformTransactionManager manager;
@@ -84,7 +84,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
 
     private long register(int available) {
         long product = Math.abs(UUID.randomUUID().getMostSignificantBits() >>> 1);
-        shopping.register(new ProductSnapshot(product, "판매정보 테스트", null));
+        productLookup.register(new ProductSnapshot(product, "판매정보 테스트", null));
         long id = registration.register(product, 1000L, available).getId();
         fixtureSales.add(id);
         return id;

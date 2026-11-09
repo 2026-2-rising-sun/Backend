@@ -38,14 +38,14 @@ class OrderCheckoutServiceTest {
 
     @Mock private SalesStockJpaRepository salesStockRepository;
 
-    @Mock private ProductLookup shoppingClient;
+    @Mock private ProductLookup productLookup;
 
     private OrderCheckoutService orderCheckoutService;
 
     @BeforeEach
     void setUp() {
         orderCheckoutService =
-                new OrderCheckoutService(salesRepository, salesStockRepository, shoppingClient);
+                new OrderCheckoutService(salesRepository, salesStockRepository, productLookup);
     }
 
     /** 판매정보·재고·상품명이 모두 준비된 기본 상태를 만든다. */
@@ -58,7 +58,7 @@ class OrderCheckoutServiceTest {
     }
 
     private void productExists() {
-        given(shoppingClient.findProduct(PRODUCT_ID))
+        given(productLookup.findProduct(PRODUCT_ID))
                 .willReturn(Optional.of(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null)));
     }
 
@@ -182,9 +182,9 @@ class OrderCheckoutServiceTest {
 
     @Test
     @DisplayName("Core 상품 원본이 없으면 주문서 조회는 404로 응답한다")
-    void returns404WhenShoppingProductIsMissing() {
+    void returns404WhenProductIsMissing() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
-        given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
+        given(productLookup.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 1))
                 .isInstanceOf(ProductNotFoundException.class);
@@ -193,10 +193,10 @@ class OrderCheckoutServiceTest {
     /** 상품명을 확인하지 못한 채 주문서를 그리면 무엇을 사는지 모르는 화면이 된다. 장애를 "상품 없음" 으로 단정하지도 않는다. */
     @Test
     @DisplayName("Core 상품 저장소 장애를 상품 없음으로 바꾸지 않고 전파한다")
-    void propagatesShoppingFailureWithoutMappingItTo404() {
+    void propagatesProductLookupFailureWithoutMappingItTo404() {
         salesExists(15_000L, 10, SalesStatus.ON_SALE);
-        given(shoppingClient.findProduct(PRODUCT_ID))
-                .willThrow(new DataAccessResourceFailureException("shopping timeout"));
+        given(productLookup.findProduct(PRODUCT_ID))
+                .willThrow(new DataAccessResourceFailureException("상품 저장소 조회 실패"));
 
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 1))
                 .isInstanceOf(DataAccessResourceFailureException.class)

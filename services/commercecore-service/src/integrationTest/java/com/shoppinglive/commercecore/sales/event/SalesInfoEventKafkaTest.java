@@ -52,7 +52,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
     @Autowired SalesService sales;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
 
     @DisplayName("API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다")
     @Test
@@ -71,7 +71,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
             }
         }
         long productId = UUID.randomUUID().getMostSignificantBits() >>> 1;
-        shopping.register(new ProductSnapshot(productId, "Kafka 검증 상품", null));
+        productLookup.register(new ProductSnapshot(productId, "Kafka 검증 상품", null));
         try (KafkaConsumer<String, String> consumer =
                 new KafkaConsumer<>(
                         Map.of(

@@ -53,7 +53,7 @@ class OrderCheckoutApiTest
 
     @Autowired private MockMvc mockMvc;
 
-    @Autowired private InMemoryProductLookupStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub productLookupStub;
 
     @Autowired private SalesJpaRepository salesRepository;
 
@@ -73,8 +73,8 @@ class OrderCheckoutApiTest
     void setUp() {
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
-        shoppingClientStub.register(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null));
+        productLookupStub.clear();
+        productLookupStub.register(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null));
 
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 15_000L, SalesStatus.ON_SALE));
         salesStockRepository.save(new SalesStock(sales.getId(), 5, 0));
@@ -113,7 +113,7 @@ class OrderCheckoutApiTest
         jdbc.update("DELETE FROM coupon_definition WHERE id=?", COUPON_ID);
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
+        productLookupStub.clear();
     }
 
     @DisplayName("단건 주문서는 본인 쿠폰의 할인액을 계산하고 예약하지 않는다")

@@ -60,7 +60,7 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
     @DisplayName("판매정보와 Outbox를 함께 커밋하고 기록 실패 시 가격과 버전도 롤백한다")
     void commitsSnapshotAndRollsBackBusinessChangeWhenOutboxFails() {
         long product = UUID.randomUUID().getMostSignificantBits() >>> 1;
-        shopping.register(
+        productLookup.register(
                 new com.shoppinglive.commercecore.product.dto.ProductSnapshot(
                         product, "Outbox 원자성 검증", null));
         long id = registration.register(product, 1000L, 3).getId();

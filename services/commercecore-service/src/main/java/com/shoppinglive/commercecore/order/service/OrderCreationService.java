@@ -48,12 +48,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p><b>트랜잭션 경계</b> (ERD 설계 문서 §6.1):
  *
  * <pre>
- *   (밖) 입력 검증 → 멱등키로 기존 주문 조회 → Shopping 에서 상품명 확인
+ *   (밖) 입력 검증 → 멱등키로 기존 주문 조회 → 로컬 상품 원본에서 상품명 확인
  *   (안) 판매정보 조회 → 상태·금액 검증 → 주문 INSERT → 재고 예약 → 품절 전이
  * </pre>
  *
- * Shopping 호출을 트랜잭션 밖에 두는 이유는 timeout 동안 DB 커넥션을 잡고 있지 않기 위함이다. 반대로 가격·재고 검증은 배정과 같은 트랜잭션 안에 있어야
- * 한다. 검증과 배정 사이에 틈이 있으면 그 사이 바뀐 값으로 주문이 만들어진다.
+ * 상품명은 로컬 ProductLookup으로 미리 확인하고, 가격·재고 검증은 배정과 같은 트랜잭션 안에서 수행한다. 검증과 배정 사이에 틈이 있으면 그 사이 바뀐 값으로
+ * 주문이 만들어진다.
  *
  * <p><b>재고와 주문의 원자성:</b> 배정과 INSERT 가 한 트랜잭션이라 "주문은 있는데 재고는 그대로" 나 "재고만 줄고 주문은 없음" 이 남지 않는다. 어느 쪽이든
  * 실패하면 둘 다 롤백된다.
@@ -74,7 +74,7 @@ public class OrderCreationService {
     private final OrderJpaRepository orderRepository;
     private final SalesJpaRepository salesRepository;
     private final SalesStockJpaRepository salesStockRepository;
-    private final ProductLookup shoppingClient;
+    private final ProductLookup productLookup;
     private final OrderNumberGenerator orderNumberGenerator;
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
@@ -87,7 +87,7 @@ public class OrderCreationService {
             OrderJpaRepository orderRepository,
             SalesJpaRepository salesRepository,
             SalesStockJpaRepository salesStockRepository,
-            ProductLookup shoppingClient,
+            ProductLookup productLookup,
             OrderNumberGenerator orderNumberGenerator,
             CartItemRepository cartItems,
             TransactionTemplate transactionTemplate,
@@ -99,7 +99,7 @@ public class OrderCreationService {
         this.orderRepository = orderRepository;
         this.salesRepository = salesRepository;
         this.salesStockRepository = salesStockRepository;
-        this.shoppingClient = shoppingClient;
+        this.productLookup = productLookup;
         this.orderNumberGenerator = orderNumberGenerator;
         this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
@@ -117,7 +117,7 @@ public class OrderCreationService {
      * @return 새로 만든 주문, 또는 멱등키로 찾은 기존 주문
      * @throws BusinessException 입력 제약 위반 (400)
      * @throws SalesNotFoundException 판매정보가 없는 상품 (404)
-     * @throws ProductNotFoundException Shopping 에 상품이 없음 (404)
+     * @throws ProductNotFoundException 로컬 상품 원본에 상품이 없음 (404)
      * @throws OrderNotAcceptableException 판매 중이 아닌 상품 (409)
      * @throws OrderAmountMismatchException 확인한 금액과 현재 금액이 다름 (409)
      * @throws InsufficientStockException 배정할 재고가 없음 (409)
@@ -202,7 +202,7 @@ public class OrderCreationService {
 
         // 트랜잭션 밖. 주문에 남길 상품명을 확정하지 못하면 재고를 건드리기 전에 멈춘다.
         ProductSnapshot product =
-                shoppingClient
+                productLookup
                         .findProduct(command.productId())
                         .orElseThrow(() -> new ProductNotFoundException(command.productId()));
 

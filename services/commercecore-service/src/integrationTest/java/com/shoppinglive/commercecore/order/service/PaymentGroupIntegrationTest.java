@@ -71,7 +71,7 @@ class PaymentGroupIntegrationTest
     @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @MockitoSpyBean SalesStockJpaRepository stocks;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
 
@@ -94,9 +94,9 @@ class PaymentGroupIntegrationTest
     void seed() {
         clean();
         paymentServer.reset();
-        shopping.register(new ProductSnapshot(1L, "A", null));
-        shopping.register(new ProductSnapshot(2L, "B", null));
-        shopping.register(new ProductSnapshot(3L, "미선택", null));
+        productLookup.register(new ProductSnapshot(1L, "A", null));
+        productLookup.register(new ProductSnapshot(2L, "B", null));
+        productLookup.register(new ProductSnapshot(3L, "미선택", null));
         salesA = sales.saveAndFlush(new Sales(1L, 10000L, SalesStatus.ON_SALE)).getId();
         salesB = sales.saveAndFlush(new Sales(2L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 10, 0));
@@ -124,7 +124,7 @@ class PaymentGroupIntegrationTest
         stocks.deleteAll();
         sales.deleteAll();
         jdbc.update("DELETE FROM member_purchase_guard");
-        shopping.clear();
+        productLookup.clear();
     }
 
     private void ensureCouponTables() {

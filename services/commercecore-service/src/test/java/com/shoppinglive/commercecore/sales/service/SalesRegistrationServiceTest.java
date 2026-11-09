@@ -175,7 +175,7 @@ class SalesRegistrationServiceTest {
      */
     @DisplayName("로컬 상품 저장소 장애를 상품 미존재로 단정하지 않고 전파한다")
     @Test
-    void propagatesShoppingOutageWithoutAssumingProductIsMissing() {
+    void propagatesProductLookupFailureWithoutAssumingProductIsMissing() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
         given(productLookup.findProduct(PRODUCT_ID))
                 .willThrow(new DataAccessResourceFailureException("상품 저장소 연결 실패"));
@@ -189,9 +189,9 @@ class SalesRegistrationServiceTest {
 
     // ----- 중복 등록 -----
 
-    @DisplayName("이미 판매정보가 있으면 409로 거절하고 Shopping을 호출하지 않는다")
+    @DisplayName("이미 판매정보가 있으면 409로 거절하고 상품 원본을 조회하지 않는다")
     @Test
-    void rejectsDuplicateSaleWithoutCallingShopping() {
+    void rejectsDuplicateSaleWithoutProductLookup() {
         given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(true);
 
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
@@ -253,10 +253,10 @@ class SalesRegistrationServiceTest {
                 .isInstanceOf(BusinessException.class);
     }
 
-    /** 검증 실패는 DB·Shopping 어디에도 닿기 전에 끝나야 한다. */
-    @DisplayName("판매 등록 검증에 실패하면 DB·Shopping에 접근하지 않는다")
+    /** 검증 실패는 DB·상품 저장소 어디에도 닿기 전에 끝나야 한다. */
+    @DisplayName("판매 등록 검증에 실패하면 DB·상품 저장소에 접근하지 않는다")
     @Test
-    void rejectsInvalidRegistrationBeforeDatabaseAndShoppingAccess() {
+    void rejectsInvalidRegistrationBeforeDatabaseAndProductLookup() {
         assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, -1L, 10))
                 .isInstanceOf(BusinessException.class);
 

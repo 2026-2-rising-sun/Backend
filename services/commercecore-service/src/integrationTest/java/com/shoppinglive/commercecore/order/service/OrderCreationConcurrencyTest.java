@@ -56,7 +56,7 @@ class OrderCreationConcurrencyTest
 
     @Autowired private SalesStockJpaRepository salesStockRepository;
 
-    @Autowired private InMemoryProductLookupStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub productLookupStub;
 
     private Long salesId;
 
@@ -65,8 +65,8 @@ class OrderCreationConcurrencyTest
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
-        shoppingClientStub.register(new ProductSnapshot(PRODUCT_ID, "한정 수량 상품", null));
+        productLookupStub.clear();
+        productLookupStub.register(new ProductSnapshot(PRODUCT_ID, "한정 수량 상품", null));
 
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 15_000L, SalesStatus.ON_SALE));
         salesId = sales.getId();
@@ -78,7 +78,7 @@ class OrderCreationConcurrencyTest
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
+        productLookupStub.clear();
     }
 
     private CreateOrderCommand command(int index) {

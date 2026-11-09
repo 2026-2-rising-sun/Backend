@@ -49,7 +49,7 @@ class OrderCreationApiTest
 
     @Autowired private ObjectMapper objectMapper;
 
-    @Autowired private InMemoryProductLookupStub shoppingClientStub;
+    @Autowired private InMemoryProductLookupStub productLookupStub;
 
     @Autowired private OrderJpaRepository orderRepository;
 
@@ -66,8 +66,8 @@ class OrderCreationApiTest
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
-        shoppingClientStub.register(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null));
+        productLookupStub.clear();
+        productLookupStub.register(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null));
 
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE));
         salesId = sales.getId();
@@ -79,7 +79,7 @@ class OrderCreationApiTest
         orderRepository.deleteAll();
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
-        shoppingClientStub.clear();
+        productLookupStub.clear();
     }
 
     private String body(Map<String, Object> overrides) throws Exception {

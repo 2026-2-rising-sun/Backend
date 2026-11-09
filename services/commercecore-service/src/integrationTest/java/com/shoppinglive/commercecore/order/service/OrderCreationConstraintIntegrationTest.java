@@ -39,7 +39,7 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
     @Autowired private OrderJpaRepository orders;
     @Autowired private SalesJpaRepository sales;
     @Autowired private SalesStockJpaRepository stocks;
-    @Autowired private InMemoryProductLookupStub shopping;
+    @Autowired private InMemoryProductLookupStub productLookup;
     @Autowired private JdbcTemplate jdbc;
     @MockitoBean private OrderNumberGenerator numbers;
     private Long salesId;
@@ -47,7 +47,7 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
     @BeforeEach
     void seed() {
         cleanup();
-        shopping.register(new ProductSnapshot(PRODUCT_ID, "주문 제약 검증 상품", null));
+        productLookup.register(new ProductSnapshot(PRODUCT_ID, "주문 제약 검증 상품", null));
         salesId = sales.saveAndFlush(new Sales(PRODUCT_ID, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesId, 5, 0));
         given(numbers.generate()).willReturn(COLLIDING_NUMBER);
@@ -61,7 +61,7 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
         stocks.deleteAll();
         sales.deleteAll();
         jdbc.update("DELETE FROM member_purchase_guard");
-        shopping.clear();
+        productLookup.clear();
     }
 
     @Test

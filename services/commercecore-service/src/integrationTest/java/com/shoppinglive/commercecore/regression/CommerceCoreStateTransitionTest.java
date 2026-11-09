@@ -61,7 +61,7 @@ class CommerceCoreStateTransitionTest
     @Autowired PaymentAttemptJpaRepository paymentRepository;
     @Autowired SalesJpaRepository salesRepository;
     @Autowired SalesStockJpaRepository stockRepository;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired TransactionTemplate transaction;
     @Autowired JdbcTemplate jdbc;
 
@@ -76,7 +76,7 @@ class CommerceCoreStateTransitionTest
     @BeforeEach
     void setUp() {
         clean();
-        shopping.register(new ProductSnapshot(920L, "마지막 재고", null));
+        productLookup.register(new ProductSnapshot(920L, "마지막 재고", null));
         salesId = salesRepository.save(new Sales(920L, 10_000L, SalesStatus.ON_SALE)).getId();
         stockRepository.save(new SalesStock(salesId, 1, 0));
     }
@@ -89,7 +89,7 @@ class CommerceCoreStateTransitionTest
         orderRepository.deleteAll();
         stockRepository.deleteAll();
         salesRepository.deleteAll();
-        shopping.clear();
+        productLookup.clear();
     }
 
     private Order create() {

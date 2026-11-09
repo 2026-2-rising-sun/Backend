@@ -56,7 +56,7 @@ class PaymentGroupCheckoutService {
     private final CartItemRepository cart;
     private final SalesJpaRepository sales;
     private final SalesStockJpaRepository stock;
-    private final ProductLookup shopping;
+    private final ProductLookup productLookup;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
     private final JdbcTemplate jdbc;
@@ -74,7 +74,7 @@ class PaymentGroupCheckoutService {
             CartItemRepository cart,
             SalesJpaRepository sales,
             SalesStockJpaRepository stock,
-            ProductLookup shopping,
+            ProductLookup productLookup,
             PurchaseGuard guard,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
@@ -89,7 +89,7 @@ class PaymentGroupCheckoutService {
         this.cart = cart;
         this.sales = sales;
         this.stock = stock;
-        this.shopping = shopping;
+        this.productLookup = productLookup;
         this.guard = guard;
         this.tx = tx;
         this.jdbc = jdbc;
@@ -113,7 +113,8 @@ class PaymentGroupCheckoutService {
                 throw conflict("장바구니가 변경되었습니다. 다시 확인해 주세요.");
             }
             String name =
-                    shopping.findProduct(c.getProductId())
+                    productLookup
+                            .findProduct(c.getProductId())
                             .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다."))
                             .name();
             Sales s =

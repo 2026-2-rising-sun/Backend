@@ -15,19 +15,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CartService {
     private final CartItemRepository items;
-    private final ProductLookup shopping;
+    private final ProductLookup productLookup;
 
-    public CartService(CartItemRepository items, ProductLookup shopping) {
+    public CartService(CartItemRepository items, ProductLookup productLookup) {
         this.items = items;
-        this.shopping = shopping;
+        this.productLookup = productLookup;
     }
 
-    // Shopping 장애 동안 DB 트랜잭션을 열어두지 않도록 바깥 트랜잭션을 사용하지 않는다.
+    // 상품 존재 확인과 장바구니 저장은 각각의 저장소 호출로 수행한다.
     public CartItem add(String memberId, Long productId, int quantity) {
         if (items.existsByMemberIdAndProductId(memberId, productId)) {
             throw duplicate();
         }
-        shopping.findProduct(productId).orElseThrow(() -> new ProductNotFoundException(productId));
+        productLookup
+                .findProduct(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
         try {
             return items.saveAndFlush(new CartItem(memberId, productId, quantity));
         } catch (DataIntegrityViolationException e) {

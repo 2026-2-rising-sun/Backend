@@ -50,7 +50,7 @@ class CartCouponPreviewApiTest extends CommerceCoreSecurityTestSupport {
     @Autowired CartItemRepository items;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired JdbcTemplate jdbc;
     private CartItem first;
     private CartItem second;
@@ -59,9 +59,9 @@ class CartCouponPreviewApiTest extends CommerceCoreSecurityTestSupport {
     @BeforeEach
     void setUp() {
         clean();
-        shopping.register(new ProductSnapshot(1L, "A", null));
-        shopping.register(new ProductSnapshot(2L, "B", null));
-        shopping.register(new ProductSnapshot(3L, "미대상", null));
+        productLookup.register(new ProductSnapshot(1L, "A", null));
+        productLookup.register(new ProductSnapshot(2L, "B", null));
+        productLookup.register(new ProductSnapshot(3L, "미대상", null));
         var firstSales = sales.saveAndFlush(new Sales(1L, 10_000L, SalesStatus.ON_SALE));
         var secondSales = sales.saveAndFlush(new Sales(2L, 5_000L, SalesStatus.ON_SALE));
         var thirdSales = sales.saveAndFlush(new Sales(3L, 1_000L, SalesStatus.ON_SALE));
@@ -76,7 +76,7 @@ class CartCouponPreviewApiTest extends CommerceCoreSecurityTestSupport {
     @AfterEach
     void tearDown() {
         clean();
-        shopping.clear();
+        productLookup.clear();
     }
 
     @DisplayName("쿠폰은 대상 장바구니 상품에만 적용하고 재고·쿠폰을 예약하지 않는다")

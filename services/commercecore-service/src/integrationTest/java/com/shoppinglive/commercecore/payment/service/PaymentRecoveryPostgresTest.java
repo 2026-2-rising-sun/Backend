@@ -47,7 +47,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     @Autowired OrderJpaRepository orders;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
-    @Autowired InMemoryProductLookupStub shopping;
+    @Autowired InMemoryProductLookupStub productLookup;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
     @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
@@ -60,7 +60,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     @BeforeEach
     void seed() {
         cleanup();
-        shopping.register(new ProductSnapshot(99001L, "상품", null, SELLER));
+        productLookup.register(new ProductSnapshot(99001L, "상품", null, SELLER));
         stockId = sales.saveAndFlush(new Sales(99001L, 10000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(stockId, 5, 0));
         jdbc.update(
@@ -93,7 +93,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         stocks.deleteAll();
         sales.deleteAll();
         jdbc.update("DELETE FROM member_purchase_guard");
-        shopping.clear();
+        productLookup.clear();
     }
 
     PaymentExecution start(PaymentScenario scenario) {

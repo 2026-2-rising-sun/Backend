@@ -65,7 +65,7 @@ class OrderCreationServiceTest {
 
     @Mock private SalesStockJpaRepository salesStockRepository;
 
-    @Mock private ProductLookup shoppingClient;
+    @Mock private ProductLookup productLookup;
 
     @Mock private OrderNumberGenerator orderNumberGenerator;
 
@@ -85,7 +85,7 @@ class OrderCreationServiceTest {
                         orderRepository,
                         salesRepository,
                         salesStockRepository,
-                        shoppingClient,
+                        productLookup,
                         orderNumberGenerator,
                         cartItems,
                         transactionTemplate,
@@ -114,7 +114,7 @@ class OrderCreationServiceTest {
     }
 
     private void productExists() {
-        given(shoppingClient.findProduct(PRODUCT_ID))
+        given(productLookup.findProduct(PRODUCT_ID))
                 .willReturn(Optional.of(new ProductSnapshot(PRODUCT_ID, "테스트 상품", null)));
     }
 
@@ -156,7 +156,7 @@ class OrderCreationServiceTest {
         assertThat(order.getTotalAmount()).isEqualTo(30_000L);
     }
 
-    /** 상품명·단가는 주문 시점 값으로 고정된다. 나중에 Shopping 이 이름을 바꾸거나 판매자가 가격을 올려도 이미 만들어진 주문의 영수증은 그대로여야 한다. */
+    /** 상품명·단가는 주문 시점 값으로 고정된다. 나중에 상품명이 바뀌거나 판매자가 가격을 올려도 이미 만들어진 주문의 영수증은 그대로여야 한다. */
     @Test
     @DisplayName("주문 당시 상품명과 단가를 스냅샷으로 저장한다")
     void snapshotsProductNameAndUnitPriceAtCreation() {
@@ -260,9 +260,9 @@ class OrderCreationServiceTest {
     }
 
     @Test
-    @DisplayName("Shopping에 상품이 없으면 재고를 변경하기 전에 중단한다")
-    void stopsBeforeStockMutationWhenShoppingProductIsMissing() {
-        given(shoppingClient.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
+    @DisplayName("로컬 상품 원본에 상품이 없으면 재고를 변경하기 전에 중단한다")
+    void stopsBeforeStockMutationWhenProductIsMissing() {
+        given(productLookup.findProduct(PRODUCT_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
                 .isInstanceOf(ProductNotFoundException.class);
@@ -354,7 +354,7 @@ class OrderCreationServiceTest {
         assertThat(result.created()).isFalse();
         assertThat(result.order()).isSameAs(existing);
         verify(salesStockRepository, never()).reserve(any(), anyInt());
-        verify(shoppingClient, never()).findProduct(any());
+        verify(productLookup, never()).findProduct(any());
     }
 
     /** 두 재전송이 동시에 멱등키 조회를 통과하면 한쪽은 UNIQUE 제약에 걸린다. 그 요청도 실패가 아니라 기존 주문을 받아야 한다. */
@@ -534,7 +534,7 @@ class OrderCreationServiceTest {
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.INVALID_REQUEST);
 
-        verify(shoppingClient, never()).findProduct(any());
+        verify(productLookup, never()).findProduct(any());
     }
 
     @Test
@@ -580,7 +580,7 @@ class OrderCreationServiceTest {
 
     @Test
     @DisplayName("상품 조회 중 장바구니가 변경되면 주문을 생성하거나 재고를 예약하지 않는다")
-    void cartChangedDuringShoppingLookupDoesNotCreateOrReserveOrder() {
+    void cartChangedDuringProductLookupDoesNotCreateOrReserveOrder() {
         String member = "11111111-1111-4111-8111-111111111111";
         var snapshot =
                 new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
