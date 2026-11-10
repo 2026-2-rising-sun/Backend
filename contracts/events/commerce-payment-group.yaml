@@ -36,6 +36,10 @@ operations:
     - $ref: '#/channels/paymentGroup/messages/OrderExpired'
     - $ref: '#/channels/paymentGroup/messages/RefundCompleted'
 components:
+  schemas:
+    PaymentGroupNumber:
+      type: string
+      pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
   messages:
     PaymentGroupCreated:
       name: PaymentGroupCreated
@@ -59,9 +63,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: &id001
-            type: string
-            pattern: ^PG-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|LEGACY-[1-9][0-9]{0,18})$
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time
@@ -156,7 +159,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: *id001
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time
@@ -263,7 +267,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: *id001
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time
@@ -377,7 +382,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: *id001
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time
@@ -478,7 +484,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: *id001
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time
@@ -579,7 +586,8 @@ components:
             const: 1
           source:
             enum: [commerce-service, commercecore-service]
-          aggregateId: *id001
+          aggregateId:
+            $ref: '#/components/schemas/PaymentGroupNumber'
           occurredAt:
             type: string
             format: date-time

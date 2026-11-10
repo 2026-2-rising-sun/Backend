@@ -12,7 +12,7 @@ import java.util.HashSet;
 import java.util.List;
 
 /**
- * 쿠폰 표시정보를 Shopping 자체 모델({@link CouponSnapshot})로 해석하고 계약 범위를 검증한다.
+ * 쿠폰 표시정보를 Catalog 자체 모델({@link CouponSnapshot})로 해석하고 계약 범위를 검증한다.
  *
  * <p>판매정보 parser 와 같은 이유로 공유 DTO 를 쓰지 않는다. {@code eventType} 은 읽지 않는다. 세 이벤트 모두 쿠폰 전체 상태를 싣기 때문에 같은
  * 방식으로 저장한다.

@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Commerce → Shopping 판매정보 이벤트 계약의 전송 관련 상수.
+ * Commerce → Catalog 판매정보 이벤트 계약의 전송 관련 상수.
  *
  * <p>모든 이벤트는 판매 ID를 Kafka 키로 사용하므로 같은 판매정보의 이벤트는 같은 파티션에 들어간다. 소비자는 판매정보별 {@code snapshotVersion}이
  * 마지막 반영 버전보다 클 때만 스냅샷을 반영한다. 시각과 이벤트 ID는 순서 판정에 사용하지 않는다. 재고 변경을 포함해 전체 스냅샷의 어느 필드든 변경되면 버전이 증가한다.

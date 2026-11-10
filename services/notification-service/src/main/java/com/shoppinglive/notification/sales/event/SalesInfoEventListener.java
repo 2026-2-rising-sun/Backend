@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 /**
  * {@code commerce.sales-info.v1} 을 받아 판매 상태 사본을 갱신하고, 품절이 풀리면 재입고 알림을 만든다.
  *
- * <p>Shopping 도 같은 토픽을 구독하지만 consumer group 이 달라서 서로 영향이 없다. 각자 자기 사본을 가진다.
+ * <p>Catalog 도 같은 토픽을 구독하지만 consumer group 이 달라서 서로 영향이 없다. 각자 자기 사본을 가진다.
  *
  * <p>실패를 직접 다루지 않는다. 해석과 검증 실패는 {@code InvalidEventMessageException} 으로 올라가 보관함 토픽으로 가고, DB 장애 같은
  * 일시 실패는 복구될 때까지 재시도된다. 분류는 {@code NotificationConsumerConfiguration} 에 한 곳으로 모아 뒀다.

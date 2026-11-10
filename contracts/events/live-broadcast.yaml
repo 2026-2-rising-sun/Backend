@@ -38,6 +38,28 @@ operations:
     - $ref: '#/channels/broadcast/messages/LiveBroadcastPromotionClosed'
 components:
   schemas:
+    PositiveId:
+      type: integer
+      format: int64
+      minimum: 1
+      maximum: 9223372036854775807
+    Version:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9223372036854775807
+    Timestamp:
+      type: string
+      format: date-time
+    NonBlankText:
+      type: string
+      minLength: 1
+      pattern: \S
+    NullableTimestamp:
+      type:
+      - string
+      - 'null'
+      format: date-time
     EventEnvelope:
       type: object
       description: '도메인 payload와 독립적인 공통 봉투. 필수값은 null일 수 없다.
@@ -96,21 +118,14 @@ components:
       - title
       - scheduledAt
       properties:
-        broadcastId: &id001
-          type: integer
-          format: int64
-          minimum: 1
-          maximum: 9223372036854775807
-        broadcastVersion: &id002
-          type: integer
-          format: int64
-          minimum: 0
-          maximum: 9223372036854775807
+        broadcastId:
+          $ref: '#/components/schemas/PositiveId'
+        broadcastVersion:
+          $ref: '#/components/schemas/Version'
         title:
           type: string
-        scheduledAt: &id003
-          type: string
-          format: date-time
+        scheduledAt:
+          $ref: '#/components/schemas/Timestamp'
     LiveBroadcastStartedPayload:
       type: object
       required:
@@ -121,16 +136,21 @@ components:
       - startedAt
       - productIds
       properties:
-        broadcastId: *id001
-        broadcastVersion: *id002
+        broadcastId:
+          $ref: '#/components/schemas/PositiveId'
+        broadcastVersion:
+          $ref: '#/components/schemas/Version'
         title:
           type: string
-        scheduledAt: *id003
-        startedAt: *id003
+        scheduledAt:
+          $ref: '#/components/schemas/Timestamp'
+        startedAt:
+          $ref: '#/components/schemas/Timestamp'
         productIds:
           type: array
           description: 방송 시작 시점에 공개 가능한 ON_SALE·SOLD_OUT 연결 상품 ID. 노출 순서대로 전달한다.
-          items: *id001
+          items:
+            $ref: '#/components/schemas/PositiveId'
     LiveBroadcastEndedPayload:
       type: object
       required:
@@ -139,17 +159,18 @@ components:
       - startedAt
       - endedAt
       properties:
-        broadcastId: *id001
-        broadcastVersion: *id002
-        startedAt: *id003
-        endedAt: *id003
+        broadcastId:
+          $ref: '#/components/schemas/PositiveId'
+        broadcastVersion:
+          $ref: '#/components/schemas/Version'
+        startedAt:
+          $ref: '#/components/schemas/Timestamp'
+        endedAt:
+          $ref: '#/components/schemas/Timestamp'
         closedPromotionIds:
           type: array
-          items: &id004
-            type: integer
-            format: int64
-            minimum: 1
-            maximum: 9223372036854775807
+          items:
+            $ref: '#/components/schemas/PositiveId'
           description: 방송 종료와 함께 닫힌 OPEN 프로모션 ID. 이전 이벤트에는 없을 수 있으며 없으면 빈 목록으로 처리한다.
     LiveBroadcastPromotionOpenedPayload:
       type: object
@@ -163,29 +184,23 @@ components:
       - openedAt
       - closesAt
       properties:
-        broadcastId: *id004
-        promotionId: *id004
-        promotionVersion: &id006
-          type: integer
-          format: int64
-          minimum: 0
-          maximum: 9223372036854775807
-        type: &id005
-          type: string
-          minLength: 1
-          pattern: \S
-        title: *id005
+        broadcastId:
+          $ref: '#/components/schemas/PositiveId'
+        promotionId:
+          $ref: '#/components/schemas/PositiveId'
+        promotionVersion:
+          $ref: '#/components/schemas/Version'
+        type:
+          $ref: '#/components/schemas/NonBlankText'
+        title:
+          $ref: '#/components/schemas/NonBlankText'
         attributes:
           type: object
           additionalProperties: true
-        openedAt: &id008
-          type: string
-          format: date-time
-        closesAt: &id007
-          type:
-          - string
-          - 'null'
-          format: date-time
+        openedAt:
+          $ref: '#/components/schemas/Timestamp'
+        closesAt:
+          $ref: '#/components/schemas/NullableTimestamp'
     LiveBroadcastPromotionClosedPayload:
       type: object
       required:
@@ -197,17 +212,23 @@ components:
       - openedAt
       - closedAt
       properties:
-        broadcastId: *id004
-        promotionId: *id004
-        promotionVersion: *id006
-        type: *id005
+        broadcastId:
+          $ref: '#/components/schemas/PositiveId'
+        promotionId:
+          $ref: '#/components/schemas/PositiveId'
+        promotionVersion:
+          $ref: '#/components/schemas/Version'
+        type:
+          $ref: '#/components/schemas/NonBlankText'
         reason:
           type: string
           minLength: 1
           pattern: \S
           description: SELLER_CLOSED·EXPIRED·BROADCAST_ENDED. 모르는 값도 문자열로 받을 수 있다.
-        openedAt: *id007
-        closedAt: *id008
+        openedAt:
+          $ref: '#/components/schemas/NullableTimestamp'
+        closedAt:
+          $ref: '#/components/schemas/Timestamp'
   messages:
     LiveBroadcastScheduled:
       name: LiveBroadcastScheduled
