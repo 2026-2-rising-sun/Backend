@@ -23,7 +23,7 @@ import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
- * Shopping 이 받는 Commerce 이벤트(판매정보, 쿠폰)의 실패 처리. error handler bean 하나가 기본 listener factory 에 붙어 두
+ * Catalog가 받는 Commerce 이벤트(판매정보, 쿠폰)의 실패 처리. error handler bean 하나가 기본 listener factory 에 붙어 두
  * listener 에 같이 적용된다.
  *
  * <p>실패를 셋으로 나눈다.

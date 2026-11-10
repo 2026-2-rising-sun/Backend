@@ -7,7 +7,7 @@ import com.shoppinglive.catalog.client.commercecore.SalesInfo;
 import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 
 /**
- * 판매정보 이벤트 한 건을 Shopping 자체 모델로 해석하고 검증한다.
+ * 판매정보 이벤트 한 건을 Catalog 자체 모델로 해석하고 검증한다.
  *
  * <p>공유 DTO({@code SalesInfoEvent})를 쓰지 않는 이유: 모르는 enum 값 하나에도 생성자가 던져 메시지 전체가 읽히지 않는다. 여기서는 필드를 직접
  * 읽어 값마다 다르게 처리한다.
