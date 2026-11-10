@@ -8,15 +8,19 @@
 
 ## 아키텍처
 
+![6개 서비스의 책임과 독립 데이터베이스](docs/assets/architecture/backend-architecture.png)
+
 각 서비스는 자신의 데이터를 소유하고 API와 이벤트로 협력합니다. 상품 원본·이미지·판매·재고·쿠폰·장바구니·주문과 환불 접수 정책은 CommerceCore가, 공개 상품·판매·쿠폰 사본은 Catalog가, 결제·환불 실행과 Mock PG·결과 복구는 Payment가 담당합니다. 공통 응답, 인증 검증, 요청 추적, JPA 감사와 Outbox 구현은 `common-module`에서 공유합니다.
 
 ## 서비스 간 통신
+
+![HTTP·Kafka·Redis Pub/Sub과 SSE 통신 흐름](docs/assets/architecture/service-communication.png)
 
 | 방식 | 주요 흐름 |
 |---|---|
 | HTTP | CommerceCore → Payment 내부 결제·환불 접수/조회, Catalog → CommerceCore 판매·쿠폰 대조, Live → CommerceCore 상품·판매 조회, Live → Member 회원 표시 이름 조회 |
 | 인증 확인 | Catalog·CommerceCore·Live·Notification → Member 세션 활성 상태 확인 |
-| Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. 기존 주문 묶음·쿠폰·방송 → Notification |
+| Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. 주문 묶음·쿠폰·판매 상태·방송 → Notification |
 | Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |
 
 판매정보 조회는 이벤트로 채운 사본(`replica`)이 기본이며 `catalog.sales.source=http`(`CATALOG_SALES_SOURCE=http`)로 CommerceCore 직접 조회로 되돌릴 수 있습니다. 상품·판매·쿠폰·방송·프로모션 및 Payment 결과 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다.
