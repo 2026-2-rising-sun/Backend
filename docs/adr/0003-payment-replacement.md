@@ -17,6 +17,6 @@
 
 ## 영향
 
-- CommerceCore 결제 모듈([#334](https://github.com/2026-2-rising-sun/Backend/issues/334))이 새 계약으로 바뀔 때까지 통합 개발 환경의 결제가 동작하지 않는다.
+- CommerceCore 결제 연동이 새 계약으로 바뀔 때(주문 연동 단계)까지 통합 개발 환경의 결제가 동작하지 않는다.
 - 로컬 Kafka에 옛 형식 메시지가 남아 있으면 토픽을 비운다.
 - 현재 설계 문서(`design-docs/services/payment/*`, `order-payment.md`, `refund.md`, `requirements/order-payment.md`)는 교체 PR마다 코드와 함께 바꾼다.

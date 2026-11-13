@@ -45,14 +45,14 @@ flowchart TB
 
 `com.shoppinglive.payment.<도메인>.{controller,service,repository,entity,dto}` ([코드 기준](../../../guides/code.md)). 외부 클라이언트는 `client.toss`.
 
-| 도메인 패키지 | 마일스톤 | 테이블(원본 `#ddl`) |
+| 도메인 패키지 | 단계 | 테이블(원본 `#ddl`) |
 |---|---|---|
-| `payment` | M1 | payment, payment_seller_amount, pg_call |
-| `ledger` | M1 | ledger_journal, ledger_entry |
-| `client.toss` | M1 | — |
-| `refund` | M2 | refund, refund_item |
-| `reconciliation` | M3 | reconciliation_run, reconciliation_mismatch |
-| `settlement`, `payout` | M4, M5 | settlement_item, payout, seller_payout_account |
+| `payment` | 결제 1차 | payment, payment_seller_amount, pg_call |
+| `ledger` | 결제 1차 | ledger_journal, ledger_entry |
+| `client.toss` | 결제 1차 | — |
+| `refund` | 환불 | refund, refund_item |
+| `reconciliation` | 후순위(대사) | reconciliation_run, reconciliation_mismatch |
+| `settlement`, `payout` | 후순위(정산·지급) | settlement_item, payout, seller_payout_account |
 
 기존 루트 패키지(`controller`, `service`, `entity`, …)는 M1 PR0에서 지운다.
 
@@ -75,10 +75,11 @@ ADR로 올리기엔 작은 결정이다. 바뀌면 이 표를 고친다.
 
 | 판단 | 이유 | 감수 |
 |---|---|---|
-| 원본에 없는 오류 코드 `STALE_CHECKOUT`, `PG_UNAVAILABLE`, `PAYMENT_BUSY`를 쓴다 | 예전 결제창·연결 실패·풀 포화를 Commerce가 구분해 안내해야 한다 | 이벤트 스토밍 v41과 다르다. 계약 YAML이 원본이 된다 |
-| 승인 응답 검증 실패 뒤 보상 취소가 불명이어도 결제는 CANCELED | 정상이면 생기지 않는 일이다. 상태를 늘리지 않는다 | 돈이 잡힌 채 CANCELED일 수 있다. M3 거래 대사 전까지는 오류 로그로 수동 확인 |
+| 원본에 없는 오류 코드 `STALE_CHECKOUT`, `PG_UNAVAILABLE`을 쓴다 | 예전 결제창·연결 실패를 Commerce가 구분해 안내해야 한다 | 이벤트 스토밍 v41과 다르다. 계약 YAML이 원본이 된다 |
+| 승인 응답 검증 실패 뒤 보상 취소가 불명이어도 결제는 CANCELED | 정상이면 생기지 않는 일이다. 상태를 늘리지 않는다 | 돈이 잡힌 채 CANCELED일 수 있다. 거래 대사를 만들기 전까지는 오류 로그로 수동 확인 |
 | 토스 401·403·429는 "보내지 않음"(CREATED 유지, 503)으로 본다 | 우리 키 설정 문제나 호출 제한은 카드 거절이 아니다. 돈이 움직이지 않은 응답이다 | 원본 `#f4`는 4xx를 모두 거절로 본다 |
 | 보상 취소 멱등 키 `cancel-{pg_order_id}`, 승인 조회는 orderId의 마지막 `-` 앞부분으로 결제를 찾는다 | 원본에 값이 없다 | — |
 | 스케줄러에 분산 락을 두지 않는다 | 모든 전이가 이전 상태 조건부 UPDATE라 중복 실행이 무해하다 | 같은 결제를 두 인스턴스가 조회할 수 있다(토스 조회 1번 더) |
-| 원본 V7(정산·지급)을 V7 정산, V8 지급으로 나눈다 | 마일스톤이 다르다 | M4 착수 때 확인 |
+| 원본 V7(정산·지급)을 V7 정산, V8 지급으로 나눈다 | 착수 시점이 다르다 | 정산 착수 때 확인 |
+| 토스 호출 동시 실행 수 제한(벌크헤드)을 두지 않는다 | 정합성 문제가 아니다. 이중 승인·누락은 조건부 UPDATE와 멱등 키가 막는다. 남는 위험은 부하(느린 PG에 스레드가 묶임)다 | 원본 `#api`와 다르다. 부하 테스트나 운영 지표에서 문제가 보이면 도입 |
 | UNKNOWN 조회 간격 10초·30초·1분·5분, 마감 30분 | 원본 `#f4` 제안값 | 운영 후 조정 |
