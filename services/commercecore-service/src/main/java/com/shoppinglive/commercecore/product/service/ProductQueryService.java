@@ -30,6 +30,7 @@ public class ProductQueryService implements ProductLookup {
     public ProductSnapshot getSnapshot(Long productId) {
         return productRepository
                 .findById(productId)
+                .filter(product -> !product.isDeleted())
                 .map(this::toSnapshot)
                 .orElseThrow(
                         () ->
@@ -46,13 +47,17 @@ public class ProductQueryService implements ProductLookup {
                 .distinct()
                 .map(byId::get)
                 .filter(Objects::nonNull)
+                .filter(product -> !product.isDeleted())
                 .map(this::toSnapshot)
                 .toList();
     }
 
     @Override
     public java.util.Optional<ProductSnapshot> findProduct(Long productId) {
-        return productRepository.findById(productId).map(this::toSnapshot);
+        return productRepository
+                .findById(productId)
+                .filter(product -> !product.isDeleted())
+                .map(this::toSnapshot);
     }
 
     @Override
@@ -62,7 +67,7 @@ public class ProductQueryService implements ProductLookup {
 
     @Override
     public boolean exists(Long productId) {
-        return productRepository.existsById(productId);
+        return productRepository.existsByIdAndDeletedAtIsNull(productId);
     }
 
     private ProductSnapshot toSnapshot(Product product) {
@@ -70,6 +75,7 @@ public class ProductQueryService implements ProductLookup {
                 product.getId(),
                 product.getName(),
                 imageUrlResolver.urlOf(product.getMainImageId()),
-                product.getSellerId());
+                product.getSellerId(),
+                product.isSaleEnabled());
     }
 }

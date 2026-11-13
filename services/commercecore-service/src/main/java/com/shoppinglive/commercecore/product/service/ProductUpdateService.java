@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 상품 기본정보 수정과 대표 이미지 교체.
  *
- * <p>가격·재고·판매 상태는 Core 판매 모듈 소유라 건드리지 않는다. 이미 생성된 주문의 상품명은 Core가 주문 시점에 스냅샷으로 저장하므로 여기서 이름을 바꿔도 영향이
+ * <p>가격·재고·개별 판매 상태는 판매 단위의 소유라 건드리지 않는다. 이미 생성된 주문의 상품명은 Core가 주문 시점에 스냅샷으로 저장하므로 여기서 이름을 바꿔도 영향이
  * 없다.
  */
 @Service
@@ -55,6 +55,9 @@ public class ProductUpdateService {
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND,
                                                 "상품을 찾을 수 없습니다: " + productId));
+        if (product.isDeleted()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다: " + productId);
+        }
         // 기존 상품의 소유자는 복원할 수 없으므로 기존 관리 동작을 유지한다.
         if (product.getSellerId() != null && !product.getSellerId().equals(sellerId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "본인 상품만 수정할 수 있습니다.");
