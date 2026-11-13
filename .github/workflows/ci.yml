@@ -35,6 +35,12 @@ jobs:
       - name: Select work from changed files
         id: changes
         run: python .github/scripts/ci/classify_changes.py
+      - name: 문서 링크와 요구사항 상태 점검
+        run: python scripts/check_docs.py
+      - name: API HTML 최신성 점검
+        run: python scripts/render_api_docs.py --check
+      - name: 설계 HTML 최신성 점검
+        run: python scripts/render_design_docs.py --check
       - uses: actions/setup-java@v5
         if: steps.changes.outputs.gradle_tasks != '[]'
         with:
@@ -54,7 +60,7 @@ jobs:
         run: python -m unittest discover -s .github/scripts/ci -p 'test_*.py'
       - name: Check local verification runner
         if: steps.changes.outputs.harness == 'true'
-        run: python -m unittest discover -s harness -p 'test_*.py'
+        run: python -m unittest discover -s scripts -p 'test_*.py'
       - name: Check local authentication configuration tool
         if: steps.changes.outputs.local_auth == 'true'
         run: node --test scripts/local/auth-env.test.cjs

@@ -10,6 +10,20 @@ CONTROLLER = b'@RestController class Example { @GetMapping("/orders") void get()
 
 
 class ClassificationTests(unittest.TestCase):
+    def test_only_document_ignore_rules_can_avoid_full_build(self):
+        """기존 문서 제외 규칙 해제는 도구 검사, 그 밖의 규칙 변경은 전체 검사다."""
+        before = b'build/\n# old\ndocs/**/*.md\nservices/*/docs/**/*.md\n'
+        after = b'build/\n# new\n'
+        plan = classify([Change('.gitignore', before, after)])
+        self.assertEqual(plan['gradle_tasks'], [])
+        self.assertTrue(plan['harness'])
+        self.assertTrue(plan['classifier'])
+        for change in [Change('.gitignore', before, after + b'*.java\n'),
+                       Change('.gitignore', before, after + b'!docs/**/*.md\n'),
+                       Change('.gitignore', before, after, False),
+                       Change('.gitignore', None, after)]:
+            self.assertEqual(classify([change])['gradle_tasks'], ['build'])
+
     def test_documents_do_not_build_or_test(self):
         plan = classify([Change(path, b"old", b"new") for path in
                          ("README.md", "AGENTS.md", "docs/notes.txt", "docs/ci.md")])
@@ -273,7 +287,8 @@ class GitDiffTests(unittest.TestCase):
 class HarnessSelectionTests(unittest.TestCase):
     def test_runner_changes_select_harness_tests_without_build(self):
         """실행기 변경은 자체 검사만 선택하고 업무 빌드를 요구하지 않는다."""
-        for path in ("harness/verify.py", "harness/test_verify.py"):
+        for path in ("scripts/verify.py", "scripts/test_verify.py", "scripts/check_docs.py",
+                     "scripts/test_check_docs.py", "scripts/check.sh", "scripts/check-docs.sh"):
             with self.subTest(path=path):
                 plan = classify([Change(path, None, b"code")])
                 self.assertTrue(plan["harness"])
@@ -282,7 +297,7 @@ class HarnessSelectionTests(unittest.TestCase):
 
     def test_harness_documents_do_not_select_runner_tests(self):
         """같은 폴더의 지침 변경은 문서로 분류하고 실행기 검사를 추가하지 않는다."""
-        plan = classify([Change("harness/README.md", b"old", b"new")])
+        plan = classify([Change("docs/README.md", b"old", b"new")])
         self.assertFalse(plan["harness"])
         self.assertEqual(plan["gradle_tasks"], [])
 
@@ -294,7 +309,26 @@ class HarnessSelectionTests(unittest.TestCase):
         step = next(s for s in ci["jobs"]["build"]["steps"]
                     if s.get("name") == "Check local verification runner")
         self.assertIn("outputs.harness == 'true'", step["if"])
-        self.assertIn("unittest discover -s harness", step["run"])
+        self.assertIn("unittest discover -s scripts", step["run"])
+
+    def test_html_assets_are_documents_but_runtime_html_is_built(self):
+        """설명용 HTML·그림은 문서이며 실행 리소스는 빌드한다."""
+        for path in ("docs/design-docs/harness-map.html", "docs/assets/map.svg"):
+            with self.subTest(path=path):
+                plan = classify([Change(path, None, b"content")])
+                self.assertEqual(plan["gradle_tasks"], [])
+        plan = classify([Change("services/member-service/src/main/resources/page.html", None, b"content")])
+        self.assertTrue(plan["run_tests"])
+
+    def test_ci_always_checks_document_links_even_for_code_deletions(self):
+        """코드 삭제로 문서 참조가 깨져도 CI 문서 점검을 생략하지 않는다."""
+        import yaml
+        root = Path(__file__).resolve().parents[3]
+        ci = yaml.safe_load((root / ".github/workflows/ci.yml").read_text())
+        for command in ("python scripts/check_docs.py", "python scripts/render_api_docs.py --check",
+                        "python scripts/render_design_docs.py --check"):
+            step = next(s for s in ci["jobs"]["build"]["steps"] if s.get("run") == command)
+            self.assertNotIn("if", step)
 
 
 class ServiceBoundaryTests(unittest.TestCase):

@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backend 디렉터리 구조</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --page: #f5f7fb; --card: #fff; --text: #172536; --muted: #536477;
+      --rule: #d9e1eb; --hover: #edf2f8; --shared: #255dc1; --shared-bg: #eef4ff;
+      --record: #925a13; --record-bg: #fff7e8; --focus: #2d6bdb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #131a25; --card: #1b2432; --text: #edf3fc; --muted: #adbed3;
+        --rule: #35465c; --hover: #26354b; --shared: #92baff; --shared-bg: #202f49;
+        --record: #f3c783; --record-bg: #382e20; --focus: #92baff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--text); font: 15px/1.75 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+    main { max-width: 1120px; padding: 42px 28px; margin: 0 auto; }
+    h1 { margin: 7px 0 12px; font-size: 32px; line-height: 1.3; letter-spacing: -.8px; }
+    h2 { margin: 0 0 8px; font-size: 18px; }
+    p { margin: 0 0 12px; }
+    a { color: var(--shared); text-underline-offset: 4px; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .eyebrow, .muted { color: var(--muted); }
+    .eyebrow { font-size: 12px; letter-spacing: 1px; font-weight: 700; }
+    .topline { display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .links { display: flex; gap: 18px; font-size: 13px; }
+    .status { display: inline-block; border: 1px solid var(--rule); background: var(--card); border-radius: 20px; padding: 3px 11px; font-size: 12px; margin-bottom: 14px; }
+    .lead { max-width: 830px; }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 24px 0 18px; }
+    .card { padding: 21px 23px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); }
+    .card p:last-child { margin-bottom: 0; }
+    .card.shared-card { background: var(--shared-bg); border-top: 3px solid var(--shared); }
+    .card.record-card { background: var(--record-bg); border-top: 3px solid var(--record); }
+    .path { font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin-bottom: 8px; }
+    .formats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 0 0 26px; }
+    .formats p { margin: 0; padding: 0 4px; font-size: 13px; color: var(--muted); }
+    .formats strong { color: var(--text); }
+    .module-guide { margin-bottom: 26px; }
+    .module-guide ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 14px; }
+    .module-guide li { border-left: 3px solid var(--rule); padding-left: 12px; overflow-wrap: anywhere; }
+    .module-guide code { font-size: 12px; }
+    .tree-card { border: 1px solid var(--rule); background: var(--card); border-radius: 12px; overflow: hidden; }
+    .tree-header { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid var(--rule); }
+    .tree-header h2 { margin: 0; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .actions[hidden] { display: none; }
+    button { font: inherit; font-size: 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--card); color: var(--text); padding: 6px 10px; cursor: pointer; }
+    button:hover { background: var(--hover); }
+    ul { list-style: none; padding: 0; margin: 0; }
+    #directory-tree { padding: 14px 20px 22px; }
+    .node ul { padding-left: 19px; margin-left: 7px; border-left: 1px solid var(--rule); }
+    summary { list-style-position: outside; padding: 5px 5px 5px 0; margin-left: 14px; cursor: pointer; border-radius: 4px; }
+    summary::marker { color: var(--muted); font-size: 11px; }
+    summary:hover { background: var(--hover); }
+    .entry { display: inline-grid; grid-template-columns: minmax(160px, .9fr) minmax(0, 1.2fr); gap: 16px; width: 100%; vertical-align: top; align-items: baseline; }
+    .name { font: 13px/1.85 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+    .note { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+    .file { padding: 5px 5px 5px 14px; }
+    .shared > details > summary .name { color: var(--shared); font-weight: 700; }
+    .records > details > summary .name { color: var(--record); font-weight: 700; }
+    .closing { padding: 20px 4px 0; color: var(--muted); font-size: 13px; }
+    .closing strong { color: var(--text); }
+    @media (max-width: 680px) {
+      main { padding: 24px 14px; }
+      h1 { font-size: 27px; }
+      .cards, .formats, .module-guide ul { grid-template-columns: 1fr; gap: 12px; }
+      .card { padding: 17px; }
+      .tree-header { padding: 16px; }
+      #directory-tree { padding: 12px 10px 18px; }
+      .node ul { padding-left: 11px; margin-left: 4px; }
+      .entry { grid-template-columns: minmax(0, 1fr); gap: 0; }
+      .note { font-size: 12px; line-height: 1.65; }
+      .note:empty { display: none; }
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .actions { display: none; }
+      main { max-width: none; padding: 0; }
+      .tree-card { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="topline">
+        <span class="eyebrow">SHOPPINGLIVE / BACKEND</span>
+        <nav class="links" aria-label="관련 문서"><a href="README.md">문서 지도</a><a href="directory-structure.md">Markdown 원본</a></nav>
+      </div>
+      <h1>Backend 디렉터리 구조</h1>
+      <span class="status">구현 · 로컬 검증 완료</span>
+      <p class="lead">참고 이미지에 맞춰 docs/ 바로 아래에 명세·요구사항·결정·설계·계획·작업 기록을 배치합니다.</p>
+      <p class="muted lead">적용한 문서·도구와 선택 항목을 구분합니다. 실제 외부 환경의 검증 완료를 뜻하지 않습니다.</p>
+    </header>
+    <section class="cards" aria-label="하네스를 구성하는 역할">
+      <article class="card shared-card"><div class="path">AGENTS.md · docs/guides/</div><h2>에이전트의 행동 기준</h2><p>명령·금지사항·작업 순서·품질 기준과 필요한 문서 포인터를 둡니다.</p><p class="muted">scripts/와 CI에 실제 연결된 검사 범위를 구분합니다.</p></article>
+      <article class="card"><div class="path">명세 · 요구사항 · 설계</div><h2>작업에 필요한 지식</h2><p>무엇을 왜 만드는지, 어떤 결과를 검증할지, 어떻게 구현할지 설명합니다.</p><p class="muted">제안·채택·구현 상태를 구분하고 코드·계약·근거를 연결합니다.</p></article>
+      <article class="card record-card"><div class="path">ADR · 계획 · worklog</div><h2>판단과 실행의 기록</h2><p>선택 이유·진행 상태·실제 작업 결과와 실패 경험을 남깁니다.</p><p class="muted">당시 조건을 보존하고 상태 변경·정정·후속 결정을 연결합니다.</p></article>
+    </section>
+    <section class="formats" aria-label="문서 형식의 역할">
+      <p><strong>MD — 설명과 근거.</strong> AI 에이전트가 읽고 참조하기 쉽게 구조화하며, 사람도 이해할 수 있는 문장·표·링크로 씁니다.</p>
+      <p><strong>HTML — 시각적 이해.</strong> 구조·흐름·상태·차이를 그림과 비교 화면으로 설명하고, 필요한 상호작용을 제공합니다.</p>
+    </section>
+    <section class="card module-guide" aria-labelledby="module-title">
+      <h2 id="module-title">모듈 문서는 한곳에서, 원본은 명확하게</h2>
+      <p>각 모듈의 <code>docs/design-docs/services/모듈명/README.md</code>에서 책임·소유 데이터와 API·DB·상태 문서를 연결합니다.</p>
+      <ul>
+        <li><strong>API 명세</strong><br><code>계약 YAML → api.html</code><br><span class="muted">기존 계약에서 생성합니다. 명세 전체를 MD에 다시 복사하지 않습니다.</span></li>
+        <li><strong>DB ERD</strong><br><code>마이그레이션·엔티티 → erd.md ↔ erd.html</code><br><span class="muted">테이블·키·관계를 설명하고 물리 FK와 논리 참조를 구분합니다.</span></li>
+        <li><strong>상태·수명 주기</strong><br><code>구현·테스트 → states/주제.md ↔ 주제.html</code><br><span class="muted">실제 전이 조건·실패·복구 경로를 대조합니다. 코드 조사와 실행 결과는 구분합니다.</span></li>
+      </ul>
+      <p class="muted" style="margin-top: 14px">모듈 문서와 생성 도구를 구현했습니다. 기준 소스·확인 범위·미확인 사항을 표시하고, 코드 조사와 실제 DB·HTTP·브로커 실행 결과를 구분합니다. <a href="exec-plans/completed/330-document-harness/tables.md">모듈별 문서 범위 보기</a></p>
+    </section>
+    <section class="tree-card" aria-labelledby="tree-title">
+      <div class="tree-header"><h2 id="tree-title">디렉터리와 주석</h2><div class="actions" hidden><button type="button" id="expand-all" aria-controls="directory-tree">모두 펼치기</button><button type="button" id="collapse-all" aria-controls="directory-tree">모두 접기</button></div></div>
+      <ul id="directory-tree">
+        <li class="node" data-path=".">
+          <details open>
+            <summary><span class="entry"><code class="name">Backend/</code><span class="note"></span></span></summary>
+            <ul>
+              <li class="node" data-path="README.md">
+                <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">프로젝트 소개·실행 진입점</span></span></div>
+              </li>
+              <li class="node" data-path="AGENTS.md">
+                <div class="file"><span class="entry"><code class="name">AGENTS.md</code><span class="note">AI 에이전트의 명령·금지사항·문서 포인터</span></span></div>
+              </li>
+              <li class="node" data-path="ARCHITECTURE.md">
+                <div class="file"><span class="entry"><code class="name">ARCHITECTURE.md</code><span class="note">레이어·서비스 경계·의존 방향·핵심 도메인</span></span></div>
+              </li>
+              <li class="node" data-path="docs">
+                <details open>
+                  <summary><span class="entry"><code class="name">docs/</code><span class="note"></span></span></summary>
+                  <ul>
+                    <li class="node" data-path="docs/README.md">
+                      <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">문서 지도·작성·갱신 기준</span></span></div>
+                    </li>
+                    <li class="node" data-path="docs/directory-structure.md">
+                      <div class="file"><span class="entry"><code class="name">directory-structure.md</code><span class="note">AI 에이전트와 사람이 읽는 구조·주석 원본</span></span></div>
+                    </li>
+                    <li class="node" data-path="docs/directory-structure.html">
+                      <div class="file"><span class="entry"><code class="name">directory-structure.html</code><span class="note">사람이 폴더를 펼쳐 보는 시각 자료</span></span></div>
+                    </li>
+                    <li class="node shared" data-path="docs/product-specs">
+                      <details>
+                        <summary><span class="entry"><code class="name">product-specs/</code><span class="note">PRD: 무엇을, 왜 만드는가</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/product-specs/document-harness.md">
+                            <div class="file"><span class="entry"><code class="name">document-harness.md</code><span class="note">하네스 개편의 목적·사용자·범위</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/product-specs/shoppinglive.md">
+                            <div class="file"><span class="entry"><code class="name">shoppinglive.md</code><span class="note">제품 목적·기능 범위·주요 정책</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/product-specs/glossary.md">
+                            <div class="file"><span class="entry"><code class="name">glossary.md</code><span class="note">공통 업무 용어</span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node shared" data-path="docs/requirements">
+                      <details>
+                        <summary><span class="entry"><code class="name">requirements/</code><span class="note">Engineering Requirements Document: 검증 가능한 수용 기준</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/requirements/document-harness.md">
+                            <div class="file"><span class="entry"><code class="name">document-harness.md</code><span class="note">문서 하네스의 요구사항</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/requirements/order-payment.md">
+                            <div class="file"><span class="entry"><code class="name">order-payment.md</code><span class="note">주문·결제의 수용 기준</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/requirements/catalog-sync.md">
+                            <div class="file"><span class="entry"><code class="name">catalog-sync.md</code><span class="note">사본 동기화의 수용 기준</span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node records" data-path="docs/adr">
+                      <details>
+                        <summary><span class="entry"><code class="name">adr/</code><span class="note">왜 이렇게 결정했는가: 대안·선택 이유·결정 상태</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/adr/0001-document-harness.md">
+                            <div class="file"><span class="entry"><code class="name">0001-document-harness.md</code><span class="note"></span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node shared" data-path="docs/design-docs">
+                      <details open>
+                        <summary><span class="entry"><code class="name">design-docs/</code><span class="note">어떻게 구현하는가: 구조·흐름·설계·비교 자료</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/design-docs/README.md">
+                            <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">설계·서비스 간 흐름 지도</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/document-harness.md">
+                            <div class="file"><span class="entry"><code class="name">document-harness.md</code><span class="note">하네스 동작과 문서·검사 연결 설계</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/authentication.md">
+                            <div class="file"><span class="entry"><code class="name">authentication.md</code><span class="note">인증·세션 확인 흐름</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/authentication.html">
+                            <div class="file"><span class="entry"><code class="name">authentication.html</code><span class="note">인증·세션의 서비스 간 흐름 시각화</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/order-payment.md">
+                            <div class="file"><span class="entry"><code class="name">order-payment.md</code><span class="note">주문·결제의 책임·처리 순서·예외</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/order-payment.html">
+                            <div class="file"><span class="entry"><code class="name">order-payment.html</code><span class="note">서비스 간 흐름·상태 변화 시각화</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/refund.md">
+                            <div class="file"><span class="entry"><code class="name">refund.md</code><span class="note">환불 접수·실행·결과 반영</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/refund.html">
+                            <div class="file"><span class="entry"><code class="name">refund.html</code><span class="note">서비스 간 환불 처리와 실패·복구 흐름</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/catalog-sync.md">
+                            <div class="file"><span class="entry"><code class="name">catalog-sync.md</code><span class="note">상품·판매·쿠폰 사본 동기화</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/catalog-sync.html">
+                            <div class="file"><span class="entry"><code class="name">catalog-sync.html</code><span class="note">원본·조회 사본과 동기화 경로 시각화</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/live-notification.md">
+                            <div class="file"><span class="entry"><code class="name">live-notification.md</code><span class="note">방송 이벤트와 알림 연결</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/live-notification.html">
+                            <div class="file"><span class="entry"><code class="name">live-notification.html</code><span class="note">방송·알림의 서비스 간 협력 시각화</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/design-docs/services">
+                            <details>
+                              <summary><span class="entry"><code class="name">services/</code><span class="note">모듈별 현재 구조·API·DB ERD·상태·수명 주기</span></span></summary>
+                              <ul>
+                                <li class="node" data-path="docs/design-docs/services/README.md">
+                                  <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">모듈 문서 지도</span></span></div>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/commercecore">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">commercecore/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/commercecore/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">책임·소유 데이터·의존·문서와 원본의 지도</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/commercecore/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note">계약 YAML에서 생성한 API 열람 화면</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/commercecore/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note">마이그레이션·엔티티에 근거한 테이블·키·관계</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/commercecore/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note">테이블·관계를 탐색하는 DB 관계도</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/commercecore/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/order.md">
+                                              <div class="file"><span class="entry"><code class="name">order.md</code><span class="note">주문 상태·허용 전이·조건·구현·테스트 근거</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/order.html">
+                                              <div class="file"><span class="entry"><code class="name">order.html</code><span class="note">주문 상태 전이 시각화</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/payment.md">
+                                              <div class="file"><span class="entry"><code class="name">payment.md</code><span class="note">CommerceCore의 결제 접수·결과 반영</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/payment.html">
+                                              <div class="file"><span class="entry"><code class="name">payment.html</code><span class="note"></span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/refund.md">
+                                              <div class="file"><span class="entry"><code class="name">refund.md</code><span class="note">CommerceCore의 환불 접수·결과 반영</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/refund.html">
+                                              <div class="file"><span class="entry"><code class="name">refund.html</code><span class="note"></span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/sales.md">
+                                              <div class="file"><span class="entry"><code class="name">sales.md</code><span class="note">판매 상태와 변경 조건</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/commercecore/states/sales.html">
+                                              <div class="file"><span class="entry"><code class="name">sales.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/payment">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">payment/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/payment/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/payment/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/payment/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note">db/payment-migration/와 엔티티 기준</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/payment/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/payment/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/payment/states/payment.md">
+                                              <div class="file"><span class="entry"><code class="name">payment.md</code><span class="note">결제 실행·실패·미확정 결과의 복구</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/payment/states/payment.html">
+                                              <div class="file"><span class="entry"><code class="name">payment.html</code><span class="note"></span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/payment/states/refund.md">
+                                              <div class="file"><span class="entry"><code class="name">refund.md</code><span class="note">환불 실행·실패·복구</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/payment/states/refund.html">
+                                              <div class="file"><span class="entry"><code class="name">refund.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/catalog">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">catalog/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/catalog/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/catalog/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/catalog/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/catalog/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/catalog/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/catalog/states/sales-view.md">
+                                              <div class="file"><span class="entry"><code class="name">sales-view.md</code><span class="note">판매 상태의 조회 사본·표시·동기화 조건</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/catalog/states/sales-view.html">
+                                              <div class="file"><span class="entry"><code class="name">sales-view.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/member">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">member/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/member/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/member/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/member/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/member/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/member/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/member/states/session.md">
+                                              <div class="file"><span class="entry"><code class="name">session.md</code><span class="note">세션 발급·만료·폐기·갱신의 수명 주기</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/member/states/session.html">
+                                              <div class="file"><span class="entry"><code class="name">session.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/live">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">live/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/live/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/live/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/live/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/live/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/live/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/live/states/broadcast.md">
+                                              <div class="file"><span class="entry"><code class="name">broadcast.md</code><span class="note">방송 상태·변경 조건</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/live/states/broadcast.html">
+                                              <div class="file"><span class="entry"><code class="name">broadcast.html</code><span class="note"></span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/live/states/promotion.md">
+                                              <div class="file"><span class="entry"><code class="name">promotion.md</code><span class="note">프로모션 상태·변경 조건</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/live/states/promotion.html">
+                                              <div class="file"><span class="entry"><code class="name">promotion.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/notification">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">notification/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/notification/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/notification/api.html">
+                                        <div class="file"><span class="entry"><code class="name">api.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/notification/erd.md">
+                                        <div class="file"><span class="entry"><code class="name">erd.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/notification/erd.html">
+                                        <div class="file"><span class="entry"><code class="name">erd.html</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/notification/states">
+                                        <details>
+                                          <summary><span class="entry"><code class="name">states/</code><span class="note"></span></span></summary>
+                                          <ul>
+                                            <li class="node" data-path="docs/design-docs/services/notification/states/inbox.md">
+                                              <div class="file"><span class="entry"><code class="name">inbox.md</code><span class="note">알림 읽음 처리·보존 수명 주기</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/notification/states/inbox.html">
+                                              <div class="file"><span class="entry"><code class="name">inbox.html</code><span class="note"></span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/notification/states/subscription.md">
+                                              <div class="file"><span class="entry"><code class="name">subscription.md</code><span class="note">구독 설정과 변경 조건</span></span></div>
+                                            </li>
+                                            <li class="node" data-path="docs/design-docs/services/notification/states/subscription.html">
+                                              <div class="file"><span class="entry"><code class="name">subscription.html</code><span class="note"></span></span></div>
+                                            </li>
+                                          </ul>
+                                        </details>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                                <li class="node" data-path="docs/design-docs/services/common-module">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">common-module/</code><span class="note">공통 구현·계약·제약: 독립 서비스 아님</span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/design-docs/services/common-module/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/common-module/outbox.md">
+                                        <div class="file"><span class="entry"><code class="name">outbox.md</code><span class="note">공통 Outbox 처리·소유 서비스와의 관계</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/design-docs/services/common-module/outbox.html">
+                                        <div class="file"><span class="entry"><code class="name">outbox.html</code><span class="note">발행·재시도 흐름 시각화</span></span></div>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                              </ul>
+                            </details>
+                          </li>
+                          <li class="node records" data-path="docs/design-docs/failures">
+                            <details>
+                              <summary><span class="entry"><code class="name">failures/</code><span class="note">무엇이 깨졌고 왜 실패했는가</span></span></summary>
+                              <ul>
+                                <li class="node" data-path="docs/design-docs/failures/330-stale-links.md">
+                                  <div class="file"><span class="entry"><code class="name">330-stale-links.md</code><span class="note">이관 중 링크 단절의 원인·검증</span></span></div>
+                                </li>
+                              </ul>
+                            </details>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node records" data-path="docs/exec-plans">
+                      <details open>
+                        <summary><span class="entry"><code class="name">exec-plans/</code><span class="note"></span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/exec-plans/README.md">
+                            <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">진행·완료 계획의 지도</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/exec-plans/active">
+                            <div class="file"><span class="entry"><code class="name">active/</code><span class="note">새 진행 계획이 생길 때 생성</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/exec-plans/completed">
+                            <details>
+                              <summary><span class="entry"><code class="name">completed/</code><span class="note">완료한 계획·결과·남은 과제</span></span></summary>
+                              <ul>
+                                <li class="node" data-path="docs/exec-plans/completed/330-document-harness">
+                                  <details>
+                                    <summary><span class="entry"><code class="name">330-document-harness/</code><span class="note"></span></span></summary>
+                                    <ul>
+                                      <li class="node" data-path="docs/exec-plans/completed/330-document-harness/README.md">
+                                        <div class="file"><span class="entry"><code class="name">README.md</code><span class="note">실행 계획·상태·검증·관련 자료의 진입점</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/exec-plans/completed/330-document-harness/decision.md">
+                                        <div class="file"><span class="entry"><code class="name">decision.md</code><span class="note">이 작업의 판단 기준·공통 ADR 연결</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/exec-plans/completed/330-document-harness/research.md">
+                                        <div class="file"><span class="entry"><code class="name">research.md</code><span class="note">구현 전 조사·근거·후속 결과 연결</span></span></div>
+                                      </li>
+                                      <li class="node" data-path="docs/exec-plans/completed/330-document-harness/tables.md">
+                                        <div class="file"><span class="entry"><code class="name">tables.md</code><span class="note">모듈별 문서 범위·원본·진행 상태</span></span></div>
+                                      </li>
+                                    </ul>
+                                  </details>
+                                </li>
+                              </ul>
+                            </details>
+                          </li>
+                          <li class="node" data-path="docs/exec-plans/tech-debt.md">
+                            <div class="file"><span class="entry"><code class="name">tech-debt.md</code><span class="note">미룬 문제·영향·다시 다룰 조건</span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node records" data-path="docs/worklog">
+                      <details>
+                        <summary><span class="entry"><code class="name">worklog/</code><span class="note"></span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/worklog/2026-11-13.md">
+                            <div class="file"><span class="entry"><code class="name">2026-11-13.md</code><span class="note">날짜별 작업·판단·실제 검증 결과 (YYYY-MM-DD.md)</span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node shared" data-path="docs/guides">
+                      <details>
+                        <summary><span class="entry"><code class="name">guides/</code><span class="note">Backend의 작업 방식·품질 기준</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/guides/workflow.md">
+                            <div class="file"><span class="entry"><code class="name">workflow.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/guides/code.md">
+                            <div class="file"><span class="entry"><code class="name">code.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/guides/tests.md">
+                            <div class="file"><span class="entry"><code class="name">tests.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/guides/contracts.md">
+                            <div class="file"><span class="entry"><code class="name">contracts.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/guides/tooling.md">
+                            <div class="file"><span class="entry"><code class="name">tooling.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/guides/writing.md">
+                            <div class="file"><span class="entry"><code class="name">writing.md</code><span class="note"></span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node" data-path="docs/templates">
+                      <details>
+                        <summary><span class="entry"><code class="name">templates/</code><span class="note">필요한 작성 양식</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/templates/README.md">
+                            <div class="file"><span class="entry"><code class="name">README.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/issue-feature.md">
+                            <div class="file"><span class="entry"><code class="name">issue-feature.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/issue-bug.md">
+                            <div class="file"><span class="entry"><code class="name">issue-bug.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/issue-refactor.md">
+                            <div class="file"><span class="entry"><code class="name">issue-refactor.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/pull-request.md">
+                            <div class="file"><span class="entry"><code class="name">pull-request.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/commit-message.md">
+                            <div class="file"><span class="entry"><code class="name">commit-message.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/adr.md">
+                            <div class="file"><span class="entry"><code class="name">adr.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/exec-plan.md">
+                            <div class="file"><span class="entry"><code class="name">exec-plan.md</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/templates/worklog.md">
+                            <div class="file"><span class="entry"><code class="name">worklog.md</code><span class="note"></span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node" data-path="docs/assets">
+                      <details>
+                        <summary><span class="entry"><code class="name">assets/</code><span class="note"></span></span></summary>
+                        <ul>
+                          <li class="node" data-path="docs/assets/architecture">
+                            <div class="file"><span class="entry"><code class="name">architecture/</code><span class="note">기존 SVG·PNG 자료</span></span></div>
+                          </li>
+                          <li class="node" data-path="docs/assets/harness">
+                            <details>
+                              <summary><span class="entry"><code class="name">harness/</code><span class="note">하네스 HTML의 실제 화면 확인 자료</span></span></summary>
+                              <ul>
+                                <li class="node" data-path="docs/assets/harness/330-directory-structure.png">
+                                  <div class="file"><span class="entry"><code class="name">330-directory-structure.png</code><span class="note">역할·문서 지도 화면 캡처</span></span></div>
+                                </li>
+                                <li class="node" data-path="docs/assets/harness/330-order-state-filter.png">
+                                  <div class="file"><span class="entry"><code class="name">330-order-state-filter.png</code><span class="note">주문 상태 필터 동작 화면 캡처</span></span></div>
+                                </li>
+                              </ul>
+                            </details>
+                          </li>
+                          <li class="node" data-path="docs/assets/api">
+                            <div class="file"><span class="entry"><code class="name">api/</code><span class="note">선택·미생성: 외부 뷰어 자산이 필요할 때</span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              <li class="node" data-path="scripts">
+                <details>
+                  <summary><span class="entry"><code class="name">scripts/</code><span class="note">검사 선택·실행·문서 생성 도구</span></span></summary>
+                  <ul>
+                    <li class="node" data-path="scripts/check.sh">
+                      <div class="file"><span class="entry"><code class="name">check.sh</code><span class="note">변경 영향에 따른 포맷·테스트·계약·문서 검사</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/check-docs.sh">
+                      <div class="file"><span class="entry"><code class="name">check-docs.sh</code><span class="note">문서 링크·요구사항 상태·검증 참조 검사</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/verify.py">
+                      <div class="file"><span class="entry"><code class="name">verify.py</code><span class="note">검사 선택·실행·결과 집계</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/check_docs.py">
+                      <div class="file"><span class="entry"><code class="name">check_docs.py</code><span class="note">문서 검사 구현</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/render-api-docs.sh">
+                      <div class="file"><span class="entry"><code class="name">render-api-docs.sh</code><span class="note">OpenAPI HTML 생성·최신성 확인</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/render_api_docs.py">
+                      <div class="file"><span class="entry"><code class="name">render_api_docs.py</code><span class="note">저장소 내부 API 렌더러 버전 1</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/render_design_docs.py">
+                      <div class="file"><span class="entry"><code class="name">render_design_docs.py</code><span class="note">MD 표에서 관계·전이 HTML 생성</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/doc_html.py">
+                      <div class="file"><span class="entry"><code class="name">doc_html.py</code><span class="note">외부 자산 없는 공통 HTML 화면</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/test_render_docs.py">
+                      <div class="file"><span class="entry"><code class="name">test_render_docs.py</code><span class="note">참조·표시·생성 최신성 회귀 검사</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/test_verify.py">
+                      <div class="file"><span class="entry"><code class="name">test_verify.py</code><span class="note">검증 실행기 회귀 테스트</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/test_check_docs.py">
+                      <div class="file"><span class="entry"><code class="name">test_check_docs.py</code><span class="note">문서 검사기 회귀 테스트</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/guard.sh">
+                      <div class="file"><span class="entry"><code class="name">guard.sh</code><span class="note">선택·미연결: 위험 명령 차단</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/post-edit.sh">
+                      <div class="file"><span class="entry"><code class="name">post-edit.sh</code><span class="note">선택·미연결: 파일 수정 후 포맷·검사</span></span></div>
+                    </li>
+                    <li class="node" data-path="scripts/local">
+                      <div class="file"><span class="entry"><code class="name">local/</code><span class="note">기존 로컬 실행 도구</span></span></div>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              <li class="node" data-path="CLAUDE.md">
+                <div class="file"><span class="entry"><code class="name">CLAUDE.md</code><span class="note">@AGENTS.md 참조·필요한 Claude 전용 안내</span></span></div>
+              </li>
+              <li class="node" data-path=".mcp.json">
+                <div class="file"><span class="entry"><code class="name">.mcp.json</code><span class="note">선택·미연결: 팀 공통 MCP 서버</span></span></div>
+              </li>
+              <li class="node" data-path=".claude">
+                <details>
+                  <summary><span class="entry"><code class="name">.claude/</code><span class="note">선택·미연결: Claude 전용 설정</span></span></summary>
+                  <ul>
+                    <li class="node" data-path=".claude/settings.json">
+                      <div class="file"><span class="entry"><code class="name">settings.json</code><span class="note">권한·훅 등록과 scripts/ 호출</span></span></div>
+                    </li>
+                    <li class="node" data-path=".claude/settings.local.json">
+                      <div class="file"><span class="entry"><code class="name">settings.local.json</code><span class="note">개인 설정·Git 추적 제외</span></span></div>
+                    </li>
+                    <li class="node" data-path=".claude/rules">
+                      <div class="file"><span class="entry"><code class="name">rules/</code><span class="note">필요한 Claude 전용 규칙</span></span></div>
+                    </li>
+                    <li class="node" data-path=".claude/skills">
+                      <div class="file"><span class="entry"><code class="name">skills/</code><span class="note">필요한 Claude 전용 스킬</span></span></div>
+                    </li>
+                    <li class="node" data-path=".claude/agents">
+                      <div class="file"><span class="entry"><code class="name">agents/</code><span class="note">필요한 Claude 전용 에이전트 설정</span></span></div>
+                    </li>
+                    <li class="node" data-path=".claude/commands">
+                      <div class="file"><span class="entry"><code class="name">commands/</code><span class="note">필요한 Claude 전용 명령</span></span></div>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              <li class="node" data-path="contracts">
+                <details>
+                  <summary><span class="entry"><code class="name">contracts/</code><span class="note">AI 에이전트·검증 도구가 참조하는 계약 원본</span></span></summary>
+                  <ul>
+                    <li class="node" data-path="contracts/api">
+                      <details>
+                        <summary><span class="entry"><code class="name">api/</code><span class="note">OpenAPI 원본: AI 참조·계약 검사·HTML 생성 입력</span></span></summary>
+                        <ul>
+                          <li class="node" data-path="contracts/api/common.yaml">
+                            <div class="file"><span class="entry"><code class="name">common.yaml</code><span class="note">공통 스키마·참조</span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/commercecore-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">commercecore-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/payment-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">payment-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/catalog-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">catalog-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/member-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">member-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/live-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">live-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                          <li class="node" data-path="contracts/api/notification-service.yaml">
+                            <div class="file"><span class="entry"><code class="name">notification-service.yaml</code><span class="note"></span></span></div>
+                          </li>
+                        </ul>
+                      </details>
+                    </li>
+                    <li class="node" data-path="contracts/events">
+                      <div class="file"><span class="entry"><code class="name">events/</code><span class="note">AsyncAPI</span></span></div>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              <li class="node" data-path="services">
+                <details>
+                  <summary><span class="entry"><code class="name">services/</code><span class="note">기존 6개 서비스 구현·설정·테스트</span></span></summary>
+                  <ul>
+                    <li class="node" data-path="services/commercecore-service">
+                      <div class="file"><span class="entry"><code class="name">commercecore-service/</code><span class="note"></span></span></div>
+                    </li>
+                    <li class="node" data-path="services/payment-service">
+                      <div class="file"><span class="entry"><code class="name">payment-service/</code><span class="note"></span></span></div>
+                    </li>
+                    <li class="node" data-path="services/catalog-service">
+                      <div class="file"><span class="entry"><code class="name">catalog-service/</code><span class="note"></span></span></div>
+                    </li>
+                    <li class="node" data-path="services/member-service">
+                      <div class="file"><span class="entry"><code class="name">member-service/</code><span class="note"></span></span></div>
+                    </li>
+                    <li class="node" data-path="services/live-service">
+                      <div class="file"><span class="entry"><code class="name">live-service/</code><span class="note"></span></span></div>
+                    </li>
+                    <li class="node" data-path="services/notification-service">
+                      <div class="file"><span class="entry"><code class="name">notification-service/</code><span class="note"></span></span></div>
+                    </li>
+                  </ul>
+                </details>
+              </li>
+              <li class="node" data-path="common-module">
+                <div class="file"><span class="entry"><code class="name">common-module/</code><span class="note">공통 구현·테스트</span></span></div>
+              </li>
+              <li class="node" data-path=".github">
+                <div class="file"><span class="entry"><code class="name">.github/</code><span class="note">CI·계약 검사·변경 선택 도구</span></span></div>
+              </li>
+              <li class="node" data-path="build.gradle.kts">
+                <div class="file"><span class="entry"><code class="name">build.gradle.kts</code><span class="note">기존 빌드 설정</span></span></div>
+              </li>
+              <li class="node" data-path="settings.gradle.kts">
+                <div class="file"><span class="entry"><code class="name">settings.gradle.kts</code><span class="note">기존 모듈 등록</span></span></div>
+              </li>
+              <li class="node" data-path="gradle">
+                <div class="file"><span class="entry"><code class="name">gradle/</code><span class="note">기존 Gradle wrapper 설정</span></span></div>
+              </li>
+              <li class="node" data-path="gradlew">
+                <div class="file"><span class="entry"><code class="name">gradlew</code><span class="note">기존 Unix 실행 진입점</span></span></div>
+              </li>
+              <li class="node" data-path="gradlew.bat">
+                <div class="file"><span class="entry"><code class="name">gradlew.bat</code><span class="note">기존 Windows 실행 진입점</span></span></div>
+              </li>
+            </ul>
+          </details>
+        </li>
+      </ul>
+    </section>
+    <footer class="closing"><p><a href="exec-plans/completed/330-document-harness/README.md">#330 하네스 변경 계획</a>에서 구현 결과·검증 방법과 관련 판단·조사 자료를 확인할 수 있습니다.</p><p><strong>선택·미연결 항목:</strong> guard.sh, post-edit.sh, MCP·Claude 설정은 아직 파일 생성과 훅 등록을 하지 않았습니다. 실제 사용할 기능을 구현·연결하고 실행을 확인한 뒤 상태를 갱신합니다.</p><p><strong>기록과 기준을 연결합니다.</strong> 채택한 내용을 공유 문서에 반영하고, 선택 이유와 실제 검증 근거를 서로 연결합니다. MD의 핵심 내용이 바뀌면 관련 HTML도 함께 확인합니다.</p><p>내용이 생길 때 해당 문서를 추가합니다. 파일을 옮기거나 이름을 바꾸면 이 구조와 관련 링크를 함께 갱신합니다.</p></footer>
+  </main>
+  <script>
+    const folders = Array.from(document.querySelectorAll('#directory-tree details'));
+    document.querySelector('.actions').hidden = false;
+    document.getElementById('expand-all').addEventListener('click', () => {
+      folders.forEach(folder => { folder.open = true; });
+    });
+    document.getElementById('collapse-all').addEventListener('click', () => {
+      folders.forEach(folder => { folder.open = false; });
+      folders[0].open = true;
+    });
+  </script>
+</body>
+</html>
