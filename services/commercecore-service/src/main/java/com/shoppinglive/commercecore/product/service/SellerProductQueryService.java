@@ -53,7 +53,7 @@ public class SellerProductQueryService {
                     ErrorCode.INVALID_REQUEST, "page × size는 2147483647 이하여야 합니다.");
         }
         Page<Product> products =
-                productRepository.findBySellerId(
+                productRepository.findBySellerIdAndDeletedAtIsNull(
                         sellerId, PageRequest.of(page, size, LATEST_FIRST));
         List<Long> ids = products.getContent().stream().map(Product::getId).toList();
         Map<Long, SalesLookup> sales = findSales(ids);
@@ -69,7 +69,8 @@ public class SellerProductQueryService {
                                             product.getCreatedAt(),
                                             view.status(),
                                             view.price(),
-                                            view.available());
+                                            view.available(),
+                                            product.isSaleEnabled());
                                 })
                         .toList();
         return new SellerProductPage(
@@ -86,6 +87,7 @@ public class SellerProductQueryService {
                 productRepository
                         .findById(productId)
                         .filter(found -> sellerId.equals(found.getSellerId()))
+                        .filter(found -> !found.isDeleted())
                         .orElseThrow(
                                 () ->
                                         new BusinessException(
@@ -104,7 +106,8 @@ public class SellerProductQueryService {
                 view.status(),
                 view.price(),
                 view.available(),
-                product.getCategory());
+                product.getCategory(),
+                product.isSaleEnabled());
     }
 
     private Map<Long, SalesLookup> findSales(List<Long> productIds) {

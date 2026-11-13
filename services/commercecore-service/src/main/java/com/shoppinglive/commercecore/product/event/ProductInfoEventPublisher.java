@@ -32,7 +32,9 @@ public class ProductInfoEventPublisher {
                         product.getSellerId(),
                         product.getVersion(),
                         product.getCreatedAt(),
-                        product.getUpdatedAt());
+                        product.getUpdatedAt(),
+                        product.isSaleEnabled(),
+                        product.getDeletedAt());
         outbox.append(
                 TOPIC,
                 EventEnvelope.create(

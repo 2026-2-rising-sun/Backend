@@ -7,12 +7,12 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.time.Instant;
 
 /**
- * 상품 기본정보. 가격·판매 상태는 Core 판매정보가 갖고, 판매정보가 등록되기 전까지는 공개·주문 대상이 아니다.
+ * 상품 표현 정보와 전체 판매 제어. 옵션별 가격·재고·판매 상태는 SKU가 소유한다.
  *
- * <p>대표 이미지는 {@code @ManyToOne} 이 아니라 id 컬럼으로만 참조한다. product 와 image 모듈을 느슨하게 두고, 존재 확인은 등록 서비스가 한다
- * (DB FK 가 최종 방어선).
+ * <p>대표 이미지는 id 컬럼으로 참조하고 등록·수정 서비스에서 존재를 확인한다. 이미지 파일은 공유될 수 있어 상품 삭제 시 지우지 않는다.
  */
 @Entity
 @Table(name = "product")
@@ -39,7 +39,12 @@ public class Product extends BaseEntity {
     @Column(length = 32)
     private ProductCategory category;
 
-    /** 기본정보 수정의 낙관적 락. */
+    @Column(nullable = false)
+    private boolean saleEnabled;
+
+    private Instant deletedAt;
+
+    /** 기본정보·전체 제어·삭제의 낙관적 잠금. */
     @Version
     @Column(nullable = false)
     private Long version;
@@ -109,5 +114,26 @@ public class Product extends BaseEntity {
 
     public Long getVersion() {
         return version;
+    }
+
+    public boolean isSaleEnabled() {
+        return saleEnabled;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void changeSaleEnabled(boolean saleEnabled) {
+        this.saleEnabled = saleEnabled;
+    }
+
+    public void softDelete(Instant deletedAt) {
+        this.saleEnabled = false;
+        this.deletedAt = deletedAt;
     }
 }

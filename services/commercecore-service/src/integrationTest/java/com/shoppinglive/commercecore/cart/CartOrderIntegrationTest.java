@@ -1,14 +1,14 @@
-package com.shoppinglive.commercecore.order;
+package com.shoppinglive.commercecore.cart;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
@@ -29,9 +29,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
+@Sql("classpath:cart/sku-fixture.sql")
 class CartOrderIntegrationTest
         extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
@@ -56,6 +58,7 @@ class CartOrderIntegrationTest
     @Autowired TransactionTemplate transaction;
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentService paymentService;
     private Long salesId;
+    private final java.util.List<Long> skuFixtures = new java.util.ArrayList<>();
 
     @BeforeEach
     void seed() {
@@ -64,6 +67,12 @@ class CartOrderIntegrationTest
         productLookup.register(new ProductSnapshot(2L, "다른 상품", null));
         salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.save(new SalesStock(salesId, 10, 0));
+        skuFixtures.add(salesId);
+        skuFixtures.add(1_000_000_000L + salesId);
+        jdbc.update(
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,1,1000,10,0,'ON_SALE',0,1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(?,2,1000,0,0,'READY',0,1,'다른 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                salesId,
+                1_000_000_000L + salesId);
     }
 
     @AfterEach
@@ -73,6 +82,10 @@ class CartOrderIntegrationTest
         jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         items.deleteAll();
+        for (Long id : skuFixtures) {
+            jdbc.update("DELETE FROM sku WHERE id=?", id);
+        }
+        skuFixtures.clear();
         stocks.deleteAll();
         sales.deleteAll();
         productLookup.clear();

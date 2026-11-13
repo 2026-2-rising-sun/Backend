@@ -1,0 +1,280 @@
+paths:
+  /v1/seller/products/{productId}/sale-state:
+    parameters:
+    - $ref: '#/components/parameters/ProductId'
+    patch:
+      summary: 상품 전체 판매허용 변경
+      operationId: changeProductSaleState
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeProductSaleStateRequest'
+      responses:
+        '200':
+          description: 수정됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductEnvelope'
+              example:
+                success: true
+                data:
+                  productId: 1
+                  name: 가을 니트 수정
+                  description: 울 혼방 니트
+                  mainImageId: 10
+                  mainImageUrl: /api/commercecore/v1/product-images/10
+                  version: 1
+                  createdAt: '2026-09-30T03:00:00Z'
+                  sellerId: 00000000-0000-0000-0000-000000000003
+                  category: FASHION
+                error: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ProductConflict'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+  /v1/seller/products/{productId}:
+    delete:
+      summary: 상품 소프트 삭제
+      description: version은 필수 쿼리이며 첫 삭제에서 낙관적 버전을 검사한다. 본인 상품의 완료된 삭제 재전송은 원래 version으로도 204이며 추가 변경·이벤트가 없다. 상품/SKU/이미지
+        행과 기존 주문 snapshot을 물리 삭제하지 않는다.
+      operationId: deleteProduct
+      security: []
+      parameters:
+      - name: version
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      responses:
+        '204':
+          description: 삭제 완료 또는 본인의 완료된 삭제 재요청
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ProductConflict'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+  /v1/seller/products/:
+    delete:
+      operationId: missingProductIdOnDelete
+      summary: 삭제 대상 상품 ID 누락
+      description: 끝의 /는 목록 경로와 별도 매핑이다. ID가 비어 있는 요청에 400 INVALID_REQUEST를 반환한다.
+      tags:
+      - Seller Product
+      x-required-roles:
+      - SELLER
+      responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+      - productId
+      - name
+      - description
+      - mainImageId
+      - mainImageUrl
+      - version
+      - createdAt
+      - sellerId
+      - category
+      - saleEnabled
+      - deletedAt
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        mainImageId:
+          type: integer
+          format: int64
+        mainImageUrl:
+          type: string
+          format: uri-reference
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        sellerId:
+          type:
+          - string
+          - 'null'
+          description: 등록 판매자 회원 ID. 기존 소유자 미지정 상품은 null.
+          maxLength: 36
+        category:
+          $ref: '#/components/schemas/ProductCategory'
+        saleEnabled:
+          type: boolean
+          description: Product 전체 판매허용. SKU 개별 상태·재고와 독립이다.
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    SellerProductSummary:
+      type: object
+      required:
+      - productId
+      - name
+      - mainImageUrl
+      - createdAt
+      - salesStatus
+      - price
+      - available
+      - saleEnabled
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        mainImageUrl:
+          type: string
+          format: uri-reference
+        createdAt:
+          type: string
+          format: date-time
+        salesStatus:
+          $ref: '#/components/schemas/SellerSalesStatus'
+        price:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        available:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        saleEnabled:
+          type: boolean
+          description: Product 전체 판매허용. SKU 개별 상태·재고와 독립이다.
+    SellerProductDetail:
+      type: object
+      required:
+      - productId
+      - name
+      - description
+      - mainImageId
+      - mainImageUrl
+      - version
+      - createdAt
+      - updatedAt
+      - salesStatus
+      - price
+      - available
+      - category
+      - saleEnabled
+      properties:
+        productId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        mainImageId:
+          type: integer
+          format: int64
+        mainImageUrl:
+          type: string
+          format: uri-reference
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        salesStatus:
+          $ref: '#/components/schemas/SellerSalesStatus'
+        price:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        available:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+        category:
+          $ref: '#/components/schemas/ProductCategory'
+        saleEnabled:
+          type: boolean
+          description: Product 전체 판매허용. SKU 개별 상태·재고와 독립이다.
+    ProductSnapshot:
+      type: object
+      required:
+      - id
+      - name
+      - mainImageUrl
+      - saleEnabled
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        mainImageUrl:
+          type: string
+          format: uri-reference
+        sellerId:
+          type:
+          - string
+          - 'null'
+          maxLength: 36
+          description: 등록 판매자 회원 ID. 기존 상품은 null이며 이전 소비자 계약과 호환되는 추가 필드.
+        saleEnabled:
+          type: boolean
+          description: Product 전체 판매허용. SKU 개별 상태·재고와 독립이다.
+    ChangeProductSaleStateRequest:
+      type: object
+      required:
+      - saleEnabled
+      - version
+      properties:
+        saleEnabled:
+          type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 0

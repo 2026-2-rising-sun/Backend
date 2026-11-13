@@ -2,11 +2,14 @@ package com.shoppinglive.commercecore.cart.service;
 
 import com.shoppinglive.commercecore.cart.dto.CartSelection;
 import com.shoppinglive.commercecore.cart.dto.SelectedCartItem;
-import com.shoppinglive.commercecore.order.entity.CartItem;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.PersistenceContext;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CartSelectionService implements CartSelectionPort {
     private static final int MAX_SELECTIONS = 100;
     private final CartItemRepository items;
+    @PersistenceContext private EntityManager entityManager;
 
     public CartSelectionService(CartItemRepository items) {
         this.items = items;
@@ -45,11 +49,14 @@ public class CartSelectionService implements CartSelectionPort {
         String owner = owner(memberId);
         return validated(selections).stream()
                 .map(
-                        selection ->
-                                snapshot(
-                                        items.lockOwned(selection.itemId(), owner)
-                                                .orElseThrow(CartItemNotFoundException::new),
-                                        selection))
+                        selection -> {
+                            CartItem item =
+                                    items.lockOwned(selection.itemId(), owner)
+                                            .orElseThrow(CartItemNotFoundException::new);
+                            // 먼저 읽은 관리 객체가 있어도 잠근 DB 행의 최신 수량·버전으로 판정한다.
+                            entityManager.refresh(item, LockModeType.PESSIMISTIC_WRITE);
+                            return snapshot(item, selection);
+                        })
                 .toList();
     }
 
@@ -82,8 +89,15 @@ public class CartSelectionService implements CartSelectionPort {
         if (!Objects.equals(item.getVersion(), selection.version())) {
             throw new BusinessException(ErrorCode.CONFLICT, "장바구니 항목이 변경되었습니다. 다시 확인해 주세요.");
         }
+        if (item.getSkuId() == null) {
+            throw new BusinessException(ErrorCode.CONFLICT, "판매 단위가 준비되지 않은 장바구니 항목입니다.");
+        }
         return new SelectedCartItem(
-                item.getId(), item.getProductId(), item.getQuantity(), item.getVersion());
+                item.getId(),
+                item.getSkuId(),
+                item.getProductId(),
+                item.getQuantity(),
+                item.getVersion());
     }
 
     private List<CartSelection> validated(List<CartSelection> selections) {

@@ -33,7 +33,10 @@ public class PublicProductDetailService {
      */
     public PublicProductDetail getDetail(Long productId) {
         Product product =
-                productRepository.findById(productId).orElseThrow(() -> notFound(productId));
+                productRepository
+                        .findById(productId)
+                        .filter(p -> p.getDeletedAt() == null)
+                        .orElseThrow(() -> notFound(productId));
         SalesInfo salesInfo = salesInfoClient.findByProductId(productId).orElse(null);
         SalesDisplayStatus status = SalesDisplayStatus.from(salesInfo);
         if (!status.isPubliclyVisible()) {

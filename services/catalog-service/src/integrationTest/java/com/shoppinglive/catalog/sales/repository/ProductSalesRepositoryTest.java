@@ -1,8 +1,10 @@
 package com.shoppinglive.catalog.sales.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import java.util.ArrayList;
 import java.util.List;
@@ -182,6 +184,27 @@ class ProductSalesRepositoryTest {
     }
 
     private static SalesInfo sales(long productId, long price) {
-        return new SalesInfo(productId, 10L, price, SalesStatus.ON_SALE, 5);
+        return new SalesInfo(productId, productId * 10L, price, SalesStatus.ON_SALE, 5);
+    }
+
+    @ParameterizedTest
+    @DisplayName("한 상품의 여러 SKU를 별도 행과 버전으로 보존하고 단일값으로 축약하지 않는다")
+    @MethodSource("databases")
+    void storesMultipleSkusAndComparesVersionsPerSku(Db db) {
+        Fixture fixture = open(db);
+        SalesInfo first = new SalesInfo(PRODUCT, 10L, 100, SalesStatus.ON_SALE, 5);
+        SalesInfo second = new SalesInfo(PRODUCT, 11L, 200, SalesStatus.PRIVATE, 3);
+        fixture.repository().apply(first, 10);
+        assertThat(fixture.repository().apply(second, 1)).isTrue();
+        assertThat(fixture.repository().findAllByProductIds(List.of(PRODUCT)))
+                .containsExactly(first, second);
+        assertThat(
+                        fixture.repository()
+                                .apply(new SalesInfo(PRODUCT, 10L, 50, SalesStatus.ON_SALE, 0), 9))
+                .isFalse();
+        assertThat(fixture.repository().findAllByProductIds(List.of(PRODUCT)))
+                .containsExactly(first, second);
+        assertThatThrownBy(() -> fixture.repository().findByProductIds(List.of(PRODUCT)))
+                .isInstanceOf(SalesInfoUnavailableException.class);
     }
 }

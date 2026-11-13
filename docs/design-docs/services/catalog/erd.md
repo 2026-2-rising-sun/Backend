@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
+기준: `cc91c09b` 공통 모델 위 Product #333의 Catalog V2 구현을 반영했다. SKU의 다중 판매 사본 V3는 통합 전이며 아래 product_sales는 현행 모델이다. 운영 DB 적용이나 실제 Kafka 전달 검증 결과는 아니다.
 
 [시각 자료](erd.html)
 
@@ -12,7 +12,7 @@
 
 | 테이블 | 핵심 키·열 | DDL 근거 |
 |---|---|---|
-| product | PK id; name; main_image_id/url; seller_id; category; version | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
+| product | PK id; name; main_image_id/url; seller_id; category; version; sale_enabled; deleted_at | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) · [V2](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql) |
 | product_sales | PK product_id; sales_id; price; status; available; version | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display | PK coupon_id; fixed_discount; sold_out; version; 유효 기간 | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display_product | PK (coupon_id,product_id) | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
@@ -30,9 +30,12 @@
 
 조회 사본은 이벤트 도착 순서가 다를 수 있어 product와 product_sales 사이 FK가 없다. 상품 version은 0 이상, 판매 backfill은 version 0, 쿠폰 display version은 1 이상이다.
 
+V2는 기존 사본의 전체 허용을 true로 보존한다. 새 Product 이벤트는 saleEnabled/deletedAt을 명시하며 구형 생략은 true/null이다. 더 큰 version만 반영하되 삭제 사실은 보존한다. 전체 중지는 기존 공개 노출을 바꾸지 않고 구매 가능 조건에 반영하며 삭제는 공개 조회에서 제외한다. [Product 원본·사본 상세](../../commercecore/product/ERD.md)를 따른다.
+
 ## 원본과 매핑
 
 - [V1__catalog_baseline.sql](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql)
+- [V2__product_sale_control.sql](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql)
 
 JPA 매핑: [Product.java](../../../../services/catalog-service/src/main/java/com/shoppinglive/catalog/product/entity/Product.java).
 

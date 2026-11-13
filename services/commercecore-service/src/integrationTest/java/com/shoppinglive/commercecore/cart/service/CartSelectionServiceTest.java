@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commercecore.cart.dto.CartSelection;
 import com.shoppinglive.commercecore.cart.dto.SelectedCartItem;
-import com.shoppinglive.commercecore.order.entity.CartItem;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.common.core.BusinessException;
 import jakarta.persistence.EntityManager;
 import java.util.List;
@@ -55,6 +55,7 @@ class CartSelectionServiceTest {
                 .extracting(SelectedCartItem::itemId)
                 .containsExactly(first.getId(), second.getId());
         assertThat(selected).extracting(SelectedCartItem::quantity).containsExactly(2, 5);
+        assertThat(selected).extracting(SelectedCartItem::skuId).containsExactly(101L, 102L);
     }
 
     @Test
@@ -81,6 +82,24 @@ class CartSelectionServiceTest {
         assertThatThrownBy(() -> selections.lockOwned(MEMBER_A, List.of(old)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("변경");
+    }
+
+    @Test
+    @DisplayName("이미 읽은 관리 객체가 있어도 잠금 뒤 DB의 최신 버전으로 선택을 검증한다")
+    void refreshesCachedEntityBeforeValidatingLockedVersion() {
+        CartItem item = add(1L, 2);
+        CartSelection old = selection(item);
+        entityManager
+                .createNativeQuery("UPDATE cart_item SET quantity=3,version=version+1 WHERE id=:id")
+                .setParameter("id", item.getId())
+                .executeUpdate();
+        assertThat(item.getQuantity()).isEqualTo(2);
+
+        assertThatThrownBy(() -> selections.lockOwned(MEMBER_A, List.of(old)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("변경");
+        assertThat(item.getQuantity()).isEqualTo(3);
+        assertThat(item.getVersion()).isEqualTo(old.version() + 1);
     }
 
     @Test
@@ -143,10 +162,40 @@ class CartSelectionServiceTest {
     }
 
     private CartItem add(Long productId, int quantity) {
-        return items.saveAndFlush(new CartItem(MEMBER_A, productId, quantity));
+        return items.saveAndFlush(new CartItem(MEMBER_A, productId, 100L + productId, quantity));
     }
 
     private CartSelection selection(CartItem item) {
         return new CartSelection(item.getId(), item.getVersion());
+    }
+
+    @Test
+    @DisplayName("매핑되지 않은 기존 항목은 보존하되 주문 선택에서는 거절한다")
+    void preservesLegacyItemWithoutPurchasableSku() {
+        CartItem legacy = items.saveAndFlush(new CartItem(MEMBER_A, 9L, 2));
+
+        assertThatThrownBy(() -> selections.lockOwned(MEMBER_A, List.of(selection(legacy))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("판매 단위");
+        assertThat(items.findById(legacy.getId()).orElseThrow().getProductId()).isEqualTo(9L);
+        assertThat(items.findById(legacy.getId()).orElseThrow().getSkuId()).isNull();
+    }
+
+    @Test
+    @DisplayName("선택 개수는 기존 API와 같이 100개까지 허용하고 101개를 거절한다")
+    void rejectsSelectionsAboveExistingApiLimit() {
+        var oversized =
+                java.util.stream.LongStream.rangeClosed(1, 101)
+                        .mapToObj(id -> new CartSelection(id, 0L))
+                        .toList();
+
+        assertThatThrownBy(() -> selections.readOwned(MEMBER_A, oversized))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(
+                        () ->
+                                selections.lockForCompletion(
+                                        MEMBER_A,
+                                        oversized.stream().map(CartSelection::itemId).toList()))
+                .isInstanceOf(BusinessException.class);
     }
 }

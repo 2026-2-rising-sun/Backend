@@ -6,10 +6,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
@@ -363,7 +363,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .andExpect(status().isBadRequest());
         var item =
                 items.saveAndFlush(
-                        new com.shoppinglive.commercecore.order.entity.CartItem(
+                        new com.shoppinglive.commercecore.cart.entity.CartItem(
                                 MEMBER_A, 1L, quantity));
         mvc.perform(
                         post("/v1/cart/items/{id}/orders", item.getId())

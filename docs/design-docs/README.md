@@ -2,6 +2,7 @@
 
 - [하네스 동작](document-harness.md)
 - [모듈별 API·ERD·상태 문서](services/README.md)
+- [Product 모듈 상세·목표 관계](commercecore/product/README.md)
 - [주문·결제](order-payment.md) · [시각 자료](order-payment.html)
 - [환불](refund.md) · [시각 자료](refund.html)
 - [Catalog 사본 동기화](catalog-sync.md) · [시각 자료](catalog-sync.html)

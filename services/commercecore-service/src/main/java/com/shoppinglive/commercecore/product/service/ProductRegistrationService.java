@@ -55,13 +55,14 @@ public class ProductRegistrationService {
         if (existing.isPresent()) {
             return requireSameSeller(existing.get(), sellerId);
         }
-        if (command.mainImageId() == null
-                || !productImageRepository.existsById(command.mainImageId())) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, MAIN_IMAGE_NOT_FOUND);
-        }
         try {
             return transactions.execute(
                     status -> {
+                        if (command.mainImageId() == null
+                                || !productImageRepository.existsById(command.mainImageId())) {
+                            throw new BusinessException(
+                                    ErrorCode.INVALID_REQUEST, MAIN_IMAGE_NOT_FOUND);
+                        }
                         Product product =
                                 productRepository.saveAndFlush(
                                         new Product(
@@ -75,7 +76,7 @@ public class ProductRegistrationService {
                         return product;
                     });
         } catch (DataIntegrityViolationException e) {
-            // 같은 키의 동시 요청이 먼저 커밋한 경우. 그 밖의 제약 위반(예: 이미지가 그사이 삭제)은 그대로 던진다.
+            // 같은 키의 동시 요청이 먼저 커밋한 경우만 기존 결과를 반환한다.
             return productRepository
                     .findByIdempotencyKey(idempotencyKey)
                     .map(
