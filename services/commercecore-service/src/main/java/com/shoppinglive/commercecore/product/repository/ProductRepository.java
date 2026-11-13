@@ -16,6 +16,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Page<Product> findBySellerId(String sellerId, Pageable pageable);
 
+    Page<Product> findBySellerIdAndDeletedAtIsNull(String sellerId, Pageable pageable);
+
+    boolean existsByIdAndDeletedAtIsNull(Long id);
+
     /** 엔티티를 로딩하지 않고 초기 적재용 상품 ID를 오름차순으로 조회한다. */
     @Query("select p.id from Product p where p.id > :id order by p.id asc")
     List<Long> findIdsAfter(@Param("id") Long id, Limit limit);

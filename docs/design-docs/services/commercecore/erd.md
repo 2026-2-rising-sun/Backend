@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
+기준: `cc91c09b` 공통 모델 위 Product #333의 V101 구현을 반영했다. SKU/Cart/Order의 후속 이행은 통합 전이며 아래 Sales 관계는 현재 레거시 모델이다. 실제 DB·HTTP·Kafka·PG 실행 결과는 워크로그와 구분한다.
 
 [시각 자료](erd.html)
 
@@ -26,7 +26,7 @@
 | event_outbox | PK id; UQ event_id; payload; published_at; claim_token/lease_until; next_attempt_at | [V18](../../../../services/commercecore-service/src/main/resources/db/migration/V18__event_outbox.sql) · [V20](../../../../services/commercecore-service/src/main/resources/db/migration/V20__outbox_worker_claim.sql) |
 | payment_delivery_request | PK id; UQ request_id, core_refund_request_id; kind; order_id; payment_group_id; payment_id; command; result; status | [V21](../../../../services/commercecore-service/src/main/resources/db/migration/V21__payment_delivery_requests.sql) |
 | product_image | PK id; UQ storage_key; content_type; size_bytes; width/height | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) |
-| product | PK id; UQ idempotency_key; main_image_id; seller_id; category; version | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) |
+| product | PK id; UQ idempotency_key; main_image_id; seller_id; category; version; sale_enabled; deleted_at | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) · [V101](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql) |
 
 ## 관계
 
@@ -44,12 +44,14 @@
 | payment_delivery_request.order_id | orders.id | 물리 FK · 영속 결제/환불 전달 |
 | payment_delivery_request.payment_group_id | payment_group.id | 물리 FK · nullable 묶음 |
 | payment_delivery_request.core_refund_request_id | refund_request.id | 물리 FK · 유일 환불 전달 |
-| product.main_image_id | product_image.id | 물리 FK · 상품 대표 이미지 |
+| product.main_image_id | product_image.id | N:1 논리 참조 · V101에서 FK 제거, 앱에서 등록/교체 시 존재 확인 |
 | sales_info.product_id | product.id | 논리 참조 · UNIQUE이지만 DDL FK 없음 |
 | orders.member_id | Member.members.id | 서비스 간 ID · FK 없음 |
 | payment_delivery_request.payment_id | Payment.payment_attempt.payment_id | 서비스 간 ID · FK 없음 |
 
 ## 제약과 이관
+
+V101은 기존 Product 전체 스위치를 true로 보존하고 신규 기본값만 false로 바꾼다. deleted_at이 있으면 전체 false CHECK를 유지하고 상품·이미지·하위 판매 행을 물리 삭제하지 않는다. [Product 상세 ERD/상태](../../commercecore/product/README.md)에서 통합 목표와 현재 구현을 구분한다.
 
 V3에서 비회원 lookup_password_hash를 제거하고 member_id를 필수화했다. V7 금액은 total_amount와 할인·실결제액을 구분한다. V11은 REFUNDED를 허용한다. V10·V12~V14 등 이관용 파일의 이름만 보고 현재 Core가 PG 테이블을 소유한다고 추정하지 않는다. V21 영속 전달과 Payment 원본을 구분한다. 진행 중 묶음의 회원별 부분 유일 인덱스가 있다.
 
@@ -77,6 +79,7 @@ V3에서 비회원 lookup_password_hash를 제거하고 member_id를 필수화�
 - [V20__outbox_worker_claim.sql](../../../../services/commercecore-service/src/main/resources/db/migration/V20__outbox_worker_claim.sql)
 - [V21__payment_delivery_requests.sql](../../../../services/commercecore-service/src/main/resources/db/migration/V21__payment_delivery_requests.sql)
 - [V100__products.sql](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql)
+- [V101__product_sale_control.sql](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql)
 
 JPA 매핑: [PaymentDeliveryRequest.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/entity/PaymentDeliveryRequest.java) · [Order.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/entity/Order.java) · [MemberPurchaseGuard.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/entity/MemberPurchaseGuard.java) · [PaymentGroup.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/entity/PaymentGroup.java) · [CartItem.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/entity/CartItem.java) · [Sales.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/sales/entity/Sales.java) · [SalesStock.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/sales/entity/SalesStock.java) · [Product.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/entity/Product.java) · [ProductImage.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/entity/ProductImage.java).
 
