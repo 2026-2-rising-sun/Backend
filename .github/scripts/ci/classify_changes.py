@@ -78,7 +78,24 @@ def document(path):
     name = Path(path).name
     return (name == "AGENTS.md" or re.fullmatch(r"readme(?:\.(md|mdx|rst|adoc|txt))?", name, re.I)
             or Path(path).suffix.lower() in {".md", ".mdx", ".rst", ".adoc"}
-            or (path.startswith("docs/") and Path(path).suffix.lower() == ".txt"))
+            or (path.startswith("docs/") and Path(path).suffix.lower() in {".txt", ".html", ".css", ".svg", ".png", ".jpg", ".webp"}))
+
+
+def documentation_ignore_only(change):
+    """문서 제외 규칙·주석만 달라진 경우에 한해 전체 빌드를 생략한다."""
+    if change.before is None or change.after is None or not change.same_mode:
+        return False
+    allowed = {"docs/**/*.md", "services/*/docs/**/*.md", "contracts/api/README.md",
+               "contracts/docs/*.md"}
+
+    def other_rules(source):
+        return [line for line in source.decode("utf-8").splitlines()
+                if line.strip() and not line.startswith("#") and line not in allowed]
+
+    try:
+        return other_rules(change.before) == other_rules(change.after)
+    except UnicodeError:
+        return False
 
 
 def tags(source):
@@ -175,6 +192,9 @@ def classify(changes, full_reason=None):
              if path.startswith("services/" + service + "/")), None)
         if document(path):
             action = "documentation"
+        elif path == ".gitignore" and documentation_ignore_only(change):
+            tools["harness"] = tools["classifier"] = True
+            action = "documentation-ignore"
         elif path.startswith(".github/workflows/"):
             tools["workflow"] = tools["classifier"] = True
             action = "workflow"
@@ -187,8 +207,8 @@ def classify(changes, full_reason=None):
         elif path.startswith(".github/scripts/"):
             tools["classifier"] = True
             action = "ci-tool"
-        elif path.startswith("harness/"):
-            tools["harness"] = True
+        elif path.startswith("harness/") or (path.startswith("scripts/") and "/" not in path.removeprefix("scripts/")):
+            tools["harness"] = tools["classifier"] = True
             action = "harness-tool"
         elif path.startswith("scripts/local/auth-env."):
             tools["local_auth"] = True

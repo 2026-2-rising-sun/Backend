@@ -25,11 +25,8 @@ build/
 # 로컬 CI 검증기 테스트가 생성하는 파일.
 .github/scripts/__pycache__/
 
-# 공유 문서는 Notion에서 관리한다.
-docs/**/*.md
-services/*/docs/**/*.md
-contracts/api/README.md
-contracts/docs/*.md
+# 설계·요구사항·작업 기록은 코드와 함께 추적한다.
+# 생성 로그와 일회성 검사 결과는 build/에 둔다.
 
 .venv-api/
 __pycache__/

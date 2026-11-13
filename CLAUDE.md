@@ -1,3 +1,5 @@
 # Backend 작업 안내
 
-작업 전에 루트 [AGENTS.md](AGENTS.md)를 읽고, 작업별 필수 참조 문서와 템플릿을 따른다. 공통 규칙의 원본은 `harness/`에서 관리한다.
+@AGENTS.md
+
+공통 규칙과 문서 원본은 `docs/`, 실행 명령은 `scripts/`에서 관리한다. Claude 전용 훅은 현재 등록하지 않았다.

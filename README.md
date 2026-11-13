@@ -78,7 +78,8 @@ Catalog는 상품·판매·쿠폰을 조회용 사본에 저장하며 더 큰 �
 ## API · 문서
 
 - [분리 서비스 로컬 실행](scripts/local/README.md): 전용 PostgreSQL·Kafka, 인증정보와 HTTP 실행 명령.
-- [Backend 팀 하네스](harness/README.md): AI 작업 지침·검증 안내·이슈와 PR 작성 템플릿.
+- [Backend 팀 하네스](docs/README.md): AI 작업 지침·모듈별 API/ERD/상태 문서·판단과 실행 기록.
+- [아키텍처](ARCHITECTURE.md) · [모듈 문서](docs/design-docs/services/README.md) · [디렉터리 시각 자료](docs/directory-structure.html).
 
 API 문서 원본은 [서비스별 OpenAPI YAML](contracts/api)입니다. Apidog·Postman에 서비스 YAML을 가져와 API를 확인하고 호출하거나, curl로 직접 요청합니다. YAML의 `servers`에 서비스별 로컬 주소가 정의되어 있습니다.
 
