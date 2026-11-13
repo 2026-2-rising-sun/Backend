@@ -17,6 +17,9 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
+import com.shoppinglive.commercecore.sku.dto.SkuView;
+import com.shoppinglive.commercecore.sku.entity.SkuSaleStatus;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -54,6 +57,7 @@ class CartOrderIntegrationTest
     @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
+    @Autowired SkuService skus;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired TransactionTemplate transaction;
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentService paymentService;
@@ -97,6 +101,10 @@ class CartOrderIntegrationTest
         productLookup.clear();
     }
 
+    private SkuView skuSnapshot() {
+        return skus.findBySkuIds(java.util.List.of(salesId)).getFirst();
+    }
+
     private CartOrderCommand request(long amount) {
         return new CartOrderCommand("회원", "01012345678", amount);
     }
@@ -106,7 +114,7 @@ class CartOrderIntegrationTest
     void cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay() {
         var selected = cart.add(MEMBER_A, 1L, 2);
         var other = cart.add(MEMBER_A, 2L, 1);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isZero();
+        assertThat(skuSnapshot().reserved()).isZero();
         var first = creation.createFromCart(MEMBER_A, selected.getId(), request(2000), "cart-key");
         assertThat(first.created()).isTrue();
         assertThat(items.findAll())
@@ -116,7 +124,7 @@ class CartOrderIntegrationTest
         assertThat(replay.created()).isFalse();
         assertThat(replay.order().getId()).isEqualTo(first.order().getId());
         assertThat(orders.count()).isEqualTo(1);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        assertThat(skuSnapshot().reserved()).isEqualTo(2);
         var payment = paymentService.startPayment(first.order().getOrderNumber(), MEMBER_A);
         org.awaitility.Awaitility.await()
                 .atMost(java.time.Duration.ofSeconds(10))
@@ -157,7 +165,7 @@ class CartOrderIntegrationTest
                 .isInstanceOf(CartItemNotFoundException.class);
         assertThat(orders.count()).isZero();
         assertThat(items.findById(selected.getId()).orElseThrow().getQuantity()).isEqualTo(2);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isZero();
+        assertThat(skuSnapshot().reserved()).isZero();
     }
 
     @DisplayName("재고가 부족하면 주문을 롤백하고 장바구니를 유지한다")
@@ -171,7 +179,7 @@ class CartOrderIntegrationTest
                 .isInstanceOf(BusinessException.class);
         assertThat(orders.count()).isZero();
         assertThat(items.existsById(selected.getId())).isTrue();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
+        assertThat(skuSnapshot().available()).isEqualTo(10);
     }
 
     @DisplayName("주문 시 최신 가격과 판매 상태를 다시 확인하고 장바구니 항목을 유지한다")
@@ -184,7 +192,7 @@ class CartOrderIntegrationTest
                                         MEMBER_A, selected.getId(), request(999), "key"))
                 .isInstanceOf(BusinessException.class);
         transaction.executeWithoutResult(
-                status -> sales.transitionStatus(salesId, "ON_SALE", "PRIVATE"));
+                status -> skus.changeSaleStatus(salesId, SkuSaleStatus.PRIVATE));
         assertThatThrownBy(
                         () ->
                                 creation.createFromCart(
@@ -205,7 +213,7 @@ class CartOrderIntegrationTest
                         new CreateOrderCommand(1L, 1, "회원", "01012345678", MEMBER_B, null), "same");
         assertThat(a.order().getId()).isNotEqualTo(b.order().getId());
         assertThat(orders.count()).isEqualTo(2);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        assertThat(skuSnapshot().reserved()).isEqualTo(2);
     }
 
     @DisplayName("장바구니 주문을 동시에 재전송해도 주문과 재고 예약은 한 번만 생성한다")
@@ -245,6 +253,6 @@ class CartOrderIntegrationTest
         assertThat(orders.count()).isEqualTo(1);
         assertThat(items.count()).isEqualTo(1);
         assertThat(items.existsById(item.getId())).isTrue();
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        assertThat(skuSnapshot().reserved()).isEqualTo(2);
     }
 }
