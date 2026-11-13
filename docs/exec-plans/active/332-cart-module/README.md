@@ -79,4 +79,8 @@ PostgreSQL은 Cart 전용 임시 컨테이너/DB를 준비했고 테스트는 �
 
 53af15c7을 원격 Cart 브랜치에 푸시하고 Order에 전달했다. 전체 Core 통합298개 중30개 실패·외부 Kafka2개 스킵이다. PaymentGroupIntegrationTest27, CartCouponPreviewApiTest1, SalesInfoEventIntegrationTest1, MemberCommerceCoreApiTest1에서 Sales-only fixture의 SKU 누락/H2 테이블 누락이 드러났다. 운영 신규 Sales 쓰기에서도 SKU 동기화가 빠지면 Cart의 기존 productId 호환이409가 되므로 단순 fixture 수정만으로 전환 완료라고 하지 않는다. 코디네이터가 소비자 fixture 수정·재검증을 Order에 배정했다.
 
-Spotless·문서123개·생성 API HTML6개/설계 HTML28개 최신성은 통과했다. API 구조 검사는 Product 신규3개 매핑의 원본 누락으로 실패했으며 Cart GET 응답 스키마 변경도 Order의 최종 원본 통합 대기다. root build·외부 Kafka/PG/AWS·CI는 미검증으로 유지한다.
+Spotless·문서123개·생성 API HTML6개/설계 HTML28개 최신성은 통과했다. 이전 API 구조 실패는 Product 후속447b0056 통합으로 해소됐다. Cart GET 응답 스키마 변경은 여전히 Order의 최종 원본 통합 대기다. root build·외부 Kafka/PG/AWS·CI는 미검증으로 유지한다.
+
+### Product 승인 API 후속 통합
+
+코디네이터 승인으로 Product `447b0056902dd0bac4262c113f8c93a8653ce251`을 `22289dbf`로 merge했다. 충돌은 워크로그 한 곳으로 양쪽 기록을 모두 보존했다. Cart 원본 API 경로는 이전과 의미가 동일함을 YAML 구조 비교로 확인했고 신규 SKU 조회 조각은 중복 적용하지 않았다. Cart 단위13/H2통합20·Spotless 재검증 통과, API 경로 구조 검사·문서124개·생성 API HTML6/설계HTML28 최신성 통과다. 이 병합 후 실제 PG/전체Core 회귀는 재실행하지 않았으며 이전30실패·Sales 원본전환 미완료가 해소됐다고 보지 않는다.

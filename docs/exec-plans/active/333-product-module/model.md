@@ -36,6 +36,8 @@ ProductLookup.findProduct(Long)·findProducts(Collection<Long>) signature는 유
 
 SKU 제공 signature는 `findBySkuIds(Collection<Long>)` / `findByProductId(Long)` → List<SkuView>다. Product는 검증된 SKU 커밋을 받기 전에 타입을 복제하지 않고 상품별 목록 연결을 기다린다. 대표 SKU 임의 선택·최저가/합산재고 정책은 도입하지 않는다.
 
+후속 배정으로 SKU/Order 역merge 없이 [내부 조회 조각·검증 기준](sku-query-connection.md)을 #334에 제공한다. 페이지의 N+1 방지를 위한 productIds 일괄 조회는 실제 SKU 소유자에게 추가를 요청했다.
+
 ## 남은 통합
 
 공통 API 원본과 HTML, 기존 단일 판매 응답의 다중 SKU 호환, 전체 잠금 순서, 검증 SHA merge, 외부 환경 검증을 마친다. PR base는 Product→dev, SKU→Product, Cart→SKU, Order→Cart다. 기존 적용 SQL은 바꾸지 않고 데이터 삭제·추정 backfill을 하지 않는다.

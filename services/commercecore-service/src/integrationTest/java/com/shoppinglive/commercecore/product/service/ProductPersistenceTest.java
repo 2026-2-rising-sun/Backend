@@ -429,4 +429,35 @@ class ProductPersistenceTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("상품 중지·삭제 후에도 기존 배정 재고의 완료·해제·환불 복구는 신규 거래 가드 없이 처리된다")
+    void existingStockWorkSurvivesProductSuspensionAndDeletion() {
+        Product p = registration.register(command(), "existing-stock-work", "seller");
+        var sale = sales.saveAndFlush(new Sales(p.getId(), 39000L, SalesStatus.ON_SALE));
+        stocks.saveAndFlush(new SalesStock(sale.getId(), 4, 2));
+        lifecycle.changeSaleState(p.getId(), true, 0L, "seller");
+        var snapshot =
+                transactions
+                        .execute(status -> trading.lockForNewOrder(List.of(p.getId())))
+                        .getFirst();
+        lifecycle.changeSaleState(p.getId(), false, 1L, "seller");
+        assertThatThrownBy(
+                        () ->
+                                transactions.execute(
+                                        status -> trading.lockForNewOrder(List.of(p.getId()))))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+        int consumedRows = transactions.execute(status -> stocks.consumeReserved(sale.getId(), 1));
+        assertThat(consumedRows).isEqualTo(1);
+        lifecycle.delete(p.getId(), 2L, "seller");
+        int releasedRows = transactions.execute(status -> stocks.restoreReserved(sale.getId(), 1));
+        assertThat(releasedRows).isEqualTo(1);
+        int restoredRows = transactions.execute(status -> stocks.adjustAvailable(sale.getId(), 1));
+        assertThat(restoredRows).isEqualTo(1);
+        var stock = stocks.findById(sale.getId()).orElseThrow();
+        assertThat(stock.getAvailable()).isEqualTo(6);
+        assertThat(stock.getReserved()).isZero();
+        assertThat(snapshot.name()).isEqualTo("상품");
+        assertThat(products.findById(p.getId()).orElseThrow().isDeleted()).isTrue();
+    }
 }
