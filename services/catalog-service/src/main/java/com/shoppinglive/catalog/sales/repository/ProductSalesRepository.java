@@ -2,21 +2,21 @@ package com.shoppinglive.catalog.sales.repository;
 
 import com.shoppinglive.catalog.client.commercecore.ProductIds;
 import com.shoppinglive.catalog.client.commercecore.SalesInfo;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Commerce 판매정보의 조회용 사본({@code product_sales})을 읽고 쓴다. 상품 하나에 행 하나다.
+ * Commerce 판매정보의 조회용 사본({@code product_sales})을 읽고 쓴다. SKU(salesId) 하나에 행 하나다.
  *
  * <p>쓰는 경로는 둘이다. 이벤트는 {@link #apply}, 초기 적재(backfill)는 {@link #insertIfAbsent} 를 쓴다. 이벤트는 중복되거나 순서가
  * 바뀌어 올 수 있어, 저장된 값보다 큰 {@code snapshotVersion} 만 반영해야 옛 이벤트가 새 값을 덮지 않는다. 이벤트의 version 은 1 이상이므로
@@ -32,14 +32,14 @@ public class ProductSalesRepository {
             """
         INSERT INTO product_sales (product_id, sales_id, price, status, available, version, updated_at)
         SELECT :productId, :salesId, :price, :status, :available, :version, :updatedAt
-        WHERE NOT EXISTS (SELECT 1 FROM product_sales WHERE product_id = :productId)
+        WHERE NOT EXISTS (SELECT 1 FROM product_sales WHERE sales_id = :salesId)
         """;
     private static final String UPDATE_IF_NEWER =
             """
         UPDATE product_sales
-        SET sales_id = :salesId, price = :price, status = :status, available = :available,
+        SET price = :price, status = :status, available = :available,
             version = :version, updated_at = :updatedAt
-        WHERE product_id = :productId AND version < :version
+        WHERE sales_id = :salesId AND product_id = :productId AND version < :version
         """;
     private static final long BACKFILL_VERSION = 0L;
 
@@ -60,7 +60,7 @@ public class ProductSalesRepository {
         try {
             inserted = insertIfMissing(info, version);
         } catch (DuplicateKeyException e) {
-            // NOT EXISTS 는 다른 쓰기의 미커밋 행을 보지 못한다. 같은 신규 상품을 동시에 INSERT 하면 한쪽은
+            // NOT EXISTS 는 다른 쓰기의 미커밋 행을 보지 못한다. 같은 신규 SKU를 동시에 INSERT 하면 한쪽은
             // PK 충돌이 난다. 먼저 들어간 행과 version 을 비교해야 하므로 UPDATE 로 넘어간다.
             inserted = 0;
         }
@@ -82,25 +82,34 @@ public class ProductSalesRepository {
         }
     }
 
-    /** 상품 id 목록에 해당하는 판매정보만 돌려준다. 저장되지 않은 상품은 결과에서 빠진다. */
+    /** 기존 상품당 단일값 계약이다. 다중 SKU를 임의 대표값으로 축약하지 않는다. */
     public Map<Long, SalesInfo> findByProductIds(Collection<Long> productIds) {
+        Map<Long, SalesInfo> result = new LinkedHashMap<>();
+        for (SalesInfo info : findAllByProductIds(productIds)) {
+            if (result.putIfAbsent(info.productId(), info) != null) {
+                throw new SalesInfoUnavailableException("상품의 여러 SKU를 단일 판매정보로 조회할 수 없습니다.");
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    /** SKU별 전체 사본 조회다. 상품별 대표 가격·합산 재고를 만들지 않는다. */
+    public List<SalesInfo> findAllByProductIds(Collection<Long> productIds) {
         Set<Long> ids = ProductIds.distinct(productIds);
         if (ids.isEmpty()) {
-            return Map.of();
+            return List.of();
         }
-        List<SalesInfo> rows =
-                jdbc.query(
-                        "SELECT product_id, sales_id, price, status, available FROM product_sales "
-                                + "WHERE product_id IN (:productIds)",
-                        Map.of("productIds", ids),
-                        (rs, rowNum) ->
-                                new SalesInfo(
-                                        rs.getLong("product_id"),
-                                        rs.getLong("sales_id"),
-                                        rs.getLong("price"),
-                                        SalesStatus.valueOf(rs.getString("status")),
-                                        rs.getInt("available")));
-        return rows.stream().collect(Collectors.toMap(SalesInfo::productId, Function.identity()));
+        return jdbc.query(
+                "SELECT product_id, sales_id, price, status, available FROM product_sales "
+                        + "WHERE product_id IN (:productIds) ORDER BY product_id,sales_id",
+                Map.of("productIds", ids),
+                (rs, rowNum) ->
+                        new SalesInfo(
+                                rs.getLong("product_id"),
+                                rs.getLong("sales_id"),
+                                rs.getLong("price"),
+                                SalesStatus.valueOf(rs.getString("status")),
+                                rs.getInt("available")));
     }
 
     private int insertIfMissing(SalesInfo info, long version) {

@@ -4,10 +4,11 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 계약·마이그레이션·주요 상태 변경 코드. 현재 #330 문서 변경은 미커밋이며 업무 코드는 변경하지 않았다. 운영 환경 검증 자료와 구분한다.
+기준: 기존 서비스 경로는 `cc91c09b753a12a352bda65481210e264d3e88b0`의 계약·마이그레이션·주요 상태 코드다. #334에서 SKU 내부 기반을 추가하고 있으며 기존 Sales API/거래 경로의 전환 상태는 모듈 상세에서 구분한다. 운영 환경 적용·검증 자료와 구분한다.
 
 ## 문서
 
+- [SKU 모듈 목표·구현 진행 상태](../../commercecore/sku/README.md): V102/V3·내부 거래 포트의 별도 상세. 아래 기존 Sales 설명과 전환 상태를 구분한다.
 - [API HTML](api.html) · [계약 YAML](../../../../contracts/api/commercecore-service.yaml)
 - [DB ERD 설명](erd.md) · [관계도](erd.html)
 - [주문·결제 묶음](states/order.md) · [시각 자료](states/order.html)
