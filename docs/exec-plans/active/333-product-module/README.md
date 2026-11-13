@@ -1,6 +1,6 @@
 # CommerceCore Product 구현 계획 — #333
 
-상태: **구현 진행 · 자체 회귀 통과 · 공유 계약/선행 통합 검증 중.** 2026-11-13 사용자 코드 구현 지시와 코디네이터 Task `task_c4e31898898a`로 기존 착수 대기를 해제했다. 실제 결과는 [워크로그](../../../worklog/2026-11-13.md)를 따른다.
+상태: **Product 독립 구현·계약 반영 완료 · 후속 SKU/Cart/Order 통합 대기.** 2026-11-13 사용자 코드 구현 지시와 코디네이터 Task `task_c4e31898898a`로 기존 착수 대기를 해제했다. 실제 결과는 [워크로그](../../../worklog/2026-11-13.md)를 따른다.
 
 - 작업 경로: `/Users/junje/orca/workspaces/Backend/commercecore-product`, 브랜치 `refactor/#333-product-module`.
 - 시작 기준: `cc91c09b753a12a352bda65481210e264d3e88b0`. 기존 설계 변경을 보존하고 fetch·ff-only 동기화를 확인했다. 로컬 pull.rebase 설정 때문에 첫 pull이 dirty로 거절되어 해당 명령에서만 rebase=false로 재실행했다. reset/stash 없음.
@@ -28,7 +28,7 @@ Product는 소프트 삭제하고 이미지 FK도 사용하지 않는다. 앱 �
 | 이벤트 | Product 변경과 같은 TX의 전체 snapshot | saleEnabled/deletedAt, 중복 no-op, Outbox 실패 시 원본 롤백 |
 | Catalog V2/소비 | 제어/삭제 사본, version·삭제 사실 보존 | 구형 이벤트 true/null 호환, 역순/중복·삭제 후 구형 snapshot 보호 |
 | Catalog 공개 조회 | 기존 공개 조건 + 삭제 제외, 전체 중지 시 구매 불가 | SKU 상태/재고와 구분한 SALE_SUSPENDED, 실제 예약/재고 갱신 없음 |
-| API | sale-state PATCH, version 쿼리 DELETE, 응답 제어 필드 | 실제 HTTP·보안 검증, 공유 원본은 최종 담당 조각 통합 필요 |
+| API | sale-state PATCH, version 쿼리 DELETE, 응답 제어 필드 | 실제 HTTP·보안 검증, Order 승인 범위 원본/HTML 반영 완료 |
 | MD/HTML | 모듈 ERD/상태 MD 원본과 생성 HTML | 현재/목표·근거·원본 링크, 1280px/390px 화면·필터 검증 |
 
 ## 3. 다른 모듈과 통합
@@ -37,9 +37,9 @@ Product/Cart/SKU ID는 BIGINT/Long이다. SKU ID는 기존 Sales ID를 보존한
 
 - Core V101/Catalog V2: Product #333. SKU는 V102/Catalog V3, Cart는 V103, Order는 V104.
 - 의존 PR base: Product→dev, SKU→Product 브랜치, Cart→SKU 브랜치, Order→Cart 브랜치. 각자 검증된 SHA를 일반 merge로 통합해 ancestry를 보존한다. 가능하면 ff-only, cherry-pick/rebase/force push는 하지 않는다.
-- Core API YAML 최종 편집자는 Order #331이다. [Core 조각](api-changes.yaml)을 전달하고 최종 source/HTML 반영 전 PR ready로 보고하지 않는다. Catalog API는 SKU #334가 [Catalog 조각](catalog-api-changes.yaml)을 통합한다.
+- Core API YAML 최종 편집자는 Order #331이다. Order가 검토한 [Core 조각](api-changes.yaml)의 신규 3매핑·제어 필드와 [Catalog 조각](catalog-api-changes.yaml)의 최소 reason 확장을 #333 원본/HTML에 제한 반영했다. 후속 Order/SKU 통합에서도 해당 변경을 보존한다.
 - Catalog Product 이벤트/사본·최소 제어 조회는 #333, sales-info·다중 SKU 판매 사본은 #334 소유다. 공유 Query/DTO 파일의 후속 변경은 Product 선행 커밋을 먼저 통합해 조정한다.
-- SKU 포트의 실제 검증 커밋을 받은 뒤 상품별 SKU 목록을 연결한다. 다중 SKU의 대표가·최저가·합산재고·외부 가격정렬을 임의 도입하지 않는다. 기존 단일 SKU 응답 호환은 통합 대상이다.
+- SKU 검증 커밋의 실제 포트를 기준으로 #334에서 상품별 SKU 목록을 연결한다. 다중 SKU의 대표가·최저가·합산재고·외부 가격정렬을 임의 도입하지 않는다. 기존 단일 SKU 응답 호환은 통합 대상이다.
 - [Product 조회 연결 조각·검증 기준](sku-query-connection.md)은 코디네이터 배정에 따라 #334가 적용한다. #333은 SKU/Order를 역merge하지 않는다.
 - Order는 모든 Product 정렬 공유 잠금 다음 모든 SKU 정렬 잠금과 수량/상태를 같은 트랜잭션에 저장한다. 회원/Cart/쿠폰까지 포함한 전체 순서는 Order 통합에서 확인한다.
 
@@ -79,6 +79,6 @@ python3 scripts/render_design_docs.py --check
 
 ## 5. 진행·납품
 
-독립 구현과 회귀, Core V101/Catalog V2, MD/HTML을 선행 체크포인트로 묶는다. 정확한 SHA·포트/API·실행 결과와 미확인을 공유한 뒤 SKU/Cart/Order 의존 통합을 진행한다.
+독립 구현과 회귀, Core V101/Catalog V2, MD/HTML을 선행 체크포인트로 묶는다. 기반 64598663과 API/경합 검증 보완 447b0056을 원격 전달했다. 전용 PostgreSQL 21건은 모두 통과했다. root Gradle build는 성공했지만 922건 중 5건 스킵으로 하네스는 incomplete이며 상세 결과는 워크로그를 따른다. 후속 SKU/Cart/Order 의존 통합은 각 소유 브랜치에서 수행한다.
 
 최종 #333 PR은 하나다. 공유 계약·선행 포트·필요 검사가 미완료면 PR ready로 보고하지 않는다. 완료 조건이 남는 동안 active로 유지한다. FigJam API·ERD·상태 차이는 코디네이터에 전달하고 Product 담당은 직접 편집하지 않는다. 병합·배포는 허용 범위에 포함되지 않는다.
