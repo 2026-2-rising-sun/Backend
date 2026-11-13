@@ -2,9 +2,9 @@ package com.shoppinglive.commercecore.cart.service;
 
 import com.shoppinglive.commercecore.cart.dto.CartSelection;
 import com.shoppinglive.commercecore.cart.dto.SelectedCartItem;
-import com.shoppinglive.commercecore.order.entity.CartItem;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.util.Comparator;
@@ -82,8 +82,15 @@ public class CartSelectionService implements CartSelectionPort {
         if (!Objects.equals(item.getVersion(), selection.version())) {
             throw new BusinessException(ErrorCode.CONFLICT, "장바구니 항목이 변경되었습니다. 다시 확인해 주세요.");
         }
+        if (item.getSkuId() == null) {
+            throw new BusinessException(ErrorCode.CONFLICT, "판매 단위가 준비되지 않은 장바구니 항목입니다.");
+        }
         return new SelectedCartItem(
-                item.getId(), item.getProductId(), item.getQuantity(), item.getVersion());
+                item.getId(),
+                item.getSkuId(),
+                item.getProductId(),
+                item.getQuantity(),
+                item.getVersion());
     }
 
     private List<CartSelection> validated(List<CartSelection> selections) {

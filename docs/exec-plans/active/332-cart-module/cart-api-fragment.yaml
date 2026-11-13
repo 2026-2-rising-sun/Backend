@@ -1,0 +1,130 @@
+# Order 담당이 commercecore-service.yaml에 통합할 Cart CRUD 변경 조각.
+# 아직 계약 원본에 적용되지 않았으며 선행 Product/SKU 통합 검증 전이다.
+paths:
+  /v1/cart/items:
+    get:
+      tags: [Cart]
+      operationId: listMyCart
+      summary: 본인 장바구니를 상품별 SKU 항목으로 조회
+      description: 담긴 SKU만 상품별로 묶는다. 가격·재고는 현재 조회값이며 예약하지 않는다. 미매핑·삭제된 항목은 보존하고 purchasable=false로 표시한다. purchasable은 표시용이며 주문서 생성 시 원본을 다시 검증한다.
+      x-required-roles: [USER, SELLER]
+      responses:
+        '200':
+          description: 상품별 묶음, 없으면 빈 배열
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/CartProductGroup'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/AuthUnavailable'}
+    post:
+      tags: [Cart]
+      operationId: addMyCartItem
+      summary: 본인 장바구니에 SKU 추가
+      description: skuId 또는 기존 productId 중 하나만 지정한다. productId는 SKU가 정확히 하나일 때만 호환하고 0개/여러 개이면 409다. 같은 회원의 같은 SKU 중복도 409이며 수량을 누적하지 않는다. 판매 준비·중지·품절 여부로 담기 자체를 예약으로 바꾸지 않는다.
+      x-required-roles: [USER, SELLER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AddCartItemRequest'}
+      responses:
+        '201':
+          description: SKU 항목 생성
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CartItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '503': {$ref: '#/components/responses/ShoppingUnavailable'}
+  /v1/cart/items/{itemId}:
+    parameters: [{$ref: '#/components/parameters/ItemId'}]
+    patch:
+      tags: [Cart]
+      operationId: updateMyCartQuantity
+      summary: 본인 SKU 항목의 절대 수량 변경
+      x-required-roles: [USER, SELLER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QuantityRequest'}
+      responses:
+        '200':
+          description: 변경한 항목
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CartItem'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/AuthUnavailable'}
+    delete:
+      tags: [Cart]
+      operationId: deleteMyCartItem
+      summary: 본인 SKU 항목 삭제
+      x-required-roles: [USER, SELLER]
+      responses:
+        '204': {description: '삭제, 응답 본문 없음'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/AuthUnavailable'}
+components:
+  schemas:
+    AddCartItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        skuId: {type: [integer, 'null'], format: int64, minimum: 1}
+        productId: {type: [integer, 'null'], format: int64, minimum: 1, deprecated: true}
+        quantity: {type: integer, format: int32, minimum: 1, maximum: 2147483647}
+      oneOf:
+        - required: [skuId]
+          properties:
+            skuId: {type: integer, minimum: 1}
+            productId: {type: 'null'}
+        - required: [productId]
+          properties:
+            productId: {type: integer, minimum: 1}
+            skuId: {type: 'null'}
+    CartItem:
+      type: object
+      required: [id, productId, skuId, quantity, version]
+      properties:
+        id: {type: integer, format: int64, minimum: 1}
+        productId: {type: integer, format: int64, minimum: 1}
+        skuId: {type: [integer, 'null'], format: int64, minimum: 1}
+        quantity: {type: integer, format: int32, minimum: 1, maximum: 2147483647}
+        version: {type: integer, format: int64, minimum: 0}
+    CartProductGroup:
+      type: object
+      required: [productId, productName, mainImageUrl, saleEnabled, items]
+      properties:
+        productId: {type: integer, format: int64, minimum: 1}
+        productName: {type: [string, 'null']}
+        mainImageUrl: {type: [string, 'null']}
+        saleEnabled: {type: boolean}
+        items:
+          type: array
+          minItems: 1
+          items: {$ref: '#/components/schemas/CartSkuView'}
+    CartSkuView:
+      type: object
+      required: [id, skuId, quantity, version, unitPrice, available, skuStatus, purchasable]
+      properties:
+        id: {type: integer, format: int64, minimum: 1}
+        skuId: {type: [integer, 'null'], format: int64, minimum: 1}
+        quantity: {type: integer, format: int32, minimum: 1, maximum: 2147483647}
+        version: {type: integer, format: int64, minimum: 0}
+        unitPrice: {type: [integer, 'null'], format: int64, minimum: 1}
+        available: {type: [integer, 'null'], format: int32, minimum: 0}
+        skuStatus: {type: [string, 'null'], enum: [READY, ON_SALE, SOLD_OUT, PRIVATE, null]}
+        purchasable: {type: boolean}

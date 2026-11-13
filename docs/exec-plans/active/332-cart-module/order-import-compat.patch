@@ -1,0 +1,85 @@
+--- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
++++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
+@@ -20 +20 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -586 +586 @@
+-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
++                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 1);
+@@ -588 +588 @@
+-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
++                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 2);
+--- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
++++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
+@@ -34 +34 @@
+-    @Mock com.shoppinglive.commercecore.order.repository.CartItemRepository cart;
++    @Mock com.shoppinglive.commercecore.cart.repository.CartItemRepository cart;
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
+@@ -12 +12 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -366 +366 @@
+-                        new com.shoppinglive.commercecore.order.entity.CartItem(
++                        new com.shoppinglive.commercecore.cart.entity.CartItem(
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java
+@@ -8,3 +8,3 @@
+-import com.shoppinglive.commercecore.order.entity.CartItem;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+-import com.shoppinglive.commercecore.order.service.CartService;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.service.CartService;
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java
+@@ -15 +15 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
+@@ -10 +10 @@
+-import com.shoppinglive.commercecore.order.service.CartService;
++import com.shoppinglive.commercecore.cart.service.CartService;
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
+@@ -3,2 +3,2 @@
+-import com.shoppinglive.commercecore.order.entity.CartItem;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -7 +7 @@
+-import com.shoppinglive.commercecore.order.service.CartService;
++import com.shoppinglive.commercecore.cart.service.CartService;
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java
+@@ -6 +6 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -9 +9 @@
+-import com.shoppinglive.commercecore.order.service.CartService;
++import com.shoppinglive.commercecore.cart.service.CartService;
+--- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
++++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
+@@ -8 +8 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+--- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
++++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
+@@ -7 +7 @@
+-import com.shoppinglive.commercecore.order.entity.CartItem;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
+@@ -13 +13 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+--- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java
++++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java
+@@ -7 +7 @@
+-import com.shoppinglive.commercecore.order.entity.CartItem;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
+@@ -10 +10 @@
+-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
++import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+@@ -13 +13 @@
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;

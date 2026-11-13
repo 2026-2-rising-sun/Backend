@@ -1,14 +1,14 @@
-package com.shoppinglive.commercecore.order;
+package com.shoppinglive.commercecore.cart;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
