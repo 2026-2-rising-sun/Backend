@@ -8,7 +8,7 @@
 |---|---|
 | 제품 목적·기능 범위 | [제품 명세](product-specs/shoppinglive.md), [공통 용어](product-specs/glossary.md) |
 | 검증 가능한 수용 기준 | [하네스 요구사항](requirements/document-harness.md), [주문·결제](requirements/order-payment.md), [Catalog 동기화](requirements/catalog-sync.md), 결제 재설계 [결제](requirements/payment.md)·[원장](requirements/ledger.md)·[환불](requirements/refund.md) |
-| 중요한 선택 이유 | [문서 하네스 ADR](adr/0001-document-harness.md), 결제 재설계 [ADR 0002–0006](exec-plans/active/337-payment-redesign/README.md) |
+| 중요한 선택 이유 | [문서 하네스 ADR](adr/0001-document-harness.md), 결제 재설계 [ADR 0337-1–5](exec-plans/active/337-payment-redesign/README.md) |
 | 현재 설계·업무 흐름 | [설계 지도](design-docs/README.md), [모듈 문서](design-docs/services/README.md) |
 | 작업 방식·품질 | [작업 절차](guides/workflow.md), [코드](guides/code.md), [테스트](guides/tests.md), [계약](guides/contracts.md), [도구](guides/tooling.md), [작성](guides/writing.md) |
 | 진행 중·완료 계획 | [실행 계획 지도](exec-plans/README.md), [기술부채](exec-plans/tech-debt.md) |

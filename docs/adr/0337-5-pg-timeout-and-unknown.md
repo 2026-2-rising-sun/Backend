@@ -1,4 +1,4 @@
-# ADR 0006: PG 결과를 모르면 UNKNOWN으로 두고 조회로 확정한다
+# ADR 0337-5: PG 결과를 모르면 UNKNOWN으로 두고 조회로 확정한다
 
 결정 상태: 제안
 구현 상태: [결제 요구사항](../requirements/payment.md)의 PAY-CONFIRM·PAY-PG·PAY-RECOVER

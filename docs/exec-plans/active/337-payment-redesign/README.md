@@ -3,13 +3,13 @@
 상태: 진행 중 — 스펙 문서 PR 리뷰
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md) · [환불](../../../requirements/refund.md)
-관련 결정: [ADR 0002](../../../adr/0002-commerce-relay-internal-api.md) · [0003](../../../adr/0003-payment-replacement.md) · [0004](../../../adr/0004-payment-result-delivery.md) · [0005](../../../adr/0005-ledger-double-entry.md) · [0006](../../../adr/0006-pg-timeout-and-unknown.md)
+관련 결정: [ADR 0337-1](../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)
 단계 문서: [M1 결제 1차](m1-payment.md)
 자료: [목표 설계와 작은 판단](decision.md) · [이벤트 스토밍 v41](event-storming-v41.html) (2026-11-13 고정 사본. 이후 원본은 요구사항 MD다)
 
 ## 목표와 범위
 
-Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부터 완성한다**: 결제 1건이 끝까지 정확하게 끝나는 것이 먼저고, 대사·정산·지급은 후순위다. 기존 구현과 호환을 맞추지 않는다([ADR 0003](../../../adr/0003-payment-replacement.md)). 주문·재고·쿠폰은 CommerceCore 범위다.
+Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부터 완성한다**: 결제 1건이 끝까지 정확하게 끝나는 것이 먼저고, 대사·정산·지급은 후순위다. 기존 구현과 호환을 맞추지 않는다([ADR 0337-2](../../../adr/0337-2-payment-replacement.md)). 주문·재고·쿠폰은 CommerceCore 범위다.
 
 ## 로드맵
 
@@ -17,7 +17,7 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 
 | 단계 | 목표 | 이슈 | 요구사항 | 상태 |
 |---|---|---|---|---|
-| S | 스펙·결정·계획 문서 | #337 (PR #339) | 이 폴더, 요구사항 3개, ADR 0002–0006 | 리뷰 중 |
+| S | 스펙·결정·계획 문서 | #337 (PR #339) | 이 폴더, 요구사항 3개, ADR 0337-1–5 | 리뷰 중 |
 | **M1 결제 1차** | 기존 코드 삭제 | 생성 예정 | — | 대기 |
 | | 결제 생성·결제창·조회 API | 생성 예정 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 대기 |
 | | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 대기 |
@@ -107,7 +107,7 @@ Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 
 ## 인계
 
-- 완료: 이벤트 스토밍 v41, 요구사항 초안 3개, ADR 0002–0006 제안, 이 계획.
+- 완료: 이벤트 스토밍 v41, 요구사항 초안 3개, ADR 0337-1–5 제안, 이 계획.
 - 남은 일: M1 하위 이슈 생성·연결 → 스펙 문서 PR 리뷰·병합 → ADR 채택 → M1 시작(기존 코드 삭제·토스 클라이언트부터).
 - 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. M1의 삭제·스키마 PR과 겹치므로 병합 순서와 마이그레이션 번호를 그 담당과 먼저 정한다.
 - 폴더를 옮기거나 `completed/`로 보낼 때: 요구사항·ADR이 `event-storming-v41.html`을 가리키므로 링크를 함께 고치고 `scripts/check-docs.sh`로 확인한다.

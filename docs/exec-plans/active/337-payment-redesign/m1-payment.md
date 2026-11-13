@@ -35,7 +35,7 @@ dev ─ PR4 토스 클라이언트 (병렬 가능, PR5 전에 dev 병합) ──
   - 갱신할 문서: `design-docs/services/payment/states/payment.md`·`.html`.
 - [ ] **PR6 승인 API · 8초** #338 `payment-confirm-api` · base PR5 · M · PAY-CONFIRM-11과 승인 HTTP 매핑
   - 결과 → HTTP(요구사항 API 표): 승인 200 · 처리 중 202 · 거절 422 · 없음 404 · `BUYER_MISMATCH` 403 · `AMOUNT_MISMATCH` 400 · `PAYMENT_CLOSED`·`STALE_CHECKOUT` 409 · `PG_UNAVAILABLE` 503.
-  - PR5와 나눈 이유: 엔드포인트가 8초 대기 없이 먼저 배포되면 Payment가 Commerce 10초보다 오래 기다린다([ADR 0006](../../../adr/0006-pg-timeout-and-unknown.md)).
+  - PR5와 나눈 이유: 엔드포인트가 8초 대기 없이 먼저 배포되면 Payment가 Commerce 10초보다 오래 기다린다([ADR 0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)).
   - 갱신할 문서: `api.html`.
 - [ ] **PR7 복구 · 만료** `payment-recovery` · base PR6 · M · PAY-RECOVER-01–05, PAY-EXPIRE-01
   - 스케줄러 3개(APPROVING 스위퍼, UNKNOWN 조회, CREATED 만료). 분산 락 없이 조건부 UPDATE로 중복을 막는다. DONE 처리는 PR5 함수를 그대로 쓴다.

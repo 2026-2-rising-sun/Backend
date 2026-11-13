@@ -6,7 +6,7 @@
 결제 생성·결제창·승인·결과 불명 복구·만료를 다룬다. 환불은 [환불](refund.md), 분개는 [원장](ledger.md)에 있다.
 
 - 설계 근거: [이벤트 스토밍 v41](../exec-plans/active/337-payment-redesign/event-storming-v41.html) — `#f1`–`#f6`, `#api`, `#states`, `#toss`, `#mapping`. `EC n`은 그 문서 `#edge` 표의 번호다.
-- 지금 코드가 아니라 **교체할 목표 동작**이다. 현재 구현의 기준은 [주문·결제](order-payment.md)에 있고, 교체 PR에서 함께 정리한다([ADR 0003](../adr/0003-payment-replacement.md)).
+- 지금 코드가 아니라 **교체할 목표 동작**이다. 현재 구현의 기준은 [주문·결제](order-payment.md)에 있고, 교체 PR에서 함께 정리한다([ADR 0337-2](../adr/0337-2-payment-replacement.md)).
 - ID는 바꾸지 않는다. 테스트 `@DisplayName`에 ID를 넣는다. 예: `"[PAY-CREATE-03] 같은 orderRef에 금액이 다르면 거절한다"`.
 - `(제안)` 표시 오류 코드는 원본에 없어 새로 정한 값이다.
 
