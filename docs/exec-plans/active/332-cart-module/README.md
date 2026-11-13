@@ -8,7 +8,7 @@
 
 2026-11-13 사용자가 코드 구현과 MD/HTML 보완을 요청했고 코디네이터가 이 동일 세션의 Sol Medium 적용을 확인해 구현 Task task_496cea38c3e7를 배정했다. 이전 설계 Task의 failed 판정과 당시 기록은 과거 사실로 보존하되 현재 구현을 중단시키는 지시로 재사용하지 않는다. 모듈별 커밋·푸시·PR은 허용됐으며 dev 병합·배포는 범위 밖이다.
 
-기반 cc91c09b에서 검증된 첫 포트 b3091eae를 커밋했다. 패키지 이동/SKU 연결 후속 코드는 e84a03c7 체크포인트로 보존하고 SKU 정확 SHA 0b36ba4722aea963b092e87a1f6af4145e920af3를 merge했다. Product 64598663은 SKU가 먼저 merge한 후속 SHA를 받아 통합한다. 미커밋 파일 복사·cherry-pick·rebase/force push는 하지 않는다.
+기반 cc91c09b에서 검증된 첫 포트 b3091eae를 커밋했다. 패키지 이동/SKU 연결 후속 코드는 e84a03c7 체크포인트로 보존하고 SKU 정확 SHA 0b36ba4722aea963b092e87a1f6af4145e920af3를 merge했다. 코디네이터의 후속 의존 조정 승인으로 Product 64598663을 fc5e6be5로 직접 merge했다. 후속 SKU SHA도 merge해 PR base 차이를 정리한다. 미커밋 파일 복사·cherry-pick·rebase/force push는 하지 않는다.
 
 공통 지시의 파일 소유권 예외로 공유 소비자 11개 파일의 import/fully-qualified type 변경만 Cart 브랜치에서 적용·검증·커밋하도록 코디네이터가 승인했다. [변경 조각](order-import-compat.patch)의 업무 로직·상태·환불 DTO 변경은 없으며 Order 소유권을 유지한다.
 
@@ -27,11 +27,11 @@ Cart를 cart 패키지로 분리하고 SKU별 항목·수량·소유권을 관�
 - [x] 후속 SKU 참조와 미매핑 보존을 보강한 단계의 H2 8개 실패/오류/스킵 0. 이후 최종 패키지/DTO 변화는 재검증 대상.
 - [x] Cart 패키지/CRUD/상품별 그룹/최종 선택 DTO/nullable V103 코드와 테스트 작성. 공유 import-only 패치 적용.
 - [x] ERD.md와 독립 ERD.html 작성. 자체 HTML 검사와 390px 페이지 폭/도표 내부 스크롤 확인.
-- [ ] Product 확장을 포함한 SKU 선행 검증 SHA 통합. 실제 포트/단순조회 DTO와 코드 대조.
-- [ ] 최종 단위·MockMvc·H2 JPA 검사, 실제 PostgreSQL 선택 잠금/롤백·V103 이행 검사.
+- [x] SKU 0b36ba47과 Product 64598663을 통합하고 실제 포트/단순조회 DTO와 코드 대조.
+- [x] Cart 단위13/H2통합20/실제PG잠금12/Flyway이행3 실패·오류·스킵0. 전체 Core 단위165 통과.
 - [ ] 기존 단일 SKU 주문·결제/환불 호출자와 데이터/권한 회귀 확인. 기존 Sales 경로 전환의 선행 한계 분리.
 - [ ] Core YAML 최종 편집자 Order가 [Cart API 조각](cart-api-fragment.yaml)을 통합하고 생성 API/소비자 의미를 검증.
-- [ ] 코드·실행 결과와 MD/HTML·현행 Core 설명을 맞추고 1280/390px 일반 viewport 화면·링크 확인.
+- [x] 코드·실행 결과와 MD/HTML·현행 Core 설명을 맞추고 1280/390px 일반 viewport 화면·링크 확인.
 - [ ] Cart PR 한 개를 SKU 브랜치 base로 전달. 계약/연계 미완료면 완성 PR로 보고하지 않음.
 
 ## 포트와 소유 파일
@@ -58,7 +58,7 @@ scripts/render-api-docs.sh --check
 python3 scripts/render_design_docs.py --check
 ./gradlew :services:commercecore-service:spotlessCheck
 ./gradlew :services:commercecore-service:test --tests '*Cart*Test'
-./gradlew :services:commercecore-service:integrationTest --tests '*CartSelectionServiceTest' --tests '*CartOrderIntegrationTest'
+./gradlew :services:commercecore-service:integrationTest --tests '*CartSelectionServiceTest' --tests '*CartApiIntegrationTest' --tests '*CartOrderIntegrationTest'
 ./gradlew :services:commercecore-service:postgresTest --tests '*CartSelectionPostgresTest'
 ./gradlew :services:commercecore-service:migrationTest --tests '*CartSkuMigrationPostgresTest'
 ```
@@ -74,3 +74,9 @@ PostgreSQL은 Cart 전용 임시 컨테이너/DB를 준비했고 테스트는 �
 의존 PR은 Product→dev, SKU→Product, Cart→SKU, Order→Cart 순서이며 네 개를 유지한다. 검증된 정확 SHA를 merge해 ancestry를 보존하고 워크로그 충돌에서는 각 모듈 기록을 모두 남긴다. FigJam API·ERD·상태 표현은 코디네이터 단독 편집, Cart는 구현/API 근거만 전달한다.
 
 현재 상품별 GET 응답은 기존 평면 배열과 달라지고 POST는 SKU ID와 단일 SKU productId 호환을 제공한다. 계약 원본/생성 HTML은 아직 Order 통합 대기이며 이 상태는 PR ready가 아니다. 검증된 범위·후속 SHA·실행 결과는 워크로그와 감독 Task 보고에 갱신한다. 필수 연계·검증이 남아 있어 계획은 active에 둔다.
+
+## 최종 검증 체크포인트
+
+53af15c7을 원격 Cart 브랜치에 푸시하고 Order에 전달했다. 전체 Core 통합298개 중30개 실패·외부 Kafka2개 스킵이다. PaymentGroupIntegrationTest27, CartCouponPreviewApiTest1, SalesInfoEventIntegrationTest1, MemberCommerceCoreApiTest1에서 Sales-only fixture의 SKU 누락/H2 테이블 누락이 드러났다. 운영 신규 Sales 쓰기에서도 SKU 동기화가 빠지면 Cart의 기존 productId 호환이409가 되므로 단순 fixture 수정만으로 전환 완료라고 하지 않는다. 코디네이터가 소비자 fixture 수정·재검증을 Order에 배정했다.
+
+Spotless·문서123개·생성 API HTML6개/설계 HTML28개 최신성은 통과했다. API 구조 검사는 Product 신규3개 매핑의 원본 누락으로 실패했으며 Cart GET 응답 스키마 변경도 Order의 최종 원본 통합 대기다. root build·외부 Kafka/PG/AWS·CI는 미검증으로 유지한다.

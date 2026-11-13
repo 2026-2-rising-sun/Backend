@@ -15,10 +15,10 @@
     <div class="eyebrow">COMMERCECORE / CART #332</div>
     <h1>SKU마다 따로 담고,<br>구매한 원본 항목만 정리합니다</h1>
     <p class="lead">옵션이 다른 상품은 별도 SKU 항목으로 관리합니다. 기존에 담긴 항목에 판매정보가 없더라도 지우지 않고 남겨 두며, 주문 선택에서는 이용 불가로 처리합니다.</p>
-    <p><span class="badge">구현 중 · 선행 통합 검증 대기</span></p>
+    <p><span class="badge">Cart 검증 통과 · 전체 연계 검증 대기</span></p>
     <p class="meta">기준: <code>cc91c09b</code> 위의 Cart 구현 변경 · <a href="ERD.md">MD 원본</a> · <a href="설계.md">상세 설계</a> · <a href="../../../exec-plans/active/332-cart-module/README.md">구현 계획</a> · <a href="../../services/commercecore/erd.html">현행 Core 전체 ERD</a></p>
   </header>
-  <aside class="notice"><strong>현재 데이터와 목표 모델을 구분합니다.</strong> <code>sku_id</code>는 Cart 엔티티와 V103 확장에 반영 중입니다. 실제 PostgreSQL 16의 직접 SQL 검사로 기존 행 보존·다중 SKU·유일성 제약을 확인했습니다. Flyway/JUnit 이행 검사와 잠금 경합 검사는 선행 모듈 통합 뒤 실행합니다. nullable SKU는 기존 항목의 보존을 위한 것이며 가격·재고 원본을 Cart에 만드는 의미가 아닙니다.</aside>
+  <aside class="notice"><strong>현재 데이터와 목표 모델을 구분합니다.</strong> <code>sku_id</code>는 Cart 엔티티와 V103 확장에 반영 중입니다. 실제 PostgreSQL 16에서 Flyway 이행 3개·선택 잠금/롤백 12개를 통과했습니다. 전체 Core 거래 회귀의 실패와 계약 원본 통합은 후속 작업입니다. nullable SKU는 기존 항목의 보존을 위한 것이며 가격·재고 원본을 Cart에 만드는 의미가 아닙니다.</aside>
   <section aria-labelledby="relationships">
     <h2 id="relationships">상품·SKU·회원과 Cart의 관계</h2>
     <p class="meta">점선은 논리 참조입니다. 아래 관계에 물리 FK를 추가하지 않습니다. 좁은 화면에서는 도표 안을 가로로 이동할 수 있습니다.</p>
@@ -99,7 +99,7 @@
     <p class="meta">선행 순서: V101 Product → V102 SKU → V103 Cart → V104 Order. legacy Sales 쓰기 전환 전 중간 상태는 독립 배포 가능한 완료 상태가 아닙니다.</p>
     <details open><summary>결제 중 수량이 바뀌면 어떻게 정리하나요?</summary><p>구매 당시의 Cart ID·회원·version이 같은 행만 결제 성공 후 삭제합니다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남깁니다. 실패·취소·만료에는 성공 정리를 실행하지 않습니다. SQL 오류는 주문 상태·재고 변경과 함께 롤백합니다.</p></details>
   </section>
-  <footer>현재 검증: H2 JPA 선택·성공 정리 실행. PostgreSQL 직접 SQL로 V103 데이터 보존·부분 인덱스를 확인했습니다. Flyway/JUnit 이행·잠금 경합과 선행 모듈 통합 검증은 대기 중입니다. <a href="ERD.md">동일 모델의 MD 원본</a>과 <a href="../../../worklog/2026-11-13.md">실행 기록</a>을 함께 확인하세요.</footer>
+  <footer>현재 검증: Cart 단위 13개·H2 통합 20개·실제 PostgreSQL 잠금/롤백 12개·Flyway 이행 3개 통과. 전체 Core 통합은 298개 중 30개 실패·외부 Kafka 2개 스킵으로 후속 거래 전환과 API 원본 통합이 남았습니다. <a href="ERD.md">동일 모델의 MD 원본</a>과 <a href="../../../worklog/2026-11-13.md">실행 기록</a>을 함께 확인하세요.</footer>
 </main>
 </body>
 </html>

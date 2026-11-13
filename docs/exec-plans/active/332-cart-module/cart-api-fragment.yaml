@@ -1,5 +1,5 @@
 # Order 담당이 commercecore-service.yaml에 통합할 Cart CRUD 변경 조각.
-# 아직 계약 원본에 적용되지 않았으며 선행 Product/SKU 통합 검증 전이다.
+# Cart Product/SKU 통합 검증은 통과했으며 계약 원본은 Order 최종 통합 대기다.
 paths:
   /v1/cart/items:
     get:

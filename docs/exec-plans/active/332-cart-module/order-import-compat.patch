@@ -1,85 +1,116 @@
---- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
-+++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
-@@ -20 +20 @@
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
-+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
-@@ -586 +586 @@
--                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
-+                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 1);
-@@ -588 +588 @@
--                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
-+                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 2);
---- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
-+++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
-@@ -34 +34 @@
--    @Mock com.shoppinglive.commercecore.order.repository.CartItemRepository cart;
-+    @Mock com.shoppinglive.commercecore.cart.repository.CartItemRepository cart;
---- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
-+++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
-@@ -12 +12 @@
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
-+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
-@@ -366 +366 @@
--                        new com.shoppinglive.commercecore.order.entity.CartItem(
-+                        new com.shoppinglive.commercecore.cart.entity.CartItem(
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java
+index d7cb7c2a..c1736742 100644
 --- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java
 +++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/controller/CartCouponPreviewApiTest.java
-@@ -8,3 +8,3 @@
+@@ -8,3 +8,3 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 -import com.shoppinglive.commercecore.order.entity.CartItem;
 -import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 -import com.shoppinglive.commercecore.order.service.CartService;
 +import com.shoppinglive.commercecore.cart.entity.CartItem;
 +import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 +import com.shoppinglive.commercecore.cart.service.CartService;
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java
+index 3e0aa113..c696fb25 100644
 --- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java
 +++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java
-@@ -15 +15 @@
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
-+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
---- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
-+++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
-@@ -10 +10 @@
--import com.shoppinglive.commercecore.order.service.CartService;
-+import com.shoppinglive.commercecore.cart.service.CartService;
---- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
-+++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
-@@ -3,2 +3,2 @@
--import com.shoppinglive.commercecore.order.entity.CartItem;
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+@@ -12,0 +13,3 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 +import com.shoppinglive.commercecore.cart.entity.CartItem;
 +import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
-@@ -7 +7 @@
--import com.shoppinglive.commercecore.order.service.CartService;
 +import com.shoppinglive.commercecore.cart.service.CartService;
+@@ -15 +17,0 @@ import com.shoppinglive.commercecore.order.entity.*;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java
+index 2918f5a7..39edc691 100644
 --- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java
 +++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentRecoveryPostgresTest.java
-@@ -6 +6 @@
+@@ -6 +6,2 @@ import static org.mockito.Mockito.*;
 -import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 +import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
-@@ -9 +9 @@
--import com.shoppinglive.commercecore.order.service.CartService;
 +import com.shoppinglive.commercecore.cart.service.CartService;
---- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
-+++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
-@@ -8 +8 @@
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
-+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
---- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
-+++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
-@@ -7 +7 @@
+@@ -9 +9,0 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
+-import com.shoppinglive.commercecore.order.service.CartService;
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
+index 318d7891..c6e8eabf 100644
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundTestSupport.java
+@@ -3,2 +3,3 @@ package com.shoppinglive.commercecore.payment.service;
 -import com.shoppinglive.commercecore.order.entity.CartItem;
-+import com.shoppinglive.commercecore.cart.entity.CartItem;
-@@ -13 +13 @@
 -import com.shoppinglive.commercecore.order.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
 +import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
++import com.shoppinglive.commercecore.cart.service.CartService;
+@@ -7 +7,0 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
+-import com.shoppinglive.commercecore.order.service.CartService;
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
+index 739e0896..4e5b870a 100644
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/sales/event/SalesInfoEventIntegrationTest.java
+@@ -8,0 +9 @@ import static org.mockito.Mockito.doAnswer;
++import com.shoppinglive.commercecore.cart.service.CartService;
+@@ -10 +10,0 @@ import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
+-import com.shoppinglive.commercecore.order.service.CartService;
+diff --git a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
+index 7a64d381..0dda663e 100644
+--- a/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
++++ b/services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/security/MemberCommerceCoreApiTest.java
+@@ -8,0 +9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -12 +12,0 @@ import com.shoppinglive.commercecore.order.entity.OrderStatus;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+@@ -366 +366 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
+-                        new com.shoppinglive.commercecore.order.entity.CartItem(
++                        new com.shoppinglive.commercecore.cart.entity.CartItem(
+diff --git a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java
+index 00c03ea7..92181ae8 100644
 --- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java
 +++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderCreationService.java
-@@ -7 +7 @@
--import com.shoppinglive.commercecore.order.entity.CartItem;
+@@ -2,0 +3,3 @@ package com.shoppinglive.commercecore.order.service;
 +import com.shoppinglive.commercecore.cart.entity.CartItem;
-@@ -10 +10 @@
--import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
 +import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
-@@ -13 +13 @@
--import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 +import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -7 +9,0 @@ import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
+-import com.shoppinglive.commercecore.order.entity.CartItem;
+@@ -10 +11,0 @@ import com.shoppinglive.commercecore.order.entity.OrderAmounts;
+-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
+@@ -13 +13,0 @@ import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+diff --git a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
+index 68533996..e721a856 100644
+--- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
++++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java
+@@ -2,0 +3 @@ package com.shoppinglive.commercecore.order.service;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -8 +8,0 @@ import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+diff --git a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
+index 5b1b9e29..18db9545 100644
+--- a/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
++++ b/services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/PaymentGroupCheckoutService.java
+@@ -3,0 +4,2 @@ import com.fasterxml.jackson.databind.ObjectMapper;
++import com.shoppinglive.commercecore.cart.entity.CartItem;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -7 +8,0 @@ import com.shoppinglive.commercecore.order.dto.OrderResponse;
+-import com.shoppinglive.commercecore.order.entity.CartItem;
+@@ -13 +13,0 @@ import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+diff --git a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
+index ce4fb6b0..1f8c3b54 100644
+--- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
++++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/order/service/OrderCreationServiceTest.java
+@@ -13,0 +14 @@ import static org.mockito.Mockito.verify;
++import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+@@ -20 +20,0 @@ import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException
+-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+@@ -586,3 +586,2 @@ class OrderCreationServiceTest {
+-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
+-        var changed =
+-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
++                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 1);
++        var changed = new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 2);
+diff --git a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
+index a18452fb..981d6bc4 100644
+--- a/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
++++ b/services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java
+@@ -34 +34 @@ class PaymentResultHandlerTest {
+-    @Mock com.shoppinglive.commercecore.order.repository.CartItemRepository cart;
++    @Mock com.shoppinglive.commercecore.cart.repository.CartItemRepository cart;
