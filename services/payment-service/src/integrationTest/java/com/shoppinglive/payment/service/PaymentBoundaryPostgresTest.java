@@ -31,7 +31,8 @@ import org.springframework.web.client.RestClient;
             "payment.dev.payment-scenario.enabled=true",
             "shoppinglive.outbox.relay.enabled=false",
             "payment.execution.recovery-enabled=false",
-            "payment.refunds.execution-enabled=false"
+            "payment.refunds.execution-enabled=false",
+            "payment.refunds.recovery.initial-delay=PT1H"
         })
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
@@ -55,7 +56,9 @@ class PaymentBoundaryPostgresTest {
 
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
+    @MockitoSpyBean PaymentRecoveryStore paymentRecovery;
     @Autowired PaymentService payments;
+    @Autowired OrderClosureService closures;
     @Autowired RefundIntakeService refunds;
     @Autowired RefundExecutionService executions;
     @Autowired RefundRecoveryStore refundRecovery;
@@ -73,6 +76,7 @@ class PaymentBoundaryPostgresTest {
         jdbc.update("DELETE FROM mock_refund_result");
         jdbc.update("DELETE FROM refund_execution");
         jdbc.update("DELETE FROM mock_gateway_result");
+        jdbc.update("DELETE FROM payment_order_control");
         jdbc.update("DELETE FROM payment_attempt");
         http =
                 RestClient.builder()
@@ -367,5 +371,289 @@ class PaymentBoundaryPostgresTest {
         dueRefund();
         assertThat(executions.execute(1)).isTrue();
         verify(refundGateway, times(1)).execute(1, 1000, MockRefundScenario.SUCCESS);
+    }
+
+    OrderClosureCommand closure(PaymentCommand c) {
+        return new OrderClosureCommand(
+                UUID.randomUUID().toString(),
+                c.requestId(),
+                c.orderId(),
+                c.paymentGroupId(),
+                c.referenceNumber(),
+                c.amount(),
+                "EXPIRED",
+                Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+    }
+
+    @Test
+    @DisplayName("종료가 결제 생성보다 먼저 도착하면 실제 승인을 요청하지 않는다")
+    void closureBeforeCreationBlocksAuthorization() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        var closed = closure(c);
+        closures.close(c.paymentId(), closed);
+        var result = post(c);
+        assertThat(result.status()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(closures.close(c.paymentId(), closed).status()).isEqualTo("RECORDED");
+        verify(gateway, never()).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("결제 생성과 종료가 경합해도 실행 키 하나로 직렬화하고 대기 승인을 차단한다")
+    void concurrentCreationAndClosureUseOneControl() throws Exception {
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            for (long id = 1; id <= 12; id++) {
+                var c = command(id, 1000, PaymentScenario.INSTANT_SUCCESS);
+                var closed = closure(c);
+                var gate = new CountDownLatch(1);
+                var create =
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    return post(c);
+                                });
+                var close =
+                        pool.submit(
+                                () -> {
+                                    gate.await();
+                                    return closures.close(c.paymentId(), closed);
+                                });
+                gate.countDown();
+                create.get(10, TimeUnit.SECONDS);
+                close.get(10, TimeUnit.SECONDS);
+                payments.resolvePayment(c.paymentId());
+                assertThat(payments.get(c.paymentId()).status()).isEqualTo(PaymentStatus.FAILED);
+            }
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_order_control", Long.class))
+                .isEqualTo(12);
+        verify(gateway, never()).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("실행 예약 뒤 종료를 받아도 engine의 호출 시작에서 승인을 차단한다")
+    void scheduledWorkChecksClosureAtInvocation() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        post(c);
+        closures.close(c.paymentId(), closure(c));
+        assertThat(payments.resolvePayment(c.paymentId())).isTrue();
+        assertThat(payments.get(c.paymentId()).status()).isEqualTo(PaymentStatus.FAILED);
+        verify(gateway, never()).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("종료 뒤 결과불명 승인은 다시 호출하지 않고 저장된 성공을 조회한다")
+    void closureKeepsUnknownAndRecoversKnownSuccess() {
+        var c = command(1, 1000, PaymentScenario.SUCCESS_RESPONSE_LOST);
+        post(c);
+        assertThat(payments.resolvePayment(c.paymentId())).isFalse();
+        assertThat(payments.get(c.paymentId()).status()).isEqualTo(PaymentStatus.UNKNOWN);
+        closures.close(c.paymentId(), closure(c));
+        duePayment();
+        assertThat(payments.resolvePayment(c.paymentId())).isTrue();
+        assertThat(payments.get(c.paymentId()).status()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(gateway, times(1)).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("종료 뒤 조회할 결과가 없는 UNKNOWN은 실패로 단정하거나 재승인하지 않는다")
+    void closedUnknownWithoutResultIsOnlyQueried() {
+        var c = command(1, 1000, PaymentScenario.UNAVAILABLE_BEFORE_RESULT);
+        post(c);
+        payments.resolvePayment(c.paymentId());
+        closures.close(c.paymentId(), closure(c));
+        duePayment();
+        assertThat(payments.resolvePayment(c.paymentId())).isFalse();
+        assertThat(payments.get(c.paymentId()).status()).isEqualTo(PaymentStatus.UNKNOWN);
+        verify(gateway, times(1)).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("다른 종료 ID나 결제 키로 같은 원결제의 종료를 덮어쓸 수 없다")
+    void changedClosureAndReusedExecutionKeyConflict() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        closures.close(1, closure(c));
+        assertThatThrownBy(() -> closures.close(1, closure(c)))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> closures.close(2, closure(c)))
+                .isInstanceOf(BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_order_control", Long.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("보상이 종료 통지보다 먼저 도착하면 영구 실패 대신 503으로 재전달을 요구한다")
+    void compensationBeforeClosureCanBeRetried() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        post(c);
+        payments.resolvePayment(1L);
+        var closed = closure(c);
+        var refund =
+                new RefundCommand(
+                        UUID.randomUUID().toString(),
+                        1L,
+                        1L,
+                        1L,
+                        1L,
+                        "PG-1",
+                        1000,
+                        closed.closureRequestId());
+        assertThatThrownBy(
+                        () ->
+                                http.post()
+                                        .uri("/v1/internal/refunds")
+                                        .body(refund)
+                                        .retrieve()
+                                        .body(RefundExecution.class))
+                .isInstanceOf(
+                        org.springframework.web.client.HttpServerErrorException.ServiceUnavailable
+                                .class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM refund_execution", Long.class))
+                .isZero();
+        closures.close(1, closed);
+        assertThat(refunds.start(refund).status()).isEqualTo(RefundStatus.PROCESSING);
+        assertThat(refunds.start(refund).executionId()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("환불 기능이 꺼져도 검증된 보상만 재시작 복구하고 일반 환불은 대기한다")
+    void disabledRefundsRecoverOnlyCompensation() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        post(c);
+        payments.resolvePayment(1L);
+        var closed = closure(c);
+        closures.close(1, closed);
+        var compensation =
+                new RefundCommand(
+                        UUID.randomUUID().toString(),
+                        1L,
+                        1L,
+                        1L,
+                        1L,
+                        "PG-1",
+                        1000,
+                        closed.closureRequestId());
+        refunds.start(compensation);
+        var other = command(2, 2000, PaymentScenario.INSTANT_SUCCESS);
+        post(other);
+        payments.resolvePayment(2L);
+        var ordinary =
+                new RefundCommand(UUID.randomUUID().toString(), 2L, 2L, 1L, 1L, "PG-1", 1000);
+        refunds.start(ordinary);
+        verify(refundEngine, times(1)).schedule(1L);
+        verify(refundEngine, never()).schedule(2L);
+        assertThat(new RefundReconciler(refundRecovery, executions, false).reconcileDue())
+                .isEqualTo(1);
+        assertThat(refunds.get(1).status()).isEqualTo(RefundStatus.SUCCESS);
+        assertThat(refunds.get(2).status()).isEqualTo(RefundStatus.PROCESSING);
+        assertThatThrownBy(
+                        () ->
+                                refunds.start(
+                                        new RefundCommand(
+                                                UUID.randomUUID().toString(),
+                                                3L,
+                                                1L,
+                                                1L,
+                                                1L,
+                                                "PG-1",
+                                                1000,
+                                                closed.closureRequestId())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(refunds.start(compensation).status()).isEqualTo(RefundStatus.SUCCESS);
+    }
+
+    @Test
+    @DisplayName("0원 종료는 PG 청구 없이 종결하고 레거시 nullable 묶음 결제는 보존한다")
+    void zeroClosureAndLegacyNullableGroup() {
+        var zero = command(1, 0, PaymentScenario.INSTANT_SUCCESS);
+        closures.close(1, closure(zero));
+        assertThat(post(zero).status()).isEqualTo(PaymentStatus.FAILED);
+        var legacy =
+                new PaymentCommand(
+                        UUID.randomUUID().toString(),
+                        2L,
+                        2L,
+                        null,
+                        "legacy",
+                        0,
+                        PaymentScenario.INSTANT_SUCCESS);
+        assertThat(post(legacy).status()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(gateway, never()).authorize(anyLong(), any());
+        verify(refundGateway, never()).execute(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("호출 권한 확보 직전 종료는 PG 실행 없이 최종 실패로 수렴한다")
+    void closeImmediatelyBeforeInvocation() throws Exception {
+        closureAtPhase("BEFORE");
+    }
+
+    @Test
+    @DisplayName("호출 권한 확보 직후 종료돼도 이미 시작한 실행의 실제 성공을 보존한다")
+    void closeImmediatelyAfterInvocation() throws Exception {
+        closureAtPhase("AFTER");
+    }
+
+    @Test
+    @DisplayName("PG 승인 호출 중 종료돼도 성공 사실을 보존하고 다시 승인하지 않는다")
+    void closeDuringAuthorization() throws Exception {
+        closureAtPhase("GATEWAY");
+    }
+
+    private void closureAtPhase(String phase) throws Exception {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        post(c);
+        var reached = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        if ("GATEWAY".equals(phase))
+            doAnswer(
+                            invocation -> {
+                                reached.countDown();
+                                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                                return invocation.callRealMethod();
+                            })
+                    .when(gateway)
+                    .authorize(anyLong(), any());
+        else
+            doAnswer(
+                            invocation -> {
+                                Object answer = null;
+                                if ("AFTER".equals(phase)) answer = invocation.callRealMethod();
+                                reached.countDown();
+                                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                                return "BEFORE".equals(phase)
+                                        ? invocation.callRealMethod()
+                                        : answer;
+                            })
+                    .when(paymentRecovery)
+                    .beginInvocation(any());
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var running = pool.submit(() -> payments.resolvePayment(1L));
+            try {
+                assertThat(reached.await(10, TimeUnit.SECONDS)).isTrue();
+                closures.close(1, closure(c));
+            } finally {
+                release.countDown();
+            }
+            running.get(10, TimeUnit.SECONDS);
+        }
+        duePayment();
+        payments.resolvePayment(1L);
+        assertThat(payments.get(1).status())
+                .isEqualTo("BEFORE".equals(phase) ? PaymentStatus.FAILED : PaymentStatus.SUCCESS);
+        verify(gateway, times("BEFORE".equals(phase) ? 0 : 1)).authorize(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("attempt PK와 paymentId가 달라도 원결제 제어 키로 종료를 확인한다")
+    void physicalAttemptIdDiffersFromPaymentId() {
+        var c = command(1, 1000, PaymentScenario.INSTANT_SUCCESS);
+        post(c);
+        jdbc.update("UPDATE payment_attempt SET id=71 WHERE payment_id=1");
+        closures.close(1, closure(c));
+        assertThat(payments.resolvePayment(71L)).isTrue();
+        assertThat(payments.get(1).status()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(jdbc.queryForObject("SELECT payment_id FROM payment_order_control", Long.class))
+                .isEqualTo(1);
+        verify(gateway, never()).authorize(anyLong(), any());
     }
 }

@@ -10,15 +10,24 @@ import org.springframework.web.bind.annotation.*;
 public class InternalPaymentController {
     private final PaymentService payments;
     private final RefundIntakeService refunds;
+    private final OrderClosureService closures;
 
-    public InternalPaymentController(PaymentService payments, RefundIntakeService refunds) {
+    public InternalPaymentController(
+            PaymentService payments, RefundIntakeService refunds, OrderClosureService closures) {
         this.payments = payments;
         this.refunds = refunds;
+        this.closures = closures;
     }
 
     @PostMapping("/payments")
     public PaymentExecution start(@Valid @RequestBody PaymentCommand command) {
         return payments.start(command);
+    }
+
+    @PutMapping("/payments/{paymentId}/order-closure")
+    public OrderClosureService.Receipt closeOrder(
+            @PathVariable long paymentId, @Valid @RequestBody OrderClosureCommand command) {
+        return closures.close(paymentId, command);
     }
 
     @GetMapping("/payments/{paymentId}")

@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "payment.core-service-token=payment-security-test-service-credential-32",
             "payment.execution.recovery-enabled=false",
             "payment.refunds.execution-enabled=false",
+            "payment.refunds.recovery.initial-delay=PT1H",
             "payment.dev.payment-scenario.enabled=true"
         })
 @AutoConfigureMockMvc

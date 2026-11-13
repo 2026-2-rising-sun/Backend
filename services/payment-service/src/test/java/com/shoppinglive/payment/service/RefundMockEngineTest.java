@@ -41,4 +41,32 @@ class RefundMockEngineTest {
             engine.shutdown();
         }
     }
+
+    @Test
+    @DisplayName("비활성 엔진도 영속 검증된 보상 건만 실행하고 일반 환불은 대기한다")
+    void disabledEngineRunsOnlyPersistedCompensation() throws Exception {
+        var executions = mock(RefundExecutionService.class);
+        var jdbc = mock(org.springframework.jdbc.core.JdbcTemplate.class);
+        var called = new java.util.concurrent.CountDownLatch(1);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(1L))).thenReturn(true);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(2L))).thenReturn(false);
+        when(executions.execute(1L))
+                .thenAnswer(
+                        i -> {
+                            called.countDown();
+                            return true;
+                        });
+        var engine = new RefundMockEngine(executions, false, jdbc);
+        try {
+            engine.schedule(2L);
+            engine.schedule(1L);
+            org.assertj.core.api.Assertions.assertThat(
+                            called.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            verify(executions, times(1)).execute(1L);
+            verify(executions, never()).execute(2L);
+        } finally {
+            engine.shutdown();
+        }
+    }
 }

@@ -18,22 +18,40 @@ public class RefundIntakeService {
     private final TransactionTemplate tx;
     private final RefundMockEngine engine;
     private final boolean executionEnabled;
+    private final OrderClosureService closures;
 
     public RefundIntakeService(
             JdbcTemplate jdbc,
             TransactionTemplate tx,
             RefundMockEngine engine,
+            boolean executionEnabled) {
+        this(
+                jdbc,
+                tx,
+                engine,
+                new OrderClosureService(jdbc, tx.getTransactionManager()),
+                executionEnabled);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RefundIntakeService(
+            JdbcTemplate jdbc,
+            TransactionTemplate tx,
+            RefundMockEngine engine,
+            OrderClosureService closures,
             @org.springframework.beans.factory.annotation.Value(
                             "${payment.refunds.execution-enabled:false}")
                     boolean executionEnabled) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.engine = engine;
+        this.closures = closures;
         this.executionEnabled = executionEnabled;
     }
 
     public RefundExecution start(RefundCommand c) {
         PaymentService.requireUuid(c.requestId());
+        closures.requireCompensation(c);
         try {
             return tx.execute(
                     t -> {
@@ -81,7 +99,12 @@ public class RefundIntakeService {
                                 Timestamp.from(now),
                                 Timestamp.from(now),
                                 Timestamp.from(now));
-                        if (executionEnabled)
+                        if (c.orderClosureRequestId() != null)
+                            jdbc.update(
+                                    "UPDATE refund_execution SET order_closure_request_id=? WHERE id=?",
+                                    c.orderClosureRequestId(),
+                                    c.coreRefundRequestId());
+                        if (executionEnabled || c.orderClosureRequestId() != null)
                             AfterCommit.run(() -> engine.schedule(c.coreRefundRequestId()));
                         return get(c.coreRefundRequestId());
                     });
@@ -95,10 +118,12 @@ public class RefundIntakeService {
     private RefundExecution findExisting(RefundCommand c) {
         var ids =
                 jdbc.queryForList(
-                        "SELECT id FROM refund_execution WHERE request_id=? OR core_refund_request_id=?",
+                        "SELECT id FROM refund_execution WHERE request_id=? OR core_refund_request_id=? OR (payment_id=? AND order_closure_request_id IS NOT NULL AND CAST(? AS VARCHAR) IS NOT NULL)",
                         Long.class,
                         c.requestId(),
-                        c.coreRefundRequestId());
+                        c.coreRefundRequestId(),
+                        c.paymentId(),
+                        c.orderClosureRequestId());
         if (ids.isEmpty()) return null;
         var p = get(ids.getFirst());
         if (ids.size() != 1
@@ -108,7 +133,13 @@ public class RefundIntakeService {
                 || !Objects.equals(p.orderId(), c.orderId())
                 || !Objects.equals(p.paymentGroupId(), c.paymentGroupId())
                 || !Objects.equals(p.referenceNumber(), c.referenceNumber())
-                || p.amount() != c.amount())
+                || p.amount() != c.amount()
+                || !Objects.equals(
+                        jdbc.queryForObject(
+                                "SELECT order_closure_request_id FROM refund_execution WHERE id=?",
+                                String.class,
+                                p.executionId()),
+                        c.orderClosureRequestId()))
             throw new BusinessException(ErrorCode.CONFLICT, "기존 환불 요청과 내용이 다릅니다.");
         return p;
     }

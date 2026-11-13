@@ -106,4 +106,38 @@ class PaymentSchemaPostgresTest {
                                 Integer.class))
                 .isEqualTo(5);
     }
+
+    @Test
+    @DisplayName("V4 종료 제어 확장은 진행 중 결제와 환불의 기존 값과 기한을 보존한다")
+    void closureMigrationPreservesActiveExecutions() {
+        flyway.clean();
+        Flyway.configure().configuration(flyway.getConfiguration()).target("3").load().migrate();
+        insert(1, "UNKNOWN", "SUCCESS_RESPONSE_LOST");
+        insert(2, "SUCCESS", "INSTANT_SUCCESS");
+        jdbc.update(
+                "INSERT INTO refund_execution(id,request_id,core_refund_request_id,payment_id,order_id,payment_group_id,reference_number,refund_amount,status,idempotency_key,request_fingerprint,requested_at,created_at,updated_at,next_action_at) VALUES (17,?,17,2,999,999,'PG',0,'UNKNOWN','original','original',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+INTERVAL '1 hour')",
+                UUID.randomUUID().toString());
+        var payment =
+                jdbc.queryForMap(
+                        "SELECT id,request_id,payment_id,status,amount,requested_at,scheduled_resolve_at FROM payment_attempt WHERE id=1");
+        var refund =
+                jdbc.queryForMap(
+                        "SELECT id,request_id,payment_id,status,refund_amount,next_action_at FROM refund_execution WHERE id=17");
+        flyway.migrate();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT id,request_id,payment_id,status,amount,requested_at,scheduled_resolve_at FROM payment_attempt WHERE id=1"))
+                .isEqualTo(payment);
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT id,request_id,payment_id,status,refund_amount,next_action_at FROM refund_execution WHERE id=17"))
+                .isEqualTo(refund);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_order_control", Long.class))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT order_closure_request_id FROM refund_execution WHERE id=17",
+                                String.class))
+                .isNull();
+    }
 }

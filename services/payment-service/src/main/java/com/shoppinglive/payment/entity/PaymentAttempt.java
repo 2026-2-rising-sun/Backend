@@ -130,6 +130,13 @@ public class PaymentAttempt extends AuditedEntity {
         resolvedAt = completedAt;
     }
 
+    public void rejectClosedOrder(Instant at) {
+        if (status != PaymentStatus.PROCESSING)
+            throw new IllegalStateException("처리 전 결제만 종료할 수 있습니다.");
+        status = PaymentStatus.FAILED;
+        resolvedAt = at;
+    }
+
     protected PaymentAttempt() {
         // JPA
     }

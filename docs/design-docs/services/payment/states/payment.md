@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
+기준: `cc91c09b`와 #331 종료/보상 변경. 실제 PostgreSQL / Mock gateway로 생성·종료/호출 경합을 검증했다. 실제 외부 PG 실행 증거는 아니다.
 
 [시각 자료](payment.html)
 
@@ -22,6 +22,10 @@ PENDING은 미사용 호환 값, TIMEOUT은 과거 호환 terminal이다. 현재
 | UNKNOWN | SUCCESS | 제공자 결과 조회 또는 같은 실행의 재호출에서 성공을 확인하고 Outbox와 함께 확정한다. |
 | PROCESSING | FAILED | 확정 실패 결과를 유효한 lease에서 반영한다. |
 | UNKNOWN | FAILED | 제공자 결과가 실패로 확정된 경우만 반영한다. |
+| 신규/미호출 PROCESSING | FAILED | 같은 영속 제어 키에 종료가 먼저 기록되면 PG 호출 없이 실패와 Outbox를 저장한다. |
+| 호출 중/UNKNOWN | SUCCESS | 종료 뒤에도 기존 실행의 실제 성공을 보존한다. Core는 실패 주문을 부활시키지 않고 별도 보상한다. |
+
+종료 뒤 이미 호출한 UNKNOWN은 새 승인을 요청하지 않고 결과 조회만 계속한다. 종료 수신은 확정 실패 근거가 아니며 호출 시작 전만 차단한다. 기존 nullable paymentGroupId 단건 흐름은 보존하고 종료 통지는 신규 묶음 주문을 대상으로 한다.
 
 ## 구현과 검증 근거
 
@@ -32,4 +36,4 @@ PENDING은 미사용 호환 값, TIMEOUT은 과거 호환 terminal이다. 현재
 
 관련 기존 테스트: [PaymentBoundaryPostgresTest.java](../../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentBoundaryPostgresTest.java) · [PaymentRecoveryStorePostgresTest.java](../../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentRecoveryStorePostgresTest.java).
 
-테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
+PaymentBoundaryPostgresTest의 생성/종료·beginInvocation 직전/직후·authorize 진행 중 동기화 경합과 attempt PK가 paymentId와 다른 표본을 실행했다. Payment 단위 8건, 기본 통합 3건, PostgreSQL 41건, migration 6건이 실패·오류·스킵 0이었다. Core 연계 결과 적용과 실제 PG 검증은 별도 범위다.
