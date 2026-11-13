@@ -63,6 +63,11 @@ class CartOrderIntegrationTest
     @BeforeEach
     void seed() {
         clean();
+        // 조회 stub과 별개로 신규 주문의 실제 Product 거래 잠금 대상도 만든다.
+        jdbc.update(
+                "INSERT INTO product(id,name,description,main_image_id,seller_id,sale_enabled,deleted_at,version,created_at,updated_at) VALUES(1,'상품','Cart 주문 테스트 상품',1,?,TRUE,NULL,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(2,'다른 상품','Cart 주문 테스트 다른 상품',1,?,TRUE,NULL,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                SELLER,
+                SELLER);
         productLookup.register(new ProductSnapshot(1L, "상품", null));
         productLookup.register(new ProductSnapshot(2L, "다른 상품", null));
         salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
@@ -88,6 +93,7 @@ class CartOrderIntegrationTest
         skuFixtures.clear();
         stocks.deleteAll();
         sales.deleteAll();
+        jdbc.update("DELETE FROM product WHERE id IN (1,2)");
         productLookup.clear();
     }
 
