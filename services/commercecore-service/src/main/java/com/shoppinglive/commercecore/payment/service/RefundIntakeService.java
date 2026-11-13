@@ -222,6 +222,9 @@ public class RefundIntakeService {
             return new RequestResult(queries.load(existing.id(), groupNumber), false);
         }
 
+        if (group.isOrderSheet())
+            throw new BusinessException(
+                    ErrorCode.SERVICE_UNAVAILABLE, "SKU 주문의 부분 환불 정책을 확정한 뒤 접수를 지원합니다.");
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         if (group.getStatus() != OrderStatus.PAID
                 || groupOrders.isEmpty()
@@ -309,15 +312,16 @@ public class RefundIntakeService {
             jdbc.update(
                     """
                 INSERT INTO refund_target_order
-                    (refund_request_id, order_id, product_id_snapshot, seller_id_snapshot, refund_amount, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (refund_request_id, order_id, product_id_snapshot, seller_id_snapshot, refund_amount, created_at, quantity)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     requestId,
                     order.getId(),
                     productIds.get(order.getSalesInfoId()),
                     sellerIds.get(productIds.get(order.getSalesInfoId())),
                     order.getPayableAmount(),
-                    Timestamp.from(now));
+                    Timestamp.from(now),
+                    order.getQuantity());
         }
         deliveries.refund(
                 requestId,

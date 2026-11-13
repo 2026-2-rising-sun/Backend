@@ -7,6 +7,8 @@ public interface PaymentClient {
 
     PaymentExecution get(long paymentId);
 
+    void closeOrder(long paymentId, OrderClosureCommand command);
+
     RefundExecution refund(RefundCommand command);
 
     RefundExecution refund(long executionId);

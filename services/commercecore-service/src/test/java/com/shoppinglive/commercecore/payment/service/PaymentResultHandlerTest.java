@@ -48,6 +48,9 @@ class PaymentResultHandlerTest {
         var orderOutcomes =
                 new OrderPaymentOutcomeService(
                         groups,
+                        mock(
+                                com.shoppinglive.commercecore.order.service
+                                        .OrderSheetLifecycleService.class),
                         orders,
                         cart,
                         salesRepository,

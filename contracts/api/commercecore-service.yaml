@@ -11,7 +11,7 @@ info:
     공개 결제/환불 facade는 Core가 유지한다. Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다.
     0원도 Payment에 원본 성공과 Outbox를 저장한 뒤 Core가 즉시 주문·재고·쿠폰을 반영해 200을 반환한다. Payment 불가용·응답 유실은 같은 requestId로 복구하며 UNKNOWN을 실패로 확정하지 않는다.
 
-    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 결제 전 15분 만료, 확인 중 결과 불명은 재확인한다.
+    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 기존 API/활성 주문의 15분·확인 중 호환 규칙은 보존한다. 신규 /v1/order-sheets는 생성 시 서버 스냅샷/선점과 10분 기한을 사용하고 결제 결과 대기 중에도 만료한다.
     장바구니는 주문 생성 뒤에도 편집할 수 있으며 결제 성공 때 원본 ID·version 일치 항목만 삭제한다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 서비스 토큰 전용 요청은 Member 세션 확인과 독립이다.
@@ -45,6 +45,154 @@ tags:
   - name: Internal Product
     description: Live가 호출하는 CommerceCore 상품 원본 스냅샷
 paths:
+  /v1/order-sheets:
+    post:
+      tags:
+      - Orders
+      operationId: createOrderSheet
+      summary: 서버 현재 SKU 스냅샷과 10분 재고 선점 주문서 생성
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '201':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '200':
+          description: 회원/생성 키/정규화 입력이 같은 기존 주문서. 만료 주문은 FAILED로 반환하고 다시 선점하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderSheetRequest'
+      parameters:
+      - $ref: '#/components/parameters/RequiredIdempotencyKey'
+      description: items와 cartItems 중 하나만 전달한다. 가격은 서버 현재 SKU 기준이며 예상 금액을 생성 원본으로 받지 않는다. 전 항목 생성/선점은 한
+        DB 트랜잭션이다. 주문번호는 UUID 문자열이다. 기존 활성 구매 가드를 공유한다. 쿠폰 선택/부분 환불 정책은 확정 전이며 이 경로의 완료 범위에 포함하지 않는다. 기존
+        API/활성 주문은 policy_version=0 호환을 유지한다.
+  /v1/order-sheets/{number}:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Orders
+      operationId: getOrderSheet
+      summary: 본인 주문서와 저장 스냅샷 조회
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '200':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/order-sheets/{number}/payments:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Orders
+      operationId: startOrderSheetPayment
+      summary: 저장된 주문서 금액으로 결제 시작
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '200':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttempt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderSheetPaymentRequest'
+      parameters:
+      - $ref: '#/components/parameters/RequiredIdempotencyKey'
+      description: 사용자가 확인한 금액과 저장된 금액을 대조한다. 이후 SKU 가격을 재조회해 주문 금액을 바꾸지 않는다. 미확정 결제도 원래 10분 기한에 만료하며 늦은
+        성공은 주문을 되살리지 않고 보상한다.
+  /v1/order-sheets/{number}/cancel:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Orders
+      operationId: cancelOrderSheet
+      summary: 결제 요청 전 본인 주문서 취소
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '204':
+          description: 주문서 처리 결과
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /v1/seller/products:
     post:
       x-required-roles:
@@ -1727,6 +1875,182 @@ components:
                   message: 인증 상태를 확인할 수 없습니다.
                   requestId: request-001
   schemas:
+    CreateOrderSheetRequest:
+      type: object
+      required:
+      - buyerName
+      - buyerPhone
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - skuId
+            - quantity
+            properties:
+              skuId:
+                type: integer
+                format: int64
+                minimum: 1
+              quantity:
+                type: integer
+                minimum: 1
+        cartItems:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartSelection'
+        buyerName:
+          type: string
+          minLength: 1
+          maxLength: 64
+        buyerPhone:
+          type: string
+          minLength: 1
+          maxLength: 32
+      description: items/cartItems는 하나만 비어 있지 않아야 하며 null 원소를 허용하지 않는다.
+    OrderSheetPaymentRequest:
+      type: object
+      required:
+      - expectedPayableAmount
+      properties:
+        expectedPayableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+    OrderSheetItem:
+      type: object
+      required:
+      - orderItemId
+      - skuId
+      - productId
+      - productName
+      - sellerId
+      - mainImageUrl
+      - selectedOptions
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - sourceCartItemId
+      - sourceCartVersion
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type: integer
+          format: int64
+          minimum: 1
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        productName:
+          type: string
+        sellerId:
+          type:
+          - string
+          - 'null'
+        mainImageUrl:
+          type:
+          - string
+          - 'null'
+        selectedOptions:
+          type:
+          - string
+          - 'null'
+          description: 옵션 JSON 공급 경계 보류. 임의 현재 옵션을 복사하지 않음
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 0
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        sourceCartItemId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+        sourceCartVersion:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 0
+          - type: 'null'
+    OrderSheet:
+      type: object
+      required:
+      - orderNumber
+      - status
+      - failureReason
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - expiresAt
+      - paymentId
+      - items
+      properties:
+        orderNumber:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - REFUNDED
+        failureReason:
+          type:
+          - string
+          - 'null'
+          description: 만료 실패는 EXPIRED
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+        paymentId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderSheetItem'
     DevImageResetEnvelope:
       type: object
       required:

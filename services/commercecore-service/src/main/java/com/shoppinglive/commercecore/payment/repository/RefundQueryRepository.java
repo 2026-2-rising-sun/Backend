@@ -38,7 +38,7 @@ public class RefundQueryRepository {
         return jdbc.query(
                 """
             SELECT id,payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,next_action_at
-            FROM refund_request WHERE payment_group_id=? ORDER BY requested_at DESC,id DESC
+            FROM refund_request WHERE purpose='USER' AND payment_group_id=? ORDER BY requested_at DESC,id DESC
             """,
                 (rs, row) -> requestRow(rs),
                 groupId);
@@ -46,7 +46,7 @@ public class RefundQueryRepository {
 
     public Long ownedRequestId(long requestId, Long groupId, String memberId) {
         return jdbc.query(
-                "SELECT id FROM refund_request WHERE id=? AND payment_group_id=? AND member_id=?",
+                "SELECT id FROM refund_request WHERE purpose='USER' AND id=? AND payment_group_id=? AND member_id=?",
                 rs -> rs.next() ? rs.getLong(1) : null,
                 requestId,
                 groupId,
@@ -83,7 +83,7 @@ public class RefundQueryRepository {
         return jdbc.query(
                 """
             SELECT id,payment_group_id,refund_amount,status,requested_at,resolved_at,retry_count,next_action_at
-            FROM refund_request WHERE id=?
+            FROM refund_request WHERE purpose='USER' AND id=?
             """,
                 rs -> rs.next() ? requestRow(rs) : null,
                 id);
@@ -91,7 +91,7 @@ public class RefundQueryRepository {
 
     public long cumulativeAmount(long groupId) {
         return jdbc.queryForObject(
-                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=? AND status='SUCCESS'",
+                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE purpose='USER' AND payment_group_id=? AND status='SUCCESS'",
                 Long.class,
                 groupId);
     }
@@ -200,7 +200,7 @@ public class RefundQueryRepository {
         return cumulativeAmounts(
                 """
             SELECT payment_group_id,COALESCE(SUM(refund_amount),0) AS cumulative_amount
-            FROM refund_request WHERE payment_group_id IN (:groupIds) AND status='SUCCESS'
+            FROM refund_request WHERE purpose='USER' AND payment_group_id IN (:groupIds) AND status='SUCCESS'
             GROUP BY payment_group_id
             """,
                 Map.of("groupIds", groupIds));

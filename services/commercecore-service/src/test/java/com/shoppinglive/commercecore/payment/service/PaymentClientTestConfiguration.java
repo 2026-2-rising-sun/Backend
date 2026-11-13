@@ -201,6 +201,10 @@ public class PaymentClientTestConfiguration {
                     return http.start(c);
                 }
 
+                public void closeOrder(long id, OrderClosureCommand command) {
+                    http.closeOrder(id, command);
+                }
+
                 public PaymentExecution get(long id) {
                     return http.get(id);
                 }
@@ -261,7 +265,8 @@ public class PaymentClientTestConfiguration {
                     List.of(
                             "V1__payment_baseline.sql",
                             "V2__event_outbox.sql",
-                            "V3__outbox_worker_claim.sql")) {
+                            "V3__outbox_worker_claim.sql",
+                            "V4__order_closure_compensation.sql")) {
                 String sql =
                         new String(
                                 Objects.requireNonNull(

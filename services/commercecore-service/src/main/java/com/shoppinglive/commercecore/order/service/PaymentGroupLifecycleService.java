@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 class PaymentGroupLifecycleService {
     private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
+    private final OrderSheetLifecycleService sheets;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final SalesJpaRepository sales;
@@ -44,6 +45,7 @@ class PaymentGroupLifecycleService {
 
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
+            OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
             SalesJpaRepository sales,
             SalesStockJpaRepository stock,
@@ -57,6 +59,7 @@ class PaymentGroupLifecycleService {
             ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
         this.telemetry = telemetry;
         this.groups = groups;
+        this.sheets = sheets;
         this.orders = orders;
         this.sales = sales;
         this.stock = stock;
@@ -71,6 +74,10 @@ class PaymentGroupLifecycleService {
 
     PaymentExecution start(String member, String number, String key) {
         PaymentGroup found = owned(member, number);
+        if (found.isOrderSheet()) {
+            var accepted = sheets.start(member, number, key, null);
+            return dispatcher.paymentAfterCommit(accepted.paymentId());
+        }
         guard.ensure(member);
         PaymentExecution accepted =
                 tx.execute(
@@ -122,6 +129,10 @@ class PaymentGroupLifecycleService {
 
     void cancel(String member, String number) {
         PaymentGroup found = owned(member, number);
+        if (found.isOrderSheet()) {
+            sheets.cancel(member, number);
+            return;
+        }
         guard.ensure(member);
         tx.executeWithoutResult(
                 t -> {
@@ -139,6 +150,7 @@ class PaymentGroupLifecycleService {
 
     boolean expire(Long groupId) {
         PaymentGroup found = groups.findById(groupId).orElseThrow();
+        if (found.isOrderSheet()) return sheets.expire(groupId);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {

@@ -28,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class OrderPaymentOutcomeService {
+    private final OrderSheetLifecycleService sheets;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
@@ -44,6 +45,7 @@ public class OrderPaymentOutcomeService {
 
     public OrderPaymentOutcomeService(
             PaymentGroupRepository groups,
+            OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
             CartItemRepository cart,
             SalesJpaRepository sales,
@@ -56,6 +58,7 @@ public class OrderPaymentOutcomeService {
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents) {
         this.groups = groups;
+        this.sheets = sheets;
         this.orders = orders;
         this.cart = cart;
         this.sales = sales;
@@ -78,6 +81,7 @@ public class OrderPaymentOutcomeService {
     private boolean applyGroup(PaymentExecution result) {
         Long id = result.paymentId();
         PaymentGroup found = groups.findById(result.paymentGroupId()).orElseThrow();
+        if (found.isOrderSheet()) return sheets.apply(result);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {

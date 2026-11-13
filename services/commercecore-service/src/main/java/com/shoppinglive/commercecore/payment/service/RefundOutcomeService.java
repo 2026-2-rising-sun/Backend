@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 /** 작업자가 영속 실행 권한을 보유한 동안 확인된 결과를 원자적으로 반영한다. */
 @Service
 public class RefundOutcomeService {
+    private final com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons;
+    private final com.shoppinglive.commercecore.order.service.OrderSheetRefundService sheetRefunds;
     private final JdbcTemplate jdbc;
     private final PaymentDeliveryStore deliveries;
     private final PaymentGroupRepository groups;
@@ -32,8 +34,12 @@ public class RefundOutcomeService {
             PaymentDeliveryStore deliveries,
             PaymentGroupRepository groups,
             SalesService sales,
-            PaymentGroupEventPublisher notificationEvents) {
+            PaymentGroupEventPublisher notificationEvents,
+            com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons,
+            com.shoppinglive.commercecore.order.service.OrderSheetRefundService sheetRefunds) {
         this.jdbc = jdbc;
+        this.coupons = coupons;
+        this.sheetRefunds = sheetRefunds;
         this.deliveries = deliveries;
         this.groups = groups;
         this.sales = sales;
@@ -65,6 +71,17 @@ public class RefundOutcomeService {
                 || request.refundAmount() != result.amount()
                 || !fitsPaymentAmount(group.getPayableAmount(), request))
             throw new BusinessException(ErrorCode.CONFLICT, "환불 요청 대상과 금액이 다릅니다.");
+        if (group.isOrderSheet()
+                && "USER"
+                        .equals(
+                                jdbc.queryForObject(
+                                        "SELECT purpose FROM refund_request WHERE id=?",
+                                        String.class,
+                                        result.coreRefundRequestId()))) {
+            boolean applied = sheetRefunds.apply(result, group);
+            deliveries.record(delivery, result, result.status().name());
+            return applied;
+        }
         boolean applied =
                 applyOutcome(
                         result,
@@ -95,6 +112,24 @@ public class RefundOutcomeService {
 
     private boolean applyOutcome(RefundExecution result, MockRefundOutcome outcome, String detail) {
         long requestId = result.coreRefundRequestId();
+        if ("COMPENSATION"
+                .equals(
+                        jdbc.queryForObject(
+                                "SELECT purpose FROM refund_request WHERE id=?",
+                                String.class,
+                                requestId))) {
+            if (jdbc.update(
+                            "UPDATE refund_request SET status=?,resolved_at=?,result_detail=?,retry_count=?,next_action_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status IN ('PROCESSING','UNKNOWN')",
+                            outcome.name(),
+                            java.sql.Timestamp.from(result.resolvedAt()),
+                            detail,
+                            result.retryCount(),
+                            java.sql.Timestamp.from(result.nextActionAt()),
+                            requestId)
+                    != 1) throw new IllegalStateException("보상 환불 결과 적용 상태가 다릅니다.");
+            return true;
+        }
+
         if (outcome == MockRefundOutcome.SUCCESS) {
             List<RefundTarget> targets =
                     jdbc.query(
@@ -139,6 +174,9 @@ public class RefundOutcomeService {
                                                 new BusinessException(
                                                         ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
                 group.transition(OrderStatus.REFUNDED);
+                if (group.isOrderSheet())
+                    coupons.restoreForOrder(
+                            group.getMemberId(), group.getCouponId(), group.getId());
             }
         }
         int updated =
