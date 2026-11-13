@@ -21,6 +21,36 @@ class OrderSheetCompensationPostgresTest extends OrderSheetPostgresSupport {
     @MockitoSpyBean SkuService skuSpy;
 
     @Test
+    @DisplayName("실제 Payment HTTP 종료 경로는 무토큰·오류토큰·사용자 Bearer를 거절한다")
+    void actualHttpClosureRejectsNonServiceCallers() throws Exception {
+        int port =
+                ((org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext)
+                                paymentServer.context)
+                        .getWebServer()
+                        .getPort();
+        try (var http = java.net.http.HttpClient.newHttpClient()) {
+            for (int mode = 0; mode < 3; mode++) {
+                var request =
+                        java.net.http.HttpRequest.newBuilder(
+                                        java.net.URI.create(
+                                                "http://127.0.0.1:"
+                                                        + port
+                                                        + "/v1/internal/payments/1/order-closure"))
+                                .header("Content-Type", "application/json")
+                                .PUT(java.net.http.HttpRequest.BodyPublishers.ofString("{}"));
+                if (mode == 1) request.header("X-Service-Token", "wrong-token");
+                if (mode == 2) request.header("Authorization", bearer(MEMBER_A));
+                assertThat(
+                                http.send(
+                                                request.build(),
+                                                java.net.http.HttpResponse.BodyHandlers.ofString())
+                                        .statusCode())
+                        .isEqualTo(401);
+            }
+        }
+    }
+
+    @Test
     @DisplayName("만료 후 늦은 성공은 주문을 되살리지 않고 일반 환불 off에서도 보상만 전달한다")
     void compensatesLateSuccessWithoutRepeatingOrderEffects() {
         var order = createCart(501, 1);

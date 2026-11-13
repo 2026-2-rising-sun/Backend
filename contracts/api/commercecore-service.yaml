@@ -3176,19 +3176,65 @@ components:
         discountAmount: {"type":"integer","format":"int64","minimum":0}
         payableAmount: {"type":"integer","format":"int64","minimum":0}
     PaymentGroup:
-      type: "object"
-      required: ["groupNumber","status","totalAmount","discountAmount","payableAmount","couponId","expiresAt","orders","paymentId"]
+      type: object
+      required:
+      - groupNumber
+      - status
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - couponId
+      - expiresAt
+      - orders
+      - paymentId
       properties:
-        groupNumber: {"type":"string"}
-        status: {"type":"string","enum":["PENDING_PAYMENT","PAYMENT_CONFIRMING","PAID","FAILED","CANCELLED","EXPIRED","REFUNDED"]}
-        totalAmount: {"type":"integer","format":"int64","minimum":1}
-        discountAmount: {"type":"integer","format":"int64","minimum":0}
-        payableAmount: {"type":"integer","format":"int64","minimum":0}
-        couponId: {"type":["string","null"],"maxLength":64}
-        expiresAt: {"type":"string","format":"date-time"}
-        orders: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/Order"}}
-        paymentId: {"type":["integer","null"],"format":"int64","minimum":1}
-      description: "totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 환불로 일부 주문만 환불된 묶음은 PAID를 유지하고 모든 주문이 환불되면 REFUNDED다. 만료는 미결제에만 적용되며 확인 중에는 임의 취소·재고 반환을 하지 않는다."
+        groupNumber:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        expiresAt:
+          type: string
+          format: date-time
+        orders:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Order'
+        paymentId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+      description: 기존 API는 Sales와 같은 ID의 기본 SKU만 지원한다. Cart 옵션 SKU가 기본 SKU와 다르면409이며 /v1/order-sheets를 사용한다. 이미 생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는
+        null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 버전0은 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. 버전1은 일부 수량 성공 뒤 PARTIALLY_REFUNDED이며 주문 전체 수량 성공이면 REFUNDED다. 버전0은 확인 중 만료 제외, 버전1은 결제 결과 대기 중에도 원래10분 기한에 실패·해제하고 늦은성공을 보상한다.
     CreateOrderRequest:
       type: "object"
       required: ["productId", "quantity", "buyerName", "buyerPhone"]
@@ -3287,22 +3333,85 @@ components:
           format: int64
           minimum: 0
     Order:
-      type: "object"
-      required: ["orderNumber", "productName", "quantity", "unitPrice", "totalAmount", "discountAmount", "payableAmount", "status", "buyerName", "createdAt", "expiresAt", "cancelledAt", "groupNumber"]
+      type: object
+      required:
+      - orderNumber
+      - productName
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - status
+      - buyerName
+      - createdAt
+      - expiresAt
+      - cancelledAt
+      - groupNumber
       properties:
-        orderNumber: {"type": "string"}
-        groupNumber: {"type": ["string", "null"], "description": "연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null."}
-        productName: {"type": "string"}
-        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
-        unitPrice: {"type": "integer", "format": "int64", "minimum": 1}
-        totalAmount: {"type": "integer", "format": "int64", "minimum": 1}
-        discountAmount: {"type": "integer", "format": "int64", "minimum": 0}
-        payableAmount: {"type": "integer", "format": "int64", "minimum": 0}
-        status: {"type": "string", "enum": ["PENDING_PAYMENT", "PAYMENT_CONFIRMING", "PAID", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]}
-        buyerName: {"type": "string"}
-        createdAt: {"type": "string", "format": "date-time"}
-        expiresAt: {"type": ["string", "null"], "format": "date-time"}
-        cancelledAt: {"type": ["string", "null"], "format": "date-time"}
+        orderNumber:
+          type: string
+        groupNumber:
+          type:
+          - string
+          - 'null'
+          description: 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 1
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        buyerName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        cancelledAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        salesInfoId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+          description: 기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 /v1/order-sheets의 skuId를 사용한다.
     OrderHistory:
       type: "object"
       required: ["items", "page", "size", "totalElements", "totalPages"]

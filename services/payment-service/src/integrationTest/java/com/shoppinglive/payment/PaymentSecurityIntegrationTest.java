@@ -87,6 +87,23 @@ class PaymentSecurityIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"null", "\"\"", "\"잘못된시각\"", "1794560000"})
+    @DisplayName("종료 시각은 null·빈 값·잘못된 ISO·숫자 epoch를 400으로 거절한다")
+    void closureRequiresIsoDateTime(String value) throws Exception {
+        String body =
+                "{\"closureRequestId\":\"11111111-1111-4111-8111-111111111111\",\"paymentRequestId\":\"22222222-2222-4222-8222-222222222222\",\"orderId\":1,\"paymentGroupId\":1,\"referenceNumber\":\"order\",\"amount\":1000,\"reason\":\"EXPIRED\",\"closedAt\":"
+                        + value
+                        + "}";
+        mvc.perform(
+                        put("/v1/internal/payments/1/order-closure")
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     @DisplayName("prod가 함께 활성화되면 개발 플래그가 있어도 시나리오 registry와 API를 만들지 않는다")
     void productionProfileCannotEnableDevScenario() throws Exception {

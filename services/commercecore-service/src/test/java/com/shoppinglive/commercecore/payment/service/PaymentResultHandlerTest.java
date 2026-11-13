@@ -52,9 +52,7 @@ class PaymentResultHandlerTest {
                                         .OrderSheetLifecycleService.class),
                         orders,
                         cart,
-                        salesRepository,
                         stock,
-                        sales,
                         store,
                         guard,
                         tx,
@@ -126,7 +124,7 @@ class PaymentResultHandlerTest {
         when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).thenReturn(1);
         handler.payment(result(PaymentStatus.SUCCESS));
         verify(stock).consume(10L, 1);
-        verify(sales, never()).restoreReserved(any(), anyInt());
+        verify(stock, never()).release(any(), anyInt());
         verify(store).record(pending, result(PaymentStatus.SUCCESS), "SUCCESS");
     }
 
@@ -139,7 +137,6 @@ class PaymentResultHandlerTest {
         when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).thenReturn(1);
         handler.payment(result(PaymentStatus.FAILED));
         verify(stock).release(10L, 1);
-        verifyNoInteractions(sales);
     }
 
     @Test

@@ -11,8 +11,6 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -31,9 +29,7 @@ public class OrderPaymentOutcomeService {
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
-    private final SalesJpaRepository sales;
     private final com.shoppinglive.commercecore.sku.service.SkuService skus;
-    private final SalesService singleOrderSales;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
@@ -47,9 +43,7 @@ public class OrderPaymentOutcomeService {
             OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
             CartItemRepository cart,
-            SalesJpaRepository sales,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
-            SalesService singleOrderSales,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             TransactionTemplate tx,
@@ -60,9 +54,7 @@ public class OrderPaymentOutcomeService {
         this.sheets = sheets;
         this.orders = orders;
         this.cart = cart;
-        this.sales = sales;
         this.skus = skus;
-        this.singleOrderSales = singleOrderSales;
         this.payments = payments;
         this.guard = guard;
         this.tx = tx;

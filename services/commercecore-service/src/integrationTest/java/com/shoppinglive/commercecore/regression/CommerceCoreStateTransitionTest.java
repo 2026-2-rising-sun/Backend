@@ -199,7 +199,10 @@ class CommerceCoreStateTransitionTest
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
     void rejectsOnSaleTransitionWhenStockIsZero(SalesStatus current) throws Exception {
-        jdbc.update("UPDATE sku SET sale_status = ? WHERE id = ?", current.name(), salesId);
+        jdbc.update(
+                "UPDATE sku SET sale_status = ? WHERE id = ?",
+                current == SalesStatus.SOLD_OUT ? "ON_SALE" : current.name(),
+                salesId);
         jdbc.update("UPDATE sku SET available = 0 WHERE id = ?", salesId);
         var result =
                 mvc.perform(

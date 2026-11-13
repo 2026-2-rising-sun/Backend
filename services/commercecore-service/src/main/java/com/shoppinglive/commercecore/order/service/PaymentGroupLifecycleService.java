@@ -10,7 +10,6 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -31,7 +30,6 @@ class PaymentGroupLifecycleService {
     private final OrderSheetLifecycleService sheets;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final SalesJpaRepository sales;
     private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
@@ -46,7 +44,6 @@ class PaymentGroupLifecycleService {
             PaymentGroupRepository groups,
             OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
-            SalesJpaRepository sales,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
@@ -60,7 +57,6 @@ class PaymentGroupLifecycleService {
         this.groups = groups;
         this.sheets = sheets;
         this.orders = orders;
-        this.sales = sales;
         this.skus = skus;
         this.payments = payments;
         this.guard = guard;

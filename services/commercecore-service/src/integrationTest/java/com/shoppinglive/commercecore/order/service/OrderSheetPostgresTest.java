@@ -27,6 +27,52 @@ class OrderSheetPostgresTest extends OrderSheetPostgresSupport {
     @MockitoSpyBean SkuService skuSpy;
 
     @Test
+    @DisplayName("수량 환불 HTTP는 201접수·같은키200·본인결과·타인404와 null항목400을 보존한다")
+    void quantityRefundHttpMatchesPublicContract() throws Exception {
+        var order = paid(create(3), true);
+        String route = "/v1/order-sheets/" + order.orderNumber() + "/refunds";
+        String body =
+                "{\"items\":[{\"orderItemId\":"
+                        + order.items().getFirst().orderItemId()
+                        + ",\"quantity\":1}]}";
+        mvc.perform(
+                        post(route)
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header("Idempotency-Key", "http-refund")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.refundAmount").value(4000))
+                .andExpect(jsonPath("$.data.items[0].quantity").value(1));
+        var refund = request(order, 1, "http-refund").refund();
+        mvc.perform(
+                        post(route)
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header("Idempotency-Key", "http-refund")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isOk());
+        complete(order, refund.refundRequestId());
+        mvc.perform(
+                        get(route + "/" + refund.refundRequestId())
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCESS"));
+        mvc.perform(
+                        get(route + "/" + refund.refundRequestId())
+                                .header("Authorization", bearer(MEMBER_B)))
+                .andExpect(status().isNotFound());
+        mvc.perform(
+                        post(route)
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header("Idempotency-Key", "invalid")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"items\":[null]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("여러 SKU 주문서 생성과 재전송은 UUID 주문 하나와 선점 한 번을 보존한다")
     void snapshotsMultipleSkusAndReplaysOnce() {
         String key = "sheet-replay";
