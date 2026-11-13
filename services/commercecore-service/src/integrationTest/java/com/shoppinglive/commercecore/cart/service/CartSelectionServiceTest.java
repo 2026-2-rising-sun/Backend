@@ -85,6 +85,24 @@ class CartSelectionServiceTest {
     }
 
     @Test
+    @DisplayName("이미 읽은 관리 객체가 있어도 잠금 뒤 DB의 최신 버전으로 선택을 검증한다")
+    void refreshesCachedEntityBeforeValidatingLockedVersion() {
+        CartItem item = add(1L, 2);
+        CartSelection old = selection(item);
+        entityManager
+                .createNativeQuery("UPDATE cart_item SET quantity=3,version=version+1 WHERE id=:id")
+                .setParameter("id", item.getId())
+                .executeUpdate();
+        assertThat(item.getQuantity()).isEqualTo(2);
+
+        assertThatThrownBy(() -> selections.lockOwned(MEMBER_A, List.of(old)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("변경");
+        assertThat(item.getQuantity()).isEqualTo(3);
+        assertThat(item.getVersion()).isEqualTo(old.version() + 1);
+    }
+
+    @Test
     @DisplayName("비어 있거나 중복되거나 잘못된 버전의 선택 목록을 거절한다")
     void rejectsInvalidSelections() {
         assertThatThrownBy(() -> selections.readOwned(MEMBER_A, List.of()))

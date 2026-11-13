@@ -11,13 +11,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.exception.OrderAmountMismatchException;
 import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
@@ -583,9 +583,8 @@ class OrderCreationServiceTest {
     void cartChangedDuringProductLookupDoesNotCreateOrReserveOrder() {
         String member = "11111111-1111-4111-8111-111111111111";
         var snapshot =
-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 1);
-        var changed =
-                new com.shoppinglive.commercecore.order.entity.CartItem(member, PRODUCT_ID, 2);
+                new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 1);
+        var changed = new com.shoppinglive.commercecore.cart.entity.CartItem(member, PRODUCT_ID, 2);
         ReflectionTestUtils.setField(snapshot, "version", 0L);
         ReflectionTestUtils.setField(changed, "version", 1L);
         given(cartItems.findByIdAndMemberId(1L, member)).willReturn(Optional.of(snapshot));

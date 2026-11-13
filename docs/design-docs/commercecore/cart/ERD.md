@@ -1,6 +1,6 @@
 # Cart 모듈 ERD
 
-상태: 구현 중 · V103 검증 대기
+상태: 구현 중 · 선행 통합 검증 대기
 
 기준: `refactor/#332-cart-module`, 기존 dev `cc91c09b` 위의 Cart 변경. [HTML 관계도](ERD.html) · [설계](설계.md) · [구현 계획](../../../exec-plans/active/332-cart-module/README.md) · [현행 Core 전체 ERD](../../services/commercecore/erd.md)
 
@@ -57,4 +57,4 @@ Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 �
 - [CartSelectionPort.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartSelectionPort.java)
 - [CartSelectionServiceTest.java](../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/cart/service/CartSelectionServiceTest.java)
 
-현재 H2 JPA 선택/성공 정리 테스트는 실행했다. 실제 PostgreSQL V103 이행·부분 인덱스·잠금 경합과 Product/SKU 선행 코드 통합 검증은 대기 중이다. MD와 HTML은 같은 모델을 설명하며 현재 실행한 검증과 목표 설계를 구분한다.
+현재 H2 JPA 선택/성공 정리 테스트는 실행했다. PostgreSQL 16 직접 SQL로 기존 행 보존·다중 SKU·부분 유일 인덱스를 확인했다. Flyway/JUnit 이행·잠금 경합과 Product/SKU 선행 코드 통합 검증은 대기 중이다. MD와 HTML은 같은 모델을 설명하며 현재 실행한 검증과 목표 설계를 구분한다.

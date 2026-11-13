@@ -2,7 +2,7 @@
 
 결정 상태: 업무 방향 채택 · 1차 기술 경계 고정 · 나머지 연결안 미결정
 
-구현 상태: 미착수. [실행 계획](../exec-plans/active/332-cart-module/README.md) · [설계 초안](../design-docs/commercecore/cart/설계.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
+구현 상태: 사용자 착수 지시에 따라 진행 중. [실행 계획](../exec-plans/active/332-cart-module/README.md) · [설계](../design-docs/commercecore/cart/설계.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
 ## 문제
 
@@ -28,4 +28,10 @@
 
 근거 원문은 `build/design-handoff/신규-판매준비-확정.md`와 `통합-경계-1차-결정.md`에 보존했다. 앞 문단의 ID·공유 편집자 결정은 코디네이터 기술 조정이고 신규 판매 준비는 사용자 업무 정책이라는 차이를 유지한다.
 
-이 ADR은 사용자 확정 방향과 미결정 대안을 구분한 기록이다. 구현 착수는 코디네이터의 전체 검토와 명시적인 시작 메시지 이후다. 구현 단계 FigJam은 코디네이터가 맡고 Cart는 코드·테스트·로컬 문서·HTML과 변경 근거를 제공한다.
+사용자 구현 착수와 코디네이터 배정으로 코드·테스트·로컬 MD/HTML 작성을 진행한다. 기존 설계 Task의 failed 판정은 과거 기록으로 보존하며 새 시작 지시를 무효화하지 않는다. 구현 단계 FigJam은 코디네이터가 맡는다.
+
+## 구현 조정: 미매핑 항목의 보존
+
+V103은 원본 product_id를 유지하고 sku_id를 nullable로 확장한다. 기존 Sales ID와 일치하는 기본 SKU만 연결하며 매핑 불가 행을 삭제하거나 임의 SKU를 만들지 않는다. 해당 행은 조회·수량 변경·사용자 삭제를 허용하고 주문 선택만 이용 불가로 거절한다. 새 SKU 담기는 실제 SKU ID를 저장하고 기존 productId 요청은 SKU가 정확히 하나일 때만 호환한다.
+
+후속 쿠폰/환불/취소 U1/U2/U3 확정은 Order 범위에 반영한다. Cart에는 별도 쿠폰 계산·환불 상태·취소 상태를 추가하지 않는다. 상세 최신 동작과 실제 검증은 설계·실행 계획·워크로그를 원본으로 삼는다.

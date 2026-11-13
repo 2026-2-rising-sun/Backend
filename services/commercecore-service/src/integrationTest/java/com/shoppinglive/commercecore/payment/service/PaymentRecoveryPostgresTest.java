@@ -3,10 +3,10 @@ package com.shoppinglive.commercecore.payment.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
 import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;

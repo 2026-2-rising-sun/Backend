@@ -77,7 +77,7 @@ class CartSkuMigrationPostgresTest {
     void usesPreservedSalesIdInsteadOfArbitraryProductSku() throws Exception {
         migration("102").migrate();
         sql(
-                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(202,501,2000,5,0,'ON_SALE',0,0,'다른 옵션',now(),now())");
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(202,501,2000,5,0,'ON_SALE',0,1,'다른 옵션',now(),now())");
         migration("103").migrate();
 
         assertThat(number("SELECT sku_id FROM cart_item WHERE id=11")).isEqualTo(101);
