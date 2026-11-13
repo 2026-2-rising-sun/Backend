@@ -40,6 +40,7 @@ Product/Cart/SKU ID는 BIGINT/Long이다. SKU ID는 기존 Sales ID를 보존한
 - Core API YAML 최종 편집자는 Order #331이다. [Core 조각](api-changes.yaml)을 전달하고 최종 source/HTML 반영 전 PR ready로 보고하지 않는다. Catalog API는 SKU #334가 [Catalog 조각](catalog-api-changes.yaml)을 통합한다.
 - Catalog Product 이벤트/사본·최소 제어 조회는 #333, sales-info·다중 SKU 판매 사본은 #334 소유다. 공유 Query/DTO 파일의 후속 변경은 Product 선행 커밋을 먼저 통합해 조정한다.
 - SKU 포트의 실제 검증 커밋을 받은 뒤 상품별 SKU 목록을 연결한다. 다중 SKU의 대표가·최저가·합산재고·외부 가격정렬을 임의 도입하지 않는다. 기존 단일 SKU 응답 호환은 통합 대상이다.
+- [Product 조회 연결 조각·검증 기준](sku-query-connection.md)은 코디네이터 배정에 따라 #334가 적용한다. #333은 SKU/Order를 역merge하지 않는다.
 - Order는 모든 Product 정렬 공유 잠금 다음 모든 SKU 정렬 잠금과 수량/상태를 같은 트랜잭션에 저장한다. 회원/Cart/쿠폰까지 포함한 전체 순서는 Order 통합에서 확인한다.
 
 ## 4. 수용 기준과 검증
