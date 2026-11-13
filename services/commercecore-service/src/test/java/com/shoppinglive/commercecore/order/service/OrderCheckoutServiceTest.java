@@ -10,12 +10,9 @@ import com.shoppinglive.commercecore.order.entity.OrderCheckout;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.util.Optional;
@@ -26,7 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class OrderCheckoutServiceTest {
@@ -36,7 +32,7 @@ class OrderCheckoutServiceTest {
 
     @Mock private SalesJpaRepository salesRepository;
 
-    @Mock private SalesStockJpaRepository salesStockRepository;
+    @Mock private LegacyOrderSkuService trading;
 
     @Mock private ProductLookup productLookup;
 
@@ -44,17 +40,22 @@ class OrderCheckoutServiceTest {
 
     @BeforeEach
     void setUp() {
-        orderCheckoutService =
-                new OrderCheckoutService(salesRepository, salesStockRepository, productLookup);
+        orderCheckoutService = new OrderCheckoutService(trading, productLookup);
     }
 
     /** 판매정보·재고·상품명이 모두 준비된 기본 상태를 만든다. */
     private void salesExists(long price, int available, SalesStatus status) {
-        Sales sales = new Sales(PRODUCT_ID, price, status);
-        ReflectionTestUtils.setField(sales, "id", SALES_ID);
-        given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(sales));
-        given(salesStockRepository.findById(SALES_ID))
-                .willReturn(Optional.of(new SalesStock(SALES_ID, available, 0)));
+        given(trading.read(PRODUCT_ID, null))
+                .willReturn(
+                        new com.shoppinglive.commercecore.sku.dto.SkuView(
+                                SALES_ID,
+                                PRODUCT_ID,
+                                price,
+                                available,
+                                0,
+                                com.shoppinglive.commercecore.sku.entity.SkuSaleStatus.valueOf(
+                                        status == SalesStatus.SOLD_OUT ? "ON_SALE" : status.name()),
+                                0));
     }
 
     private void productExists() {
@@ -95,7 +96,7 @@ class OrderCheckoutServiceTest {
 
         orderCheckoutService.preview(PRODUCT_ID, 2);
 
-        verify(salesStockRepository, only()).findById(SALES_ID);
+        verify(trading, only()).read(PRODUCT_ID, null);
     }
 
     @Test
@@ -172,7 +173,7 @@ class OrderCheckoutServiceTest {
     @Test
     @DisplayName("판매정보가 없으면 주문서 조회는 404로 응답한다")
     void returns404WhenPreviewSalesAreMissing() {
-        given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.empty());
+        given(trading.read(PRODUCT_ID, null)).willThrow(new SalesNotFoundException("판매 정보 없음"));
 
         assertThatThrownBy(() -> orderCheckoutService.preview(PRODUCT_ID, 1))
                 .isInstanceOf(SalesNotFoundException.class)

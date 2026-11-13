@@ -115,7 +115,7 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
 
     void seedSku(long id, long product, long price, int available) {
         jdbc.update(
-                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,0,'ON_SALE',0,0,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,0,'ON_SALE',0,1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 id,
                 product,
                 price,

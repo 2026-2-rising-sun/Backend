@@ -137,7 +137,7 @@ public class OrderClosureDeliveryService {
                         "UPDATE order_payment_closure SET next_action_at=? WHERE closure_request_id=?",
                         Timestamp.from(Instant.now().plusSeconds(1)),
                         p.command().closureRequestId());
-                log.warn("주문 종료 통지 재시도 예정: paymentId={}", p.paymentId());
+                log.warn("주문 종료 통지 재시도 예정: paymentId={}", p.paymentId(), unavailable);
             }
         }
     }

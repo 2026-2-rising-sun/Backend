@@ -39,6 +39,7 @@ public class PaymentSecurityConfiguration {
                                 a.requestMatchers(
                                                 "/v1/internal/payments",
                                                 "/v1/internal/payments/*",
+                                                "/v1/internal/payments/*/order-closure",
                                                 "/v1/internal/refunds",
                                                 "/v1/internal/refunds/*",
                                                 "/v1/internal/payment-scenarios/*")

@@ -24,11 +24,9 @@ import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.sql.SQLException;
@@ -63,7 +61,8 @@ class OrderCreationServiceTest {
 
     @Mock private SalesJpaRepository salesRepository;
 
-    @Mock private SalesStockJpaRepository salesStockRepository;
+    @Mock private LegacyOrderSkuService trading;
+    @Mock private com.shoppinglive.commercecore.sku.service.SkuService skus;
 
     @Mock private ProductLookup productLookup;
 
@@ -84,7 +83,8 @@ class OrderCreationServiceTest {
                 new OrderCreationService(
                         orderRepository,
                         salesRepository,
-                        salesStockRepository,
+                        trading,
+                        skus,
                         productLookup,
                         orderNumberGenerator,
                         cartItems,
@@ -121,14 +121,25 @@ class OrderCreationServiceTest {
     private void salesExists(SalesStatus status) {
         Sales sales = new Sales(PRODUCT_ID, PRICE, status);
         ReflectionTestUtils.setField(sales, "id", SALES_ID);
-        given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.of(sales));
+        given(trading.lockForNewOrder(any()))
+                .willReturn(
+                        java.util.List.of(
+                                new com.shoppinglive.commercecore.sku.dto.SkuView(
+                                        SALES_ID,
+                                        PRODUCT_ID,
+                                        PRICE,
+                                        10,
+                                        0,
+                                        com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
+                                                .valueOf(
+                                                        status == SalesStatus.SOLD_OUT
+                                                                ? "ON_SALE"
+                                                                : status.name()),
+                                        0)));
     }
 
     /** 배정 성공 + 저장까지 이어지는 기본 경로를 구성한다. */
     private void reservationSucceeds(int remainingAvailable) {
-        given(salesStockRepository.reserve(eq(SALES_ID), anyInt())).willReturn(1);
-        given(salesStockRepository.findById(SALES_ID))
-                .willReturn(Optional.of(new SalesStock(SALES_ID, remainingAvailable, 1)));
         given(orderNumberGenerator.generate()).willReturn("OD-20260922-000001");
         given(orderRepository.saveAndFlush(any(Order.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -147,7 +158,7 @@ class OrderCreationServiceTest {
         OrderCreationResult result = orderCreationService.create(command(2, null), null);
 
         assertThat(result.created()).isTrue();
-        verify(salesStockRepository).reserve(SALES_ID, 2);
+        verify(skus).reserve(SALES_ID, 2);
 
         Order order = result.order();
         assertThat(order.getOrderNumber()).isEqualTo("OD-20260922-000001");
@@ -206,8 +217,8 @@ class OrderCreationServiceTest {
     // ----- 품절 자동 전이 -----
 
     @Test
-    @DisplayName("주문 예약으로 재고가 0이 되면 품절로 전이한다")
-    void marksSaleSoldOutWhenReservationLeavesZeroStock() {
+    @DisplayName("마지막 재고도 SKU 예약으로 처리하고 구 Sales 상태를 변경하지 않는다")
+    void reservesLastQuantityWithoutWritingLegacySaleState() {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
@@ -215,7 +226,8 @@ class OrderCreationServiceTest {
 
         orderCreationService.create(command(1, null), null);
 
-        verify(salesRepository).transitionStatus(SALES_ID, "ON_SALE", "SOLD_OUT");
+        verify(skus).reserve(SALES_ID, 1);
+        verify(salesRepository, never()).transitionStatus(any(), anyString(), anyString());
     }
 
     @Test
@@ -245,7 +257,7 @@ class OrderCreationServiceTest {
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.CONFLICT);
 
-        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(skus, never()).reserve(any(), anyInt());
     }
 
     @Test
@@ -253,7 +265,7 @@ class OrderCreationServiceTest {
     void returns404ForMissingSale() {
         productExists();
         executeTransactionInline();
-        given(salesRepository.findByProductId(PRODUCT_ID)).willReturn(Optional.empty());
+        given(trading.lockForNewOrder(any())).willThrow(new SalesNotFoundException("판매 정보 없음"));
 
         assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
                 .isInstanceOf(SalesNotFoundException.class);
@@ -267,7 +279,7 @@ class OrderCreationServiceTest {
         assertThatThrownBy(() -> orderCreationService.create(command(1, null), null))
                 .isInstanceOf(ProductNotFoundException.class);
 
-        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(skus, never()).reserve(any(), anyInt());
         verify(orderRepository, never()).saveAndFlush(any());
     }
 
@@ -283,7 +295,9 @@ class OrderCreationServiceTest {
         productExists();
         executeTransactionInline();
         salesExists(SalesStatus.ON_SALE);
-        given(salesStockRepository.reserve(SALES_ID, 5)).willReturn(0);
+        org.mockito.Mockito.doThrow(new InsufficientStockException("재고 부족"))
+                .when(skus)
+                .reserve(SALES_ID, 5);
         given(orderNumberGenerator.generate()).willReturn("OD-20260922-000001");
         given(orderRepository.saveAndFlush(any(Order.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -322,7 +336,7 @@ class OrderCreationServiceTest {
                 .hasMessageContaining("25000")
                 .hasMessageContaining("30000");
 
-        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(skus, never()).reserve(any(), anyInt());
     }
 
     @Test
@@ -353,7 +367,7 @@ class OrderCreationServiceTest {
 
         assertThat(result.created()).isFalse();
         assertThat(result.order()).isSameAs(existing);
-        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(skus, never()).reserve(any(), anyInt());
         verify(productLookup, never()).findProduct(any());
     }
 
@@ -604,7 +618,7 @@ class OrderCreationServiceTest {
                 .extracting(e -> ((BusinessException) e).errorCode())
                 .isEqualTo(ErrorCode.CONFLICT);
         verify(orderRepository, never()).saveAndFlush(any());
-        verify(salesStockRepository, never()).reserve(any(), anyInt());
+        verify(skus, never()).reserve(any(), anyInt());
         verify(cartItems, never()).delete(any());
     }
 }

@@ -22,6 +22,25 @@ import org.springframework.test.context.DynamicPropertySource;
 })
 public abstract class CommerceCoreSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
+    @Autowired private LegacyOrderTradeFixture legacyTrades;
+
+    protected void prepareLegacyTradeFixtures() {
+        legacyTrades.prepare();
+    }
+
+    protected void addMissingLegacyTradeFixtures() {
+        legacyTrades.addMissing();
+    }
+
+    protected com.shoppinglive.commercecore.sales.entity.SalesStock legacyStock(long id) {
+        var sku = legacyTrades.sku(id);
+        return new com.shoppinglive.commercecore.sales.entity.SalesStock(
+                id, sku.available(), sku.reserved());
+    }
+
+    protected com.shoppinglive.commercecore.sku.dto.SkuView legacySku(long id) {
+        return legacyTrades.sku(id);
+    }
 
     @BeforeEach
     void resetAccessSessionFixture() {

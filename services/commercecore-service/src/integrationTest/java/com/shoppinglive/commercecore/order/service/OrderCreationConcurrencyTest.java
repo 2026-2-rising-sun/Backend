@@ -71,6 +71,7 @@ class OrderCreationConcurrencyTest
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, 15_000L, SalesStatus.ON_SALE));
         salesId = sales.getId();
         salesStockRepository.save(new SalesStock(salesId, INITIAL_STOCK, 0));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -134,7 +135,7 @@ class OrderCreationConcurrencyTest
         assertThat(succeeded + rejectedCount.get()).isEqualTo(THREADS);
         assertThat(succeeded).as("성공은 재고 수를 넘지 못한다").isLessThanOrEqualTo(INITIAL_STOCK);
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getAvailable())
                 .as("판매 가능 재고는 음수가 되지 않는다")
                 .isEqualTo(INITIAL_STOCK - succeeded)
@@ -175,9 +176,8 @@ class OrderCreationConcurrencyTest
         assertThat(doneGate.await(30, TimeUnit.SECONDS)).isTrue();
         executor.shutdownNow();
 
-        assertThat(salesStockRepository.findById(salesId).orElseThrow().getAvailable()).isZero();
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.SOLD_OUT);
+        assertThat(legacyStock(salesId).getAvailable()).isZero();
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
     }
 
     /** 같은 멱등키로 동시에 들어온 요청은 주문 한 건만 만들고 재고도 한 번만 잡아야 한다. 사용자가 버튼을 연타하거나 네트워크 재전송이 겹치는 상황이다. */
@@ -210,7 +210,7 @@ class OrderCreationConcurrencyTest
         assertThat(unexpected).as("모든 요청이 성공해야 한다: %s", unexpected).isEmpty();
         assertThat(orderRepository.findAll()).hasSize(1);
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getReserved()).as("재고도 한 번만 잡힌다").isEqualTo(1);
         assertThat(stock.getAvailable()).isEqualTo(INITIAL_STOCK - 1);
     }

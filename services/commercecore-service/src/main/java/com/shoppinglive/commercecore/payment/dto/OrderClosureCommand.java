@@ -10,4 +10,6 @@ public record OrderClosureCommand(
         String referenceNumber,
         long amount,
         String reason,
-        Instant closedAt) {}
+        @com.fasterxml.jackson.annotation.JsonFormat(
+                        shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
+                Instant closedAt) {}

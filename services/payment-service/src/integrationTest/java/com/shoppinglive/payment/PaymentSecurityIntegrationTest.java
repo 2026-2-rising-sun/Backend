@@ -62,6 +62,32 @@ class PaymentSecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("주문 종료 API는 올바른 Core 서비스 토큰만 허용한다")
+    void closureRequiresCoreToken() throws Exception {
+        String path = "/v1/internal/payments/1/order-closure";
+        mvc.perform(put(path).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("X-Service-Token", "wrong-token")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("Authorization", "Bearer user-only-token")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("prod가 함께 활성화되면 개발 플래그가 있어도 시나리오 registry와 API를 만들지 않는다")
     void productionProfileCannotEnableDevScenario() throws Exception {
         assertThat(context.getBeansOfType(DevPaymentScenarioRegistry.class)).isEmpty();

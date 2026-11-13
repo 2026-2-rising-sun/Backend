@@ -59,6 +59,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
         productLookup.register(new ProductSnapshot(2L, "새 상품", null));
         salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.save(new SalesStock(salesId, 10, 0));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -105,7 +106,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .andExpect(status().isOk());
         mvc.perform(get("/actuator/health/liveness")).andExpect(status().isOk());
         assertThat(orders.count()).isZero();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(10);
     }
 
     @DisplayName("익명 거래와 기존 비밀번호 우회 경로를 허용하지 않는다")
@@ -133,7 +134,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                     .andExpect(status().isUnauthorized());
         }
         assertThat(orders.count()).isZero();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(10);
     }
 
     @DisplayName("잘못된 형식·만료·다른 서명의 JWT는 실제 검증기로 거절한다")
@@ -181,7 +182,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_delivery_request", Long.class))
                 .isZero();
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
+        assertThat(legacyStock(salesId).getReserved()).isEqualTo(1);
     }
 
     @DisplayName("결제 본문으로 시나리오를 선택하거나 일반 사용자가 개발 제어 API에 접근할 수 없다")
@@ -292,7 +293,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2));
         assertThat(items.count()).isZero();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(7);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(7);
     }
 
     @DisplayName("일반 사용자는 판매를 관리할 수 없고 판매자는 가능하며 서비스가 회원을 대신할 수 없다")
@@ -347,7 +348,8 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
     @org.junit.jupiter.params.provider.ValueSource(ints = {2, 3, Integer.MAX_VALUE})
     void amountOverflowRejectsPreviewDirectAndCartWithoutMutation(int quantity) throws Exception {
         transaction.executeWithoutResult(
-                status -> sales.findById(salesId).orElseThrow().changePrice(Long.MAX_VALUE));
+                status ->
+                        jdbc.update("UPDATE sku SET price=? WHERE id=?", Long.MAX_VALUE, salesId));
         mvc.perform(
                         get("/v1/orders/checkout?productId=1&quantity=" + quantity)
                                 .header("Authorization", bearer(MEMBER_A)))
@@ -375,7 +377,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .andExpect(status().isBadRequest());
         assertThat(orders.count()).isZero();
         assertThat(items.existsById(item.getId())).isTrue();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(10);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(10);
+        assertThat(legacyStock(salesId).getReserved()).isZero();
     }
 }

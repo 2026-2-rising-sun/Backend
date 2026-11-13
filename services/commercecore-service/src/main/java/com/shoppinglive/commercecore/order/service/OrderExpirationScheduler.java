@@ -3,7 +3,6 @@ package com.shoppinglive.commercecore.order.service;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -28,9 +27,11 @@ public class OrderExpirationScheduler {
     private static final int BATCH_SIZE = 100;
 
     private final OrderJpaRepository orderRepository;
-    private final SalesService salesService;
+    private final com.shoppinglive.commercecore.sku.service.SkuService salesService;
 
-    public OrderExpirationScheduler(OrderJpaRepository orderRepository, SalesService salesService) {
+    public OrderExpirationScheduler(
+            OrderJpaRepository orderRepository,
+            com.shoppinglive.commercecore.sku.service.SkuService salesService) {
         this.orderRepository = orderRepository;
         this.salesService = salesService;
     }
@@ -68,7 +69,7 @@ public class OrderExpirationScheduler {
             }
             int updated = orderRepository.expireOrder(order.getId());
             if (updated == 1) {
-                salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+                salesService.release(order.getSalesInfoId(), order.getQuantity());
                 expired++;
             }
             // updated == 0 이면 이미 다른 흐름에서 상태 전이 (결제 시작·수동 취소 등). 무해.

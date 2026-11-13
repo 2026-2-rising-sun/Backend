@@ -12,7 +12,6 @@ import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -33,7 +32,7 @@ public class OrderPaymentOutcomeService {
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
     private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final SalesService singleOrderSales;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
@@ -49,7 +48,7 @@ public class OrderPaymentOutcomeService {
             OrderJpaRepository orders,
             CartItemRepository cart,
             SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             SalesService singleOrderSales,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
@@ -62,7 +61,7 @@ public class OrderPaymentOutcomeService {
         this.orders = orders;
         this.cart = cart;
         this.sales = sales;
-        this.stock = stock;
+        this.skus = skus;
         this.singleOrderSales = singleOrderSales;
         this.payments = payments;
         this.guard = guard;
@@ -106,7 +105,7 @@ public class OrderPaymentOutcomeService {
                             children.stream()
                                     .sorted(Comparator.comparing(Order::getSalesInfoId))
                                     .toList()) {
-                        guard.lockSales(child.getSalesInfoId());
+                        // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
                     }
                     OrderStatus finalStatus =
                             result.status() == PaymentStatus.SUCCESS
@@ -124,10 +123,8 @@ public class OrderPaymentOutcomeService {
                             throw new IllegalStateException("결제 묶음 주문의 상태가 일치하지 않습니다.");
                         }
                         if (result.status() == PaymentStatus.SUCCESS) {
-                            if (stock.consumeReserved(child.getSalesInfoId(), child.getQuantity())
-                                    != 1) {
-                                throw new IllegalStateException("예약 재고가 누락되었습니다.");
-                            }
+                            skus.consume(child.getSalesInfoId(), child.getQuantity());
+
                             if (child.getSourceCartItemId() != null
                                     && child.getSourceCartItemVersion() != null) {
                                 jdbc.update(
@@ -181,11 +178,8 @@ public class OrderPaymentOutcomeService {
                                     success ? "PAID" : "FAILED")
                             != 1) throw new IllegalStateException("단건 결제 주문 상태가 다릅니다.");
                     if (success) {
-                        if (stock.consumeReserved(order.getSalesInfoId(), order.getQuantity()) != 1)
-                            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-                    } else
-                        singleOrderSales.restoreReserved(
-                                order.getSalesInfoId(), order.getQuantity());
+                        skus.consume(order.getSalesInfoId(), order.getQuantity());
+                    } else skus.release(order.getSalesInfoId(), order.getQuantity());
                     payments.record(current, p, p.status().name());
                     return true;
                 });
@@ -198,10 +192,7 @@ public class OrderPaymentOutcomeService {
     }
 
     private void restore(Order child) {
-        if (stock.restoreReserved(child.getSalesInfoId(), child.getQuantity()) != 1) {
-            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-        }
-        sales.reopenIfStockAvailable(child.getSalesInfoId());
+        skus.release(child.getSalesInfoId(), child.getQuantity());
     }
 
     private static BusinessException conflict(String message) {

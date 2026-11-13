@@ -43,6 +43,7 @@ class FirewallRejectionHttpTest extends CommerceCoreSecurityTestSupport {
     void seed() {
         saleId = sales.save(new Sales(123L, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.save(new SalesStock(saleId, 10, 0));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -107,8 +108,8 @@ class FirewallRejectionHttpTest extends CommerceCoreSecurityTestSupport {
     private void unchanged() {
         assertThat(sales.count()).isEqualTo(1);
         assertThat(sales.findById(saleId).orElseThrow().getPrice()).isEqualTo(1000L);
-        assertThat(stocks.findById(saleId).orElseThrow().getAvailable()).isEqualTo(10);
-        assertThat(stocks.findById(saleId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(saleId).getAvailable()).isEqualTo(10);
+        assertThat(legacyStock(saleId).getReserved()).isZero();
     }
 
     private HttpResponse<String> request(String method, String path, String bearer)

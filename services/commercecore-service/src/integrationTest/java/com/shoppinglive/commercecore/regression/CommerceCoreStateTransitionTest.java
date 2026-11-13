@@ -79,6 +79,7 @@ class CommerceCoreStateTransitionTest
         productLookup.register(new ProductSnapshot(920L, "마지막 재고", null));
         salesId = salesRepository.save(new Sales(920L, 10_000L, SalesStatus.ON_SALE)).getId();
         stockRepository.save(new SalesStock(salesId, 1, 0));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -132,12 +133,10 @@ class CommerceCoreStateTransitionTest
     @ValueSource(strings = {"cancel", "expire", "fail"})
     void allowsNewOrderAfterRestoringLastReservedItem(String path) {
         Order order = create();
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.SOLD_OUT);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
         release(order, path);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.ON_SALE);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.ON_SALE);
         assertThat(create().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
@@ -148,9 +147,8 @@ class CommerceCoreStateTransitionTest
         Order order = create();
         sales.changeStatus(salesId, SalesStatus.PRIVATE);
         release(order, path);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.PRIVATE);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
     }
 
     @DisplayName("실제 스케줄 진입점에서 재고 복구에 실패하면 주문 만료도 롤백한다")
@@ -161,7 +159,7 @@ class CommerceCoreStateTransitionTest
                 "UPDATE payment_group SET expires_at = ? WHERE id = ?",
                 java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
                 order.getPaymentGroup().getId());
-        jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
+        jdbc.update("UPDATE sku SET reserved = 0 WHERE id = ?", salesId);
         assertThatThrownBy(() -> groups.expire(order.getPaymentGroup().getId()))
                 .isInstanceOf(IllegalStateException.class);
         // 묶음 스케줄러는 실패한 묶음 하나를 분리해 로그로 남긴다.
@@ -169,7 +167,7 @@ class CommerceCoreStateTransitionTest
         groupExpiration.run();
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isZero();
+        assertThat(legacyStock(salesId).getAvailable()).isZero();
     }
 
     @DisplayName("결제의 재고 처리에 실패하면 결제·주문 확정도 롤백한다")
@@ -181,7 +179,7 @@ class CommerceCoreStateTransitionTest
         Order order = create();
         scenarios.set(order.getOrderNumber(), scenario);
         var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
-        jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
+        jdbc.update("UPDATE sku SET reserved = 0 WHERE id = ?", salesId);
         assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(deliveries.payment(attempt.getId()).status())
@@ -201,8 +199,8 @@ class CommerceCoreStateTransitionTest
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
     void rejectsOnSaleTransitionWhenStockIsZero(SalesStatus current) throws Exception {
-        jdbc.update("UPDATE sales_info SET status = ? WHERE id = ?", current.name(), salesId);
-        jdbc.update("UPDATE sales_stock SET available = 0 WHERE sales_info_id = ?", salesId);
+        jdbc.update("UPDATE sku SET sale_status = ? WHERE id = ?", current.name(), salesId);
+        jdbc.update("UPDATE sku SET available = 0 WHERE id = ?", salesId);
         var result =
                 mvc.perform(
                         patch("/v1/sales/{id}/status", salesId)
@@ -213,8 +211,7 @@ class CommerceCoreStateTransitionTest
             result.andExpect(status().isConflict());
         } else {
             result.andExpect(status().isOk());
-            assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                    .isEqualTo(SalesStatus.SOLD_OUT);
+            assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
         }
     }
 
@@ -223,12 +220,10 @@ class CommerceCoreStateTransitionTest
     void reopensOnlySoldOutSalesAfterStockReplenishment() {
         create();
         sales.adjustAvailable(salesId, 1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.ON_SALE);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.ON_SALE);
         sales.changeStatus(salesId, SalesStatus.PRIVATE);
         sales.adjustAvailable(salesId, 1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.PRIVATE);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
     }
 
     @DisplayName("업무 거절은 500 대신 해당하는 400·404·409로 응답한다")
@@ -254,7 +249,7 @@ class CommerceCoreStateTransitionTest
                         post("/v1/orders/{number}/cancel", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isNoContent());
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
         mvc.perform(
                         post("/v1/orders/{number}/payments", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A)))

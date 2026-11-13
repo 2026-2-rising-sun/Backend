@@ -11,7 +11,6 @@ import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -33,7 +32,7 @@ class PaymentGroupLifecycleService {
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final PaymentDispatcher dispatcher;
@@ -48,7 +47,7 @@ class PaymentGroupLifecycleService {
             OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
             SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             PaymentDispatcher dispatcher,
@@ -62,7 +61,7 @@ class PaymentGroupLifecycleService {
         this.sheets = sheets;
         this.orders = orders;
         this.sales = sales;
-        this.stock = stock;
+        this.skus = skus;
         this.payments = payments;
         this.guard = guard;
         this.dispatcher = dispatcher;
@@ -177,7 +176,7 @@ class PaymentGroupLifecycleService {
                         .sorted(Comparator.comparing(Order::getSalesInfoId))
                         .toList();
         for (Order child : children) {
-            guard.lockSales(child.getSalesInfoId());
+            // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
         }
         for (Order child : children) {
             int changed =
@@ -203,10 +202,7 @@ class PaymentGroupLifecycleService {
     }
 
     private void restore(Order child) {
-        if (stock.restoreReserved(child.getSalesInfoId(), child.getQuantity()) != 1) {
-            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-        }
-        sales.reopenIfStockAvailable(child.getSalesInfoId());
+        skus.release(child.getSalesInfoId(), child.getQuantity());
     }
 
     private PaymentGroup owned(String member, String number) {

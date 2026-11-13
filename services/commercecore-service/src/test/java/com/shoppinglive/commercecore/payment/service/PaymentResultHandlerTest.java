@@ -9,7 +9,6 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderPaymentOutcomeService;
 import com.shoppinglive.commercecore.payment.dto.*;
 import com.shoppinglive.commercecore.payment.entity.*;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.*;
 import java.time.Instant;
@@ -27,7 +26,7 @@ class PaymentResultHandlerTest {
     @Mock RefundOutcomeService refunds;
     @Mock TransactionTemplate tx;
     @Mock OrderJpaRepository orders;
-    @Mock SalesStockJpaRepository stock;
+    @Mock com.shoppinglive.commercecore.sku.service.SkuService stock;
     @Mock SalesService sales;
     @Mock JdbcTemplate jdbc;
     @Mock com.shoppinglive.commercecore.order.repository.PaymentGroupRepository groups;
@@ -125,9 +124,8 @@ class PaymentResultHandlerTest {
         transaction();
         order();
         when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "PAID")).thenReturn(1);
-        when(stock.consumeReserved(10L, 1)).thenReturn(1);
         handler.payment(result(PaymentStatus.SUCCESS));
-        verify(stock).consumeReserved(10L, 1);
+        verify(stock).consume(10L, 1);
         verify(sales, never()).restoreReserved(any(), anyInt());
         verify(store).record(pending, result(PaymentStatus.SUCCESS), "SUCCESS");
     }
@@ -140,8 +138,8 @@ class PaymentResultHandlerTest {
         order();
         when(orders.transitionStatus(1L, "PAYMENT_CONFIRMING", "FAILED")).thenReturn(1);
         handler.payment(result(PaymentStatus.FAILED));
-        verify(sales).restoreReserved(10L, 1);
-        verifyNoInteractions(stock);
+        verify(stock).release(10L, 1);
+        verifyNoInteractions(sales);
     }
 
     @Test

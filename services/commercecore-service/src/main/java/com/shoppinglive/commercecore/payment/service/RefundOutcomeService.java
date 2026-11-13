@@ -7,7 +7,6 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.RefundExecution;
 import com.shoppinglive.commercecore.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -25,7 +24,7 @@ public class RefundOutcomeService {
     private final JdbcTemplate jdbc;
     private final PaymentDeliveryStore deliveries;
     private final PaymentGroupRepository groups;
-    private final SalesService sales;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final PaymentGroupEventPublisher notificationEvents;
     @PersistenceContext private EntityManager entityManager;
 
@@ -33,7 +32,7 @@ public class RefundOutcomeService {
             JdbcTemplate jdbc,
             PaymentDeliveryStore deliveries,
             PaymentGroupRepository groups,
-            SalesService sales,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentGroupEventPublisher notificationEvents,
             com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons,
             com.shoppinglive.commercecore.order.service.OrderSheetRefundService sheetRefunds) {
@@ -42,7 +41,7 @@ public class RefundOutcomeService {
         this.sheetRefunds = sheetRefunds;
         this.deliveries = deliveries;
         this.groups = groups;
-        this.sales = sales;
+        this.skus = skus;
         this.notificationEvents = notificationEvents;
     }
 
@@ -152,7 +151,7 @@ public class RefundOutcomeService {
                 if (transitioned != 1) {
                     throw new BusinessException(ErrorCode.CONFLICT, "환불 대상 주문 상태가 변경되었습니다.");
                 }
-                sales.adjustAvailable(target.salesId(), target.quantity());
+                skus.restock(target.salesId(), target.quantity());
             }
             Long groupId =
                     jdbc.queryForObject(

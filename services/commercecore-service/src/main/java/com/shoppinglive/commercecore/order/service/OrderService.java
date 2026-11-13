@@ -4,7 +4,6 @@ import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.exception.OrderCannotBeCancelledException;
 import com.shoppinglive.commercecore.order.exception.OrderNotFoundException;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import org.springframework.data.domain.Page;
@@ -22,12 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private final OrderJpaRepository orderRepository;
-    private final SalesService salesService;
+    private final com.shoppinglive.commercecore.sku.service.SkuService salesService;
     private final com.shoppinglive.commercecore.order.service.PaymentGroupService groups;
 
     public OrderService(
             OrderJpaRepository orderRepository,
-            SalesService salesService,
+            com.shoppinglive.commercecore.sku.service.SkuService salesService,
             com.shoppinglive.commercecore.order.service.PaymentGroupService groups) {
         this.orderRepository = orderRepository;
         this.salesService = salesService;
@@ -93,6 +92,6 @@ public class OrderService {
             throw new OrderCannotBeCancelledException(orderNumber);
         }
 
-        salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+        salesService.release(order.getSalesInfoId(), order.getQuantity());
     }
 }

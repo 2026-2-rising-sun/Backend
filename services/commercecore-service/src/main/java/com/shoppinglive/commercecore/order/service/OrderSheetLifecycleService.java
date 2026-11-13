@@ -189,7 +189,7 @@ public class OrderSheetLifecycleService {
                     guard.lock(member);
                     PaymentGroup group = locked(found.getId());
                     if (group.getStatus() == OrderStatus.CANCELLED) return;
-                    // 진행 중 취소의 신규 정책은 미결정이므로 기존 제한을 유지한다.
+                    // 결제 결과 대기 중 즉시 취소 제한은 사용자 확정 정책이다.
                     if (group.getStatus() != OrderStatus.PENDING_PAYMENT
                             || group.getPaymentId() != null)
                         throw conflict("결제 요청 전 주문만 즉시 취소할 수 있습니다.");
@@ -237,20 +237,21 @@ public class OrderSheetLifecycleService {
                             List<Order> items = items(group);
                             boolean success = result.status() == PaymentStatus.SUCCESS;
                             if (success) {
-                                cart.lockForCompletion(
-                                        group.getMemberId(),
+                                var cartIds =
                                         items.stream()
                                                 .map(Order::getSourceCartItemId)
                                                 .filter(Objects::nonNull)
-                                                .toList());
+                                                .distinct()
+                                                .toList();
+                                if (!cartIds.isEmpty())
+                                    cart.lockForCompletion(group.getMemberId(), cartIds);
                                 couponReservations.confirmForOrder(
                                         group.getMemberId(), group.getCouponId(), group.getId());
                                 for (var item : items) {
                                     transition(item, "PAID");
                                     skus.consume(item.getSkuId(), item.getQuantity());
                                 }
-                                cart.deletePurchased(
-                                        group.getMemberId(),
+                                var purchased =
                                         items.stream()
                                                 .filter(
                                                         i ->
@@ -264,7 +265,9 @@ public class OrderSheetLifecycleService {
                                                                         i.getSourceCartItemId(),
                                                                         i
                                                                                 .getSourceCartItemVersion()))
-                                                .toList());
+                                                .toList();
+                                if (!purchased.isEmpty())
+                                    cart.deletePurchased(group.getMemberId(), purchased);
                                 group.transition(OrderStatus.PAID);
                             } else {
                                 releaseItems(group, "FAILED");

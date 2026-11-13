@@ -361,13 +361,23 @@ class OrderSheetPostgresTest extends OrderSheetPostgresSupport {
     void refundStockFailureRollsBackApplication() {
         var order = paid(create(1), false);
         var r = request(order, 1, "atomic").refund();
-        doThrow(new IllegalStateException("복구 실패 주입")).when(skuSpy).restock(501L, 1);
+        doThrow(new IllegalStateException("복구 실패 주입"))
+                .when(
+                        (SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuSpy))
+                .restock(501L, 1);
         assertThatThrownBy(() -> complete(order, r.refundRequestId()))
                 .isInstanceOf(RuntimeException.class);
         assertThat(refunds.get(MEMBER_A, order.orderNumber(), r.refundRequestId()).status())
                 .isEqualTo("PROCESSING");
         assertThat(available(501)).isEqualTo(19);
-        doCallRealMethod().when(skuSpy).restock(501L, 1);
+        doCallRealMethod()
+                .when(
+                        (SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuSpy))
+                .restock(501L, 1);
         complete(order, r.refundRequestId());
         assertThat(available(501)).isEqualTo(20);
     }
