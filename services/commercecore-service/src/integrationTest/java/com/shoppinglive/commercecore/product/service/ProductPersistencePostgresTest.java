@@ -21,6 +21,9 @@ import org.springframework.test.context.DynamicPropertySource;
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 @DisplayName("격리 PostgreSQL 상품 원본·Outbox 원자성·동시 등록")
 class ProductPersistencePostgresTest extends ProductPersistenceTest {
+    @org.springframework.beans.factory.annotation.Autowired
+    jakarta.persistence.EntityManager entityManager;
+
     @DynamicPropertySource
     static void postgres(DynamicPropertyRegistry properties) throws Exception {
         String url = System.getenv("COMMERCECORE_TEST_POSTGRES_URL");
@@ -35,6 +38,8 @@ class ProductPersistencePostgresTest extends ProductPersistenceTest {
         properties.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         properties.add("spring.datasource.username", () -> user);
         properties.add("spring.datasource.password", () -> password);
+        // 공유 잠금 두 개와 제어 요청 외에 DB 대기 상태를 관측할 연결이 하나 더 필요하다.
+        properties.add("spring.datasource.hikari.maximum-pool-size", () -> 4);
         properties.add("spring.jpa.properties.hibernate.default_schema", () -> schema);
     }
 
@@ -73,9 +78,12 @@ class ProductPersistencePostgresTest extends ProductPersistenceTest {
                                             transactions.execute(
                                                     status -> {
                                                         writerPid.set(
-                                                                jdbc.queryForObject(
-                                                                        "SELECT pg_backend_pid()",
-                                                                        Integer.class));
+                                                                ((Number)
+                                                                                entityManager
+                                                                                        .createNativeQuery(
+                                                                                                "SELECT pg_backend_pid()")
+                                                                                        .getSingleResult())
+                                                                        .intValue());
                                                         writerStarted.countDown();
                                                         if (delete)
                                                             lifecycle.delete(
@@ -86,7 +94,7 @@ class ProductPersistencePostgresTest extends ProductPersistenceTest {
                                                         return null;
                                                     }));
                     assertThat(writerStarted.await(10, TimeUnit.SECONDS)).isTrue();
-                    awaitDatabaseLock(writerPid.get());
+                    awaitDatabaseLock(writerPid.get(), writer);
                     assertThat(writer.isDone()).isFalse();
                     release.countDown();
                     first.get(10, TimeUnit.SECONDS);
@@ -116,9 +124,13 @@ class ProductPersistencePostgresTest extends ProductPersistenceTest {
         return lifecycle.changeSaleState(p.getId(), true, 0L, "seller");
     }
 
-    private void awaitDatabaseLock(int pid) throws Exception {
+    private void awaitDatabaseLock(int pid, Future<?> writer) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {
+            if (writer.isDone()) {
+                writer.get();
+                throw new AssertionError("공유 잠금 해제 전에 상품 제어가 완료되었습니다.");
+            }
             if (jdbc.queryForObject(
                             "SELECT COUNT(*) FROM pg_locks WHERE pid=? AND NOT granted",
                             Integer.class,
