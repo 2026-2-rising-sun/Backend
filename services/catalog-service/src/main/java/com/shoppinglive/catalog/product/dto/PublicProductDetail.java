@@ -14,7 +14,7 @@ public record PublicProductDetail(
         Product product, String mainImageUrl, SalesInfo salesInfo, SalesDisplayStatus salesStatus) {
 
     public boolean purchasable() {
-        return salesStatus.isPurchasable() && salesInfo.available() > 0;
+        return product.isSaleEnabled() && salesStatus.isPurchasable() && salesInfo.available() > 0;
     }
 
     /** 고를 수 있는 최대 수량. 구매 불가면 0. */

@@ -126,6 +126,37 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
                 .getId();
     }
 
+    @Test
+    @DisplayName("상품 전체 중지는 공개 상태·재고를 보존하며 구매만 막고 삭제는 모든 공개 조회에서 제외한다")
+    void wholeControlDoesNotPretendToBeStockoutAndDeletionStaysHidden() throws Exception {
+        long id = product("paused");
+        sales(id, SalesStatus.ON_SALE, 4);
+        jdbc.update("UPDATE product SET sale_enabled=FALSE WHERE id=?", id);
+        mvc.perform(get("/v1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
+                .andExpect(jsonPath("$.data.items[0].available").value(4))
+                .andExpect(jsonPath("$.data.items[0].purchasable").value(false));
+        mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderable").value(false))
+                .andExpect(jsonPath("$.data.reason").value("SALE_SUSPENDED"))
+                .andExpect(jsonPath("$.data.maxQuantity").value(0));
+        jdbc.update("UPDATE product SET deleted_at=CURRENT_TIMESTAMP WHERE id=?", id);
+        mvc.perform(get("/v1/products"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items", empty()));
+        mvc.perform(get("/v1/products/{id}", id)).andExpect(status().isNotFound());
+        mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
+                .andExpect(status().isNotFound());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT available FROM product_sales WHERE product_id=?",
+                                Integer.class,
+                                id))
+                .isEqualTo(4);
+    }
+
     private void sales(long productId, SalesStatus status, int available) {
         // 이벤트 경로와 같은 저장 규칙으로 사본 행을 넣는다 (version 1).
         assertThat(
