@@ -65,3 +65,9 @@ Cart 최초 기준은 H2 단위165 통과/통합298 중30실패·외부Kafka2스
 전체Core최종회귀·최종공유SKU계약/어댑터연결·root하네스완료는미실행이다. 외부Kafka2스킵, 실제Redis/PG제공자/AWS/원격CI는미검증이다. 옵션JSON공급과공개다중SKU표시정책은보류범위다. 계획은active로유지하고PR도통합검증전에는Draft로표시한다.
 
 실제 브라우저 캡처: [1280px ERD](../../../design-docs/commercecore/order/assets/order-erd-desktop.png) · [390px 상태/환불](../../../design-docs/commercecore/order/assets/order-state-mobile.png). 확대 상호작용 결과는 위 로컬 JSON에 별도 기록했다.
+
+## 저장과 정리
+
+검증 소스 체크포인트 `9426989811c9036283af781381f5701f445cd848`를 원격 #331 브랜치에 push하고 [Draft PR #343](https://github.com/2026-2-rising-sun/Backend/pull/343)을 생성했다. base는 `refactor/#332-cart-module`이며 dev 병합·배포하지 않았다. 이 후속 문서 저장은 서비스 코드 변경이 아니다.
+
+검사 로그 확보 뒤 작업 전용 PostgreSQL 컨테이너만 stop하여 `--rm` 제거를 확인했다. Docker Desktop과 다른 컨테이너·볼륨은 그대로 두었다. 후속 실제PG검사는 새 전용 컨테이너와 환경변수를 준비해야 한다.

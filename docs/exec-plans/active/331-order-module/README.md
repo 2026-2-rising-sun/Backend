@@ -1,6 +1,6 @@
 # #331 Order 구현과 통합 검증
 
-상태: **구현·통합 회귀 진행 중**. 서비스·DB·계약 코드는 작성됐으나 SKU의 기존 Sales 어댑터 후속 통합과 전체 Core 회귀·최종 문서 검증이 남았다. 전체 완료 또는 배포 가능 상태로 표시하지 않는다.
+상태: **구현·통합 회귀 진행 중**. [검토용 Draft PR #343](https://github.com/2026-2-rising-sun/Backend/pull/343), base는 Cart #341이다. 서비스·DB·계약 코드는 작성됐으나 SKU의 기존 Sales 어댑터 후속 통합과 전체 Core 회귀·최종 문서 검증이 남았다. 전체 완료 또는 배포 가능 상태로 표시하지 않는다.
 
 [이슈 #331](https://github.com/2026-2-rising-sun/Backend/issues/331) · [ADR 0331](../../../adr/0331-order-snapshot-lifecycle.md) · [상세설계](../../../design-docs/commercecore/order/설계.md) · [ERD](../../../design-docs/commercecore/order/ERD.md) · [상태](../../../design-docs/commercecore/order/상태관리도.md) · [워크로그](../../../worklog/2026-11-13.md) · [실제 검증 보고](verification.md)
 
