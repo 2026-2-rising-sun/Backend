@@ -169,6 +169,8 @@ public class PaymentClientTestConfiguration {
                         "jdbc:h2:mem:" + schema + ";DB_CLOSE_DELAY=-1;MODE=PostgreSQL");
                 props.put("spring.datasource.username", "sa");
                 props.put("spring.datasource.password", "");
+                // H2는 보상 복구 SQL을 지원하지 않으며 명시적 드라이버로만 실행한다.
+                props.put("payment.refunds.recovery.initial-delay", "PT24H");
             }
             // 단일 Gradle 테스트 classpath에서도 서비스별 스키마를 명시적으로 고른다.
             PaymentFixtureOverrides.properties = props;
@@ -199,6 +201,10 @@ public class PaymentClientTestConfiguration {
                         context.getBean(com.shoppinglive.payment.service.PaymentService.class)
                                 .resolvePayment(ids.getFirst());
                     return http.start(c);
+                }
+
+                public void closeOrder(long id, OrderClosureCommand command) {
+                    http.closeOrder(id, command);
                 }
 
                 public PaymentExecution get(long id) {
@@ -247,11 +253,12 @@ public class PaymentClientTestConfiguration {
 
         @Bean
         DataSource dataSource() throws Exception {
-            var source =
-                    new org.springframework.jdbc.datasource.DriverManagerDataSource(
-                            (String) properties.get("spring.datasource.url"),
-                            (String) properties.get("spring.datasource.username"),
-                            (String) properties.get("spring.datasource.password"));
+            var source = new com.zaxxer.hikari.HikariDataSource();
+            source.setJdbcUrl((String) properties.get("spring.datasource.url"));
+            source.setUsername((String) properties.get("spring.datasource.username"));
+            source.setPassword((String) properties.get("spring.datasource.password"));
+            source.setMaximumPoolSize(8);
+            source.setMinimumIdle(1);
             JdbcTemplate jdbc = new JdbcTemplate(source);
             boolean h2 = ((String) properties.get("spring.datasource.url")).contains(":h2:");
             if (h2)
@@ -261,7 +268,8 @@ public class PaymentClientTestConfiguration {
                     List.of(
                             "V1__payment_baseline.sql",
                             "V2__event_outbox.sql",
-                            "V3__outbox_worker_claim.sql")) {
+                            "V3__outbox_worker_claim.sql",
+                            "V4__order_closure_compensation.sql")) {
                 String sql =
                         new String(
                                 Objects.requireNonNull(

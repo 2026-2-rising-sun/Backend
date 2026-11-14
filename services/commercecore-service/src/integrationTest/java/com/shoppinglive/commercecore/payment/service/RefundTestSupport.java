@@ -76,6 +76,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         Long salesB = sales.saveAndFlush(new Sales(81002L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 5, 0));
         stocks.saveAndFlush(new SalesStock(salesB, 5, 0));
+        prepareLegacyTradeFixtures();
         a = cart.add(MEMBER_A, 81001L, 2);
         b = cart.add(MEMBER_A, 81002L, 1);
     }

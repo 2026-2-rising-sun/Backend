@@ -82,6 +82,7 @@ class PaymentSchedulingAfterCommitTest
                         "테스트",
                         null,
                         Instant.now().plusSeconds(900)));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -115,8 +116,7 @@ class PaymentSchedulingAfterCommitTest
                                     .as("커밋 직후 결제 콜백으로 확정된다")
                                     .isEqualTo(OrderStatus.PAID);
 
-                            SalesStock stock =
-                                    salesStockRepository.findById(salesInfoId).orElseThrow();
+                            SalesStock stock = legacyStock(salesInfoId);
                             assertThat(stock.getReserved()).as("성공 시 배정분 소진").isZero();
                             assertThat(stock.getAvailable()).isEqualTo(4);
                         });
@@ -136,8 +136,7 @@ class PaymentSchedulingAfterCommitTest
                                     orderRepository.findByOrderNumber(ORDER_NUMBER).orElseThrow();
                             assertThat(order.getStatus()).isEqualTo(OrderStatus.FAILED);
 
-                            SalesStock stock =
-                                    salesStockRepository.findById(salesInfoId).orElseThrow();
+                            SalesStock stock = legacyStock(salesInfoId);
                             assertThat(stock.getReserved()).isZero();
                             assertThat(stock.getAvailable()).as("실패 시 배정분 복구").isEqualTo(5);
                         });

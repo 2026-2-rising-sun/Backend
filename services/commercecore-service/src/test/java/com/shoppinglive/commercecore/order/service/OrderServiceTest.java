@@ -10,7 +10,6 @@ import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.exception.OrderCannotBeCancelledException;
 import com.shoppinglive.commercecore.order.exception.OrderNotFoundException;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +24,7 @@ class OrderServiceTest {
 
     @Mock private OrderJpaRepository orderRepository;
 
-    @Mock private SalesService salesService;
+    @Mock private com.shoppinglive.commercecore.sku.service.SkuService salesService;
 
     @InjectMocks private OrderService orderService;
 
@@ -119,7 +118,7 @@ class OrderServiceTest {
                 "OD-20260920-000001", "11111111-1111-4111-8111-111111111111");
 
         verify(orderRepository).cancelOrder(order.getId());
-        verify(salesService).restoreReserved(order.getSalesInfoId(), order.getQuantity());
+        verify(salesService).release(order.getSalesInfoId(), order.getQuantity());
     }
 
     @Test
@@ -167,7 +166,7 @@ class OrderServiceTest {
         given(orderRepository.cancelOrder(order.getId())).willReturn(1);
         doThrow(new IllegalStateException("예약 재고 복원에 실패했습니다."))
                 .when(salesService)
-                .restoreReserved(order.getSalesInfoId(), order.getQuantity());
+                .release(order.getSalesInfoId(), order.getQuantity());
 
         assertThatThrownBy(
                         () ->

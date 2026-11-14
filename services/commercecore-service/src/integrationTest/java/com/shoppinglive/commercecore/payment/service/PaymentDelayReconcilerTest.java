@@ -89,6 +89,7 @@ class PaymentDelayReconcilerTest
                         status ->
                                 orderRepository.transitionStatus(
                                         orderId, "PENDING_PAYMENT", "PAYMENT_CONFIRMING"));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -131,7 +132,7 @@ class PaymentDelayReconcilerTest
         Order refreshedOrder = orderRepository.findById(orderId).orElseThrow();
         assertThat(refreshedOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock stock = legacyStock(salesInfoId);
         // consumeReserved: reserved 1 → 0, available 4 그대로
         assertThat(stock.getReserved()).isZero();
         assertThat(stock.getAvailable()).isEqualTo(4);
@@ -156,8 +157,7 @@ class PaymentDelayReconcilerTest
                 .isNull();
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
-        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved())
-                .isEqualTo(1);
+        assertThat(legacyStock(salesInfoId).getReserved()).isEqualTo(1);
 
         assertThat(
                         tx.<Integer>execute(
@@ -177,7 +177,7 @@ class PaymentDelayReconcilerTest
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);
-        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(salesInfoId).getReserved()).isZero();
     }
 
     @DisplayName("지연된 INSTANT_FAIL 결제는 FAILED로 확정하고 재고를 복구한다")
@@ -190,7 +190,7 @@ class PaymentDelayReconcilerTest
         Order refreshedOrder = orderRepository.findById(orderId).orElseThrow();
         assertThat(refreshedOrder.getStatus()).isEqualTo(OrderStatus.FAILED);
 
-        SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock stock = legacyStock(salesInfoId);
         // restoreReserved: 예약 재고 1 → 0, 가용 재고 4 → 5
         assertThat(stock.getReserved()).isZero();
         assertThat(stock.getAvailable()).isEqualTo(5);
@@ -207,7 +207,7 @@ class PaymentDelayReconcilerTest
         // 두 번째 실행에서도 attempt 는 스캔 대상 아님 (status = SUCCESS)
         assertThat(secondRun).isZero();
 
-        SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock stock = legacyStock(salesInfoId);
         // consumeReserved 한 번만 적용
         assertThat(stock.getReserved()).isZero();
         assertThat(stock.getAvailable()).isEqualTo(4);
@@ -223,7 +223,7 @@ class PaymentDelayReconcilerTest
         // 이미 완료된 결제는 뒤늦게 실행된 프로세스 내부 콜백이 다시 처리할 수 없다.
         assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
         assertThat(reconciler.reconcileOverdue()).isZero();
-        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(salesInfoId).getReserved()).isZero();
     }
 
     private PaymentExecution overdueGroupAttempt(Long childId, String key) {
@@ -256,10 +256,11 @@ class PaymentDelayReconcilerTest
     @Test
     void failedApprovedGroupDoesNotBlockNextPaymentAndRemainsRetryable() {
         PaymentExecution failed = overdueGroupAttempt(orderId, "broken-group");
-        jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", salesInfoId);
+        jdbc.update("UPDATE sku SET reserved=0 WHERE id=?", salesInfoId);
         Long healthySales =
                 salesRepository.save(new Sales(401L, 10_000L, SalesStatus.ON_SALE)).getId();
         salesStockRepository.save(new SalesStock(healthySales, 4, 1));
+        addMissingLegacyTradeFixtures();
         Order healthyOrder =
                 orderRepository.saveAndFlush(
                         new Order(
@@ -295,10 +296,9 @@ class PaymentDelayReconcilerTest
                 .isEqualTo(OrderStatus.PAID);
         assertThat(paymentAttemptRepository.findById(healthy.getId()).orElseThrow().getStatus())
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
-        assertThat(salesStockRepository.findById(healthySales).orElseThrow().getReserved())
-                .isZero();
+        assertThat(legacyStock(healthySales).getReserved()).isZero();
 
-        jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesInfoId);
+        jdbc.update("UPDATE sku SET reserved=1 WHERE id=?", salesInfoId);
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 failed.getId());
@@ -306,8 +306,7 @@ class PaymentDelayReconcilerTest
         assertThat(recovery.reconcileOverdue()).isZero();
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PAID);
-        assertThat(salesStockRepository.findById(salesInfoId).orElseThrow().getReserved()).isZero();
-        assertThat(salesStockRepository.findById(healthySales).orElseThrow().getReserved())
-                .isZero();
+        assertThat(legacyStock(salesInfoId).getReserved()).isZero();
+        assertThat(legacyStock(healthySales).getReserved()).isZero();
     }
 }

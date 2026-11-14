@@ -63,6 +63,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         productLookup.register(new ProductSnapshot(99001L, "상품", null, SELLER));
         stockId = sales.saveAndFlush(new Sales(99001L, 10000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(stockId, 5, 0));
+        prepareLegacyTradeFixtures();
         jdbc.update(
                 "INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,starts_at,ends_at,expires_at,created_at) VALUES(?,?,'쿠폰',1000,1,1,CURRENT_TIMESTAMP-INTERVAL '1 minute',CURRENT_TIMESTAMP+INTERVAL '1 hour',CURRENT_TIMESTAMP+INTERVAL '2 hours',CURRENT_TIMESTAMP)",
                 COUPON,
@@ -130,7 +131,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                 .extracting(o -> o.getStatus().name())
                 .containsOnly("PAYMENT_CONFIRMING");
         assertThat(coupon()).isEqualTo("RESERVED");
-        assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isEqualTo(1);
+        assertThat(legacyStock(stockId).getReserved()).isEqualTo(1);
     }
 
     @DisplayName("승인 응답이 유실되면 예약을 유지하고 재승인 없이 기존 승인을 반영한다")
@@ -144,7 +145,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         due(p.getId());
         assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         assertThat(coupon()).isEqualTo("USED");
-        assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(stockId).getReserved()).isZero();
         assertThat(
                         paymentServer.jdbc.queryForObject(
                                 "SELECT retry_count FROM payment_attempt WHERE id=?",
@@ -168,8 +169,8 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
         due(p.getId());
         assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         assertThat(coupon()).isEqualTo("AVAILABLE");
-        assertThat(stocks.findById(stockId).orElseThrow().getAvailable()).isEqualTo(5);
-        assertThat(stocks.findById(stockId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(stockId).getAvailable()).isEqualTo(5);
+        assertThat(legacyStock(stockId).getReserved()).isZero();
         assertThat(attempts.findById(p.getId()).orElseThrow().getStatus())
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.FAILED);
     }
@@ -250,7 +251,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
     @Test
     void approvalSurvivesBusinessRollbackAndDoesNotConsumeAnotherInvocation() {
         var p = start(PaymentScenario.INSTANT_SUCCESS);
-        jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", stockId);
+        jdbc.update("UPDATE sku SET reserved=0 WHERE id=?", stockId);
         assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(p.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(coupon()).isEqualTo("RESERVED");
@@ -261,7 +262,7 @@ class PaymentRecoveryPostgresTest extends PaymentDatabaseTestSupport {
                         paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
                 .isEqualTo(1);
-        jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", stockId);
+        jdbc.update("UPDATE sku SET reserved=1 WHERE id=?", stockId);
         due(p.getId());
         assertThat(dispatcher.dispatch(deliveries.byPayment(p.getId()))).isTrue();
         verify(gateway, times(1))

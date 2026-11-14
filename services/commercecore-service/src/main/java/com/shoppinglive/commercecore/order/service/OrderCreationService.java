@@ -15,19 +15,13 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
-import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.time.Duration;
-import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -35,7 +29,6 @@ import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -72,38 +65,36 @@ public class OrderCreationService {
     private final Object[] idempotencyLocks = createLockStripes();
 
     private final OrderJpaRepository orderRepository;
-    private final SalesJpaRepository salesRepository;
-    private final SalesStockJpaRepository salesStockRepository;
+    private final LegacyOrderSkuService trading;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final ProductLookup productLookup;
     private final OrderNumberGenerator orderNumberGenerator;
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
     @PersistenceContext private EntityManager entityManager;
-    private final Duration expiration;
+    private final OrderTimeSource time;
     private final PurchaseGuard purchaseGuard;
     private final PaymentGroupService paymentGroups;
 
     public OrderCreationService(
             OrderJpaRepository orderRepository,
-            SalesJpaRepository salesRepository,
-            SalesStockJpaRepository salesStockRepository,
+            LegacyOrderSkuService trading,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             ProductLookup productLookup,
             OrderNumberGenerator orderNumberGenerator,
             CartItemRepository cartItems,
             TransactionTemplate transactionTemplate,
             PurchaseGuard purchaseGuard,
             PaymentGroupService paymentGroups,
-            // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
-            // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
-            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
+            OrderTimeSource time) {
         this.orderRepository = orderRepository;
-        this.salesRepository = salesRepository;
-        this.salesStockRepository = salesStockRepository;
+        this.trading = trading;
+        this.skus = skus;
         this.productLookup = productLookup;
         this.orderNumberGenerator = orderNumberGenerator;
         this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
-        this.expiration = expiration;
+        this.time = time;
         this.purchaseGuard = purchaseGuard;
         this.paymentGroups = paymentGroups;
     }
@@ -182,7 +173,7 @@ public class OrderCreationService {
                         order.getRequestedTotalAmount(), request.expectedTotalAmount())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
         }
-        return OrderCreationResult.replayed(order);
+        return replayResult(order);
     }
 
     private void validateKey(String key, boolean required) {
@@ -285,24 +276,13 @@ public class OrderCreationService {
                                     ErrorCode.CONFLICT, "장바구니가 변경되었습니다. 다시 확인해 주세요.");
                         }
                     }
-                    Sales sales =
-                            salesRepository
-                                    .findByProductId(command.productId())
-                                    .orElseThrow(
-                                            () ->
-                                                    new SalesNotFoundException(
-                                                            "상품의 판매정보를 찾을 수 없습니다: productId="
-                                                                    + command.productId()));
-
-                    purchaseGuard.lockSales(sales.getId());
-                    if (entityManager != null) {
-                        entityManager.refresh(sales);
-                    }
-                    if (!sales.getStatus().canAcceptNewOrder()) {
-                        throw new OrderNotAcceptableException(sales.getStatus());
-                    }
-
-                    long unitPrice = sales.getPrice();
+                    var selectedSkus = new java.util.HashMap<Long, Long>();
+                    selectedSkus.put(
+                            command.productId(), selected == null ? null : selected.getSkuId());
+                    var sales = trading.lockForNewOrder(selectedSkus).getFirst();
+                    if (!sales.status().canAcceptNewOrder())
+                        throw new OrderNotAcceptableException(sales.status());
+                    long unitPrice = sales.price();
                     long totalAmount = OrderAmounts.total(unitPrice, command.quantity());
                     command.verifyExpectedAmount(totalAmount);
                     var coupon =
@@ -320,7 +300,7 @@ public class OrderCreationService {
                     Order order =
                             new Order(
                                     orderNumberGenerator.generate(),
-                                    sales.getId(),
+                                    sales.skuId(),
                                     command.quantity(),
                                     unitPrice,
                                     command.buyerName(),
@@ -328,25 +308,15 @@ public class OrderCreationService {
                                     command.memberId(),
                                     productName,
                                     idempotencyKey,
-                                    Instant.now().plus(expiration),
+                                    time.now().plusSeconds(600),
                                     command.sourceCartItemId(),
                                     command.expectedTotalAmount(),
                                     coupon.discountAmount());
+                    order.recordSkuSource(sales.skuId(), command.productId());
                     order.recordSourceCartVersion(command.sourceCartItemVersion());
                     order = orderRepository.saveAndFlush(order);
 
-                    // 조건부 UPDATE. 이 한 줄이 초과 판매를 막는다. 동시에 들어온 요청들은 행 잠금으로
-                    // 줄을 서고, 재고가 모자란 순간부터 대상 행이 0 이 되어 여기서 걸러진다. 실패하면
-                    // 위의 주문 INSERT 까지 함께 롤백되므로 "주문만 있고 재고는 그대로" 가 남지 않는다.
-                    if (salesStockRepository.reserve(sales.getId(), command.quantity()) == 0) {
-                        throw new InsufficientStockException(
-                                "주문 가능한 재고가 부족합니다: productId="
-                                        + command.productId()
-                                        + ", quantity="
-                                        + command.quantity());
-                    }
-
-                    markSoldOutIfDepleted(sales);
+                    skus.reserve(sales.skuId(), command.quantity());
                     if (coupon.couponId() == null) {
                         paymentGroups.bindSingle(
                                 order,
@@ -364,33 +334,13 @@ public class OrderCreationService {
                 });
     }
 
-    /**
-     * 이번 주문으로 판매 가능 재고가 0 이 되면 판매 상태를 품절로 바꾼다 (판매 4 기준).
-     *
-     * <p>실패해도 주문을 롤백하지 않는다. 상태가 잠시 늦게 따라가도 신규 주문은 어차피 재고 조건부 UPDATE 가 막고, 다음 주문·재고 조정 때 다시 맞춰진다. 이미
-     * 다른 트랜잭션이 전이를 마쳤으면 조건부 UPDATE 가 0 행을 반환하므로 중복 전이도 없다.
-     */
-    private void markSoldOutIfDepleted(Sales sales) {
-        SalesStock stock = salesStockRepository.findById(sales.getId()).orElse(null);
-        if (stock == null || stock.getAvailable() > 0) {
-            return;
-        }
-
-        int updated =
-                salesRepository.transitionStatus(
-                        sales.getId(), SalesStatus.ON_SALE.name(), SalesStatus.SOLD_OUT.name());
-        if (updated > 0) {
-            log.info("주문 후 판매 상태를 SOLD_OUT으로 변경: 판매정보 ID={}", sales.getId());
-        }
-    }
-
     /** 멱등키만으로 다른 구매자의 주문 결과를 공개하지 않는다. 충돌 경로에도 같은 검증을 쓴다. */
     private OrderCreationResult replayMatching(CreateOrderCommand command, Order order) {
-        boolean sameProduct =
-                salesRepository
-                        .findById(order.getSalesInfoId())
-                        .map(sales -> Objects.equals(sales.getProductId(), command.productId()))
-                        .orElse(false);
+        boolean sameProduct = Objects.equals(order.getProductIdSnapshot(), command.productId());
+        if (order.getProductIdSnapshot() == null)
+            sameProduct =
+                    skus.findBySkuIds(List.of(order.getTradeSkuId())).stream()
+                            .anyMatch(sku -> Objects.equals(sku.productId(), command.productId()));
         if (!Objects.equals(order.getMemberId(), command.memberId())
                 || !Objects.equals(order.getSourceCartItemId(), command.sourceCartItemId())
                 || !sameProduct
@@ -404,6 +354,15 @@ public class OrderCreationService {
                                 : order.getPaymentGroup().getCouponId(),
                         command.couponId())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
+        }
+        return replayResult(order);
+    }
+
+    private OrderCreationResult replayResult(Order order) {
+        if (order.getPaymentGroup() != null && order.getPaymentGroup().enforcesDeadline()) {
+            paymentGroups.expire(order.getPaymentGroup().getId());
+            return OrderCreationResult.replayed(
+                    orderRepository.findById(order.getId()).orElseThrow());
         }
         return OrderCreationResult.replayed(order);
     }

@@ -2,13 +2,15 @@
 
 <!-- visual: relations -->
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
+기준: `cc91c09b`와 #331 종료 보상 변경. 실제 PostgreSQL / Mock gateway 검증 결과이며 외부 PG·운영 실행과 구분한다.
 
 [시각 자료](refund.html)
 
 ## 범위와 불변조건
 
-payment.refunds.execution-enabled=false일 때 양수·0원 모두 접수만 하고 자동 실행·확정을 하지 않는다. 원결제→환불 실행 순서로 잠그고 PROCESSING/UNKNOWN/SUCCESS 합계로 한도를 검사한다. lease를 잃은 worker의 늦은 결과 쓰기는 허용하지 않는다.
+payment.refunds.execution-enabled=false일 때 일반 환불은 양수·0원 모두 접수만 한다. 저장된 주문 종료와 원결제 전액을 대조한 보상만 예약·실행·재시작 스캔에 포함한다. 원결제→환불 실행 순서로 잠그고 PROCESSING/UNKNOWN/SUCCESS 합계로 한도를 검사한다. lease를 잃은 worker의 늦은 결과 쓰기는 허용하지 않는다.
+
+보상 통지가 종료 HTTP보다 먼저 도착하면 503을 반환해 종료 전달 후 같은 요청으로 재시도한다. 다른 종료/환불 ID로 원결제를 중복 보상할 수 없고 동일 키의 변경 원문은 409다. 0원 실행은 PG를 생략하며 Core는 과금 없는 늦은 성공에 보상 환불 자체를 만들지 않는다.
 
 ## 전이
 
@@ -30,4 +32,4 @@ payment.refunds.execution-enabled=false일 때 양수·0원 모두 접수만 하
 
 관련 기존 테스트: [RefundRecoveryStorePostgresTest.java](../../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/RefundRecoveryStorePostgresTest.java) · [RefundMockEngineTest.java](../../../../../services/payment-service/src/test/java/com/shoppinglive/payment/service/RefundMockEngineTest.java).
 
-테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
+RefundMockEngineTest와 PaymentBoundaryPostgresTest에서 일반 환불 비활성 상태의 보상 전용 예약/재시작 복구, 일반 환불 대기, 보상 중복/변경 요청·선도착 재시도를 검증했다. 실제 건수와 환경은 Payment 결제 상태 문서의 검사 결과를 따른다. Core 재고·쿠폰 재복구 금지의 통합 증거는 Core 테스트에서 별도 확인한다.

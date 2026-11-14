@@ -13,8 +13,8 @@ import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository;
 import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository.ExistingRequest;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commercecore.sku.dto.SkuView;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.nio.charset.StandardCharsets;
@@ -46,7 +46,7 @@ public class RefundIntakeService {
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final PaymentClient attempts;
-    private final SalesJpaRepository sales;
+    private final SkuService skus;
     private final ProductLookup productLookup;
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -60,7 +60,7 @@ public class RefundIntakeService {
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
             PaymentClient attempts,
-            SalesJpaRepository sales,
+            SkuService skus,
             ProductLookup productLookup,
             JdbcTemplate jdbc,
             RefundQueryService queries,
@@ -73,7 +73,7 @@ public class RefundIntakeService {
                 groups,
                 orders,
                 attempts,
-                sales,
+                skus,
                 productLookup,
                 jdbc,
                 queries,
@@ -89,7 +89,7 @@ public class RefundIntakeService {
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
             PaymentClient attempts,
-            SalesJpaRepository sales,
+            SkuService skus,
             ProductLookup productLookup,
             JdbcTemplate jdbc,
             RefundQueryService queries,
@@ -102,7 +102,7 @@ public class RefundIntakeService {
         this.groups = groups;
         this.orders = orders;
         this.attempts = attempts;
-        this.sales = sales;
+        this.skus = skus;
         this.productLookup = productLookup;
         this.jdbc = jdbc;
         this.queries = queries;
@@ -222,6 +222,9 @@ public class RefundIntakeService {
             return new RequestResult(queries.load(existing.id(), groupNumber), false);
         }
 
+        if (group.isOrderSheet())
+            throw new BusinessException(
+                    ErrorCode.SERVICE_UNAVAILABLE, "SKU 주문의 부분 환불 정책을 확정한 뒤 접수를 지원합니다.");
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         if (group.getStatus() != OrderStatus.PAID
                 || groupOrders.isEmpty()
@@ -282,11 +285,10 @@ public class RefundIntakeService {
         } catch (ArithmeticException overflow) {
             throw new BusinessException(ErrorCode.CONFLICT, "환불 금액 범위를 초과했습니다.");
         }
-        Set<Long> salesIds =
-                targets.stream().map(Order::getSalesInfoId).collect(Collectors.toSet());
+        Set<Long> salesIds = targets.stream().map(Order::getTradeSkuId).collect(Collectors.toSet());
         Map<Long, Long> productIds =
-                sales.findAllById(salesIds).stream()
-                        .collect(Collectors.toMap(Sales::getId, Sales::getProductId));
+                skus.findBySkuIds(salesIds).stream()
+                        .collect(Collectors.toMap(SkuView::skuId, SkuView::productId));
         if (!productIds.keySet().containsAll(salesIds)) {
             throw new BusinessException(ErrorCode.CONFLICT, "주문 상품 스냅샷을 확인할 수 없습니다.");
         }
@@ -309,15 +311,16 @@ public class RefundIntakeService {
             jdbc.update(
                     """
                 INSERT INTO refund_target_order
-                    (refund_request_id, order_id, product_id_snapshot, seller_id_snapshot, refund_amount, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (refund_request_id, order_id, product_id_snapshot, seller_id_snapshot, refund_amount, created_at, quantity)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     requestId,
                     order.getId(),
-                    productIds.get(order.getSalesInfoId()),
-                    sellerIds.get(productIds.get(order.getSalesInfoId())),
+                    productIds.get(order.getTradeSkuId()),
+                    sellerIds.get(productIds.get(order.getTradeSkuId())),
                     order.getPayableAmount(),
-                    Timestamp.from(now));
+                    Timestamp.from(now),
+                    order.getQuantity());
         }
         deliveries.refund(
                 requestId,

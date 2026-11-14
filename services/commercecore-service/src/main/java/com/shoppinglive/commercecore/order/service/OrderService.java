@@ -4,7 +4,6 @@ import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.exception.OrderCannotBeCancelledException;
 import com.shoppinglive.commercecore.order.exception.OrderNotFoundException;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import org.springframework.data.domain.Page;
@@ -22,12 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private final OrderJpaRepository orderRepository;
-    private final SalesService salesService;
+    private final com.shoppinglive.commercecore.sku.service.SkuService salesService;
     private final com.shoppinglive.commercecore.order.service.PaymentGroupService groups;
 
     public OrderService(
             OrderJpaRepository orderRepository,
-            SalesService salesService,
+            com.shoppinglive.commercecore.sku.service.SkuService salesService,
             com.shoppinglive.commercecore.order.service.PaymentGroupService groups) {
         this.orderRepository = orderRepository;
         this.salesService = salesService;
@@ -51,11 +50,19 @@ public class OrderService {
      *
      * <p>존재하지 않는 주문번호 · 다른 회원를 동일 404 로 통합 (leak 방지).
      */
-    @Transactional(readOnly = true)
     public Order findByOrderNumberAndMemberId(String orderNumber, String memberId) {
-        return orderRepository
-                .findByOrderNumberAndMemberId(orderNumber, memberId)
-                .orElseThrow(() -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderNumber));
+        Order order =
+                orderRepository
+                        .findByOrderNumberAndMemberId(orderNumber, memberId)
+                        .orElseThrow(
+                                () -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderNumber));
+        if (order.getPaymentGroup() != null && order.getPaymentGroup().enforcesDeadline()) {
+            groups.expire(order.getPaymentGroup().getId());
+            return orderRepository
+                    .findByOrderNumberAndMemberId(orderNumber, memberId)
+                    .orElseThrow();
+        }
+        return order;
     }
 
     /**
@@ -76,7 +83,13 @@ public class OrderService {
      */
     @Transactional
     public void cancelBeforePayment(String orderNumber, String memberId) {
-        Order order = findByOrderNumberAndMemberId(orderNumber, memberId);
+        // 취소 경로에서는 만료 후 거절 예외가 같은 트랜잭션의 만료를 롤백하지 않게
+        // 원본 조회 뒤 그룹 생명주기에서 만료를 판정한다.
+        Order order =
+                orderRepository
+                        .findByOrderNumberAndMemberId(orderNumber, memberId)
+                        .orElseThrow(
+                                () -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderNumber));
 
         if (order.getPaymentGroup() != null) {
             if (orderRepository
@@ -93,6 +106,6 @@ public class OrderService {
             throw new OrderCannotBeCancelledException(orderNumber);
         }
 
-        salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+        salesService.release(order.getTradeSkuId(), order.getQuantity());
     }
 }

@@ -40,6 +40,10 @@ public class CouponPreviewService {
     }
 
     public Preview preview(String memberId, String couponId, List<PricedItem> items) {
+        return previewAt(memberId, couponId, items, Instant.now(clock));
+    }
+
+    public Preview previewAt(String memberId, String couponId, List<PricedItem> items, Instant at) {
         if (memberId == null || memberId.isBlank() || items == null || items.isEmpty()) {
             throw invalid("회원과 주문 항목이 필요합니다.");
         }
@@ -87,7 +91,7 @@ public class CouponPreviewService {
         if (coupon == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "보유 쿠폰을 찾을 수 없습니다.");
         }
-        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        Instant now = at.truncatedTo(ChronoUnit.MICROS);
         if (!"AVAILABLE".equals(coupon.status())
                 || now.isBefore(coupon.startsAt())
                 || !now.isBefore(coupon.expiresAt())) {

@@ -19,18 +19,11 @@ import com.shoppinglive.commercecore.order.service.PaymentGroupService.Item;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Quote;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
-import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.security.MessageDigest;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,7 +35,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -54,8 +46,8 @@ class PaymentGroupCheckoutService {
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
-    private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
+    private final LegacyOrderSkuService trading;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final ProductLookup productLookup;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
@@ -65,15 +57,16 @@ class PaymentGroupCheckoutService {
     private final CouponPreviewService couponPreview;
     private final CouponReservationService couponReservations;
     private final PaymentGroupEventPublisher notificationEvents;
-    private final Duration expiration;
+    private final OrderTimeSource time;
+    private final OrderSheetLifecycleService sheetLifecycle;
     @PersistenceContext private EntityManager entityManager;
 
     PaymentGroupCheckoutService(
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
             CartItemRepository cart,
-            SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
+            LegacyOrderSkuService trading,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             ProductLookup productLookup,
             PurchaseGuard guard,
             TransactionTemplate tx,
@@ -83,12 +76,13 @@ class PaymentGroupCheckoutService {
             CouponPreviewService couponPreview,
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents,
-            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
+            OrderTimeSource time,
+            OrderSheetLifecycleService sheetLifecycle) {
         this.groups = groups;
         this.orders = orders;
         this.cart = cart;
-        this.sales = sales;
-        this.stock = stock;
+        this.trading = trading;
+        this.skus = skus;
         this.productLookup = productLookup;
         this.guard = guard;
         this.tx = tx;
@@ -98,7 +92,8 @@ class PaymentGroupCheckoutService {
         this.couponPreview = couponPreview;
         this.couponReservations = couponReservations;
         this.notificationEvents = notificationEvents;
-        this.expiration = expiration;
+        this.time = time;
+        this.sheetLifecycle = sheetLifecycle;
     }
 
     Quote preview(String member, List<Selection> selections, String couponId) {
@@ -117,16 +112,11 @@ class PaymentGroupCheckoutService {
                             .findProduct(c.getProductId())
                             .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다."))
                             .name();
-            Sales s =
-                    sales.findByProductId(c.getProductId())
-                            .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "판매 정보를 찾을 수 없습니다."));
-            SalesStock st =
-                    stock.findById(s.getId())
-                            .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "재고를 찾을 수 없습니다."));
-            if (!s.getStatus().canAcceptNewOrder() || st.getAvailable() < c.getQuantity()) {
+            var s = trading.read(c.getProductId(), c.getSkuId());
+            if (!s.status().canAcceptNewOrder() || s.available() < c.getQuantity()) {
                 throw conflict("구매할 수 없는 상품 또는 재고 부족입니다.");
             }
-            long amount = OrderAmounts.total(s.getPrice(), c.getQuantity());
+            long amount = OrderAmounts.total(s.price(), c.getQuantity());
             total = add(total, amount);
             items.add(
                     new Item(
@@ -135,7 +125,7 @@ class PaymentGroupCheckoutService {
                             c.getProductId(),
                             name,
                             c.getQuantity(),
-                            s.getPrice(),
+                            s.price(),
                             amount,
                             0L,
                             amount));
@@ -228,46 +218,25 @@ class PaymentGroupCheckoutService {
                             throw conflict("장바구니가 변경되었습니다.");
                         }
                     }
-                    List<Sales> selectedSales =
-                            quote.items().stream()
-                                    .map(
-                                            i ->
-                                                    sales.findByProductId(i.productId())
-                                                            .orElseThrow(
-                                                                    () ->
-                                                                            error(
-                                                                                    ErrorCode
-                                                                                            .NOT_FOUND,
-                                                                                    "판매 정보 없음")))
-                                    .sorted(Comparator.comparing(Sales::getId))
-                                    .toList();
-                    for (Sales s : selectedSales) {
-                        guard.lockSales(s.getId());
-                    }
-                    // DB 잠금을 확보한 뒤 가격을 다시 읽어 판매자의 가격 변경도 반영한다.
-                    Map<Long, Sales> currentSales = new HashMap<>();
+                    var selectedByProduct = new HashMap<Long, Long>();
+                    for (Item item : quote.items())
+                        selectedByProduct.put(
+                                item.productId(),
+                                cart.findById(item.itemId()).orElseThrow().getSkuId());
+                    var currentSales =
+                            trading.lockForNewOrder(selectedByProduct).stream()
+                                    .collect(
+                                            java.util.stream.Collectors.toMap(
+                                                    com.shoppinglive.commercecore.sku.dto.SkuView
+                                                            ::productId,
+                                                    s -> s));
                     long total = 0;
                     for (Item item : quote.items()) {
-                        Sales s = sales.findByProductId(item.productId()).orElseThrow();
-                        // 잠금 전에 읽은 JPA 스냅샷을 사용하지 않도록 JDBC로 조회한다.
-                        Long price =
-                                jdbc.queryForObject(
-                                        "SELECT price FROM sales_info WHERE id=?",
-                                        Long.class,
-                                        s.getId());
-                        String status =
-                                jdbc.queryForObject(
-                                        "SELECT status FROM sales_info WHERE id=?",
-                                        String.class,
-                                        s.getId());
-                        if (!SalesStatus.valueOf(status).canAcceptNewOrder()) {
-                            throw conflict("판매 중인 상품이 아닙니다.");
-                        }
-                        if (!Objects.equals(price, item.unitPrice())) {
+                        var s = currentSales.get(item.productId());
+                        if (!s.status().canAcceptNewOrder()) throw conflict("판매 중인 상품이 아닙니다.");
+                        if (s.price() != item.unitPrice())
                             throw conflict("가격이 변경되었습니다. 주문서를 다시 확인해 주세요.");
-                        }
-                        total = add(total, OrderAmounts.total(price, item.quantity()));
-                        currentSales.put(item.productId(), s);
+                        total = add(total, OrderAmounts.total(s.price(), item.quantity()));
                     }
                     if (total != expected) {
                         throw conflict("주문 금액이 변경되었습니다. 다시 확인해 주세요.");
@@ -276,20 +245,21 @@ class PaymentGroupCheckoutService {
                     PaymentGroup group =
                             groups.saveAndFlush(
                                     new PaymentGroup(
-                                            "PG-" + UUID.randomUUID(),
-                                            member,
-                                            key,
-                                            fingerprint,
-                                            total,
-                                            Instant.now().plus(expiration),
-                                            quote.discountAmount(),
-                                            couponId));
+                                                    "PG-" + UUID.randomUUID(),
+                                                    member,
+                                                    key,
+                                                    fingerprint,
+                                                    total,
+                                                    time.now().plusSeconds(600),
+                                                    quote.discountAmount(),
+                                                    couponId)
+                                            .useLegacyDeadlinePolicy());
                     for (Item item : quote.items()) {
-                        Sales s = currentSales.get(item.productId());
+                        var s = currentSales.get(item.productId());
                         Order order =
                                 new Order(
                                         numbers.generate(),
-                                        s.getId(),
+                                        s.skuId(),
                                         item.quantity(),
                                         item.unitPrice(),
                                         buyer,
@@ -301,14 +271,10 @@ class PaymentGroupCheckoutService {
                                         item.itemId(),
                                         expected,
                                         item.discountAmount());
+                        order.recordSkuSource(s.skuId(), item.productId());
                         order.attachGroup(group, item.version());
                         orders.saveAndFlush(order);
-                        if (stock.reserve(s.getId(), item.quantity()) != 1) {
-                            throw conflict("재고가 부족합니다.");
-                        }
-                        if (stock.findById(s.getId()).orElseThrow().getAvailable() == 0) {
-                            sales.transitionStatus(s.getId(), "ON_SALE", "SOLD_OUT");
-                        }
+                        skus.reserve(s.skuId(), item.quantity());
                     }
                     notificationEvents.publish("PaymentGroupCreated", group.getId(), Map.of());
                     return new Creation(
@@ -331,18 +297,19 @@ class PaymentGroupCheckoutService {
         PaymentGroup group =
                 groups.saveAndFlush(
                         new PaymentGroup(
-                                "PG-" + UUID.randomUUID(),
-                                order.getMemberId(),
-                                key,
-                                fingerprint(
-                                        List.of(
-                                                order.getOrderNumber(),
-                                                couponId == null ? "" : couponId,
-                                                discountAmount)),
-                                order.getTotalAmount(),
-                                order.getExpiresAt(),
-                                discountAmount,
-                                couponId));
+                                        "PG-" + UUID.randomUUID(),
+                                        order.getMemberId(),
+                                        key,
+                                        fingerprint(
+                                                List.of(
+                                                        order.getOrderNumber(),
+                                                        couponId == null ? "" : couponId,
+                                                        discountAmount)),
+                                        order.getTotalAmount(),
+                                        order.getExpiresAt(),
+                                        discountAmount,
+                                        couponId)
+                                .useLegacyDeadlinePolicy());
         order.attachGroup(group, sourceVersion);
         orders.saveAndFlush(order);
         notificationEvents.publish("PaymentGroupCreated", group.getId(), Map.of());
@@ -350,10 +317,15 @@ class PaymentGroupCheckoutService {
     }
 
     GroupResponse get(String member, String number) {
+        PaymentGroup found = owned(member, number);
+        if (found.enforcesDeadline()) sheetLifecycle.expire(found.getId());
         return tx.execute(t -> response(owned(member, number)));
     }
 
     Optional<GroupResponse> active(String member) {
+        for (var group : groups.findByMemberIdAndStatusIn(member, ACTIVE)) {
+            if (group.enforcesDeadline()) sheetLifecycle.expire(group.getId());
+        }
         return tx.execute(
                 t ->
                         groups.findByMemberIdAndStatusIn(member, ACTIVE).stream()

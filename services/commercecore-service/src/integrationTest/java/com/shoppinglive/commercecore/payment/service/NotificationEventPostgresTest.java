@@ -131,8 +131,23 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         failAfterRecording("OrderExpired");
         assertThatThrownBy(() -> paymentGroups.expire(id)).isInstanceOf(RuntimeException.class);
         assertThat(events("OrderExpired")).isEmpty();
-        assertThat(paymentGroups.get(MEMBER_A, group.groupNumber()).status().name())
+        // 공개 조회도 만료를 다시 시도하므로 장애 주입 중에는 원본에서 롤백을 확인한다.
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM payment_group WHERE id=?", String.class, id))
                 .isEqualTo("PENDING_PAYMENT");
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT status FROM orders WHERE payment_group_id=?",
+                                String.class,
+                                id))
+                .containsOnly("PENDING_PAYMENT");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT SUM(reserved) FROM sku WHERE id IN (SELECT sku_id FROM orders WHERE payment_group_id=?)",
+                                Long.class,
+                                id))
+                .isEqualTo(3);
         reset(outboxTarget());
         assertThat(paymentGroups.expire(id)).isTrue();
         assertThat(events("OrderExpired")).hasSize(1);

@@ -19,8 +19,8 @@ import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
-import com.shoppinglive.commercecore.sales.service.SalesRegistrationService;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.event.SkuEventTracker;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.EventOutbox;
@@ -49,9 +49,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
-    @Autowired SalesRegistrationService registration;
-    @Autowired SalesService sales;
-    @Autowired SalesInfoEventTracker tracker;
+    @Autowired SkuSalesService registration;
+    @Autowired SkuSalesService sales;
+    @Autowired SkuEventTracker tracker;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired PaymentGroupService groups;
@@ -84,8 +84,10 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
 
     private long register(int available) {
         long product = Math.abs(UUID.randomUUID().getMostSignificantBits() >>> 1);
-        productLookup.register(new ProductSnapshot(product, "판매정보 테스트", null));
-        long id = registration.register(product, 1000L, available).getId();
+        productLookup.register(new ProductSnapshot(product, "판매정보 테스트", null, SELLER, true));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, product, SELLER);
+        jdbc.update("UPDATE product SET sale_enabled=TRUE WHERE id=?", product);
+        long id = registration.register(product, 1000L, available, SELLER).skuId();
         fixtureSales.add(id);
         return id;
     }
@@ -94,29 +96,28 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     void clean() {
         for (long id : fixtureSales) {
             jdbc.queryForList(
-                            "SELECT order_number FROM orders WHERE sales_info_id=?",
+                            "SELECT order_number FROM orders WHERE COALESCE(sku_id,sales_info_id)=?",
                             String.class,
                             id)
                     .forEach(scenarios::clear);
             jdbc.update(
-                    "DELETE FROM payment_delivery_request WHERE order_id IN (SELECT id FROM orders WHERE sales_info_id=?)",
+                    "DELETE FROM payment_delivery_request WHERE order_id IN (SELECT id FROM orders WHERE COALESCE(sku_id,sales_info_id)=?)",
                     id);
-            jdbc.update("DELETE FROM orders WHERE sales_info_id=?", id);
-            jdbc.update(
-                    "DELETE FROM cart_item WHERE product_id=(SELECT product_id FROM sales_info WHERE id=?)",
-                    id);
-            jdbc.update("DELETE FROM sales_stock WHERE sales_info_id=?", id);
-            jdbc.update("DELETE FROM sales_info WHERE id=?", id);
+            jdbc.update("DELETE FROM orders WHERE COALESCE(sku_id,sales_info_id)=?", id);
+            jdbc.update("DELETE FROM cart_item WHERE sku_id=?", id);
+            var products =
+                    jdbc.queryForList("SELECT product_id FROM sku WHERE id=?", Long.class, id);
+            jdbc.update("DELETE FROM sku WHERE id=?", id);
+            for (var product : products) jdbc.update("DELETE FROM product WHERE id=?", product);
         }
     }
 
     private long product(long id) {
-        return jdbc.queryForObject("SELECT product_id FROM sales_info WHERE id=?", Long.class, id);
+        return jdbc.queryForObject("SELECT product_id FROM sku WHERE id=?", Long.class, id);
     }
 
     private long version(long id) {
-        return jdbc.queryForObject(
-                "SELECT snapshot_version FROM sales_info WHERE id=?", Long.class, id);
+        return jdbc.queryForObject("SELECT snapshot_version FROM sku WHERE id=?", Long.class, id);
     }
 
     private String member() {
@@ -132,9 +133,9 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         emitted.clear();
         tx.executeWithoutResult(
                 status -> {
-                    sales.changePrice(id, 2000L);
-                    sales.adjustAvailable(id, 2);
-                    sales.changeStatus(id, SalesStatus.ON_SALE);
+                    sales.changePrice(id, 2000L, SELLER);
+                    sales.adjustAvailable(id, 2, SELLER);
+                    sales.changeStatus(id, SalesStatus.ON_SALE, SELLER);
                     assertThat(emitted).isEmpty();
                 });
         assertThat(emitted)
@@ -159,16 +160,16 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         emitted.clear();
         tx.executeWithoutResult(
                 status -> {
-                    sales.changePrice(id, 5000L);
+                    sales.changePrice(id, 5000L, SELLER);
                     status.setRollbackOnly();
                 });
-        sales.changePrice(id, 1000L);
-        sales.adjustAvailable(id, 0);
-        assertThatThrownBy(() -> sales.adjustAvailable(id, -4))
+        sales.changePrice(id, 1000L, SELLER);
+        sales.adjustAvailable(id, 0, SELLER);
+        assertThatThrownBy(() -> sales.adjustAvailable(id, -4, SELLER))
                 .isInstanceOf(InsufficientStockException.class);
         assertThat(emitted).isEmpty();
         assertThat(version(id)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT price FROM sales_info WHERE id=?", Long.class, id))
+        assertThat(jdbc.queryForObject("SELECT price FROM sku WHERE id=?", Long.class, id))
                 .isEqualTo(1000);
     }
 
@@ -187,7 +188,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Test
     void orderReservationSoldOutCancellationAndReplayPublishOnlyRealChanges() {
         long id = register(1);
-        sales.changeStatus(id, SalesStatus.ON_SALE);
+        sales.changeStatus(id, SalesStatus.ON_SALE, SELLER);
         emitted.clear();
         String member = member();
         var command = new CreateOrderCommand(product(id), 1, "구매자", "01012345678", member, 1000L);
@@ -218,7 +219,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         for (PaymentScenario scenario :
                 List.of(PaymentScenario.INSTANT_FAIL, PaymentScenario.INSTANT_SUCCESS)) {
             long id = register(2);
-            sales.changeStatus(id, SalesStatus.ON_SALE);
+            sales.changeStatus(id, SalesStatus.ON_SALE, SELLER);
             String member = member();
             var order =
                     creation.create(
@@ -247,8 +248,8 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Test
     void multiProductReservationAndExpiryCaptureEachSale() {
         long a = register(1), b = register(1);
-        sales.changeStatus(a, SalesStatus.ON_SALE);
-        sales.changeStatus(b, SalesStatus.ON_SALE);
+        sales.changeStatus(a, SalesStatus.ON_SALE, SELLER);
+        sales.changeStatus(b, SalesStatus.ON_SALE, SELLER);
         String member = member();
         var ca = cart.add(member, product(a), 1);
         var cb = cart.add(member, product(b), 1);
@@ -305,14 +306,14 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                     pool.submit(
                             () -> {
                                 start.await();
-                                sales.changePrice(id, 2000L);
+                                sales.changePrice(id, 2000L, SELLER);
                                 return null;
                             });
             var stock =
                     pool.submit(
                             () -> {
                                 start.await();
-                                sales.adjustAvailable(id, -1);
+                                sales.adjustAvailable(id, -1, SELLER);
                                 return null;
                             });
             start.countDown();
@@ -341,8 +342,9 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         tx.executeWithoutResult(
                 status -> {
-                    sales.changePrice(outerId, 2000L);
-                    inner.executeWithoutResult(ignored -> sales.adjustAvailable(innerId, 1));
+                    sales.changePrice(outerId, 2000L, SELLER);
+                    inner.executeWithoutResult(
+                            ignored -> sales.adjustAvailable(innerId, 1, SELLER));
                     status.setRollbackOnly();
                 });
         assertThat(emitted).hasSize(1);
@@ -355,7 +357,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @Test
     void trackerRejectsNonTransactionalCallsAndMissingSaleRemainsNotFound() {
         assertThatThrownBy(() -> tracker.watch(-1)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> sales.changePrice(Long.MAX_VALUE, 1000L))
+        assertThatThrownBy(() -> sales.changePrice(Long.MAX_VALUE, 1000L, SELLER))
                 .isInstanceOf(SalesNotFoundException.class);
     }
 }

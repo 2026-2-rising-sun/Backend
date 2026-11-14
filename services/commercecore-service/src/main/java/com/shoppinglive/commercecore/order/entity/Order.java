@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -37,7 +38,7 @@ public class Order extends BaseEntity {
     @Column(name = "order_number", nullable = false, updatable = false, length = 64)
     private String orderNumber;
 
-    @Column(name = "sales_info_id", nullable = false, updatable = false)
+    @Column(name = "sales_info_id", updatable = false)
     private Long salesInfoId;
 
     @Column(name = "quantity", nullable = false, updatable = false)
@@ -49,10 +50,10 @@ public class Order extends BaseEntity {
     @Column(name = "total_amount", nullable = false, updatable = false)
     private Long totalAmount;
 
-    @Column(name = "discount_amount", nullable = false, updatable = false)
+    @Column(name = "discount_amount", nullable = false)
     private Long discountAmount;
 
-    @Column(name = "payable_amount", nullable = false, updatable = false)
+    @Column(name = "payable_amount", nullable = false)
     private Long payableAmount;
 
     @Enumerated(EnumType.STRING)
@@ -113,6 +114,102 @@ public class Order extends BaseEntity {
 
     public void recordSourceCartVersion(Long version) {
         sourceCartItemVersion = version;
+    }
+
+    @Column(name = "sku_id", updatable = false)
+    private Long skuId;
+
+    @Column(name = "product_id_snapshot", updatable = false)
+    private Long productIdSnapshot;
+
+    @Column(name = "seller_id_snapshot", updatable = false, length = 36)
+    private String sellerIdSnapshot;
+
+    @Column(name = "main_image_snapshot", updatable = false, length = 2048)
+    private String mainImageSnapshot;
+
+    @Column(name = "selected_options_snapshot", updatable = false, columnDefinition = "TEXT")
+    private String selectedOptionsSnapshot;
+
+    public void selectDiscount(long discount) {
+        if (paymentGroup == null
+                || !paymentGroup.isOrderSheet()
+                || paymentGroup.getPaymentId() != null
+                || status != OrderStatus.PENDING_PAYMENT
+                || discount < 0
+                || discount > totalAmount)
+            throw new IllegalStateException("결제 요청 전 항목의 할인만 변경할 수 있습니다.");
+        discountAmount = discount;
+        payableAmount = totalAmount - discount;
+    }
+
+    public Long getSkuId() {
+        return skuId;
+    }
+
+    public Long getTradeSkuId() {
+        return skuId == null ? salesInfoId : skuId;
+    }
+
+    public void recordSkuSource(Long skuId, Long productId) {
+        this.skuId = Objects.requireNonNull(skuId);
+        this.productIdSnapshot = Objects.requireNonNull(productId);
+        this.salesInfoId = null;
+    }
+
+    public Long getProductIdSnapshot() {
+        return productIdSnapshot;
+    }
+
+    public String getSellerIdSnapshot() {
+        return sellerIdSnapshot;
+    }
+
+    public String getMainImageSnapshot() {
+        return mainImageSnapshot;
+    }
+
+    public String getSelectedOptionsSnapshot() {
+        return selectedOptionsSnapshot;
+    }
+
+    public static Order sheetItem(
+            String number,
+            Long skuId,
+            Long legacySalesId,
+            Long productId,
+            int quantity,
+            long price,
+            String name,
+            String seller,
+            String image,
+            String buyer,
+            String phone,
+            String member,
+            PaymentGroup group,
+            Long cartId,
+            Long cartVersion) {
+        Order item =
+                new Order(
+                        number,
+                        skuId,
+                        quantity,
+                        price,
+                        buyer,
+                        phone,
+                        member,
+                        name,
+                        null,
+                        group.getExpiresAt(),
+                        cartId,
+                        null);
+        item.salesInfoId = legacySalesId;
+        item.skuId = skuId;
+        item.productIdSnapshot = productId;
+        item.sellerIdSnapshot = seller;
+        item.mainImageSnapshot = image;
+        item.attachGroup(group, cartVersion);
+        return item;
     }
 
     protected Order() {

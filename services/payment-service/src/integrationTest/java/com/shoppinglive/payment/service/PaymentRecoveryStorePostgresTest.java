@@ -244,4 +244,20 @@ class PaymentRecoveryStorePostgresTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM event_outbox", Long.class)).isZero();
         assertThat(store.owns(lease)).isTrue();
     }
+
+    @Test
+    @DisplayName("미호출 종료도 만료된 lease나 교체된 토큰으로는 적용하지 않는다")
+    void closedUnstartedAttemptStillRequiresLiveLease() {
+        var lease = store.claim(5, LEASE).orElseThrow();
+        jdbc.update(
+                "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=5");
+        assertThat(store.rejectUnstarted(lease)).isFalse();
+        var replacement = store.claim(5, LEASE).orElseThrow();
+        assertThat(store.rejectUnstarted(lease)).isFalse();
+        assertThat(store.rejectUnstarted(replacement)).isTrue();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM payment_attempt WHERE id=5", String.class))
+                .isEqualTo("FAILED");
+    }
 }

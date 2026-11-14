@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "payment.core-service-token=payment-security-test-service-credential-32",
             "payment.execution.recovery-enabled=false",
             "payment.refunds.execution-enabled=false",
+            "payment.refunds.recovery.initial-delay=PT1H",
             "payment.dev.payment-scenario.enabled=true"
         })
 @AutoConfigureMockMvc
@@ -58,6 +59,49 @@ class PaymentSecurityIntegrationTest {
                                     .content("{}"))
                     .andExpect(status().isBadRequest());
         }
+    }
+
+    @Test
+    @DisplayName("주문 종료 API는 올바른 Core 서비스 토큰만 허용한다")
+    void closureRequiresCoreToken() throws Exception {
+        String path = "/v1/internal/payments/1/order-closure";
+        mvc.perform(put(path).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("X-Service-Token", "wrong-token")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("Authorization", "Bearer user-only-token")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        put(path)
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(
+            strings = {"null", "\"\"", "\"잘못된시각\"", "1794560000"})
+    @DisplayName("종료 시각은 null·빈 값·잘못된 ISO·숫자 epoch를 400으로 거절한다")
+    void closureRequiresIsoDateTime(String value) throws Exception {
+        String body =
+                "{\"closureRequestId\":\"11111111-1111-4111-8111-111111111111\",\"paymentRequestId\":\"22222222-2222-4222-8222-222222222222\",\"orderId\":1,\"paymentGroupId\":1,\"referenceNumber\":\"order\",\"amount\":1000,\"reason\":\"EXPIRED\",\"closedAt\":"
+                        + value
+                        + "}";
+        mvc.perform(
+                        put("/v1/internal/payments/1/order-closure")
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(body))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

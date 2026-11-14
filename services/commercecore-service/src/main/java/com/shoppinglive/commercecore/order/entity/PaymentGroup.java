@@ -24,10 +24,10 @@ public class PaymentGroup extends BaseEntity {
     @Column(name = "total_amount", nullable = false)
     private Long totalAmount;
 
-    @Column(name = "discount_amount", nullable = false, updatable = false)
+    @Column(name = "discount_amount", nullable = false)
     private Long discountAmount;
 
-    @Column(name = "payable_amount", nullable = false, updatable = false)
+    @Column(name = "payable_amount", nullable = false)
     private Long payableAmount;
 
     @Column(name = "coupon_id", length = 36)
@@ -43,7 +43,65 @@ public class PaymentGroup extends BaseEntity {
     @Column(name = "payment_id")
     private Long paymentId;
 
+    @Column(name = "policy_version", nullable = false, columnDefinition = "SMALLINT DEFAULT 0")
+    private short policyVersion;
+
+    @Column(name = "failure_reason", length = 32)
+    private String failureReason;
+
     @Version private Long version;
+
+    @Column(name = "coupon_order_item_id")
+    private Long couponOrderItemId;
+
+    public Long getCouponOrderItemId() {
+        return couponOrderItemId;
+    }
+
+    public void selectCoupon(String couponId, Long itemId, long discount) {
+        if (!isOrderSheet()
+                || status != OrderStatus.PENDING_PAYMENT
+                || paymentId != null
+                || discount < 0
+                || discount > totalAmount)
+            throw new IllegalStateException("결제 요청 전 주문서에서만 쿠폰을 선택할 수 있습니다.");
+        this.couponId = couponId;
+        this.couponOrderItemId = itemId;
+        this.discountAmount = discount;
+        this.payableAmount = totalAmount - discount;
+    }
+
+    public boolean isOrderSheet() {
+        return policyVersion == 1;
+    }
+
+    /** 기존 행은 0, 주문서는 1, 신규 구 API 주문은 2로 저장 기한을 강제한다. */
+    public boolean enforcesDeadline() {
+        return policyVersion == 1 || policyVersion == 2;
+    }
+
+    public PaymentGroup useLegacyDeadlinePolicy() {
+        policyVersion = 2;
+        return this;
+    }
+
+    public void useOrderSheetPolicy() {
+        policyVersion = 1;
+    }
+
+    public void failOrderSheet() {
+        status = OrderStatus.FAILED;
+        failureReason = "PAYMENT_FAILED";
+    }
+
+    public void expireOrderSheet() {
+        status = OrderStatus.FAILED;
+        failureReason = "EXPIRED";
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
 
     protected PaymentGroup() {}
 

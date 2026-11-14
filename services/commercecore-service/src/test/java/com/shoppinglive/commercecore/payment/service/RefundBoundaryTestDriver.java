@@ -65,8 +65,8 @@ public class RefundBoundaryTestDriver {
     }
 
     public boolean executeClaimed(RefundRecoveryStore.Lease lease, MockRefundScenario scenario) {
-        boolean resolved = execution.executeClaimed(lease, scenario);
-        handler.refund(client.refund(lease.requestId()));
-        return resolved;
+        execution.executeClaimed(lease, scenario);
+        // 작업자 처리 수는 Payment 확정 수와 Core 반영 수를 중복 합산하지 않는다.
+        return handler.refund(client.refund(lease.requestId()));
     }
 }

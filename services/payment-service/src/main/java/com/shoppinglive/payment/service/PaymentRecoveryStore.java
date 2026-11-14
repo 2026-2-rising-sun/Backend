@@ -21,9 +21,11 @@ public class PaymentRecoveryStore {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate independent;
     private final String now;
+    private final OrderClosureService closures;
 
     public PaymentRecoveryStore(JdbcTemplate jdbc, PlatformTransactionManager manager) {
         this.jdbc = jdbc;
+        this.closures = new OrderClosureService(jdbc, manager);
         independent = new TransactionTemplate(manager);
         independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         // H2는 기존 단위·HTTP 테스트에만 사용한다. 운영 환경에서는 PostgreSQL의 현재 시각을 사용한다.
@@ -89,6 +91,8 @@ public class PaymentRecoveryStore {
     public Optional<Integer> beginInvocation(Lease lease) {
         return independent.execute(
                 tx -> {
+                    // 종료 뒤에는 이전 호출의 결과만 조회하며 PG 승인을 새로 요청하지 않는다.
+                    if (closures.lockClosedAttempt(lease.id())) return Optional.<Integer>empty();
                     int changed =
                             jdbc.update(
                                     "UPDATE payment_attempt SET retry_count=CASE WHEN execution_started_at IS NULL "
@@ -110,6 +114,21 @@ public class PaymentRecoveryStore {
                                             Integer.class,
                                             lease.id()));
                 });
+    }
+
+    /** 호출자가 종료 제어 행을 잠근 상태에서 미호출 시도만 종결한다. 결과 Outbox는 같은 트랜잭션에 기록한다. */
+    public boolean rejectUnstarted(Lease lease) {
+        return jdbc.update(
+                        "UPDATE payment_attempt SET status='FAILED',resolved_at="
+                                + now
+                                + ",lease_token=NULL,lease_until=NULL,version=version+1,updated_at="
+                                + now
+                                + " WHERE "
+                                + fence()
+                                + " AND execution_started_at IS NULL",
+                        lease.id(),
+                        lease.token())
+                == 1;
     }
 
     public boolean unknown(Lease lease, Duration delay) {

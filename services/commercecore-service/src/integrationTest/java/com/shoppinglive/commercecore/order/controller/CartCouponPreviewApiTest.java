@@ -68,6 +68,7 @@ class CartCouponPreviewApiTest extends CommerceCoreSecurityTestSupport {
         stocks.saveAndFlush(new SalesStock(firstSales.getId(), 10, 0));
         stocks.saveAndFlush(new SalesStock(secondSales.getId(), 10, 0));
         stocks.saveAndFlush(new SalesStock(thirdSales.getId(), 10, 0));
+        prepareLegacyTradeFixtures();
         first = cart.add(MEMBER_A, 1L, 2);
         second = cart.add(MEMBER_A, 2L, 1);
         ineligible = cart.add(MEMBER_A, 3L, 1);

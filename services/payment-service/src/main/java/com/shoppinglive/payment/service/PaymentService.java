@@ -23,6 +23,7 @@ public class PaymentService {
     private final TransactionTemplate tx;
     private final JdbcTemplate jdbc;
     private final ExecutionResultPublisher events;
+    private final OrderClosureService closures;
     private final org.springframework.beans.factory.ObjectProvider<DevPaymentScenarioRegistry>
             scenarios;
 
@@ -35,6 +36,7 @@ public class PaymentService {
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             ExecutionResultPublisher events,
+            OrderClosureService closures,
             org.springframework.beans.factory.ObjectProvider<DevPaymentScenarioRegistry>
                     scenarios) {
         this.attempts = attempts;
@@ -45,14 +47,17 @@ public class PaymentService {
         this.tx = tx;
         this.jdbc = jdbc;
         this.events = events;
+        this.closures = closures;
         this.scenarios = scenarios;
     }
 
     public PaymentExecution start(PaymentCommand command) {
         requireUuid(command.requestId());
+        closures.ensure(command.paymentId(), command.requestId());
         try {
             return tx.execute(
                     status -> {
+                        boolean closed = closures.closed(command);
                         var existing = existing(command);
                         if (existing != null) return existing;
                         var attempt =
@@ -69,11 +74,12 @@ public class PaymentService {
                                 command.paymentGroupId(),
                                 command.referenceNumber(),
                                 command.amount());
-                        if (command.amount() == 0)
+                        if (closed) attempt.rejectClosedOrder(attempt.getRequestedAt());
+                        else if (command.amount() == 0)
                             attempt.completeWithoutCharge(attempt.getRequestedAt());
                         attempts.saveAndFlush(attempt);
                         var result = getByAttemptId(attempt.getId());
-                        if (command.amount() == 0) events.payment(result);
+                        if (closed || command.amount() == 0) events.payment(result);
                         else
                             AfterCommit.run(
                                     () -> engine.schedule(attempt.getId(), attempt.getScenario()));
@@ -122,6 +128,16 @@ public class PaymentService {
     }
 
     public boolean resolveClaimed(Lease lease) {
+        boolean closedBeforeInvocation =
+                Boolean.TRUE.equals(
+                        tx.execute(
+                                t -> {
+                                    if (!closures.lockClosedAttempt(lease.id())) return false;
+                                    if (!recovery.rejectUnstarted(lease)) return false;
+                                    events.payment(getByAttemptId(lease.id()));
+                                    return true;
+                                }));
+        if (closedBeforeInvocation) return true;
         int count = lease.retryCount();
         try {
             PaymentStatus result = gateway.find(lease.id());

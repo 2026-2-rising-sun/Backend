@@ -56,6 +56,8 @@ public class RefundQueryService {
                                 () ->
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
+        if (group.isOrderSheet())
+            throw new BusinessException(ErrorCode.CONFLICT, "SKU 주문서는 주문서 항목 환불 API를 사용해 주세요.");
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         PaymentExecution attempt =
                 group.getPaymentId() == null ? null : attempts.get(group.getPaymentId());

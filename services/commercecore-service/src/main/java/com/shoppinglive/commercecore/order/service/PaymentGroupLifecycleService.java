@@ -10,13 +10,10 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -29,10 +26,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 class PaymentGroupLifecycleService {
     private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
+    private final OrderSheetLifecycleService sheets;
+    private final OrderTimeSource time;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
+    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final PaymentDispatcher dispatcher;
@@ -44,9 +42,10 @@ class PaymentGroupLifecycleService {
 
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
+            OrderSheetLifecycleService sheets,
+            OrderTimeSource time,
             OrderJpaRepository orders,
-            SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
+            com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             PaymentDispatcher dispatcher,
@@ -57,9 +56,10 @@ class PaymentGroupLifecycleService {
             ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
         this.telemetry = telemetry;
         this.groups = groups;
+        this.sheets = sheets;
+        this.time = time;
         this.orders = orders;
-        this.sales = sales;
-        this.stock = stock;
+        this.skus = skus;
         this.payments = payments;
         this.guard = guard;
         this.dispatcher = dispatcher;
@@ -71,19 +71,27 @@ class PaymentGroupLifecycleService {
 
     PaymentExecution start(String member, String number, String key) {
         PaymentGroup found = owned(member, number);
+        if (found.isOrderSheet()) {
+            var accepted = sheets.start(member, number, key, null);
+            return dispatcher.paymentAfterCommit(accepted.paymentId());
+        }
+        if (found.enforcesDeadline()) sheets.expire(found.getId());
         guard.ensure(member);
         PaymentExecution accepted =
                 tx.execute(
                         t -> {
                             guard.lock(member);
                             PaymentGroup g = lockedGroup(found.getId());
+                            if (g.enforcesDeadline()
+                                    && (sheets.expire(g.getId())
+                                            || "EXPIRED".equals(g.getFailureReason()))) return null;
                             if (g.getPaymentId() != null) {
                                 if (Objects.equals(payments.key(g.getPaymentId()), key))
                                     return payments.payment(g.getPaymentId());
                                 throw conflict("이미 결제를 시작했습니다. 기존 결과를 확인해 주세요.");
                             }
                             if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                                    || !g.getExpiresAt().isAfter(Instant.now()))
+                                    || !g.getExpiresAt().isAfter(time.now()))
                                 throw conflict("결제를 시작할 수 없는 주문입니다.");
                             List<Order> children =
                                     orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
@@ -108,6 +116,7 @@ class PaymentGroupLifecycleService {
                             }
                             return request;
                         });
+        if (accepted == null) throw conflict("주문의 10분 기한이 지났습니다.");
         // 전달 요청과 주문 상태를 커밋한 뒤 HTTP를 호출한다. 0원도 Payment 원본을 저장한다.
         return dispatcher.paymentAfterCommit(accepted.paymentId());
     }
@@ -117,11 +126,17 @@ class PaymentGroupLifecycleService {
         PaymentExecution p = payments.payment(id);
         if (!Objects.equals(p.paymentGroupId(), g.getId()))
             throw error(ErrorCode.NOT_FOUND, "결제를 찾을 수 없습니다.");
+        if (g.enforcesDeadline()) sheets.expire(g.getId());
         return dispatcher.payment(id);
     }
 
     void cancel(String member, String number) {
         PaymentGroup found = owned(member, number);
+        if (found.isOrderSheet()) {
+            sheets.cancel(member, number);
+            return;
+        }
+        if (found.enforcesDeadline() && sheets.expire(found.getId())) return;
         guard.ensure(member);
         tx.executeWithoutResult(
                 t -> {
@@ -139,13 +154,14 @@ class PaymentGroupLifecycleService {
 
     boolean expire(Long groupId) {
         PaymentGroup found = groups.findById(groupId).orElseThrow();
+        if (found.enforcesDeadline()) return sheets.expire(groupId);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {
                     guard.lock(found.getMemberId());
                     PaymentGroup g = lockedGroup(groupId);
                     if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                            || g.getExpiresAt().isAfter(Instant.now())) {
+                            || g.getExpiresAt().isAfter(time.now())) {
                         return false;
                     }
                     close(g, OrderStatus.EXPIRED);
@@ -162,10 +178,10 @@ class PaymentGroupLifecycleService {
     private void close(PaymentGroup g, OrderStatus terminal) {
         List<Order> children =
                 orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream()
-                        .sorted(Comparator.comparing(Order::getSalesInfoId))
+                        .sorted(Comparator.comparing(Order::getTradeSkuId))
                         .toList();
         for (Order child : children) {
-            guard.lockSales(child.getSalesInfoId());
+            // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
         }
         for (Order child : children) {
             int changed =
@@ -191,10 +207,7 @@ class PaymentGroupLifecycleService {
     }
 
     private void restore(Order child) {
-        if (stock.restoreReserved(child.getSalesInfoId(), child.getQuantity()) != 1) {
-            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-        }
-        sales.reopenIfStockAvailable(child.getSalesInfoId());
+        skus.release(child.getTradeSkuId(), child.getQuantity());
     }
 
     private PaymentGroup owned(String member, String number) {

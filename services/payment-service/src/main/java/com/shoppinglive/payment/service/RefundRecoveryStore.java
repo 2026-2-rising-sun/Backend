@@ -34,6 +34,16 @@ public class RefundRecoveryStore {
         return claim("", new Object[0], limit, leaseDuration);
     }
 
+    public List<Lease> claimDue(int limit, Duration leaseDuration, boolean includeOrdinary) {
+        if (limit < 1 || limit > 1000)
+            throw new IllegalArgumentException("실행 권한을 확보할 항목 수는 1~1000이어야 합니다.");
+        return claim(
+                includeOrdinary ? "" : " AND order_closure_request_id IS NOT NULL",
+                new Object[0],
+                limit,
+                leaseDuration);
+    }
+
     public Optional<Lease> claim(long requestId, Duration leaseDuration) {
         if (requestId <= 0) {
             throw new IllegalArgumentException("요청 ID는 양수여야 합니다.");

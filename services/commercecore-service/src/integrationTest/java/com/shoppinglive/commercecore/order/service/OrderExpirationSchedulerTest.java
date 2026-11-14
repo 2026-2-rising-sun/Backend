@@ -48,6 +48,7 @@ class OrderExpirationSchedulerTest
         salesInfoId = sales.getId();
         // available=3, reserved=2 (아래 2 개의 주문에 배정된 것으로 가정)
         salesStockRepository.save(new SalesStock(salesInfoId, 3, 2));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -93,7 +94,7 @@ class OrderExpirationSchedulerTest
         assertThat(refreshedPending.getCancelledAt()).isNull();
 
         // 재고: reserved 2 → 1 (한 개만 복구), available 3 → 4
-        SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock stock = legacyStock(salesInfoId);
         assertThat(stock.getAvailable()).isEqualTo(4);
         assertThat(stock.getReserved()).isEqualTo(1);
     }
@@ -108,7 +109,7 @@ class OrderExpirationSchedulerTest
 
         assertThat(secondRun).isZero();
 
-        SalesStock stock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock stock = legacyStock(salesInfoId);
         // 첫 번째 실행에서만 available += 1, reserved -= 1. 두 번째는 no-op
         assertThat(stock.getAvailable()).isEqualTo(4);
         assertThat(stock.getReserved()).isEqualTo(1);

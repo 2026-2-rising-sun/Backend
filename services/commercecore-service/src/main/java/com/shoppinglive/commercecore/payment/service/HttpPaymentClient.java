@@ -26,6 +26,15 @@ public class HttpPaymentClient implements PaymentClient {
                 .body(PaymentExecution.class);
     }
 
+    public void closeOrder(long paymentId, OrderClosureCommand command) {
+        outsideTransaction();
+        http.put()
+                .uri("/v1/internal/payments/{id}/order-closure", paymentId)
+                .body(command)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     public PaymentExecution get(long id) {
         outsideTransaction();
         return http.get()

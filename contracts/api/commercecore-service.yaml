@@ -11,7 +11,7 @@ info:
     공개 결제/환불 facade는 Core가 유지한다. Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다.
     0원도 Payment에 원본 성공과 Outbox를 저장한 뒤 Core가 즉시 주문·재고·쿠폰을 반영해 200을 반환한다. Payment 불가용·응답 유실은 같은 requestId로 복구하며 UNKNOWN을 실패로 확정하지 않는다.
 
-    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 결제 전 15분 만료, 확인 중 결과 불명은 재확인한다.
+    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 구 API 단건·Cart 단건/묶음과 /v1/order-sheets 등 모든 새 주문은 생성 시 저장한10분 기한을 사용하고 결제 결과 대기/UNKNOWN 중에도 만료한다. 이미 저장된 주문의 원래 기한(15분 포함)·번호·금액·참조는 보존한다.
     장바구니는 주문 생성 뒤에도 편집할 수 있으며 결제 성공 때 원본 ID·version 일치 항목만 삭제한다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 서비스 토큰 전용 요청은 Member 세션 확인과 독립이다.
@@ -45,6 +45,251 @@ tags:
   - name: Internal Product
     description: Live가 호출하는 CommerceCore 상품 원본 스냅샷
 paths:
+  /v1/order-sheets/{number}/refunds/{id}:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    get:
+      operationId: getOrderSheetRefund
+      tags:
+      - Orders
+      summary: 본인 주문 수량 환불 결과 조회
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '200':
+          description: 사용자 환불 결과. 내부 만료 보상은 노출하지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheetRefundEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/order-sheets/{number}/refunds:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      operationId: requestOrderSheetRefund
+      tags:
+      - Orders
+      summary: 주문 구매항목별 일부 수량 환불
+      x-required-roles:
+      - USER
+      - SELLER
+      description: 환불 API/실행 flag는 기존 설정을 따른다. 원결제 성공 후168시간 이내 접수. 주문별 미확정 환불은 하나만 허용한다. 각 항목의 스냅샷 단가×이번
+        수량을 남은 실결제액으로 제한한다. 4000원×3/쿠폰2000원은 순차4000/4000/2000, 두 개 일괄8000. 성공 수량만 재고 복구하며 0원 환불도 수량·멱등성을
+        적용하되 실제PG호출은 없다. 누적 주문 전체 수량의 환불 성공 때만 쿠폰을 한 번 복원하며 기존 유효기간은 유지한다. 실패 새 키 재시도는 수량·금액을 재사용할 수 있고
+        같은 키는 기존 결과를 반환한다.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderSheetRefundRequest'
+      responses:
+        '201':
+          description: 신규 환불 영속 접수
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheetRefundEnvelope'
+        '200':
+          description: 동일 키 재전송 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheetRefundEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/order-sheets:
+    post:
+      tags:
+      - Orders
+      operationId: createOrderSheet
+      summary: 서버 현재 SKU 스냅샷과 10분 재고 선점 주문서 생성
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '201':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '200':
+          description: 회원/생성 키/정규화 입력이 같은 기존 주문서. 만료 주문은 FAILED로 반환하고 다시 선점하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderSheetRequest'
+      parameters:
+      - $ref: '#/components/parameters/RequiredIdempotencyKey'
+      description: items/cartItems 중 하나만 전달한다. UUID 주문번호와 현재 서버 SKU 가격·표시 스냅샷을 저장하고 모든 항목 선점을 같은 트랜잭션으로
+        처리한다. 기존 활성 구매 가드를 공유한다. 이후 SKU 변경으로 재가격 산정하지 않는다. 주문서 내 쿠폰 선택은 화면 계산 후 결제 요청에서 선택 항목 하나·금액을 최종
+        검증해 고정한다. 이미 저장된 주문은 policy_version=0 호환이고 신규 구 API는 policy_version=2/10분이다.
+  /v1/order-sheets/{number}:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Orders
+      operationId: getOrderSheet
+      summary: 본인 주문서와 저장 스냅샷 조회
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '200':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderSheet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /v1/order-sheets/{number}/payments:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Orders
+      operationId: startOrderSheetPayment
+      summary: 저장된 주문서 금액으로 결제 시작
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '200':
+          description: 주문서 처리 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAttempt'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderSheetPaymentRequest'
+      parameters:
+      - $ref: '#/components/parameters/RequiredIdempotencyKey'
+      description: 사용자가 확인한 금액과 저장된 금액을 대조한다. 이후 SKU 가격을 재조회해 주문 금액을 바꾸지 않는다. 미확정 결제도 원래 10분 기한에 만료하며 늦은
+        성공은 주문을 되살리지 않고 보상한다.
+  /v1/order-sheets/{number}/cancel:
+    parameters:
+    - name: number
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Orders
+      operationId: cancelOrderSheet
+      summary: 결제 요청 전 본인 주문서 취소
+      x-required-roles:
+      - USER
+      - SELLER
+      responses:
+        '204':
+          description: 주문서 처리 결과
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /v1/seller/products:
     post:
       x-required-roles:
@@ -105,8 +350,7 @@ paths:
       - Seller Product
       summary: 판매자 상품 목록
       operationId: listSellerProducts
-      description: 상품·판매·재고 원본을 같은 CommerceCore DB에서 조회한다. 상태 조건은 sales_info/sales_stock 로컬 조인으로 페이지 계산 전에 적용하며
-        Catalog 사본 지연이나 HTTP fallback에 의존하지 않는다.
+      description: "Product와 SKU 원본을 같은 Core DB에서 조회한다. SKU 존재·파생 상태 필터는 페이지 계산 전에 적용하고 total/offset은 Product 단위다. SKU가 여러 개면 기존 단일 판매 필드로 축약하지 않고409. 본인 미삭제 상품만 조회하며 Catalog/HTTP fallback은 없다."
       parameters:
       - name: status
         in: query
@@ -133,6 +377,7 @@ paths:
           maximum: 100
           default: 20
       responses:
+        "409": {"$ref": "#/components/responses/Conflict"}
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -187,6 +432,7 @@ paths:
       summary: 판매자 상품 상세
       operationId: getSellerProduct
       responses:
+        "409": {"$ref": "#/components/responses/Conflict"}
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -244,7 +490,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '503':
           $ref: '#/components/responses/AuthUnavailable'
-      description: 본인 상품의 원본 기본정보와 sales_info/sales_stock을 로컬 조회한다. 다른 판매자 또는 소유자 없는 상품은 404다.
+      description: "본인 미삭제 Product와 SKU 원본을 조회한다. 다른 판매자 또는 소유자 없는 상품404. 여러 SKU는 임의 대표값 없이409."
     patch:
       x-required-roles:
       - SELLER
@@ -793,7 +1039,7 @@ paths:
       tags: ["Orders"]
       summary: "주문 가능 여부와 최신 금액 확인"
       operationId: "previewOrder"
-      description: "재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
+      description: "구 productId 호환 API이며 SKU가 하나인 상품만 지원한다. Sales 이력 없는 SKU도 허용하고 SKU 없음404·복수SKU409는 /v1/order-sheets 경로를 사용한다. 재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
       parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}, {"name": "couponId", "in": "query", "required": false, "schema": {"type": "string", "maxLength": 64}}]
       x-required-roles: ["USER", "SELLER"]
       responses:
@@ -817,7 +1063,7 @@ paths:
       tags: ["Orders"]
       summary: "회원 단건 주문 생성"
       operationId: "createOrder"
-      description: "couponId는 선택이며 지정 시 보유 쿠폰과 대상 상품을 검증해 할인액·실부담액을 저장하고 결제 묶음에서 예약한다. expectedTotalAmount는 할인 전 주문 총액이다. 서로 다른 회원은 같은 키를 독립 사용한다. 같은 회원의 키 재사용은 상품·수량·구매자 정보·expectedTotalAmount·couponId를 비교한다. 단건도 주문 하나를 가진 결제 묶음으로 생성하고 groupNumber를 반환한다. 회원당 활성 묶음은 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 다른 새 주문은 409, 동일 입력 재전송은 허용한다. 새 주문 저장·재고 예약·쿠폰 예약은 원자적이며 결제 전 기한은 15분이다."
+      description: "구 productId 호환 API이며 SKU가 하나인 상품만 지원한다. Sales 이력 없는 SKU도 허용하고 SKU 없음404·복수SKU409는 /v1/order-sheets 경로를 사용한다. couponId는 선택이며 지정 시 보유 쿠폰과 대상 상품을 검증해 할인액·실부담액을 저장하고 결제 묶음에서 예약한다. expectedTotalAmount는 할인 전 주문 총액이다. 서로 다른 회원은 같은 키를 독립 사용한다. 같은 회원의 키 재사용은 상품·수량·구매자 정보·expectedTotalAmount·couponId를 비교한다. 단건도 주문 하나를 가진 결제 묶음으로 생성하고 groupNumber를 반환한다. 회원당 활성 묶음은 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 다른 새 주문은 409, 동일 입력 재전송은 허용한다. 새 주문 저장·재고 예약·쿠폰 예약은 원자적이며 신규 주문 기한은 생성부터10분이며 결제 결과 대기/UNKNOWN도 연장하지 않는다. 이미 저장된 기한은 보존한다."
       parameters: [{"$ref": "#/components/parameters/OptionalIdempotencyKey"}]
       requestBody:
         required: true
@@ -833,7 +1079,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Order"}
               examples:
-                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
+                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -846,7 +1092,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Order"}
               examples:
-                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
+                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
     get:
       tags: ["Orders"]
       summary: "본인 주문 내역"
@@ -861,7 +1107,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/OrderHistory"}
               examples:
-                normal: {"value": {"items": [{"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}], "page": 0, "size": 20, "totalElements": 1, "totalPages": 1}}
+                normal: {"value": {"items": [{"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}], "page": 0, "size": 20, "totalElements": 1, "totalPages": 1}}
                 empty: {"value": {"items": [], "page": 0, "size": 20, "totalElements": 0, "totalPages": 0}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
@@ -882,7 +1128,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Order"}
               examples:
-                normal: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
+                normal: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
@@ -958,89 +1204,120 @@ paths:
           $ref: "#/components/responses/AuthUnavailable"
   /v1/cart/items:
     get:
-      tags: ["Cart"]
-      summary: "본인 장바구니 목록"
-      operationId: "listMyCart"
-      x-required-roles: ["USER", "SELLER"]
+      tags:
+      - Cart
+      operationId: listMyCart
+      summary: 본인 장바구니를 상품별 SKU 항목으로 조회
+      description: 담긴 SKU만 상품별로 묶는다. 가격·재고는 현재 조회값이며 예약하지 않는다. 미매핑·삭제된 항목은 보존하고 purchasable=false로 표시한다.
+        purchasable은 표시용이며 주문서 생성 시 원본을 다시 검증한다.
+      x-required-roles:
+      - USER
+      - SELLER
       responses:
-        "200":
-          description: "성공"
+        '200':
+          description: 상품별 묶음, 없으면 빈 배열
           content:
             application/json:
-              schema: {"type": "array", "items": {"$ref": "#/components/schemas/CartItem"}}
-              examples:
-                normal: {"value": [{"id": 1, "productId": 1, "quantity": 2, "version": 0}]}
-                empty: {"value": []}
-        "401": {"$ref": "#/components/responses/Unauthorized"}
-        "403": {"$ref": "#/components/responses/Forbidden"}
-        "503":
-          $ref: "#/components/responses/AuthUnavailable"
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CartProductGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
     post:
-      tags: ["Cart"]
-      summary: "장바구니 상품 추가"
-      operationId: "addMyCartItem"
-      description: "상품당 한 항목. 중복 409. 담기는 재고 예약이나 가격 확정이 아니다."
+      tags:
+      - Cart
+      operationId: addMyCartItem
+      summary: 본인 장바구니에 SKU 추가
+      description: skuId 또는 기존 productId 중 하나만 지정한다. productId는 SKU가 정확히 하나일 때만 호환하고 0개/여러 개이면 409다. 같은
+        회원의 같은 SKU 중복도 409이며 수량을 누적하지 않는다. 판매 준비·중지·품절 여부로 담기 자체를 예약으로 바꾸지 않는다.
+      x-required-roles:
+      - USER
+      - SELLER
       requestBody:
         required: true
         content:
           application/json:
-            schema: {"$ref": "#/components/schemas/AddCartItemRequest"}
-            example: {"productId": 1, "quantity": 2}
-      x-required-roles: ["USER", "SELLER"]
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
       responses:
-        "201":
-          description: "성공"
+        '201':
+          description: SKU 항목 생성
           content:
             application/json:
-              schema: {"$ref": "#/components/schemas/CartItem"}
-              examples:
-                created: {"value": {"id": 1, "productId": 1, "quantity": 2, "version": 0}}
-        "400": {"$ref": "#/components/responses/BadRequest"}
-        "401": {"$ref": "#/components/responses/Unauthorized"}
-        "403": {"$ref": "#/components/responses/Forbidden"}
-        "404": {"$ref": "#/components/responses/NotFound"}
-        "409": {"$ref": "#/components/responses/Conflict"}
-        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+              schema:
+                $ref: '#/components/schemas/CartItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ShoppingUnavailable'
   /v1/cart/items/{itemId}:
-    parameters: [{"$ref": "#/components/parameters/ItemId"}]
+    parameters:
+    - $ref: '#/components/parameters/ItemId'
     patch:
-      tags: ["Cart"]
-      summary: "본인 항목 절대 수량 변경"
-      operationId: "updateMyCartQuantity"
+      tags:
+      - Cart
+      operationId: updateMyCartQuantity
+      summary: 본인 SKU 항목의 절대 수량 변경
+      x-required-roles:
+      - USER
+      - SELLER
       requestBody:
         required: true
         content:
           application/json:
-            schema: {"$ref": "#/components/schemas/QuantityRequest"}
-            example: {"quantity": 3}
-      x-required-roles: ["USER", "SELLER"]
+            schema:
+              $ref: '#/components/schemas/QuantityRequest'
       responses:
-        "200":
-          description: "성공"
+        '200':
+          description: 변경한 항목
           content:
             application/json:
-              schema: {"$ref": "#/components/schemas/CartItem"}
-              examples:
-                updated: {"value": {"id": 1, "productId": 1, "quantity": 3, "version": 1}}
-        "400": {"$ref": "#/components/responses/BadRequest"}
-        "401": {"$ref": "#/components/responses/Unauthorized"}
-        "403": {"$ref": "#/components/responses/Forbidden"}
-        "404": {"$ref": "#/components/responses/NotFound"}
-        "503":
-          $ref: "#/components/responses/AuthUnavailable"
+              schema:
+                $ref: '#/components/schemas/CartItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
     delete:
-      tags: ["Cart"]
-      summary: "본인 항목 삭제"
-      operationId: "deleteMyCartItem"
-      x-required-roles: ["USER", "SELLER"]
+      tags:
+      - Cart
+      operationId: deleteMyCartItem
+      summary: 본인 SKU 항목 삭제
+      x-required-roles:
+      - USER
+      - SELLER
       responses:
-        "204": {"description": "삭제, 본문 없음"}
-        '400': { $ref: '#/components/responses/BadRequest' }
-        "401": {"$ref": "#/components/responses/Unauthorized"}
-        "403": {"$ref": "#/components/responses/Forbidden"}
-        "404": {"$ref": "#/components/responses/NotFound"}
-        "503":
-          $ref: "#/components/responses/AuthUnavailable"
+        '204':
+          description: 삭제, 응답 본문 없음
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/AuthUnavailable'
   /v1/cart/items/{itemId}/orders:
     parameters: [{"$ref": "#/components/parameters/ItemId"}]
     post:
@@ -1063,7 +1340,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Order"}
               examples:
-                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
+                created: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -1076,7 +1353,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Order"}
               examples:
-                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:15:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
+                replay: {"value": {"orderNumber": "20261001-000001", "productName": "가을 니트", "quantity": 2, "unitPrice": 15000, "totalAmount": 30000, "discountAmount": 0, "payableAmount": 30000, "status": "PENDING_PAYMENT", "buyerName": "구매자", "createdAt": "2026-10-01T00:00:00Z", "expiresAt": "2026-10-01T00:10:00Z", "cancelledAt": null, "groupNumber": "PG-00000000-0000-0000-0000-000000000149"}}
   /v1/cart/checkout:
     post:
       tags: ["Cart"]
@@ -1108,7 +1385,7 @@ paths:
       tags: ["Cart"]
       summary: "상품별 주문과 결제 묶음 생성"
       operationId: "createMyCartGroup"
-      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때 원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 미결제 기한은 15분이며 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다."
+      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때 원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 신규 주문은 생성부터10분이며 확인 중/UNKNOWN도 기한을 연장하지 않고 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다."
       x-required-roles: ["USER","SELLER"]
       parameters: [{"$ref":"#/components/parameters/RequiredIdempotencyKey"}]
       requestBody:
@@ -1123,13 +1400,13 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:10:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         '201':
           description: "새 묶음과 상품별 주문 생성"
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:10:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         '400': {"$ref":"#/components/responses/BadRequest"}
         '401': {"$ref":"#/components/responses/Unauthorized"}
         '403': {"$ref":"#/components/responses/Forbidden"}
@@ -1149,7 +1426,7 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:10:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         '204': {"description":"활성 묶음 없음, 본문 없음"}
         '401': {"$ref":"#/components/responses/Unauthorized"}
         '403': {"$ref":"#/components/responses/Forbidden"}
@@ -1168,7 +1445,7 @@ paths:
           content:
             application/json:
               schema: {"$ref":"#/components/schemas/PaymentGroup"}
-              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:15:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:15:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
+              example: {"groupNumber":"PG-00000000-0000-0000-0000-000000000149","status":"PENDING_PAYMENT","totalAmount":25000, "discountAmount": 0, "payableAmount": 25000,"couponId":null,"expiresAt":"2026-10-08T00:10:00Z","orders":[{"orderNumber":"OD-20261008-000001","productName":"상품 1","quantity":2,"unitPrice":10000,"totalAmount":20000, "discountAmount": 0, "payableAmount": 20000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"},{"orderNumber":"OD-20261008-000002","productName":"상품 2","quantity":1,"unitPrice":5000,"totalAmount":5000, "discountAmount": 0, "payableAmount": 5000,"status":"PENDING_PAYMENT","buyerName":"구매자","createdAt":"2026-10-08T00:00:00Z","expiresAt":"2026-10-08T00:10:00Z","cancelledAt":null,"groupNumber":"PG-00000000-0000-0000-0000-000000000149"}],"paymentId":null}
         '401': {"$ref":"#/components/responses/Unauthorized"}
         '403': {"$ref":"#/components/responses/Forbidden"}
         '404': {"$ref":"#/components/responses/NotFound"}
@@ -1369,11 +1646,12 @@ paths:
       tags: ["Internal Sales"]
       summary: "서비스용 판매정보 배치 조회"
       operationId: "getSalesForServices"
-      description: "Shopping/Live 전용. 미등록 상품은 결과에서 제외하며 순서 미보장. 파라미터 누락은 400, 빈 값은 빈 배열. 반복 또는 단일 쉼표 목록을 지원하며 중복 제거 후 100개 제한. 반복과 쉼표를 섞은 형식은 보장하지 않는다."
+      description: "Shopping/Live 전용 봉투 없는 단일 SKU 배열이다. 미등록 제외·순서 미보장·중복 제거 후 최대100개. SKU가 여러 개인 상품은409이며 임의 대표가·합산재고를 만들지 않는다. 누락400/빈 값 빈 배열, 반복 목록 또는 단일 쉼표 목록 지원. 반복·쉼표 혼합은 보장하지 않는다."
       security: [{"ServiceToken": []}]
       parameters: [{"name": "productIds", "in": "query", "required": true, "schema": {"type": "array", "items": {"type": "integer", "format": "int64"}}, "style": "form", "explode": true, "description": "정규 형식 productIds=1&productIds=2. 단일 productIds=1,2도 지원. uniqueItems/maxItems는 중복 제거 전 요청 배열에 적용하지 않는다."}]
       x-allowed-callers: ["shopping", "live"]
       responses:
+        "409": {"$ref": "#/components/responses/Conflict"}
         "200":
           description: "성공"
           content:
@@ -1389,7 +1667,7 @@ paths:
       tags: ["Seller Sales"]
       summary: "판매·초기 재고 등록"
       operationId: "registerSales"
-      description: "Shopping 상품 존재 확인 후 READY로 등록한다."
+      description: "SELLER 본인의 미삭제 Product를 잠금·검증하고 SKU를 READY/예약0으로 생성한다. 전체 판매 중지 중에도 준비 가능하다. id는 SKU ID이며 신규 Sales 이력 행은 만들지 않는다. 타인403, 없음·삭제404, 이미 SKU가 있으면409."
       requestBody:
         required: true
         content:
@@ -1410,14 +1688,14 @@ paths:
         "403": {"$ref": "#/components/responses/Forbidden"}
         "404": {"$ref": "#/components/responses/NotFound"}
         "409": {"$ref": "#/components/responses/Conflict"}
-        "503": {"$ref": "#/components/responses/ShoppingUnavailable"}
+        "503": {"$ref": "#/components/responses/AuthUnavailable"}
   /v1/sales/{id}/price:
     parameters: [{"$ref": "#/components/parameters/SalesId"}]
     patch:
       tags: ["Seller Sales"]
       summary: "판매가 변경"
       operationId: "changeSalesPrice"
-      description: "클라이언트 version을 받지 않는다. 서버 트랜잭션 간 낙관적 충돌은 409."
+      description: "본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 version은 SKU 버전, 클라이언트 expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404."
       requestBody:
         required: true
         content:
@@ -1446,6 +1724,7 @@ paths:
       tags: ["Seller Sales"]
       summary: "판매 재고 조회"
       operationId: "getSalesStock"
+      description: "SELLER 본인의 미삭제 상품 SKU 재고를 조회한다. salesInfoId는 SKU ID의 호환 필드명이다. 타인403, 상품 없음·삭제 또는 SKU 없음404."
       x-required-roles: ["SELLER"]
       responses:
         "200":
@@ -1465,6 +1744,7 @@ paths:
       tags: ["Seller Sales"]
       summary: "판매 가능 재고 증감"
       operationId: "adjustSalesStock"
+      description: "본인·미삭제 검사와 SKU 행 잠금 뒤 available만 증감하고 reserved는 유지한다. 결과 음수·INTEGER 초과409, 타인403, 없음·삭제404."
       requestBody:
         required: true
         content:
@@ -1493,6 +1773,7 @@ paths:
       tags: ["Seller Sales"]
       summary: "판매 상태 변경"
       operationId: "changeSalesStatus"
+      description: "본인·미삭제 검사 뒤 ON_SALE/PRIVATE만 수동 지정한다. READY 복귀·SOLD_OUT 직접 요청400. READY의0재고도 판매 시작 가능하며 SOLD_OUT 응답을 파생한다. 같은 의도는 no-op, 타인403, 없음·삭제404."
       requestBody:
         required: true
         content:
@@ -1836,6 +2117,394 @@ components:
                   message: 인증 상태를 확인할 수 없습니다.
                   requestId: request-001
   schemas:
+    OrderSheetRefundEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/OrderSheetRefund'
+        error:
+          type: 'null'
+    OrderSheetRefund:
+      type: object
+      required:
+      - refundRequestId
+      - orderNumber
+      - status
+      - refundAmount
+      - requestedAt
+      - resolvedAt
+      - items
+      properties:
+        refundRequestId:
+          type: integer
+          format: int64
+          minimum: 1
+        orderNumber:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PROCESSING
+          - UNKNOWN
+          - SUCCESS
+          - FAILED
+        refundAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        requestedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - orderItemId
+            - skuId
+            - quantity
+            - refundAmount
+            properties:
+              orderItemId:
+                type: integer
+                format: int64
+                minimum: 1
+              skuId:
+                type: integer
+                format: int64
+                minimum: 1
+              quantity:
+                type: integer
+                format: int32
+                minimum: 1
+                maximum: 2147483647
+              refundAmount:
+                type: integer
+                format: int64
+                minimum: 0
+    OrderSheetRefundRequest:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - orderItemId
+            - quantity
+            properties:
+              orderItemId:
+                type: integer
+                format: int64
+                minimum: 1
+              quantity:
+                type: integer
+                format: int32
+                minimum: 1
+                maximum: 2147483647
+    CartSkuView:
+      type: object
+      required:
+      - id
+      - skuId
+      - quantity
+      - version
+      - unitPrice
+      - available
+      - skuStatus
+      - purchasable
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        unitPrice:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        available:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          minimum: 0
+        skuStatus:
+          type:
+          - string
+          - 'null'
+          enum:
+          - READY
+          - ON_SALE
+          - SOLD_OUT
+          - PRIVATE
+          - null
+        purchasable:
+          type: boolean
+    CartProductGroup:
+      type: object
+      required:
+      - productId
+      - productName
+      - mainImageUrl
+      - saleEnabled
+      - items
+      properties:
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        productName:
+          type:
+          - string
+          - 'null'
+        mainImageUrl:
+          type:
+          - string
+          - 'null'
+        saleEnabled:
+          type: boolean
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartSkuView'
+    CreateOrderSheetRequest:
+      type: object
+      required:
+      - buyerName
+      - buyerPhone
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+            - skuId
+            - quantity
+            properties:
+              skuId:
+                type: integer
+                format: int64
+                minimum: 1
+              quantity:
+                type: integer
+                minimum: 1
+        cartItems:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartSelection'
+        buyerName:
+          type: string
+          minLength: 1
+          maxLength: 64
+        buyerPhone:
+          type: string
+          minLength: 1
+          maxLength: 32
+      description: items/cartItems는 하나만 비어 있지 않아야 하며 null 원소를 허용하지 않는다.
+    OrderSheetPaymentRequest:
+      type: object
+      required:
+      - expectedPayableAmount
+      properties:
+        expectedPayableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        couponId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        couponOrderItemId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+      description: 쿠폰과 적용 구매항목은 함께 지정하거나 함께 null. 주문당 쿠폰 한 장, 선택 항목 하나만 할인하며 할인 전 가격 스냅샷은 바꾸지 않는다. 서버 계산과
+        확인 금액이 다르면409.
+    OrderSheetItem:
+      type: object
+      required:
+      - orderItemId
+      - skuId
+      - productId
+      - productName
+      - sellerId
+      - mainImageUrl
+      - selectedOptions
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - sourceCartItemId
+      - sourceCartVersion
+      properties:
+        orderItemId:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type: integer
+          format: int64
+          minimum: 1
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        productName:
+          type: string
+        sellerId:
+          type:
+          - string
+          - 'null'
+        mainImageUrl:
+          type:
+          - string
+          - 'null'
+        selectedOptions:
+          type:
+          - string
+          - 'null'
+          description: 옵션 JSON 공급 경계 보류. 임의 현재 옵션을 복사하지 않음
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 0
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        sourceCartItemId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+        sourceCartVersion:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 0
+          - type: 'null'
+    OrderSheet:
+      type: object
+      required:
+      - orderNumber
+      - status
+      - failureReason
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - expiresAt
+      - paymentId
+      - items
+      - couponId
+      - couponOrderItemId
+      properties:
+        orderNumber:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PENDING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        failureReason:
+          type:
+          - string
+          - 'null'
+          description: 만료 실패는 EXPIRED
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        expiresAt:
+          type: string
+          format: date-time
+        paymentId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderSheetItem'
+        couponId:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        couponOrderItemId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
     DevImageResetEnvelope:
       type: object
       required:
@@ -2512,19 +3181,65 @@ components:
         discountAmount: {"type":"integer","format":"int64","minimum":0}
         payableAmount: {"type":"integer","format":"int64","minimum":0}
     PaymentGroup:
-      type: "object"
-      required: ["groupNumber","status","totalAmount","discountAmount","payableAmount","couponId","expiresAt","orders","paymentId"]
+      type: object
+      required:
+      - groupNumber
+      - status
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - couponId
+      - expiresAt
+      - orders
+      - paymentId
       properties:
-        groupNumber: {"type":"string"}
-        status: {"type":"string","enum":["PENDING_PAYMENT","PAYMENT_CONFIRMING","PAID","FAILED","CANCELLED","EXPIRED","REFUNDED"]}
-        totalAmount: {"type":"integer","format":"int64","minimum":1}
-        discountAmount: {"type":"integer","format":"int64","minimum":0}
-        payableAmount: {"type":"integer","format":"int64","minimum":0}
-        couponId: {"type":["string","null"],"maxLength":64}
-        expiresAt: {"type":"string","format":"date-time"}
-        orders: {"type":"array","minItems":1,"maxItems":100,"items":{"$ref":"#/components/schemas/Order"}}
-        paymentId: {"type":["integer","null"],"format":"int64","minimum":1}
-      description: "totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 환불로 일부 주문만 환불된 묶음은 PAID를 유지하고 모든 주문이 환불되면 REFUNDED다. 만료는 미결제에만 적용되며 확인 중에는 임의 취소·재고 반환을 하지 않는다."
+        groupNumber:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        expiresAt:
+          type: string
+          format: date-time
+        orders:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Order'
+        paymentId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+      description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가 없으면404, 여러 개면409이고 /v1/order-sheets를 사용한다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미 생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는
+        null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 버전0/2의 구 API는 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. 버전1은 일부 수량 성공 뒤 PARTIALLY_REFUNDED이며 주문 전체 수량 성공이면 REFUNDED다. 버전0은 확인 중 만료 제외, 버전1/2의 모든 새 주문은 결제 결과 대기 중에도 원래10분 기한에 실패·해제하고 늦은성공을 보상한다.
     CreateOrderRequest:
       type: "object"
       required: ["productId", "quantity", "buyerName", "buyerPhone"]
@@ -2545,11 +3260,45 @@ components:
         expectedTotalAmount: {"type": "integer", "format": "int64", "minimum": 1}
       description: "선택 항목 하나를 단건 주문으로 전환한다. expectedTotalAmount 필수."
     AddCartItemRequest:
-      type: "object"
-      required: ["productId", "quantity"]
+      type: object
+      required:
+      - quantity
       properties:
-        productId: {"type": "integer", "format": "int64", "minimum": 1}
-        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        productId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          deprecated: true
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+      oneOf:
+      - required:
+        - skuId
+        properties:
+          skuId:
+            type: integer
+            minimum: 1
+          productId:
+            type: 'null'
+      - required:
+        - productId
+        properties:
+          productId:
+            type: integer
+            minimum: 1
+          skuId:
+            type: 'null'
     QuantityRequest:
       type: "object"
       required: ["quantity"]
@@ -2557,30 +3306,117 @@ components:
         quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
       description: "증감량이 아닌 최종 절대 수량."
     CartItem:
-      type: "object"
-      required: ["id", "productId", "quantity", "version"]
+      type: object
+      required:
+      - id
+      - productId
+      - skuId
+      - quantity
+      - version
       properties:
-        id: {"type": "integer", "format": "int64", "minimum": 1}
-        productId: {"type": "integer", "format": "int64", "minimum": 1}
-        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
-        version: {"type": "integer", "format": "int64", "minimum": 0}
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        version:
+          type: integer
+          format: int64
+          minimum: 0
     Order:
-      type: "object"
-      required: ["orderNumber", "productName", "quantity", "unitPrice", "totalAmount", "discountAmount", "payableAmount", "status", "buyerName", "createdAt", "expiresAt", "cancelledAt", "groupNumber"]
+      type: object
+      required:
+      - orderNumber
+      - productName
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - status
+      - buyerName
+      - createdAt
+      - expiresAt
+      - cancelledAt
+      - groupNumber
       properties:
-        orderNumber: {"type": "string"}
-        groupNumber: {"type": ["string", "null"], "description": "연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null."}
-        productName: {"type": "string"}
-        quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}
-        unitPrice: {"type": "integer", "format": "int64", "minimum": 1}
-        totalAmount: {"type": "integer", "format": "int64", "minimum": 1}
-        discountAmount: {"type": "integer", "format": "int64", "minimum": 0}
-        payableAmount: {"type": "integer", "format": "int64", "minimum": 0}
-        status: {"type": "string", "enum": ["PENDING_PAYMENT", "PAYMENT_CONFIRMING", "PAID", "FAILED", "CANCELLED", "EXPIRED", "REFUNDED"]}
-        buyerName: {"type": "string"}
-        createdAt: {"type": "string", "format": "date-time"}
-        expiresAt: {"type": ["string", "null"], "format": "date-time"}
-        cancelledAt: {"type": ["string", "null"], "format": "date-time"}
+        orderNumber:
+          type: string
+        groupNumber:
+          type:
+          - string
+          - 'null'
+          description: 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 1
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        buyerName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        cancelledAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        salesInfoId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+          description: 기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 /v1/order-sheets의 skuId를 사용한다.
     OrderHistory:
       type: "object"
       required: ["items", "page", "size", "totalElements", "totalPages"]
@@ -2617,7 +3453,7 @@ components:
         status:
           type: string
           enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
-          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이며 주문 PAYMENT_CONFIRMING·재고·쿠폰 예약을 유지한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
+          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이다. policy_version=0 기존 주문은 PAYMENT_CONFIRMING·예약을 유지하고, policy_version=1 주문서와2 신규 구 API 주문은 원래10분 기한에 실패·해제 후 늦은 성공을 보상한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
         scheduledResolveAt:

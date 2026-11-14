@@ -22,6 +22,25 @@ import org.springframework.test.context.DynamicPropertySource;
 })
 public abstract class CommerceCoreSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
+    @Autowired private LegacyOrderTradeFixture legacyTrades;
+
+    protected void prepareLegacyTradeFixtures() {
+        legacyTrades.prepare();
+    }
+
+    protected void addMissingLegacyTradeFixtures() {
+        legacyTrades.addMissing();
+    }
+
+    protected com.shoppinglive.commercecore.sales.entity.SalesStock legacyStock(long id) {
+        var sku = legacyTrades.sku(id);
+        return new com.shoppinglive.commercecore.sales.entity.SalesStock(
+                id, sku.available(), sku.reserved());
+    }
+
+    protected com.shoppinglive.commercecore.sku.dto.SkuView legacySku(long id) {
+        return legacyTrades.sku(id);
+    }
 
     @BeforeEach
     void resetAccessSessionFixture() {
@@ -30,6 +49,11 @@ public abstract class CommerceCoreSecurityTestSupport {
 
     @Autowired(required = false)
     private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+
+    @Autowired(required = false)
+    private com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
+                    .BoundaryPaymentServer
+            paymentFixture;
 
     @AfterEach
     void removeOrphanPurchaseFixtures() {
@@ -40,6 +64,9 @@ public abstract class CommerceCoreSecurityTestSupport {
             DELETE FROM payment_group g WHERE NOT EXISTS
                 (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
             """);
+            if (paymentFixture != null)
+                paymentFixture.jdbc.update(
+                        "DELETE FROM payment_order_control c WHERE NOT EXISTS (SELECT 1 FROM payment_attempt a WHERE a.payment_id=c.payment_id)");
         }
     }
 
