@@ -1,16 +1,16 @@
 package com.shoppinglive.commercecore.order.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.coupon.service.CouponPreviewService;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.dto.OrderResponse;
-import com.shoppinglive.commercecore.order.entity.CartItem;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderAmounts;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Creation;

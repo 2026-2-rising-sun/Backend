@@ -1,10 +1,13 @@
-package com.shoppinglive.commercecore.order.controller;
+package com.shoppinglive.commercecore.cart.controller;
 
+import com.shoppinglive.commercecore.cart.dto.CartProductGroup;
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.OrderResponse;
-import com.shoppinglive.commercecore.order.entity.CartItem;
-import com.shoppinglive.commercecore.order.service.CartService;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -29,21 +32,30 @@ public class CartController {
     }
 
     @GetMapping
-    public List<ItemResponse> list(@AuthenticationPrincipal AuthenticatedUser member) {
-        return cart.list(member.memberId()).stream().map(ItemResponse::from).toList();
+    public List<CartProductGroup> list(@AuthenticationPrincipal AuthenticatedUser member) {
+        return cart.listGrouped(member.memberId());
     }
 
     @PostMapping
     public ResponseEntity<ItemResponse> add(
             @AuthenticationPrincipal AuthenticatedUser member,
             @Valid @RequestBody AddItemRequest request) {
+        if ((request.skuId() == null) == (request.productId() == null)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST, "skuId와 productId 중 하나를 지정해 주세요.");
+        }
         return ResponseEntity.status(201)
                 .body(
                         ItemResponse.from(
-                                cart.add(
-                                        member.memberId(),
-                                        request.productId(),
-                                        request.quantity())));
+                                request.skuId() != null
+                                        ? cart.addSku(
+                                                member.memberId(),
+                                                request.skuId(),
+                                                request.quantity())
+                                        : cart.add(
+                                                member.memberId(),
+                                                request.productId(),
+                                                request.quantity())));
     }
 
     @PatchMapping("/{itemId}")
@@ -82,7 +94,8 @@ public class CartController {
     }
 
     public record AddItemRequest(
-            @NotNull(message = "필수 값입니다.") @Positive(message = "0보다 커야 합니다.") Long productId,
+            @Positive(message = "0보다 커야 합니다.") Long skuId,
+            @Positive(message = "0보다 커야 합니다.") Long productId,
             @NotNull(message = "필수 값입니다.") @Positive(message = "0보다 커야 합니다.") Integer quantity) {}
 
     public record QuantityRequest(
@@ -98,10 +111,15 @@ public class CartController {
             @NotNull(message = "필수 값입니다.") @Positive(message = "0보다 커야 합니다.")
                     Long expectedTotalAmount) {}
 
-    public record ItemResponse(Long id, Long productId, Integer quantity, Long version) {
+    public record ItemResponse(
+            Long id, Long productId, Long skuId, Integer quantity, Long version) {
         static ItemResponse from(CartItem item) {
             return new ItemResponse(
-                    item.getId(), item.getProductId(), item.getQuantity(), item.getVersion());
+                    item.getId(),
+                    item.getProductId(),
+                    item.getSkuId(),
+                    item.getQuantity(),
+                    item.getVersion());
         }
     }
 }

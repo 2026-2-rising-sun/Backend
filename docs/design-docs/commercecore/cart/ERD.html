@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cart 모듈 ERD · SKU별 수량과 구매 후 정리</title>
+  <style>
+    :root{color-scheme:light;--paper:#f8fafc;--panel:#fff;--ink:#172033;--muted:#526077;--rule:#cbd5e1;--accent:#2557a7;--tint:#eaf1fc}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}main{max-width:1280px;margin:auto;padding:40px clamp(16px,4vw,48px) 64px}a{color:var(--accent);text-underline-offset:3px}a:focus-visible,summary:focus-visible{outline:3px solid #cc7b17;outline-offset:4px}h1{font-size:clamp(28px,4vw,42px);line-height:1.25;letter-spacing:-.03em;margin:12px 0 20px}h2{font-size:24px;margin:40px 0 12px}h3{font-size:18px;margin:0 0 8px}.eyebrow{font-size:13px;color:var(--muted);letter-spacing:.08em}.lead{max-width:850px;font-size:18px}.meta{color:var(--muted);font-size:14px}.badge{display:inline-block;background:var(--tint);color:var(--accent);border:1px solid #b6c9e9;padding:3px 10px;border-radius:4px;font-size:13px}.notice{border-left:4px solid var(--accent);background:var(--panel);padding:16px 20px;margin:24px 0}.diagram{overflow-x:auto;max-width:100%;border:1px solid var(--rule);background:var(--panel);border-radius:6px}.diagram svg{display:block;width:100%;min-width:1160px;height:auto}.legend{display:flex;flex-wrap:wrap;gap:12px 24px;border:1px solid var(--rule);border-top:0;background:var(--panel);padding:12px 20px;font-size:14px;color:var(--muted)}.dash{display:inline-block;width:24px;border-top:2px dashed var(--muted);vertical-align:middle;margin-right:8px}.table-wrap{overflow-x:auto;border:1px solid var(--rule);background:var(--panel);border-radius:6px}table{border-collapse:collapse;width:100%;font-size:15px}th,td{text-align:left;vertical-align:top;padding:12px 16px;border-bottom:1px solid var(--rule);overflow-wrap:anywhere}th{background:#edf2f7}td:first-child,td:first-child code{white-space:nowrap;overflow-wrap:normal}tr:last-child td{border-bottom:0}code{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-wrap:anywhere}.steps{padding-left:24px;max-width:950px}.steps li{padding:5px 0}details{padding:16px 20px;border:1px solid var(--rule);background:var(--panel);margin-top:18px}summary{cursor:pointer;font-weight:650}footer{border-top:1px solid var(--rule);padding-top:24px;margin-top:40px;font-size:14px;color:var(--muted)}.schema-name{font-size:20px;font-weight:650;fill:var(--ink)}.field{font-size:15px;fill:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.caption{font-size:15px;fill:var(--muted)}.tag{font-size:12px;fill:var(--muted);letter-spacing:.06em}.entity{fill:var(--panel);stroke:var(--rule);stroke-width:1.5}.focal{stroke:var(--accent);stroke-width:2}.edge{fill:none;stroke:var(--muted);stroke-width:1.6;stroke-dasharray:5 5}.divider{stroke:var(--rule)}@media(max-width:600px){main{padding-top:24px}.lead{font-size:16px}h2{font-size:22px}th,td{padding:10px}table{font-size:14px}.notice{padding:12px 14px}}@media print{body{background:#fff}main{max-width:none;padding:12px}.diagram svg{min-width:0}.diagram,.table-wrap{overflow:visible}details{break-inside:avoid}a{color:inherit}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">COMMERCECORE / CART #332</div>
+    <h1>SKU마다 따로 담고,<br>구매한 원본 항목만 정리합니다</h1>
+    <p class="lead">옵션이 다른 상품은 별도 SKU 항목으로 관리합니다. 기존에 담긴 항목에 판매정보가 없더라도 지우지 않고 남겨 두며, 주문 선택에서는 이용 불가로 처리합니다.</p>
+    <p><span class="badge">Cart 구현 반영 · 전체 연계 검증 중</span></p>
+    <p class="meta">기준: <code>d85332a9</code> 이후 Cart 복구 검증 · <a href="ERD.md">MD 원본</a> · <a href="설계.md">상세 설계</a> · <a href="../../../exec-plans/active/332-cart-module/README.md">구현 계획</a> · <a href="../../services/commercecore/erd.html">현행 Core 전체 ERD</a></p>
+  </header>
+  <aside class="notice"><strong>Cart 구현과 전체 거래 검증을 구분합니다.</strong> <code>sku_id</code>는 Cart 엔티티와 V103에 반영됐습니다. 이전 체크포인트의 PostgreSQL 16 이행 3개·잠금/롤백 12개 통과와 현재 복구 검증은 <a href="../../../worklog/2026-11-14.md#332-cart-복구-검증">실행 기록</a>에서 구분합니다. 현재 Cart 브랜치의 Order는 구 Sales 경로가 남아 있고, Cart 계약은 후행 Order <code>c3d96569</code>에서 통합됐다는 인계를 받았습니다. nullable SKU는 기존 항목의 보존을 위한 것이며 가격·재고 원본을 Cart에 만드는 의미가 아닙니다.</aside>
+  <section aria-labelledby="relationships">
+    <h2 id="relationships">상품·SKU·회원과 Cart의 관계</h2>
+    <p class="meta">점선은 논리 참조입니다. 아래 관계에 물리 FK를 추가하지 않습니다. 좁은 화면에서는 도표 안을 가로로 이동할 수 있습니다.</p>
+    <div class="diagram" tabindex="0" aria-label="가로로 이동할 수 있는 Cart ERD">
+      <svg viewBox="0 0 1160 700" role="img" aria-labelledby="cart-erd-title cart-erd-desc">
+        <title id="cart-erd-title">Cart 항목과 상품·SKU·회원·주문 출처 관계</title>
+        <desc id="cart-erd-desc">상품은 여러 SKU를 가지며 Cart 항목은 SKU와 회원을 논리 참조하고 주문은 삭제 후에도 Cart 출처 ID와 버전을 보존합니다.</desc>
+        <path class="edge" d="M288 164 H360"/>
+        <path class="edge" d="M620 164 H760"/>
+        <path class="edge" d="M620 490 H680 Q688 490 688 482 V370 Q688 362 696 362 H760"/>
+        <path class="edge" d="M945 416 V488"/>
+        <text x="305" y="151" class="caption">1 : N</text>
+        <text x="660" y="151" class="caption">1 : N</text>
+        <text x="648" y="526" class="caption">회원 1 : N</text>
+        <text x="970" y="461" class="caption">출처 값 보존</text>
+        <rect x="48" y="100" width="240" height="144" rx="6" class="entity"/>
+        <text x="68" y="130" class="tag">PRODUCT 소유</text>
+        <text x="68" y="160" class="schema-name">Product</text>
+        <path d="M48 178 H288" class="divider"/>
+        <text x="68" y="208" class="field"># id : BIGINT</text>
+        <rect x="360" y="100" width="260" height="244" rx="6" class="entity"/>
+        <text x="380" y="130" class="tag">SKU 소유</text>
+        <text x="380" y="160" class="schema-name">SKU</text>
+        <path d="M360 178 H620" class="divider"/>
+        <text x="380" y="208" class="field"># id : BIGINT</text>
+        <text x="380" y="236" class="field">product_id : BIGINT</text>
+        <text x="380" y="264" class="field">price</text>
+        <text x="380" y="292" class="field">available / reserved</text>
+        <text x="380" y="320" class="field">sale_status</text>
+        <rect x="760" y="100" width="370" height="316" rx="6" class="entity focal"/>
+        <text x="780" y="130" class="tag">CART 소유 · 상태 컬럼 없음</text>
+        <text x="780" y="160" class="schema-name">cart_item</text>
+        <path d="M760 178 H1130" class="divider"/>
+        <text x="780" y="208" class="field"># id : BIGINT</text>
+        <text x="780" y="236" class="field">member_id : VARCHAR(36)</text>
+        <text x="780" y="264" class="field">product_id : BIGINT</text>
+        <text x="780" y="292" class="field">sku_id : BIGINT NULL</text>
+        <text x="780" y="320" class="field">quantity / version</text>
+        <text x="780" y="348" class="field">created_at / updated_at</text>
+        <text x="780" y="388" class="caption">UNIQUE(member_id, sku_id)</text>
+        <rect x="360" y="430" width="260" height="124" rx="6" class="entity"/>
+        <text x="380" y="460" class="tag">별도 서비스 · 논리 ID 참조</text>
+        <text x="380" y="490" class="schema-name">Member</text>
+        <text x="380" y="526" class="field">member UUID</text>
+        <rect x="760" y="488" width="370" height="132" rx="6" class="entity"/>
+        <text x="780" y="518" class="tag">ORDER 소유 · 기존 참조 보존</text>
+        <text x="780" y="548" class="schema-name">Order 출처 값</text>
+        <text x="780" y="578" class="field">source_cart_item_id</text>
+        <text x="780" y="604" class="field">source_cart_item_version</text>
+        <text x="48" y="650" class="caption">기존 SKU 미매핑 행: product_id + NULL sku_id로 보존 · 주문 선택 불가</text>
+      </svg>
+    </div>
+    <div class="legend"><span><i class="dash" aria-hidden="true"></i>논리 참조 / 물리 FK 없음</span><span>SKU·Member 하나에 Cart 항목 여러 개</span><span>Order는 Cart 삭제 뒤에도 출처 값을 유지</span></div>
+  </section>
+  <section aria-labelledby="fields">
+    <h2 id="fields">Cart가 저장하는 8개 필드</h2>
+    <div class="table-wrap"><table><thead><tr><th scope="col">필드</th><th scope="col">타입·제약</th><th scope="col">의미</th></tr></thead><tbody>
+      <tr><td><code>id</code></td><td>BIGINT IDENTITY PK</td><td>기존 항목 ID 보존</td></tr>
+      <tr><td><code>member_id</code></td><td>VARCHAR(36), NOT NULL</td><td>인증된 회원 UUID 문자열</td></tr>
+      <tr><td><code>product_id</code></td><td>BIGINT, NOT NULL, 양수</td><td>기존 상품 참조와 상품별 묶음</td></tr>
+      <tr><td><code>sku_id</code></td><td>BIGINT, NULL 또는 양수</td><td>SKU 구매 단위. 기존 매핑 불가 행만 NULL로 보존</td></tr>
+      <tr><td><code>quantity</code></td><td>INTEGER, NOT NULL, 양수</td><td>해당 SKU의 절대 수량</td></tr>
+      <tr><td><code>version</code></td><td>BIGINT, NOT NULL, 기본 0</td><td>수량 변경과 원본 구매 출처 구분</td></tr>
+      <tr><td><code>created_at</code></td><td>TIMESTAMP WITH TIME ZONE, NOT NULL</td><td>생성 시각</td></tr>
+      <tr><td><code>updated_at</code></td><td>TIMESTAMP WITH TIME ZONE, NOT NULL</td><td>수정 시각</td></tr>
+    </tbody></table></div>
+    <p><code>UNIQUE(member_id, sku_id)</code>를 사용합니다. SKU가 없는 기존 행은 <code>sku_id IS NULL</code> 조건의 회원+상품 부분 유일 인덱스로 중복을 막습니다.</p>
+    <p>가격·재고·주문 상태·선택 체크·만료 시각은 Cart 저장 원본에 넣지 않습니다. 독립 Cart 업무 상태도도 만들지 않습니다.</p>
+  </section>
+  <section aria-labelledby="migration">
+    <h2 id="migration">V103은 기존 데이터를 넓혀 이행합니다</h2>
+    <ol class="steps">
+      <li>nullable <code>sku_id</code>를 추가합니다.</li>
+      <li><code>sales_info.product_id → sales_info.id → sku.id</code>로 기존 기본 SKU만 연결합니다. 다중 SKU 중 임의 선택하지 않습니다.</li>
+      <li>회원+SKU 유일성과 미매핑 레거시의 부분 유일 인덱스를 적용합니다.</li>
+      <li>ID·수량·버전·감사 시각과 Order/환불 출처를 보존합니다. 항목을 지우거나 임의 SKU를 만들지 않습니다.</li>
+    </ol>
+    <p class="meta">선행 순서: V101 Product → V102 SKU → V103 Cart → V104 Order. legacy Sales 쓰기 전환 전 중간 상태는 독립 배포 가능한 완료 상태가 아닙니다.</p>
+    <details open><summary>결제 중 수량이 바뀌면 어떻게 정리하나요?</summary><p>구매 당시의 Cart ID·회원·version이 같은 행만 결제 성공 후 삭제합니다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남깁니다. 실패·취소·만료에는 성공 정리를 실행하지 않습니다. SQL 오류는 주문 상태·재고 변경과 함께 롤백합니다.</p></details>
+  </section>
+  <footer>현재 검증: Cart 단위 13개·H2 통합 20개·실제 PostgreSQL 잠금/롤백 12개·Flyway 이행 3개 통과. 전체 Core 통합은 298개 중 30개 실패·외부 Kafka 2개 스킵으로 후속 거래 전환과 API 원본 통합이 남았습니다. <a href="ERD.md">동일 모델의 MD 원본</a>과 <a href="../../../worklog/2026-11-13.md">실행 기록</a>을 함께 확인하세요.</footer>
+</main>
+</body>
+</html>

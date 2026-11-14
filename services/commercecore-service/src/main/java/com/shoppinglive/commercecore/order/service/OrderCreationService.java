@@ -1,16 +1,16 @@
 package com.shoppinglive.commercecore.order.service;
 
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.exception.CartItemNotFoundException;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.coupon.service.CouponPreviewService;
 import com.shoppinglive.commercecore.order.dto.CartOrderCommand;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
-import com.shoppinglive.commercecore.order.entity.CartItem;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderAmounts;
-import com.shoppinglive.commercecore.order.exception.CartItemNotFoundException;
 import com.shoppinglive.commercecore.order.exception.OrderAmountMismatchException;
 import com.shoppinglive.commercecore.order.exception.OrderNotAcceptableException;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;

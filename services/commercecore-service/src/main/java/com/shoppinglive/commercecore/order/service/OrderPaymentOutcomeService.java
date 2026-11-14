@@ -1,11 +1,11 @@
 package com.shoppinglive.commercecore.order.service;
 
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
