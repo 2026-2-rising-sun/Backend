@@ -2,9 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: 기존 테이블은 `cc91c09b753a12a352bda65481210e264d3e88b0`, SKU 기반은 #334의 V102/내부 포트 정의다. 기존 Sales API/거래 경로는 아직 전환 전이다. 실제 DB 적용·HTTP·Kafka·PG 실행 증거와 구분한다. [SKU 모듈 상세](../../commercecore/sku/README.md)를 함께 본다.
-
-기준: `cc91c09b` 공통 모델 위 Product #333의 V101 구현을 반영했다. SKU/Cart/Order의 후속 이행은 통합 전이며 아래 Sales 관계는 현재 레거시 모델이다. 실제 DB·HTTP·Kafka·PG 실행 결과는 워크로그와 구분한다.
+기준: Product #333 `729d2d5f`와 #334 V102·SKU 판매 API 전환을 반영한다. 아래 sales_info/sales_stock은 V102 입력과 기존 Order 이력 참조이며 새 판매 HTTP는 SKU에만 쓴다. Order/Cart 후행 이행은 별도다. [SKU 상세 ERD](../../commercecore/sku/ERD.md)를 함께 본다.
 
 [시각 자료](erd.html)
 

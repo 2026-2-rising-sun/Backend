@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-상태: 목표 모델의 내부 기반 구현 중. 기준은 `cc91c09b753a12a352bda65481210e264d3e88b0`에서 진행하는 #334 코드·V102/V3다. 실제 PostgreSQL 마이그레이션 검증과 외부 API 전환은 완료 전이다.
+상태: #334 SKU 저장·내부 거래 포트와 기존 단일 판매 API 전환을 반영한다. Product `729d2d5f` 통합 기준이다. V102/V3 실제 PostgreSQL 이행과 SKU 업무·Outbox 롤백을 검증했다. 공개 다중 SKU 흐름과 Order/Cart 최종 통합은 별도다.
 
 [시각 자료](ERD.html)
 
@@ -10,11 +10,11 @@
 
 | 테이블 | 키·필드 | 소유·현재 상태 |
 |---|---|---|
-| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, version, snapshot_version>0, product_name_snapshot, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 신규 READY·reserved=0. 생성·가격·수량 포트 작성 완료, 연계 전. |
+| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, version, snapshot_version>0, product_name_snapshot, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 신규 READY·reserved=0. 생성·가격·수량·기존 단일 판매 API와 Product 조회 연결. |
 | product_sales | sales_id BIGINT PK, product_id BIGINT, price, status, available, version, updated_at | Catalog 판매 사본. V3에서 product_id PK를 SKU 식별자인 sales_id PK로 전환. 기존 필드명·값 보존. |
 | product | id BIGINT, sale_enabled, 삭제 정보, 판매자·표현 정보 | Product 소유 목표. 신규 sale_enabled=false, 기존 값 보존. SKU가 이 상태를 중복 소유하지 않음. |
 | Order 항목 | sku_id BIGINT, 수량, 주문 당시 단가·상품 정보 | Order 소유 목표. PK·테이블 이행 상세는 Order 구현에 연결. 별도 재고 예약 테이블은 없음. |
-| sales_info / sales_stock | 기존 Sales ID·가격·상태와 별도 재고 | 현재 호환 경로. V102의 입력이며 소비자 전환 전 삭제하지 않음. 신규 SKU 원본과 병행 쓰는 운영 상태가 아님. |
+| sales_info / sales_stock | 기존 Sales ID·가격·상태와 별도 재고 | 기존 이력·Order 전환 전 호환 경로. V102의 입력이며 삭제하지 않음. 신규 SKU 원본과 병행 쓰는 운영 상태가 아님. |
 
 ## 관계
 
@@ -44,4 +44,4 @@
 - [Catalog 사본 저장](../../../../services/catalog-service/src/main/java/com/shoppinglive/catalog/sales/repository/ProductSalesRepository.java)
 - [실행 계획과 실제 검증 기록](../../../exec-plans/active/334-sku-module/README.md)
 
-H2 업무 테스트와 Catalog H2 이행 테스트를 실제 PostgreSQL의 잠금·시퀀스·트랜잭션 DDL 증거로 확대하지 않는다. 구 단일값 API·가격순 목록·Live 다중 SKU의 활성화 경계는 통합 검토 중이다.
+H2 업무 테스트와 Catalog H2 이행 테스트를 실제 PostgreSQL의 잠금·시퀀스·트랜잭션 DDL 증거로 확대하지 않는다. 기존 단일 SKU API는 새 원본으로 연결했다. 공개 다중 SKU·대표가·가격순·Live 다중 SKU 활성화는 보류다.
