@@ -1,6 +1,6 @@
 # #331 Order 구현과 통합 검증
 
-상태: **구현·통합 회귀 진행 중**. [검토용 Draft PR #343](https://github.com/2026-2-rising-sun/Backend/pull/343), base는 Cart #341이다. 서비스·DB·계약 코드는 작성됐으나 SKU의 기존 Sales 어댑터 후속 통합과 전체 Core 회귀·최종 문서 검증이 남았다. 전체 완료 또는 배포 가능 상태로 표시하지 않는다.
+상태: **선행 통합 완료·최종 전체 회귀 진행 중**. Draft PR #343(base Cart)에 대응한다. 통합 커밋 `ddf4d083`은 Order `0f59e17c`와 Cart `6f9dda99`의 ancestry를 보존한다. 컴파일·문서137/API HTML6/설계 HTML28은 통과했으나 전체 서비스·외부 검사·최종 CI와 사용자 영향 확인은 아직 진행 중이다. 전체 완료 또는 배포 가능으로 표시하지 않는다.
 
 [이슈 #331](https://github.com/2026-2-rising-sun/Backend/issues/331) · [ADR 0331](../../../adr/0331-order-snapshot-lifecycle.md) · [상세설계](../../../design-docs/commercecore/order/설계.md) · [ERD](../../../design-docs/commercecore/order/ERD.md) · [상태](../../../design-docs/commercecore/order/상태관리도.md) · [워크로그](../../../worklog/2026-11-13.md) · [실제 검증 보고](verification.md)
 
@@ -13,7 +13,7 @@
 
 ## 사용자 확정과 기술 연결안
 
-U1/U2/U3는 모두 사용자 확정이다. 구현 차단 업무 정책은 남지 않았다.
+U1/U2/U3는 사용자 직접 합의다. 다만 구 API 신규15분·미확정 환불1건·일반 환불off의 보상 예외는 직접 합의로 확인하지 못한 구현 선택이다. [현재 동작·영향·대안](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택)을 숨기지 않으며 사용자 확인 전 정책 전체 확정/완료로 표시하지 않는다.
 
 | 구분 | 결정 |
 |---|---|
