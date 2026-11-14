@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `cc91c09b` 공통 모델 위 Product V101·SKU V102·Cart V103 구현을 통합 중이다. 기존 Sales 거래 경로는 후속 전환 대상이다. 실제 DB·HTTP·Kafka·PG 실행 결과는 워크로그에서 구분한다. [SKU 상세](../../commercecore/sku/README.md)를 함께 본다.
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103을 반영한다. sales_info/sales_stock은 V102 입력과 기존 Order 이력 참조이며 새 판매 HTTP는 SKU에만 쓴다. Cart는 SKU 조회·선택 포트를 제공하고 기존 Order 거래 전환은 후행 통합 대상이다. [SKU 상세 ERD](../../commercecore/sku/ERD.md)를 함께 본다. 실제 실행 범위는 워크로그와 구분한다.
 
 [시각 자료](erd.html) · [Cart 모듈 상세 ERD](../../commercecore/cart/ERD.md)
 
@@ -12,11 +12,11 @@
 
 | 테이블 | 핵심 키·열 | DDL 근거 |
 |---|---|---|
-| sku | PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본 | [V102](../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql). FK 없는 신규 기반이며 기존 Sales 경로 전환/실제 PostgreSQL 검증 전. |
+| sku | PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본 | [V102](../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql). FK 없는 SKU 원본. 판매 HTTP 전환과 실제 PostgreSQL 검증은 SKU 기록에 있으며 기존 Order 거래 전환은 후행 작업이다. |
 | sales_info | PK id; UQ product_id; status; snapshot_version; product_name_snapshot | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V16](../../../../services/commercecore-service/src/main/resources/db/migration/V16__sales_snapshot_version.sql) · [V19](../../../../services/commercecore-service/src/main/resources/db/migration/V19__sales_product_name_snapshot.sql) |
 | sales_stock | PK/FK sales_info_id; available; reserved | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) |
 | orders | PK id; UQ order_number, (member_id,idempotency_key); sales_info_id; payment_group_id; status; discount_amount; payable_amount | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V2](../../../../services/commercecore-service/src/main/resources/db/migration/V2__member_commerce_expand.sql) · [V3](../../../../services/commercecore-service/src/main/resources/db/migration/V3__member_commerce_contract.sql) · [V4](../../../../services/commercecore-service/src/main/resources/db/migration/V4__payment_groups.sql) · [V7](../../../../services/commercecore-service/src/main/resources/db/migration/V7__order_discount_snapshots.sql) · [V11](../../../../services/commercecore-service/src/main/resources/db/migration/V11__refunded_order_status.sql) |
-| cart_item | PK id; product_id 보존; nullable sku_id; UQ (member_id,sku_id); 미매핑 회원+상품 부분 UQ; quantity/version | [V2](../../../../services/commercecore-service/src/main/resources/db/migration/V2__member_commerce_expand.sql) · [V103](../../../../services/commercecore-service/src/main/resources/db/migration/V103__cart_sku_reference.sql). Cart 확장 이행 검증 중. |
+| cart_item | PK id; product_id 보존; nullable sku_id; UQ (member_id,sku_id); 미매핑 회원+상품 부분 UQ; quantity/version | [V2](../../../../services/commercecore-service/src/main/resources/db/migration/V2__member_commerce_expand.sql) · [V103](../../../../services/commercecore-service/src/main/resources/db/migration/V103__cart_sku_reference.sql). Cart 확장 이행·선택/성공 정리 포트를 실제 PostgreSQL로 검증했으며 전체 Order 연결은 후행 작업이다. |
 | member_purchase_guard | PK member_id | [V4](../../../../services/commercecore-service/src/main/resources/db/migration/V4__payment_groups.sql) |
 | payment_group | PK id; UQ group_number, (member_id,request_key); coupon_id; payment_id; status; payable_amount | [V4](../../../../services/commercecore-service/src/main/resources/db/migration/V4__payment_groups.sql) · [V7](../../../../services/commercecore-service/src/main/resources/db/migration/V7__order_discount_snapshots.sql) · [V8](../../../../services/commercecore-service/src/main/resources/db/migration/V8__payment_group_coupon_reservation.sql) · [V11](../../../../services/commercecore-service/src/main/resources/db/migration/V11__refunded_order_status.sql) |
 | coupon_definition | PK id; seller_id; issuance_limit; issued_count; snapshot_version; starts_at/ends_at/expires_at | [V5](../../../../services/commercecore-service/src/main/resources/db/migration/V5__coupon_definitions.sql) · [V17](../../../../services/commercecore-service/src/main/resources/db/migration/V17__coupon_display_snapshot_version.sql) |

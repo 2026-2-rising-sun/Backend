@@ -39,7 +39,13 @@ class ProductPersistenceTest {
     @org.springframework.boot.test.context.TestComponent
     @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @EntityScan(basePackageClasses = {Product.class, OutboxMessage.class, Sales.class})
+    @EntityScan(
+            basePackageClasses = {
+                com.shoppinglive.commercecore.sku.entity.Sku.class,
+                Product.class,
+                OutboxMessage.class,
+                Sales.class
+            })
     @EnableJpaRepositories(
             basePackageClasses = {
                 ProductRepository.class,
@@ -47,6 +53,10 @@ class ProductPersistenceTest {
                 SalesJpaRepository.class
             })
     @Import({
+        com.shoppinglive.commercecore.sku.service.SkuService.class,
+        com.shoppinglive.commercecore.sku.service.SkuSalesService.class,
+        com.shoppinglive.commercecore.sku.repository.SkuRepository.class,
+        com.shoppinglive.commercecore.sku.event.SkuEventTracker.class,
         JpaAuditingConfig.class,
         OutboxConfiguration.class,
         ProductConfiguration.class,
@@ -94,6 +104,7 @@ class ProductPersistenceTest {
 
     @AfterEach
     void clean() {
+        jdbc.update("DELETE FROM sku");
         stocks.deleteAll();
         sales.deleteAll();
         products.deleteAll();
@@ -220,6 +231,8 @@ class ProductPersistenceTest {
         Product p = registration.register(command(), "local", "seller");
         var sale = sales.saveAndFlush(new Sales(p.getId(), 39000L, SalesStatus.ON_SALE));
         stocks.saveAndFlush(new SalesStock(sale.getId(), 4, 0));
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, p.getId(), 39000, SalesStatus.ON_SALE, 4, 0);
         assertThat(lookup.findProduct(p.getId()).orElseThrow())
                 .isEqualTo(
                         new ProductSnapshot(
@@ -247,6 +260,8 @@ class ProductPersistenceTest {
         assertThat(p.isSaleEnabled()).isFalse();
         var sale = sales.saveAndFlush(new Sales(p.getId(), 39000L, SalesStatus.PRIVATE));
         stocks.saveAndFlush(new SalesStock(sale.getId(), 4, 2));
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, p.getId(), 39000, sale.getStatus(), 4, 2);
         Product enabled = lifecycle.changeSaleState(p.getId(), true, 0L, "seller");
         assertThat(enabled.getVersion()).isEqualTo(1);
         lifecycle.changeSaleState(p.getId(), true, 1L, "seller");
@@ -436,6 +451,8 @@ class ProductPersistenceTest {
         Product p = registration.register(command(), "existing-stock-work", "seller");
         var sale = sales.saveAndFlush(new Sales(p.getId(), 39000L, SalesStatus.ON_SALE));
         stocks.saveAndFlush(new SalesStock(sale.getId(), 4, 2));
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, p.getId(), 39000, sale.getStatus(), 4, 2);
         lifecycle.changeSaleState(p.getId(), true, 0L, "seller");
         var snapshot =
                 transactions

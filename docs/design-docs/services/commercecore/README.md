@@ -4,7 +4,7 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: `cc91c09b` 공통 코드 위 Product V101·SKU V102·Cart V103의 통합 진행을 반영한다. 기존 Sales API/거래 경로 전환과 Order 후속 이행은 각 모듈 상세에서 구분하며 운영 환경 검증과 구분한다.
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103을 통합했다. 판매 HTTP·Product 판매 조회와 Cart 현재가/가용 재고는 SKU 원본을 사용한다. 기존 Order 거래 경로 전환과 후속 이행은 Order 통합에서 검증한다. 공개 다중 SKU/대표가·가격 정렬은 보류이며 운영 배포 결과와 구분한다.
 
 ## 문서
 

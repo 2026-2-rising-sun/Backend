@@ -1,7 +1,7 @@
 # ADR 0334: SKU 모듈과 테이블에서 현재 가격과 재고를 함께 관리한다
 
 결정 상태: SKU 통합·금액·예약 멱등성·가격 확정 시점 채택 · 모듈 연계 협의 중
-구현 상태: 사용자 후속 승인으로 내부 기반 구현 중 · 외부 다중 SKU 계약·기존 Sales 경로 전환 미완료
+구현 상태: 기존 단일 판매 HTTP·Product 판매 조회를 SKU로 전환 · Order/Cart 최종 통합과 공개 다중 SKU 흐름은 별도
 관련 작업: [#334](https://github.com/2026-2-rising-sun/Backend/issues/334) · [작업 기록](../worklog/2026-11-13.md#334-sku-모듈테이블-통합-방향과-figjam-반영)
 실행 계획: [SKU 구현 계획](../exec-plans/active/334-sku-module/README.md)
 시각 자료: [SKU 영역](https://www.figma.com/board/1lr73O8XYEhMGHAgWAEeOv/?node-id=118-2257) · [SKU 통합 spec](https://www.figma.com/board/1lr73O8XYEhMGHAgWAEeOv/?node-id=424-1279)
@@ -106,3 +106,12 @@ FigJam의 기존 가격·재고 명령과 이벤트 노드는 삭제하지 않�
 - Catalog API 판매/SKU 구간의 최종 편집은 SKU가 맡고 Product는 변경 조각을 제공한다. Live는 기존 조회 어댑터 계약 호환 조사까지만 SKU 범위에 포함한다. SKU별 방송 노출과 방송 업무/API 확대는 별도 결정하며 이번 조사를 구현 승인으로 해석하지 않는다.
 
 SKU 담당의 마지막 FigJam 쓰기는 424:1279이고 이후 편집은 코디네이터에게 인계했다. 신규 판매 준비 확정의 같은 spec 반영·본문 재조회는 코디네이터의 후속 보고이며 SKU 담당의 새 검증으로 기록하지 않는다.
+
+
+## 2026-11-14 기술안 채택과 구현 경계
+
+후속 구현 지시에서 READY/ON_SALE/PRIVATE를 수동 의도로 저장하고 ON_SALE+available=0을 기존 외부 SOLD_OUT으로 파생하는 기술안을 채택했다. 앞선 품절 표현 검토 문구는 이 절로 구체화한다. READY는 생성 전용이며 판매 시작 시0재고도 허용하고, READY 복귀는 추가하지 않는다. Product 전체 스위치는 SKU 의도·수량을 덮어쓰지 않는다.
+
+기존 단일값 HTTP 호환에서0개는 미등록,1개는 기존 응답,2개 이상은 Core409/Catalog503으로 구분한다. 이는 대표가·최저가·합산재고를 임의 채택하지 않기 위한 기술적 경계이며 공개 다중 SKU 생성/조회·옵션선택·대표가·가격 정렬을 완성한 것이 아니다. 내부0..N조회·SKU별 사본 저장·거래 수량 포트는 구현한다. 새 가격 이력·예약 테이블·옵션 JSON 저장 정책은 추가하지 않는다.
+
+V102/V3와 선행 Product→SKU→Cart→Order 순서는 코디네이터의 기술 배정이다. 기존 마이그레이션은 수정하지 않으며 Sales ID와 과거 거래 참조·가격/재고/버전을 보존한다. 운영 배포는 승인 범위에 없다. 실제 구현·환경별 결과와 미완 범위는 [실행 계획](../exec-plans/active/334-sku-module/README.md)에서 구분한다.
