@@ -33,7 +33,7 @@ U1/U2/U3는 모두 사용자 확정이다. 구현 차단 업무 정책은 남지
 | 범위 | 실제 파일/원본 |
 |---|---|
 | 새 주문·수량 환불 | `services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/`의 OrderSheetController/RefundController·DTO·Service/Lifecycle/RefundService·OrderTimeSource |
-| 기존 소비자 전환 | OrderCreation/Checkout/PaymentGroupCheckout/Lifecycle/Outcome·OrderService/ExpirationScheduler와 LegacyOrderSkuService. Sales 저장소는 기본 SKU ID 식별/과거 참조 조회에만 남김 |
+| 기존 소비자 전환 | OrderCreation/Checkout/PaymentGroupCheckout/Lifecycle/Outcome·OrderService/ExpirationScheduler와 LegacyOrderSkuService. Sales 저장소 직접 의존 제거, 신규 구 API 주문도 SKU 참조·상품 스냅샷 저장 |
 | Order 물리 이행 | Core `db/migration/V104__order_sheets_and_closure.sql`, payment_group/orders/refund_request/refund_target_order/order_payment_closure 및 member_coupon 사용 출처 |
 | 최소 Payment 연계 | Core OrderClosureDeliveryService/PaymentDeliveryStore/Dispatcher/ResultHandler·RefundOutcome, 독립 Payment OrderClosureService·제어키/호출 시작/환불 실행 필터 |
 | 독립 Payment 이행 | `services/payment-service/src/main/resources/db/payment-migration/V4__order_closure_compensation.sql` |
@@ -44,7 +44,7 @@ U1/U2/U3는 모두 사용자 확정이다. 구현 차단 업무 정책은 남지
 
 잠금은 신규 생성에서 회원 가드 → Cart 출처 → Product 전체 ID순 공유 잠금 → SKU 전체 ID순 쓰기 잠금이다. 완료/해제는 주문 상태를 직렬화하고 SKU ID순으로 수량을 처리한다. 환불은 주문/환불 기록 잠금 → 성공 수량·금액 → SKU 복구 → 마지막 전량 쿠폰 복원을 같은 트랜잭션에 적용한다. 외부 HTTP는 잠금 트랜잭션 커밋 뒤 호출한다.
 
-구 productId API는 기존 Sales ID와 동일한 기본 SKU를 식별한다. 가격·재고는 그 SKU에서만 읽는다. Cart 옵션 SKU가 기본 SKU와 다르면 409로 새 주문서 경로를 안내하며 임의 기본 SKU로 주문하지 않는다. 이미 생성된 버전0 주문의 완료/해제/환불에는 현재 판매허용을 요구하지 않는다.
+구 productId API는 상품의 SKU가 하나일 때 지원한다. 0개는404, 여러 개는409로 새 주문서 경로를 안내한다. Sales 이력이 없는 신규 SKU도 지원하며 새 구 API 주문은 SKU 참조와 상품 스냅샷을 기록한다. 과거 Sales 참조/FK는 그대로 유지한다. 가격·재고는 SKU에서만 읽는다. Cart 옵션 SKU가 기본 SKU와 다르면 409로 새 주문서 경로를 안내하며 임의 기본 SKU로 주문하지 않는다. 이미 생성된 버전0 주문의 완료/해제/환불에는 현재 판매허용을 요구하지 않는다.
 
 ## 계약·실패 복구
 

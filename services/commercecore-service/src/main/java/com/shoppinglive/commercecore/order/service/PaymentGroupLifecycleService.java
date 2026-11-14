@@ -169,7 +169,7 @@ class PaymentGroupLifecycleService {
     private void close(PaymentGroup g, OrderStatus terminal) {
         List<Order> children =
                 orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream()
-                        .sorted(Comparator.comparing(Order::getSalesInfoId))
+                        .sorted(Comparator.comparing(Order::getTradeSkuId))
                         .toList();
         for (Order child : children) {
             // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
@@ -198,7 +198,7 @@ class PaymentGroupLifecycleService {
     }
 
     private void restore(Order child) {
-        skus.release(child.getSalesInfoId(), child.getQuantity());
+        skus.release(child.getTradeSkuId(), child.getQuantity());
     }
 
     private PaymentGroup owned(String member, String number) {

@@ -50,6 +50,11 @@ public abstract class CommerceCoreSecurityTestSupport {
     @Autowired(required = false)
     private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
 
+    @Autowired(required = false)
+    private com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
+                    .BoundaryPaymentServer
+            paymentFixture;
+
     @AfterEach
     void removeOrphanPurchaseFixtures() {
         // 하위 테스트가 주문·결제를 먼저 지운 뒤 묶음 키를 정리해 활성·재요청 상태가 다음 테스트에 남지 않게 한다.
@@ -59,6 +64,9 @@ public abstract class CommerceCoreSecurityTestSupport {
             DELETE FROM payment_group g WHERE NOT EXISTS
                 (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
             """);
+            if (paymentFixture != null)
+                paymentFixture.jdbc.update(
+                        "DELETE FROM payment_order_control c WHERE NOT EXISTS (SELECT 1 FROM payment_attempt a WHERE a.payment_id=c.payment_id)");
         }
     }
 

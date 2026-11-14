@@ -28,3 +28,5 @@
 V102는 기존 Sales 가격·available/reserved·기본 ID를 그대로 이행한다. V104는 주문 당시 단가/상품명/금액·PK/번호·Cart ID/version·기존15분 기한을 보존하며 검증된 Sales ID→같은 SKU ID만 backfill한다. 과거 옵션·판매자·이미지의 근거 없는 보강은 하지 않는다.
 
 실제 PostgreSQL `OrderSheetMigrationPostgresTest`는 이전 버전 데이터에서V104 적용 후 위 값과 기존 환불 수량 의미 보존을 검사한다. DB 이행 테스트와 업무 서비스의 성공/취소/환불 테스트는 서로 다른 증거로 기록한다.
+
+구 productId API도 신규 SKU 출처(`sku_id`, `product_id_snapshot`)를 저장하고 `sales_info_id`는 null이다. 기존 주문의 Sales 참조·FK는 보존하며 완료·해제·환불은 `sku_id` 우선, 없으면 과거 `sales_info_id`를 사용한다. 상품에 SKU가 여러 개면 구 API가 임의 옵션을 선택하지 않고409로 새 주문서를 안내한다.

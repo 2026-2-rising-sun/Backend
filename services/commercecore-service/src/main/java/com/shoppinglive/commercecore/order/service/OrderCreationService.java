@@ -17,13 +17,13 @@ import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sales.exception.InsufficientStockException;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -68,7 +68,6 @@ public class OrderCreationService {
     private final Object[] idempotencyLocks = createLockStripes();
 
     private final OrderJpaRepository orderRepository;
-    private final SalesJpaRepository salesRepository;
     private final LegacyOrderSkuService trading;
     private final com.shoppinglive.commercecore.sku.service.SkuService skus;
     private final ProductLookup productLookup;
@@ -82,7 +81,6 @@ public class OrderCreationService {
 
     public OrderCreationService(
             OrderJpaRepository orderRepository,
-            SalesJpaRepository salesRepository,
             LegacyOrderSkuService trading,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
             ProductLookup productLookup,
@@ -95,7 +93,6 @@ public class OrderCreationService {
             // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
             @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
         this.orderRepository = orderRepository;
-        this.salesRepository = salesRepository;
         this.trading = trading;
         this.skus = skus;
         this.productLookup = productLookup;
@@ -320,6 +317,7 @@ public class OrderCreationService {
                                     command.sourceCartItemId(),
                                     command.expectedTotalAmount(),
                                     coupon.discountAmount());
+                    order.recordSkuSource(sales.skuId(), command.productId());
                     order.recordSourceCartVersion(command.sourceCartItemVersion());
                     order = orderRepository.saveAndFlush(order);
 
@@ -343,11 +341,11 @@ public class OrderCreationService {
 
     /** 멱등키만으로 다른 구매자의 주문 결과를 공개하지 않는다. 충돌 경로에도 같은 검증을 쓴다. */
     private OrderCreationResult replayMatching(CreateOrderCommand command, Order order) {
-        boolean sameProduct =
-                salesRepository
-                        .findById(order.getSalesInfoId())
-                        .map(sales -> Objects.equals(sales.getProductId(), command.productId()))
-                        .orElse(false);
+        boolean sameProduct = Objects.equals(order.getProductIdSnapshot(), command.productId());
+        if (order.getProductIdSnapshot() == null)
+            sameProduct =
+                    skus.findBySkuIds(List.of(order.getTradeSkuId())).stream()
+                            .anyMatch(sku -> Objects.equals(sku.productId(), command.productId()));
         if (!Objects.equals(order.getMemberId(), command.memberId())
                 || !Objects.equals(order.getSourceCartItemId(), command.sourceCartItemId())
                 || !sameProduct

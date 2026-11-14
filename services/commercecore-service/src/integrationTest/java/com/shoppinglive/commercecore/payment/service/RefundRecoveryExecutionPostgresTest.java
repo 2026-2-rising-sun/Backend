@@ -86,7 +86,7 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                         legacyStock(
                                         orders.findByPaymentGroupIdOrderByIdAsc(groupId)
                                                 .getFirst()
-                                                .getSalesInfoId())
+                                                .getTradeSkuId())
                                 .getAvailable())
                 .isEqualTo(3);
     }

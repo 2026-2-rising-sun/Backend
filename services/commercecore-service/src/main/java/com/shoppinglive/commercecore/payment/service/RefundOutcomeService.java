@@ -133,9 +133,9 @@ public class RefundOutcomeService {
             List<RefundTarget> targets =
                     jdbc.query(
                             """
-                SELECT t.order_id,o.sales_info_id,o.quantity
+                SELECT t.order_id,COALESCE(o.sku_id,o.sales_info_id),o.quantity
                   FROM refund_target_order t JOIN orders o ON o.id=t.order_id
-                 WHERE t.refund_request_id=? ORDER BY o.sales_info_id,o.id
+                 WHERE t.refund_request_id=? ORDER BY COALESCE(o.sku_id,o.sales_info_id),o.id
                 """,
                             (rs, row) ->
                                     new RefundTarget(rs.getLong(1), rs.getLong(2), rs.getInt(3)),

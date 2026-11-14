@@ -24,10 +24,12 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     @Autowired OrderCreationService legacyCreation;
     @Autowired OrderCheckoutService quote;
     @Autowired InMemoryProductLookupStub lookup;
+    @Autowired com.shoppinglive.commercecore.payment.service.RefundIntakeService legacyRefunds;
 
     @BeforeEach
     void seedPreservedDefaultIdentity() {
         lookup.register(new ProductSnapshot(101L, "상품101", null, SELLER, true));
+        jdbc.update("DELETE FROM sku WHERE id=503");
         // 구 테이블 거래 값이 달라도 신규 가격·수량은 SKU 원본만 따른다.
         jdbc.update(
                 "INSERT INTO sales_info(id,product_id,price,status,created_at,updated_at) VALUES(501,101,99000,'PRIVATE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
@@ -46,7 +48,8 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     void legacyCreationReadsSingleSkuSource() {
         assertThat(quote.preview(101L, 2).unitPrice()).isEqualTo(4000);
         var order = legacy("legacy");
-        assertThat(order.getSalesInfoId()).isEqualTo(501);
+        assertThat(order.getTradeSkuId()).isEqualTo(501);
+        assertThat(order.getSalesInfoId()).isNull();
         assertThat(order.getUnitPrice()).isEqualTo(4000);
         assertThat(available(501)).isEqualTo(18);
         assertThat(reserved(501)).isEqualTo(2);
@@ -64,6 +67,63 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
                                 "SELECT available FROM sales_stock WHERE sales_info_id=501",
                                 Integer.class))
                 .isEqualTo(99);
+    }
+
+    @Test
+    @DisplayName("Sales 이력 없는 신규 SKU도 구 API 생성·재요청·취소와 재고 복구가 가능하다")
+    void legacyApiAcceptsSkuWithoutSalesHistory() {
+        jdbc.update("DELETE FROM sales_stock WHERE sales_info_id=501");
+        jdbc.update("DELETE FROM sales_info WHERE id=501");
+        var order = legacy("sku-only");
+        assertThat(order.getSalesInfoId()).isNull();
+        assertThat(order.getSkuId()).isEqualTo(501);
+        assertThat(order.getProductIdSnapshot()).isEqualTo(101);
+        assertThat(legacy("sku-only").getId()).isEqualTo(order.getId());
+        legacyGroups.cancel(MEMBER_A, order.getPaymentGroup().getGroupNumber());
+        legacyGroups.cancel(MEMBER_A, order.getPaymentGroup().getGroupNumber());
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+    }
+
+    @Test
+    @DisplayName("Sales 이력 없는 SKU 주문도 결제 후 환불 성공 수량을 한 번만 복구한다")
+    void legacySkuOnlyPaymentAndRefundRemainIdempotent() {
+        jdbc.update("DELETE FROM sales_stock WHERE sales_info_id=501");
+        jdbc.update("DELETE FROM sales_info WHERE id=501");
+        var order = legacy("sku-refund");
+        var number = order.getPaymentGroup().getGroupNumber();
+        var payment = legacyGroups.start(MEMBER_A, number, "sku-payment");
+        paymentServer
+                .context
+                .getBean(com.shoppinglive.payment.service.PaymentService.class)
+                .resolvePayment(payment.paymentId());
+        dispatcher.payment(payment.paymentId());
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(18);
+        var refund = legacyRefunds.request(MEMBER_A, number, "sku-refund", List.of()).refund();
+        assertThat(refund.refundAmount()).isEqualTo(8000);
+        refundDriver.execute(refund.id());
+        refundDriver.execute(refund.id());
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM orders WHERE id=?",
+                                String.class,
+                                order.getId()))
+                .isEqualTo("REFUNDED");
+    }
+
+    @Test
+    @DisplayName("구 productId 주문은 SKU가 여러 개면 임의 옵션을 선택하지 않는다")
+    void legacyApiRejectsAmbiguousSku() {
+        jdbc.update("UPDATE sku SET product_id=101 WHERE id=502");
+        assertThatThrownBy(() -> legacy("ambiguous"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
     }
 
     @Test
@@ -111,6 +171,7 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     @Test
     @DisplayName("옵션 Cart SKU를 기본 SKU로 바꿔 주문하지 않고 신규 주문서 경로에서 정확히 선점한다")
     void optionSkuNeverBecomesDefaultSku() {
+        seedSku(503, 101, 5000, 20);
         jdbc.update(
                 "INSERT INTO cart_item(member_id,product_id,sku_id,quantity,version,created_at,updated_at) VALUES (?,101,503,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 MEMBER_A);

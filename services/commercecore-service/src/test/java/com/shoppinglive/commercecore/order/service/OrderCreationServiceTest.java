@@ -82,7 +82,6 @@ class OrderCreationServiceTest {
         orderCreationService =
                 new OrderCreationService(
                         orderRepository,
-                        salesRepository,
                         trading,
                         skus,
                         productLookup,
@@ -356,8 +355,18 @@ class OrderCreationServiceTest {
     @DisplayName("같은 멱등 키의 재요청은 새 주문 없이 기존 주문을 반환한다")
     void returnsExistingOrderForIdempotentReplayWithoutCreatingAnother() {
         Order existing = existingOrder();
-        given(salesRepository.findById(SALES_ID))
-                .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(skus.findBySkuIds(java.util.List.of(SALES_ID)))
+                .willReturn(
+                        java.util.List.of(
+                                new com.shoppinglive.commercecore.sku.dto.SkuView(
+                                        SALES_ID,
+                                        PRODUCT_ID,
+                                        PRICE,
+                                        10,
+                                        0,
+                                        com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
+                                                .ON_SALE,
+                                        1)));
         given(
                         orderRepository.findByMemberIdAndIdempotencyKey(
                                 "11111111-1111-4111-8111-111111111111", "key-1"))
@@ -377,8 +386,18 @@ class OrderCreationServiceTest {
     void loadsExistingOrderAfterIdempotencyUniqueConflict() {
         productExists();
         Order existing = existingOrder();
-        given(salesRepository.findById(SALES_ID))
-                .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(skus.findBySkuIds(java.util.List.of(SALES_ID)))
+                .willReturn(
+                        java.util.List.of(
+                                new com.shoppinglive.commercecore.sku.dto.SkuView(
+                                        SALES_ID,
+                                        PRODUCT_ID,
+                                        PRICE,
+                                        10,
+                                        0,
+                                        com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
+                                                .ON_SALE,
+                                        1)));
         given(
                         orderRepository.findByMemberIdAndIdempotencyKey(
                                 "11111111-1111-4111-8111-111111111111", "key-1"))
@@ -499,8 +518,18 @@ class OrderCreationServiceTest {
         productExists();
         given(orderRepository.findByMemberIdAndIdempotencyKey(anyString(), eq("key-1")))
                 .willReturn(Optional.empty(), Optional.of(existingOrder()));
-        given(salesRepository.findById(SALES_ID))
-                .willReturn(Optional.of(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE)));
+        given(skus.findBySkuIds(java.util.List.of(SALES_ID)))
+                .willReturn(
+                        java.util.List.of(
+                                new com.shoppinglive.commercecore.sku.dto.SkuView(
+                                        SALES_ID,
+                                        PRODUCT_ID,
+                                        PRICE,
+                                        10,
+                                        0,
+                                        com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
+                                                .ON_SALE,
+                                        1)));
         given(transactionTemplate.execute(any()))
                 .willThrow(integrityViolation("23505", "uk_orders_member_idempotency"));
 

@@ -95,7 +95,7 @@ public class OrderPaymentOutcomeService {
                     }
                     for (Order child :
                             children.stream()
-                                    .sorted(Comparator.comparing(Order::getSalesInfoId))
+                                    .sorted(Comparator.comparing(Order::getTradeSkuId))
                                     .toList()) {
                         // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
                     }
@@ -115,7 +115,7 @@ public class OrderPaymentOutcomeService {
                             throw new IllegalStateException("결제 묶음 주문의 상태가 일치하지 않습니다.");
                         }
                         if (result.status() == PaymentStatus.SUCCESS) {
-                            skus.consume(child.getSalesInfoId(), child.getQuantity());
+                            skus.consume(child.getTradeSkuId(), child.getQuantity());
 
                             if (child.getSourceCartItemId() != null
                                     && child.getSourceCartItemVersion() != null) {
@@ -170,8 +170,8 @@ public class OrderPaymentOutcomeService {
                                     success ? "PAID" : "FAILED")
                             != 1) throw new IllegalStateException("단건 결제 주문 상태가 다릅니다.");
                     if (success) {
-                        skus.consume(order.getSalesInfoId(), order.getQuantity());
-                    } else skus.release(order.getSalesInfoId(), order.getQuantity());
+                        skus.consume(order.getTradeSkuId(), order.getQuantity());
+                    } else skus.release(order.getTradeSkuId(), order.getQuantity());
                     payments.record(current, p, p.status().name());
                     return true;
                 });
@@ -184,7 +184,7 @@ public class OrderPaymentOutcomeService {
     }
 
     private void restore(Order child) {
-        skus.release(child.getSalesInfoId(), child.getQuantity());
+        skus.release(child.getTradeSkuId(), child.getQuantity());
     }
 
     private static BusinessException conflict(String message) {

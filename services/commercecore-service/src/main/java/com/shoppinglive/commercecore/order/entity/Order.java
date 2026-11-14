@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -144,6 +145,16 @@ public class Order extends BaseEntity {
 
     public Long getSkuId() {
         return skuId;
+    }
+
+    public Long getTradeSkuId() {
+        return skuId == null ? salesInfoId : skuId;
+    }
+
+    public void recordSkuSource(Long skuId, Long productId) {
+        this.skuId = Objects.requireNonNull(skuId);
+        this.productIdSnapshot = Objects.requireNonNull(productId);
+        this.salesInfoId = null;
     }
 
     public Long getProductIdSnapshot() {

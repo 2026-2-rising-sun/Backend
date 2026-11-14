@@ -213,7 +213,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                         .orElseThrow()
                                         .getId())
                         .getFirst()
-                        .getSalesInfoId();
+                        .getTradeSkuId();
         jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", salesId);
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
         assertThat(queries.get(MEMBER_A, group.groupNumber(), first.id()).status())
@@ -280,7 +280,7 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                         .orElseThrow()
                                         .getId())
                         .getFirst()
-                        .getSalesInfoId();
+                        .getTradeSkuId();
         jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", salesId);
         makeRefundDue(request.id());
         assertThatThrownBy(() -> executions.execute(request.id()))

@@ -92,6 +92,6 @@ public class OrderService {
             throw new OrderCannotBeCancelledException(orderNumber);
         }
 
-        salesService.release(order.getSalesInfoId(), order.getQuantity());
+        salesService.release(order.getTradeSkuId(), order.getQuantity());
     }
 }

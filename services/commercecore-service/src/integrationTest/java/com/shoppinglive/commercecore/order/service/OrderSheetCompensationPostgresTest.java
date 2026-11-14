@@ -192,6 +192,66 @@ class OrderSheetCompensationPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
+    @DisplayName("결제 요청 전 취소는 실행 원문을 만들지 않으며 취소 뒤 결제 시작을 거절한다")
+    void cancelledOrderHasNoReachablePaymentExecution() {
+        var order = create(1);
+        lifecycle.cancel(MEMBER_A, order.orderNumber());
+        lifecycle.cancel(MEMBER_A, order.orderNumber());
+        assertThatThrownBy(() -> start(order, false)).isInstanceOf(BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_delivery_request", Long.class))
+                .isZero();
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM payment_attempt", Long.class))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_payment_closure", Long.class))
+                .isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+    }
+
+    @Test
+    @DisplayName("Payment 확정 실패 뒤 상충 성공 결과는 계약 위반으로 거절하고 재고와 보상을 재적용하지 않는다")
+    void contradictorySuccessCannotReplaceConfirmedFailure() {
+        var order = create(1);
+        client.setScenario(
+                order.orderNumber(),
+                com.shoppinglive.commercecore.payment.entity.PaymentScenario.INSTANT_FAIL);
+        var payment = start(order, false);
+        var execution =
+                paymentServer.context.getBean(
+                        com.shoppinglive.payment.service.PaymentService.class);
+        assertThat(execution.resolvePayment(payment.paymentId())).isTrue();
+        dispatcher.payment(payment.paymentId());
+        var failed = client.get(payment.paymentId());
+        assertThat(failed.status())
+                .isEqualTo(com.shoppinglive.commercecore.payment.entity.PaymentStatus.FAILED);
+        assertThat(execution.resolvePayment(payment.paymentId())).isFalse();
+        assertThat(handler.payment(failed)).isFalse();
+        var contradictory =
+                new com.shoppinglive.commercecore.payment.dto.PaymentExecution(
+                        failed.requestId(),
+                        failed.paymentId(),
+                        failed.orderId(),
+                        failed.paymentGroupId(),
+                        failed.referenceNumber(),
+                        failed.amount(),
+                        failed.scenario(),
+                        com.shoppinglive.commercecore.payment.entity.PaymentStatus.SUCCESS,
+                        failed.requestedAt(),
+                        failed.resolvedAt(),
+                        failed.scheduledResolveAt());
+        assertThatThrownBy(() -> handler.payment(contradictory))
+                .isInstanceOf(BusinessException.class);
+        assertThat(sheets.get(MEMBER_A, order.orderNumber()).status()).isEqualTo("FAILED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM refund_request", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_payment_closure", Long.class))
+                .isZero();
+    }
+
+    @Test
     @DisplayName("성공 결과와 만료 경합은 만료 주문·선점 해제 한 번·보상 한 건으로 수렴한다")
     void concurrentExpiryAndSuccessAreIdempotent() throws Exception {
         var order = create(1);

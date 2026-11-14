@@ -71,7 +71,7 @@ public class PaymentDispatcher {
                 return outcomes.refund(client.refund(store.read(d.command(), RefundCommand.class)));
         } catch (org.springframework.web.client.RestClientException unavailable) {
             store.delay(d);
-            log.warn("Payment 전달 재시도 예정: requestId={}", d.requestId());
+            log.warn("Payment 전달 재시도 예정: requestId={}", d.requestId(), unavailable);
             return false;
         }
     }

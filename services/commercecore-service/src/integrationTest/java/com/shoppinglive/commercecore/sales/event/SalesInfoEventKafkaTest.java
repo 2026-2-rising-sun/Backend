@@ -53,6 +53,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired InMemoryProductLookupStub productLookup;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @DisplayName("API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다")
     @Test
@@ -71,7 +72,12 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
             }
         }
         long productId = UUID.randomUUID().getMostSignificantBits() >>> 1;
-        productLookup.register(new ProductSnapshot(productId, "Kafka 검증 상품", null));
+        productLookup.register(new ProductSnapshot(productId, "Kafka 검증 상품", null, SELLER, true));
+        jdbc.update(
+                "INSERT INTO product(id,name,description,main_image_id,seller_id,sale_enabled,version,created_at,updated_at) VALUES (?,?,'Kafka 검증',1,?,TRUE,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                productId,
+                "Kafka 검증 상품",
+                SELLER);
         try (KafkaConsumer<String, String> consumer =
                 new KafkaConsumer<>(
                         Map.of(

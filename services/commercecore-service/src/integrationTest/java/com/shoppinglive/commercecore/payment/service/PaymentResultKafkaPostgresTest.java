@@ -177,9 +177,8 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
                                 Long.class))
                 .isEqualTo(1);
         var order = orders.findByPaymentGroupIdOrderByIdAsc(result.paymentGroupId()).getFirst();
-        assertThat(stocks.findById(order.getSalesInfoId()).orElseThrow().getAvailable())
-                .isEqualTo(3);
-        assertThat(stocks.findById(order.getSalesInfoId()).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(order.getTradeSkuId()).getAvailable()).isEqualTo(3);
+        assertThat(legacyStock(order.getTradeSkuId()).getReserved()).isZero();
     }
 
     void send(String event, String topic, String key) throws Exception {

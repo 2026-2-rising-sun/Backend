@@ -273,6 +273,7 @@ class PaymentGroupCheckoutService {
                                         item.itemId(),
                                         expected,
                                         item.discountAmount());
+                        order.recordSkuSource(s.skuId(), item.productId());
                         order.attachGroup(group, item.version());
                         orders.saveAndFlush(order);
                         skus.reserve(s.skuId(), item.quantity());

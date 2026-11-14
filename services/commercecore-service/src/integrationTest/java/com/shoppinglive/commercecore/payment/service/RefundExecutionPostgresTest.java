@@ -62,9 +62,8 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
         assertThat(groupOrders)
                 .extracting(order -> order.getStatus())
                 .containsExactly(OrderStatus.REFUNDED, OrderStatus.PAID);
-        assertThat(legacyStock(groupOrders.getFirst().getSalesInfoId()).getAvailable())
-                .isEqualTo(5);
-        assertThat(legacyStock(groupOrders.getLast().getSalesInfoId()).getAvailable()).isEqualTo(4);
+        assertThat(legacyStock(groupOrders.getFirst().getTradeSkuId()).getAvailable()).isEqualTo(5);
+        assertThat(legacyStock(groupOrders.getLast().getTradeSkuId()).getAvailable()).isEqualTo(4);
         assertThat(
                         groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
                                 .orElseThrow()
@@ -126,7 +125,7 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                                         .orElseThrow()
                                         .getId())
                         .getFirst();
-        jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", target.getSalesInfoId());
+        jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", target.getTradeSkuId());
 
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(RuntimeException.class);
@@ -141,14 +140,14 @@ class RefundExecutionPostgresTest extends RefundTestSupport {
                                 request.id()))
                 .isEqualTo(1);
 
-        jdbc.update("UPDATE sku SET available=3 WHERE id=?", target.getSalesInfoId());
+        jdbc.update("UPDATE sku SET available=3 WHERE id=?", target.getTradeSkuId());
         makeRefundDue(request.id());
         assertThat(executions.execute(request.id())).isTrue();
         assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
         assertThat(orders.findById(target.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.REFUNDED);
-        assertThat(legacyStock(target.getSalesInfoId()).getAvailable()).isEqualTo(5);
+        assertThat(legacyStock(target.getTradeSkuId()).getAvailable()).isEqualTo(5);
         assertThat(
                         paymentServer.jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM mock_refund_result WHERE refund_request_id=?",

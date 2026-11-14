@@ -58,7 +58,7 @@ public class OrderExpirationScheduler {
                                 OrderStatus.PENDING_PAYMENT, Instant.now(), Limit.of(BATCH_SIZE))
                         .stream()
                         .sorted(
-                                java.util.Comparator.comparing(Order::getSalesInfoId)
+                                java.util.Comparator.comparing(Order::getTradeSkuId)
                                         .thenComparing(Order::getId))
                         .toList();
 
@@ -69,7 +69,7 @@ public class OrderExpirationScheduler {
             }
             int updated = orderRepository.expireOrder(order.getId());
             if (updated == 1) {
-                salesService.release(order.getSalesInfoId(), order.getQuantity());
+                salesService.release(order.getTradeSkuId(), order.getQuantity());
                 expired++;
             }
             // updated == 0 이면 이미 다른 흐름에서 상태 전이 (결제 시작·수동 취소 등). 무해.

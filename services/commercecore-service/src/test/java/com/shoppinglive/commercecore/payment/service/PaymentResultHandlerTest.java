@@ -109,7 +109,7 @@ class PaymentResultHandlerTest {
     Order order() {
         Order order = mock(Order.class);
         when(order.getId()).thenReturn(1L);
-        when(order.getSalesInfoId()).thenReturn(10L);
+        when(order.getTradeSkuId()).thenReturn(10L);
         when(order.getQuantity()).thenReturn(1);
         when(orders.findById(1L)).thenReturn(Optional.of(order));
         return order;

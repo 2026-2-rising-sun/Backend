@@ -284,7 +284,7 @@ class RefundQueryPostgresTest extends RefundTestSupport {
                         "OD-query-second",
                         orders.findByPaymentGroupIdOrderByIdAsc(first.groupId())
                                 .getFirst()
-                                .getSalesInfoId(),
+                                .getTradeSkuId(),
                         1,
                         7000L,
                         "구매자",
