@@ -62,13 +62,14 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
         long product = UUID.randomUUID().getMostSignificantBits() >>> 1;
         productLookup.register(
                 new com.shoppinglive.commercecore.product.dto.ProductSnapshot(
-                        product, "Outbox 원자성 검증", null));
-        long id = registration.register(product, 1000L, 3).getId();
+                        product, "Outbox 원자성 검증", null, SELLER, true));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, product, SELLER);
+        long id = registration.register(product, 1000L, 3, SELLER).skuId();
         fixtureSales.add(id);
         assertThat(count(id)).isEqualTo(1);
-        sales.changePrice(id, 2000L);
+        sales.changePrice(id, 2000L, SELLER);
         assertThat(count(id)).isEqualTo(2);
-        sales.changePrice(id, 2000L);
+        sales.changePrice(id, 2000L, SELLER);
         assertThat(count(id)).isEqualTo(2);
         doThrow(new IllegalStateException("검증용 Outbox 저장 실패"))
                 .when(
@@ -76,15 +77,13 @@ class SalesInfoOutboxPostgresTest extends SalesInfoEventIntegrationTest {
                                 .<com.shoppinglive.common.outbox.EventOutbox>
                                         getUltimateTargetObject(outbox))
                 .append(eq(SalesInfoEventContract.TOPIC_NAME), any());
-        assertThatThrownBy(() -> sales.changePrice(id, 3000L))
+        assertThatThrownBy(() -> sales.changePrice(id, 3000L, SELLER))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(jdbc.queryForObject("SELECT price FROM sales_info WHERE id=?", Long.class, id))
+        assertThat(jdbc.queryForObject("SELECT price FROM sku WHERE id=?", Long.class, id))
                 .isEqualTo(2000);
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT snapshot_version FROM sales_info WHERE id=?",
-                                Long.class,
-                                id))
+                                "SELECT snapshot_version FROM sku WHERE id=?", Long.class, id))
                 .isEqualTo(2);
         assertThat(count(id)).isEqualTo(2);
     }

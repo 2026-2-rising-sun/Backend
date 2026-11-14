@@ -14,9 +14,7 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
@@ -57,13 +55,12 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
         clean();
         com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 1L, SELLER);
         com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 2L, SELLER);
-        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
-                jdbc, 1, 1000, SalesStatus.ON_SALE, 10, 0);
-        productLookup.register(new ProductSnapshot(1L, "상품", null));
-        productLookup.register(new ProductSnapshot(2L, "새 상품", null));
-        salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
-        stocks.save(new SalesStock(salesId, 10, 0));
-        prepareLegacyTradeFixtures();
+        salesId =
+                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                        jdbc, 1, 1000, SalesStatus.ON_SALE, 10, 0);
+        jdbc.update("UPDATE product SET sale_enabled=TRUE WHERE id=1");
+        productLookup.register(new ProductSnapshot(1L, "상품", null, SELLER, true));
+        productLookup.register(new ProductSnapshot(2L, "새 상품", null, SELLER, false));
     }
 
     @AfterEach

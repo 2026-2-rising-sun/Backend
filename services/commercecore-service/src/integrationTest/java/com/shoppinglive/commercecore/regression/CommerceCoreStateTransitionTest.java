@@ -17,12 +17,10 @@ import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
@@ -56,7 +54,7 @@ class CommerceCoreStateTransitionTest
     @Autowired PaymentService payments;
     @Autowired com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry scenarios;
     @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
-    @Autowired SalesService sales;
+    @Autowired SkuSalesService sales;
     @Autowired OrderJpaRepository orderRepository;
     @Autowired PaymentAttemptJpaRepository paymentRepository;
     @Autowired SalesJpaRepository salesRepository;
@@ -76,10 +74,12 @@ class CommerceCoreStateTransitionTest
     @BeforeEach
     void setUp() {
         clean();
-        productLookup.register(new ProductSnapshot(920L, "마지막 재고", null));
-        salesId = salesRepository.save(new Sales(920L, 10_000L, SalesStatus.ON_SALE)).getId();
-        stockRepository.save(new SalesStock(salesId, 1, 0));
-        prepareLegacyTradeFixtures();
+        productLookup.register(new ProductSnapshot(920L, "마지막 재고", null, SELLER, true));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 920L, SELLER);
+        jdbc.update("UPDATE product SET sale_enabled=TRUE WHERE id=920");
+        salesId =
+                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                        jdbc, 920, 10000, SalesStatus.ON_SALE, 1, 0);
     }
 
     @AfterEach
@@ -147,7 +147,7 @@ class CommerceCoreStateTransitionTest
     @ValueSource(strings = {"cancel", "expire", "fail"})
     void preservesPrivateStatusWhenRestoringStock(String path) {
         Order order = create();
-        sales.changeStatus(salesId, SalesStatus.PRIVATE);
+        sales.changeStatus(salesId, SalesStatus.PRIVATE, SELLER);
         release(order, path);
         assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
         assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
@@ -201,10 +201,11 @@ class CommerceCoreStateTransitionTest
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
     void derivesSoldOutWhenStartingZeroStockSku(SalesStatus current) throws Exception {
-        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 920L, SELLER);
-        long skuId =
-                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
-                        jdbc, 920, 10000, current, 0, 0);
+        long skuId = salesId;
+        jdbc.update(
+                "UPDATE sku SET sale_status=?,available=0 WHERE id=?",
+                current == SalesStatus.SOLD_OUT ? "ON_SALE" : current.name(),
+                skuId);
         mvc.perform(
                         patch("/v1/sales/{id}/status", skuId)
                                 .header("Authorization", sellerBearer())
@@ -229,10 +230,10 @@ class CommerceCoreStateTransitionTest
     @Test
     void reopensOnlySoldOutSalesAfterStockReplenishment() {
         create();
-        sales.adjustAvailable(salesId, 1);
+        sales.adjustAvailable(salesId, 1, SELLER);
         assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.ON_SALE);
-        sales.changeStatus(salesId, SalesStatus.PRIVATE);
-        sales.adjustAvailable(salesId, 1);
+        sales.changeStatus(salesId, SalesStatus.PRIVATE, SELLER);
+        sales.adjustAvailable(salesId, 1, SELLER);
         assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
     }
 
