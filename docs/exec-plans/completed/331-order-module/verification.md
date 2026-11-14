@@ -2,7 +2,7 @@
 
 2026-11-14. 아래 기존 전체 하네스의 코드 기준 `a68c31dabc1ae024d5b22c695a2fe42aa61a7dde`, base `cc91c09b753a12a352bda65481210e264d3e88b0`.
 
-**코드·로컬 검증 및 코드 HEAD CI는 통과했다. 사용자 영향 두 항목은 확인 대기이므로 PR은 Draft, 실행 계획은 active다.** [계획](README.md) · [워크로그](../../../worklog/2026-11-14.md) · [직접 합의와 구분하는 구현 선택](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택).
+**기존 범위 구현·검증 완료. 후속 #345/#346은 사용자 요청으로 보류하며 실행 계획은 completed, PR은 Draft다. 정책 전체 승인·운영 검증과 구분한다.** [계획](README.md) · [워크로그](../../../worklog/2026-11-14.md) · [직접 합의와 구분하는 구현 선택](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택).
 
 ## 저장·선행·범위
 
@@ -63,7 +63,7 @@ scripts/check.sh --base origin/dev --external
 
 Order ERD/상태 HTML의1280·390px, fit/100%/확대·축소·내부 가로 이동, MD 링크/복귀, 페이지 overflow와 콘솔을 실제 Orca browser로 확인했다. 공통 ERD의 Cart select 폭 CSS도 보존한다. [ERD 캡처](../../../design-docs/commercecore/order/assets/order-erd-desktop.png) · [상태 모바일](../../../design-docs/commercecore/order/assets/order-state-mobile.png).
 
-확인 대기 두 항목은 **미확정 환불1건 제한**, **일반 환불flag-off의 COMPENSATION 예외**다. 직접 사용자 선택 근거는 없으며 현재 동작·영향·대안을 상세설계8절에 명시했다. 답을 받은 것으로 간주하지 않고 임의 변경하지 않는다. 이 때문에 정책 전체 완료를 선언하거나 계획을 completed로 옮기지 않는다.
+현재 유지하는 두 동작은 **미확정 환불1건 제한**, **일반 환불flag-off의 COMPENSATION 예외**다. 직접 사용자 선택 근거는 없으며 현재 동작·영향·대안을 상세설계8절에 명시했다. 답을 받은 것으로 간주하지 않고 임의 변경하지 않는다. 사용자는 기존 작업을 지금 마무리하고 #345/#346을 나중에 진행하도록 요청했다. 이 경계에서 기존 계획은 completed로 이동하되 정책 전체 승인으로 표시하지 않는다.
 
 ## 후속 사용자 확정: 모든 새 주문10분
 
@@ -76,3 +76,9 @@ OrderDeadlinePostgresTest는 신규5경로와 동일키 재전송/기한보존, 
 진행환불1건과 일반환불off 보상예외는 미선택이다. off 중 일반환불 접수는 PROCESSING/전달원문을 저장하고 실행을 막으므로 미확정1건제한과 결합해 추가환불이 막힐 수 있다. 이미외부전달된요청은 flag 변경으로취소되지않는다. 해당동작은 변경하지않았다.
 
 후속 문서137·API HTML6·설계 HTML28 최신성, API매핑과 이벤트7계약/22예시/29직렬화 표본도 통과했다. Order HTML두개는390/1280px의 client=scroll(390/1265), 콘솔0과10분/보류문구를 실제 브라우저로 확인했다. 실제PG제공자/운영·Redis·배포는 실행하지 않았다. 외부Kafka2는 기존a68c31da의 실제브로커 증거와 이번스킵을 분리한다.
+
+## 문서 마무리와 별도 후속 보류
+
+사용자는 [#345 동시 환불](https://github.com/2026-2-rising-sun/Backend/issues/345)·[#346 결제 준비/실행 기한 분리](https://github.com/2026-2-rising-sun/Backend/issues/346)를 나중에 별도 전용 작업 공간에서 진행하고 지금 기존 범위를 마무리하도록 요청했다. 위 기존 동작은 그대로이며 후속 모델·기한 기본값은 채택하지 않았다. 완료조건별 충족 근거는 [완료 계획](README.md)에 대조했다.
+
+코드 `84082563`의 [CI43591454215](https://github.com/2026-2-rising-sun/Backend/actions/runs/43591454215)는 SUCCESS, 업로드XML740건 실패0·오류0·외부Kafka2스킵, 신규기한PG14건 모두실행이다. 이 수치는 기존 코드 검증이며 이번 문서 이동/설명 갱신에서 서비스 테스트를 다시 실행한 것이 아니다. 문서 전용 최종HEAD CI/검사는 PR과 최종 마무리 보고에 별도로 기록한다.

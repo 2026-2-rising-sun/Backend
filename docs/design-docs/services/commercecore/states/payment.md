@@ -35,4 +35,4 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 
 ## 버전1 종료와 보상
 
-Order의10분 만료와 order_payment_closure 저장은 같은 Core 트랜잭션이다. 외부 HTTP 종료 전달은 커밋 뒤 재시도한다. 독립 Payment의 payment_order_control은 결제 생성·종료·호출 시작이 동일 paymentId/paymentRequestId를 잠근다. 이미 호출 중/UNKNOWN은 실제 결과 조회로 수렴한다. 늦은SUCCESS는 원결제 전액 보상이며0원에는 실제PG환불/신규환불원장이 없다. [최소 계약](../../../../exec-plans/active/331-order-module/payment-closure-contract.md)을 따른다.
+Order의10분 만료와 order_payment_closure 저장은 같은 Core 트랜잭션이다. 외부 HTTP 종료 전달은 커밋 뒤 재시도한다. 독립 Payment의 payment_order_control은 결제 생성·종료·호출 시작이 동일 paymentId/paymentRequestId를 잠근다. 이미 호출 중/UNKNOWN은 실제 결과 조회로 수렴한다. 늦은SUCCESS는 원결제 전액 보상이며0원에는 실제PG환불/신규환불원장이 없다. [최소 계약](../../../../exec-plans/completed/331-order-module/payment-closure-contract.md)을 따른다.

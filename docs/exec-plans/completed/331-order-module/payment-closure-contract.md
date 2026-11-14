@@ -1,6 +1,6 @@
 # 실패 주문 종료 통지·늦은 성공 보상 최소 계약
 
-상태: Core V104/Payment V4 구현·전체 회귀 검증 완료. 일반 환불flag-off의 보상 예외는 직접 사용자 합의로 확인하지 못한 기술 선택이며 확인 대기다. 구현 착수 공통 지시에서 Order #331에 배정한 Core/Payment 최소 연계이며 일반 부분 환불 정책과 독립적이다.
+상태: Core V104/Payment V4 구현·전체 회귀 검증 완료. 일반 환불flag-off의 보상 예외는 직접 사용자 합의로 확인하지 못한 기술 선택이다. 현재 동작은 유지하고 별도 [#345](https://github.com/2026-2-rising-sun/Backend/issues/345)/[#346](https://github.com/2026-2-rising-sun/Backend/issues/346) 후속은 사용자 요청으로 보류했다. 정책 전체 승인으로 표시하지 않는다. 구현 착수 공통 지시에서 Order #331에 배정한 Core/Payment 최소 연계이며 일반 부분 환불 정책과 독립적이다.
 
 ## 종료 통지
 

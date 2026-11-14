@@ -2,7 +2,7 @@
 
 [ERD.html](ERD.html) · [상세설계](설계.md) · [상태](상태관리도.md) · [현재 전체 Core ERD](../../services/commercecore/erd.md)
 
-구현 기준은 Core V104·Payment V4다. 전체 통합 검증 상태는 [실행 계획](../../../exec-plans/active/331-order-module/README.md)에 있다. HTML은 논리 Order/OrderItem 명칭을 쓰며 물리 테이블 rename이나 PK 교체를 뜻하지 않는다.
+구현 기준은 Core V104·Payment V4다. 전체 통합 검증 상태는 [실행 계획](../../../exec-plans/completed/331-order-module/README.md)에 있다. HTML은 논리 Order/OrderItem 명칭을 쓰며 물리 테이블 rename이나 PK 교체를 뜻하지 않는다.
 
 | 논리 개념 | 실제 물리 원본 | 실제 관계·불변조건 |
 |---|---|---|
