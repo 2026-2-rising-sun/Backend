@@ -1,6 +1,6 @@
 # #331 Order 구현과 통합 검증
 
-상태: **선행 통합 완료·최종 전체 회귀 진행 중**. Draft PR #343(base Cart)에 대응한다. 통합 커밋 `ddf4d083`은 Order `0f59e17c`와 Cart `6f9dda99`의 ancestry를 보존한다. 컴파일·문서137/API HTML6/설계 HTML28은 통과했으나 전체 서비스·외부 검사·최종 CI와 사용자 영향 확인은 아직 진행 중이다. 전체 완료 또는 배포 가능으로 표시하지 않는다.
+상태: **코드·전체 검증 완료, 사용자 영향 세 항목 확인 대기**. Draft PR #343(base Cart). `a68c31da`에서 전체 하네스1362건과 코드 CI43586694261가 통과했다. 구 API 신규15분·진행환불1건·flag-off보상은 직접 사용자 합의로 확인하지 못해 active/Draft를 유지한다. 배포·전체 정책 완료로 표시하지 않는다.
 
 [이슈 #331](https://github.com/2026-2-rising-sun/Backend/issues/331) · [ADR 0331](../../../adr/0331-order-snapshot-lifecycle.md) · [상세설계](../../../design-docs/commercecore/order/설계.md) · [ERD](../../../design-docs/commercecore/order/ERD.md) · [상태](../../../design-docs/commercecore/order/상태관리도.md) · [워크로그](../../../worklog/2026-11-13.md) · [실제 검증 보고](verification.md)
 
@@ -56,21 +56,10 @@ U1/U2/U3는 사용자 직접 합의다. 다만 구 API 신규15분·미확정 �
 
 순서는 Product #333 → SKU #334 → Cart #332 → Order #331이다. PR base도 dev → Product 브랜치 → SKU 브랜치 → Cart 브랜치 순서다. 검증된 정확 SHA를 일반 merge하여 ancestry를 보존하고 cherry-pick/rebase/force push는 하지 않는다. 공통 문서 각 모듈 기록을 보존한다.
 
-현재 Order에는 Payment010975ac, Order b7a6c107/44563ebc 체크포인트와 Cart의 Product 승인 API·최종 포트·소비 fixture 후속이 통합됐다. 체크포인트는 작업 보존이며 전체 완료를 의미하지 않는다. 후속 SKU 검증 SHA 통합·최종 API/회귀 후 원격 저장·PR 상태를 기록한다.
+최종 통합은 `ddf4d083`(Order `0f59e17c` + Cart `6f9dda99`)이며 Product/SKU/Cart ancestry를 보존했다. 후속 fixture 정합성과 복구 집계 보완을 포함한 코드 HEAD는 `a68c31da`다. 실제 코드 검증과 사용자 영향 확인 대기를 구분한다.
 
-## 실제 검증과 남은 검사
+## 최신 검증과 남은 확인
 
-JDK21, PostgreSQL16 전용 임시 컨테이너와 Core/Payment 별도 스키마를 사용한다. 외부 결제 제공자는 Mock gateway다. H2 테스트는 실제 PostgreSQL 검증과 구분한다.
+[최종 검증 보고](verification.md)와 [14일 기록](../../../worklog/2026-11-14.md)을 따른다. 전체 하네스1362건은 실패/오류/스킵0이며 Core169/309, PostgreSQL 전용 업무·이행244건, 외부Kafka2·직렬화29표본을 포함한다. NO-SOURCE와 선택되지 않은 작업은 통과 건수에 포함하지 않았다.
 
-| 실행 | 현재 결과·한계 |
-|---|---|
-| Payment 체크포인트 | 단위8/기본통합3/실제PostgreSQL41/이행6 실패오류스킵0. 엔진/DB 증거이며 이후 HTTP 오류를 별도로 수정 |
-| Core 신규 주문서 | 단위169, 실제PostgreSQL26(신규22+기존4), Payment 보안8 실패오류스킵0. 10분/스냅샷/선점·부분환불/쿠폰/보상 HTTP 왕복 포함 |
-| 기존 소비 API | 이전 H2 주문·쿠폰58, 최신 선택 통합64와 기존 환불 실제PostgreSQL53, V104 이행2 실패오류스킵0 |
-| 첫 전체회귀 | Core298 중53실패·외부Kafka2스킵. 실패를 보존하고 Product 실물·SKU 대상/가격/실패주입 및 portable fixture 보완 중 |
-| 실패군 재실행 | 106 중94통과/12실패. Cart SKU assertion4는 d85332a9 통합 뒤6건 검사 통과, Sales 어댑터 선행 미도착 관련 상태8은 별도 대기 |
-| 최종 검사 | 후속 통합 후 전체Core 및 관련 PostgreSQL/이행·API 구조/표본·문서·생성 최신성·모바일/데스크톱 HTML 재검사 필요 |
-
-필요 명령: `./gradlew :services:commercecore-service:test :services:commercecore-service:integrationTest :services:commercecore-service:postgresTest :services:commercecore-service:migrationTest :services:commercecore-service:spotlessCheck`, 대응 Payment 검사, `scripts/check.sh --base origin/dev`, 문서/계약 원본 검사. PostgreSQL 태그는 명시 환경변수 필요. 기본 외부 Kafka2스킵은 브로커 전달 성공이 아니다. Redis 신규 경로는 없고 실제 외부 PG/AWS/CI는 미실행이다.
-
-필수 검증이 남아 있으므로 active에 유지한다. 최종 결과는 워크로그와 이 표에 보완하고 완료 기준을 충족할 때 completed로 옮긴다.
+사용자 영향 세 항목이 남아 active를 유지한다. 옵션 JSON 공급·공개 다중 SKU/대표가·가격순은 보류 범위며 외부 PG 제공자·Redis·AWS·운영 배포는 미검증이다. 최종 PR HEAD의 CI·저장 상태와 이 제한을 함께 전달한다.

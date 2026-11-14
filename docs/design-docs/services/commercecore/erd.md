@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order V104/Payment V4를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 최종 통합 검증은 진행 중이며 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](../../commercecore/sku/ERD.md) · [Order 상세](../../commercecore/order/ERD.md).
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order V104/Payment V4를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 코드 통합 검증은 완료했고 사용자 영향 확인은 남아 있으며 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](../../commercecore/sku/ERD.md) · [Order 상세](../../commercecore/order/ERD.md).
 
 [시각 자료](erd.html) · [Cart 모듈 상세 ERD](../../commercecore/cart/ERD.md) · [Order 전체 관계도](../../commercecore/order/ERD.html)
 
@@ -12,7 +12,7 @@
 
 | 테이블 | 핵심 키·열 | DDL 근거 |
 |---|---|---|
-| sku | PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본 | [V102](../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql). FK 없는 SKU 원본. 기존 판매 HTTP·Product 판매 조회를 전환했고 실제 PostgreSQL 이행/업무를 검증했다. Cart SKU 조회·선택 포트와 Order 거래를 통합했으며 최종 회귀를 진행 중이다. |
+| sku | PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본 | [V102](../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql). FK 없는 SKU 원본. 기존 판매 HTTP·Product 판매 조회를 전환했고 실제 PostgreSQL 이행/업무를 검증했다. Cart SKU 조회·선택 포트와 Order 거래를 통합했으며 전체 회귀를 검증했다. |
 | sales_info | PK id; UQ product_id; status; snapshot_version; product_name_snapshot | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V16](../../../../services/commercecore-service/src/main/resources/db/migration/V16__sales_snapshot_version.sql) · [V19](../../../../services/commercecore-service/src/main/resources/db/migration/V19__sales_product_name_snapshot.sql) |
 | sales_stock | PK/FK sales_info_id; available; reserved | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) |
 | orders | PK id; UQ order_number, (member_id,idempotency_key); nullable sales_info_id; sku_id; product/seller/image/options snapshot; payment_group_id; status; discount_amount; payable_amount | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V2](../../../../services/commercecore-service/src/main/resources/db/migration/V2__member_commerce_expand.sql) · [V3](../../../../services/commercecore-service/src/main/resources/db/migration/V3__member_commerce_contract.sql) · [V4](../../../../services/commercecore-service/src/main/resources/db/migration/V4__payment_groups.sql) · [V7](../../../../services/commercecore-service/src/main/resources/db/migration/V7__order_discount_snapshots.sql) · [V11](../../../../services/commercecore-service/src/main/resources/db/migration/V11__refunded_order_status.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |

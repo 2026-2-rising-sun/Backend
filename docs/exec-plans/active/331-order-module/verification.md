@@ -1,73 +1,66 @@
-# Order 통합 체크포인트 검증
+# Order 최종 통합 검증
 
-2026-11-13, #331 통합 브랜치 작업 기준. **전체 완료 아님**: SKU의 기존 Sales 어댑터 후속 검증 SHA와 전체 Core 최종 회귀가 남았다. [실행 계획](README.md) · [워크로그](../../../worklog/2026-11-13.md).
+2026-11-14. 코드 기준 `a68c31dabc1ae024d5b22c695a2fe42aa61a7dde`, base `cc91c09b753a12a352bda65481210e264d3e88b0`.
 
-## 실행 환경과 재현
+**코드·로컬 검증 및 코드 HEAD CI는 통과했다. 사용자 영향 세 항목은 확인 대기이므로 PR은 Draft, 실행 계획은 active다.** [계획](README.md) · [워크로그](../../../worklog/2026-11-14.md) · [직접 합의와 구분하는 구현 선택](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택).
 
-JDK21(`/opt/homebrew/opt/openjdk@21`), 전용 PostgreSQL16 임시 컨테이너 `commercecore-order-331-postgres`를 사용했다. 실제 Core/Payment DB는 같은 로컬 PostgreSQL의 서로 다른 임의 스키마/커넥션이며 HTTP로 통신한다. 결제 제공자는 DurableMockGateway/RefundGateway다. 실제 PG 제공자·AWS·브로커·원격 CI 검증은 아니다.
+## 저장·선행·범위
 
-`COMMERCECORE_TEST_POSTGRES_URL/USER/PASSWORD`와 `PAYMENT_TEST_POSTGRES_URL/USER/PASSWORD`가 PostgreSQL 검사에 필요하다. H2 검사에는 이 환경변수를 넣지 않는다. 기존 PaymentDatabaseTestSupport는 Core URL이 있으면 H2 대신 별도 PostgreSQL 스키마를 사용한다. 스키마 이름은 프로세스별 UUID이며 테스트는 순차 실행했다. 다른 작업의 DB/컨테이너를 정리하지 않는다.
+Order 브랜치는 `refactor/#331-order-module`, [PR #343](https://github.com/2026-2-rising-sun/Backend/pull/343)의 base는 Cart다. `ddf4d083`은 Order `0f59e17c`와 Cart `6f9dda99b5ff92acf739729ec8941c0adcf404ad`를 일반 merge했다. Product `729d2d5f`, SKU `1a09aacd`/문서 `c0f3a52c` ancestry를 보존했다. dev 병합·배포는 하지 않았다.
 
-| 명령·대상 | 실제 결과 |
+공통 Core YAML에 Product/SKU/Cart 실제 API 의미와 오류를 통합하고 최소 Payment 종료/보상 계약도 유지했다. 기존 PK·물리명·과거 금액·Cart ID/version·TTL을 보존한다. Sales 이력 없는 SKU도 구 API에서 생성·결제·취소·환불하며 신규 구 API 항목은 sku_id/product snapshot을 기록한다. 옵션 JSON 공급·공개 다중 SKU/대표가·가격 정렬은 보류다.
+
+## 실제 명령과 환경
+
+`JDK21`, 전용 PostgreSQL16의 Core/Catalog/Payment/Notification/Live 별도 DB와 테스트별 스키마, 전용 Kafka4의 내부/외부 분리 리스너를 사용했다. 결제는 별도 Payment 컨텍스트·DataSource와 실제 HTTP를 연결한 Mock gateway다. 일반 통합은 명시 H2 fixture와 환경 지원 PostgreSQL fixture가 섞여 있으므로 전부 H2 또는 전부 PostgreSQL로 부르지 않는다.
+
+```bash
+scripts/check.sh --base origin/dev --external
+```
+
+서비스별 `*_TEST_POSTGRES_URL/USER/PASSWORD`, Notification의 `NOTIFICATION_TEST_DB_DRIVER/USER/PASSWORD`, `LIVE_PG_TEST/PORT/USER/PASSWORD`, `COMMERCECORE_TEST_KAFKA_SERVERS`를 전용 자원에 설정했다. 테스트 결과 재사용을 피하도록 cleanTest/cleanIntegrationTest/cleanPostgresTest/cleanMigrationTest 뒤 빌드 캐시를 끄고 실행했다. 실제 결과는 `passed`, 검사 중 diff 변경은 false다.
+
+| 서비스 | 단위 | 일반 통합 | PostgreSQL 업무 전용 | 이행 전용 |
+|---|---:|---:|---:|---:|
+| common | 61 | 60 | 선택 없음 | 선택 없음 |
+| Catalog | 12 | 99 | 4 | 3 |
+| CommerceCore | 169 | 309 | 162 | 23 |
+| Live | 38 | 216 | 5 | 선택 없음 |
+| Member | NO-SOURCE | 32 | 선택 없음 | 선택 없음 |
+| Notification | NO-SOURCE | 106 | 일반 통합에 조건부3 포함 | 선택 없음 |
+| Payment | 8 | 8 | 41 | 6 |
+
+고유 Gradle task 기준 **1362건, 실패0·오류0·스킵0**이다. 별도 PostgreSQL 업무·이행 작업은244건이다. NO-SOURCE 단위 두 개와 선택되지 않은 작업은 테스트 통과 건수에 넣지 않았다. 같은 task가 로그에 반복 출력된 것을 중복 합산하지 않았다.
+
+문서 링크137, API HTML6·설계 HTML28 최신성, API 매핑, 선택기/하네스 검사, 이벤트7계약·22예시·현재 직렬화29표본도 통과했다. 표본은 브로커 전달과 구분한다.
+
+## Order·선행 실패 수용 기준
+
+| 대상 | 최종 확인 |
 |---|---|
-| Core `test` |169건, 실패/오류/스킵0 |
-| Core `postgresTest --tests '*OrderSheet*PostgresTest' --tests '*OrderLegacySkuPostgresTest'` |26건, 실패/오류/스킵0. 주문서16·종료/보상6·구 API4 |
-| Core `migrationTest --tests '*OrderSheetMigrationPostgresTest'` |2건, 실패/오류/스킵0. V100 데이터→V104 보존 |
-| Core `integrationTest` 선택: PaymentGroupIntegrationTest/CartCouponPreviewApiTest/OrderCreationApiTest/OrderCheckoutApiTest/CartOrderIntegrationTest |64건, 실패/오류/스킵0. 실제 Postgres 환경변수 아래 PaymentGroup은PG, 나머지명시H2를 사용; 이전58건은H2만별도실행 |
-| Core `postgresTest --tests '*Refund*PostgresTest' --tests '*PaymentDeliveryBoundaryPostgresTest'` |53건, 실패/오류/스킵0. 기존 환불 성공·실패·UNKNOWN·재시도·롤백·중복/일반flag off·수신경계 |
-| Payment `test/integrationTest/postgresTest/migrationTest` 초기 엔진 체크포인트 |8/3/41/6, 실패/오류/스킵0. 이 검사는 이후 발견한 종료HTTP오류를 검증한 결과가 아님 |
-| Payment `integrationTest --tests '*PaymentSecurityIntegrationTest'` 후속 |8건, 실패/오류/스킵0. 정확 서비스 인증·잘못된/없는 토큰·사용자Bearer 거절, null/blank/비ISO/숫자시각400 |
-| Core/Payment `spotlessCheck` |통과 |
-| API 구조 | Core64·전체129매핑 일치, 실제 DTO/상태/쿠폰/수량환불 및 승인 Product3API/Cart CRUD 조각 통합 |
-| 문서·생성 최신성 |문서134 오류0, API HTML6/설계 HTML28 불일치0 |
-| 이벤트 정적/표본 |계약7·예시22·직렬화 표본24 검사 통과. 표본은 테스트 산출물이며 브로커 전달 아님 |
+| CartOrder4·PaymentGroup27·CartCouponPreview1 | 기존 Cart CI43584648800의 실패는 최종 Core309 전체 성공에 포함해 해소 확인 |
+| SalesInfoEvent1 및 Order 후속 이벤트·상태·권한 | 실제 Product 소유/SKU 원본 fixture로 보완 후 Core309·실제PG162 전체 성공 |
+| 주문서 생성·서버 스냅샷·선점·10분 | OrderSheet PostgreSQL16건에 포함. 신규 버전1/UNKNOWN 기한 유지, 멱등성·경합·원자성 |
+| 종료·늦은 성공·재고 재복구 금지 | 보상 PostgreSQL8건. 취소 뒤 실행 없음·확정FAILED 뒤 상충SUCCESS 거절 포함 |
+| 구 API/Sales 이력 없는 SKU | 실제PG7건. 생성/재요청/취소/결제/환불 성공·중복, 복수SKU 거절·과거 재고 불변 |
+| 부분 수량 환불·쿠폰 복원 | 주문서16건과 기존 환불 실제PG 회귀에 포함. 4000/4000/2000, 0원 잔여 수량, 누적 전량·원래 유효기간·후속 사용 보호 |
+| V100→V104 | 이행23건 중 Order2건. 과거 PK/금액/Cart 출처/15분 TTL·이행 원자성 |
+| 외부 Kafka2 | Sales API→SKU/Outbox→실제 브로커→테스트 소비자의7 이벤트와 쿠폰 Outbox/도메인 JSON 수신. 키·헤더·봉투·버전 확인 |
+| 영향 소비자 | Catalog99·PostgreSQL4·이행3, Live216·PostgreSQL5, Payment8/8/41/6 회귀. Catalog Kafka 검사는 EmbeddedKafka로 구분 |
 
-검사 로그는 작업 폴더의 `build/design-handoff/Order-review-checkpoint.log`, `Order-final-owned-checkpoint.log`, `Order-legacy-refund-postgres.log`, `Order-HTTP-checkpoint.log`와 각 Gradle XML에 있다. 원시 로그는 재현용 로컬 자료이며 본 문서의 검증 범위를 넘어 성공으로 해석하지 않는다.
+실제 외부 PG 제공자, AWS/운영 환경, 실제 Redis, 배포 검증은 하지 않았다. 외부 Kafka 테스트의 테스트 소비자를 별도 배포된 Catalog 소비자/DB 종단 증거라고 주장하지 않는다.
 
-## 발견·수정·재검사
+## 실패·수정 이력
 
-| 최초 실패 | 원인·수정 | 수정 후 |
-|---|---|---|
-| 주문서PG15/15 | 새 SKU fixture의 snapshot_version=0이 양수 제약 위반.1로 고침. V102 이행 값 보존은 별도 migration 검사 |26개 전체·보안8 최종 통과 |
-| 주문서/환불8건 | 직접 구매도 빈 Cart 완료 포트를 호출. Cart 출처가 있을 때만 호출 |26개 전체·보안8 최종 통과 |
-| 종료 HTTP403 | Payment 인증 경로 matcher 누락. 정확 `/payments/*/order-closure`의 SERVICE_commercecore 허용 추가 |26개 전체·보안8 최종 통과 |
-| 종료 HTTP400 | 기본 RestClient가 Instant를 epoch숫자로 직렬화했지만 수신 JsonTypePolicy는 ISO문자열만 허용. Core DTO는Instant를 유지하고 @JsonFormat STRING만 지정 |26개 전체·보안8 최종 통과 |
-| 비동기 보상 테스트 경합 | 별도 엔진/reconciler가 유효 보상을 먼저claim할 수 있어 확정 결과를 제한시간 안에 조회 후 Core 멱등 반영 확인 |26개 전체·보안8 최종 통과 |
-| 기존 환불PG53 중5실패 |옛 Sales 재고 조회·초과 복구 실패 주입을 신규 SKU 원본으로 전환. 기대 수량/롤백/재실행 의미와값은 유지 |53/53 통과 |
+- Cart의33실패와 Order의299/12실패/2스킵을 보존한 뒤 통합했다. 첫 `0395de31` 하네스는 Core309/12실패, 실제PG162/3실패로 실패했다. Product 중복·옛 Sales 변경·판매자 없는 stub 오염을 고쳤고 기대 권한·수량·가격·이벤트 개수/버전·롤백을 유지했다.
+- `19fbb7c4` 전체 빌드와 PostgreSQL244건은 실패0이었지만 Notification3스킵 때문에 하네스는 incomplete였다. 전용 Notification PostgreSQL 환경으로 해당3건을 실제 실행했다.
+- CI43585905802는 환불 작업자 처리 수1/실제2로 실패했다. Payment 확정과 Core 반영을 다른 작업자가 각각 세는 테스트 드라이버를 Core 반영 기준으로 수정했다. 관련 실제PG15건과 최종 전체 회귀가 통과했으며 원래 동시성·누적금액20000·Mock 결과1건 검증을 유지했다.
+- 첫 Kafka 준비/내부 주소 오류, 부분 메타데이터로 구독 토픽 누락, V104 fixture/HTTP403/ISO시각400 등 이전 실패와 수정 근거는13일·14일 워크로그에 보존한다. 실패·스킵·미실행을 처음부터 통과한 것으로 바꾸지 않는다.
 
-위 처음 네 실패·직접 구매 실패 수정은 최신26개 전체/인증8 검사에서 재검증했다. 실패 이력을 삭제하거나 첫 검사부터 성공했다고 기록하지 않는다.
+## CI·브라우저·남은 확인
 
-## 전체 Core 회귀 보류와 실패 분류
+코드 HEAD `a68c31da`의 [CI43586694261](https://github.com/2026-2-rising-sun/Backend/actions/runs/43586694261)는 SUCCESS다. 원격 업로드 XML은726건 실패0·오류0·외부Kafka2스킵이다. artifact의 SHA는 PR 테스트 merge 커밋이며 워크플로 head_sha는 a68c31da다. 로컬의 스킵0과 구분하며 업로드되지 않은 작업을 XML 합계에 보태지 않는다. 이후 문서만 갱신한 최종 HEAD의 CI는 PR 체크와 최종 인계 보고에서 확인한다.
 
-Cart 최초 기준은 H2 단위165 통과/통합298 중30실패·외부Kafka2스킵이었다. Order 전환 뒤 첫 전체 검사는298 중53실패·2스킵이었다. 같은 업무 코드의 단순 악화 건수로만 비교할 수 없다: 신규 Product 실행 잠금·SKU 원본 적용과 실제PG 환경변수 주입이 함께 바뀌었다.
+Order ERD/상태 HTML의1280·390px, fit/100%/확대·축소·내부 가로 이동, MD 링크/복귀, 페이지 overflow와 콘솔을 실제 Orca browser로 확인했다. 공통 ERD의 Cart select 폭 CSS도 보존한다. [ERD 캡처](../../../design-docs/commercecore/order/assets/order-erd-desktop.png) · [상태 모바일](../../../design-docs/commercecore/order/assets/order-state-mobile.png).
 
-| 첫 전체 실패군 | 건수 | 원인·조치·후속 결과 |
-|---|---:|---|
-| PaymentGroupIntegrationTest |27| H2 MERGE fixture가 PG에서도 실행됨. portable INSERT/기존행 명시 갱신으로 변경하고64개 선택 회귀에 포함해 통과 |
-| OrderCreationConstraintIntegrationTest |2| 첫 주문 생성 후에 Product/SKU fixture를 준비한 순서 오류. 생성 전에 준비,106개 실패군 재실행에서 해소 |
-| CartOrderIntegrationTest |3| Product stub만 있고 잠글 실제 Product가 없음. Cart c37c20af 실제행 보완 후 추가로 드러난 SKU 조회/상태 fixture4건은 d85332a9로 수정, 최종6건 통과 |
-| OrderCreationConcurrencyTest |3| 품절 assertion이 옛 Sales 상태를 읽음. 같은 재고0의 SKU 파생SOLD_OUT을 검증, 실패군 재실행에서 해소 |
-| CommerceCoreStateTransitionTest |11| Product 실물/신규SKU fixture 보완 뒤 기존Sales 상태/증감 API 원본에 의존하는8건이 남음. SOLD_OUT fixture는 물리ON_SALE+available0으로 표현. SKU 후속 통합 뒤 재실행 필요 |
-| PaymentDelayReconcilerTest |1| 실패 주입이 옛 Sales 재고에 적용됨. SKU 원본으로 변경하고 추가 fixture만 보강, 실패군 재실행에서 해소 |
-| MemberCommerceCoreApiTest |3| 오버플로 검사 가격을 옛 Sales에만 변경함. SKU 가격으로 변경, 실패군 재실행에서 해소 |
-| SalesInfoEventIntegrationTest |3| SKU 소유 기존 등록/이벤트 어댑터 후속 미통합. 소유자에게 전달, Order가 해당 모듈을 대신 수정하지 않음 |
-
-실패군106 재실행은94통과/12실패였고 그 중Cart4는후속6건검사에서통과했다. 남은Sales관련검사를통과로세지않는다. SKU후속이 기존채팅의 실행대기카드에 머문 사실을 코디네이터가 확인했다. 검증된 SHA 수신 뒤 같은 ancestry로 merge하고 최종 통합HEAD에서 전체Core를1회 재실행한다.
-
-## HTML 실제 브라우저
-
-기존 FigJam 색상으로 ERD/상태 HTML을 MD와 대조했다. 같은 이름 MD 원본 링크를 실제 클릭·뒤로가기로 확인했고1280/390px에서 모든SVG의fit/100%/확대/축소·가로탐색과page overflow없음을확인했다. 네 화면의console오류는0이었다. ResizeObserver는 폭 변경만 감지하고requestAnimationFrame으로 렌더하여 기존루프오류가재발하지않았다.
-
-`build/design-handoff/Order-final-browser-check.json`에행동·상태·스크린샷경로가있다. ERD 전체와상태모바일을실제이미지로확인했다. SVG별 geometry 검사3개 모두0finding이다. diagram-design의전체self_check는임의스크립트를motion controller로간주하여pan/zoom스크립트와motion-root부재를거절했다. 애니메이션을추가하거나검사기를개편하지않았으며이검사를통과로기록하지않는다;브라우저상호작용검증과기하검사를별도증거로유지한다.
-
-## 남은 한계
-
-전체Core최종회귀·최종공유SKU계약/어댑터연결·root하네스완료는미실행이다. 외부Kafka2스킵, 실제Redis/PG제공자/AWS/원격CI는미검증이다. 옵션JSON공급과공개다중SKU표시정책은보류범위다. 계획은active로유지하고PR도통합검증전에는Draft로표시한다.
-
-실제 브라우저 캡처: [1280px ERD](../../../design-docs/commercecore/order/assets/order-erd-desktop.png) · [390px 상태/환불](../../../design-docs/commercecore/order/assets/order-state-mobile.png). 확대 상호작용 결과는 위 로컬 JSON에 별도 기록했다.
-
-## 저장과 정리
-
-검증 소스 체크포인트 `9426989811c9036283af781381f5701f445cd848`를 원격 #331 브랜치에 push하고 [Draft PR #343](https://github.com/2026-2-rising-sun/Backend/pull/343)을 생성했다. base는 `refactor/#332-cart-module`이며 dev 병합·배포하지 않았다. 이 후속 문서 저장은 서비스 코드 변경이 아니다.
-
-검사 로그 확보 뒤 작업 전용 PostgreSQL 컨테이너만 stop하여 `--rm` 제거를 확인했다. Docker Desktop과 다른 컨테이너·볼륨은 그대로 두었다. 후속 실제PG검사는 새 전용 컨테이너와 환경변수를 준비해야 한다.
+확인 대기 세 항목은 **구 API 신규 주문15분**, **미확정 환불1건 제한**, **일반 환불flag-off의 COMPENSATION 예외**다. 직접 사용자 선택 근거는 없으며 현재 동작·영향·대안을 상세설계8절에 명시했다. 답을 받은 것으로 간주하지 않고 임의 변경하지 않는다. 이 때문에 정책 전체 완료를 선언하거나 계획을 completed로 옮기지 않는다.
