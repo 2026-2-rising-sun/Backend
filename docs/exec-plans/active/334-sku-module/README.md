@@ -251,3 +251,6 @@ PostgreSQL은 격리 DB와 COMMERCECORE_TEST_POSTGRES_ 환경 설정을 확인�
 
 
 최종 PostgreSQL 재검증은 SKU업무11·V102이행3·CatalogV3이행1·Catalog사본업무9, 총24건 실패/오류/스킵0이었다. 같은 Catalog 저장소 H2 9건도 통과했다. 페이지/전체 제어 보존과 같은 영속성 컨텍스트의 Product 최신 버전 잠금 회귀를 포함한다. 실제 실행의 상세와 실패 수정은 [2026-11-14 워크로그](../../../worklog/2026-11-14-sku.md), Core API 원본 반영은 Order 최종 통합 PR을 따른다. 공개 다중 SKU/후행 통합이 남아 계획은 active로 유지한다.
+
+
+최신 소스1a09aacd의 전체 하네스 재실행은 Gradle build 종료0·3분3초, Core152/295(외부Kafka2스킵)·Catalog12/82 실패/오류0이었다. Notification 비활성3건과 외부DB미실행까지 포함해 하네스는exit2/incomplete, 검사중diff변경없음이다. 별도 실제PG24건/H2 9건과 구분하며 최종 계약·거래 연계 전까지 [PR344](https://github.com/2026-2-rising-sun/Backend/pull/344)는 Draft로 유지한다.
