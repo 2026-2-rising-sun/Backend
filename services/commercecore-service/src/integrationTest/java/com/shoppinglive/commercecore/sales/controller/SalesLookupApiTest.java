@@ -4,9 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sales.service.SalesLookupService;
@@ -42,6 +40,8 @@ class SalesLookupApiTest
 
     @Autowired private MockMvc mockMvc;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private com.shoppinglive.commercecore.sku.service.SkuService skus;
     @Autowired private SalesJpaRepository salesRepository;
 
     @Autowired private SalesStockJpaRepository salesStockRepository;
@@ -59,14 +59,15 @@ class SalesLookupApiTest
     }
 
     private void clean() {
+        jdbc.update("DELETE FROM sku");
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
     }
 
     private void register(
             long productId, long price, SalesStatus status, int available, int reserved) {
-        Sales sales = salesRepository.save(new Sales(productId, price, status));
-        salesStockRepository.save(new SalesStock(sales.getId(), available, reserved));
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, productId, price, status, available, reserved);
     }
 
     private ResultActions lookup(String query) throws Exception {

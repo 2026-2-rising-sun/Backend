@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `cc91c09b` 공통 모델 위 Product #333의 V101 구현을 반영했다. SKU/Cart/Order의 후속 이행은 통합 전이며 아래 Sales 관계는 현재 레거시 모델이다. 실제 DB·HTTP·Kafka·PG 실행 결과는 워크로그와 구분한다.
+기준: Product #333 `729d2d5f`와 #334 V102·SKU 판매 API 전환을 반영한다. 아래 sales_info/sales_stock은 V102 입력과 기존 Order 이력 참조이며 새 판매 HTTP는 SKU에만 쓴다. Order/Cart 후행 이행은 별도다. [SKU 상세 ERD](../../commercecore/sku/ERD.md)를 함께 본다.
 
 [시각 자료](erd.html)
 
@@ -12,6 +12,7 @@
 
 | 테이블 | 핵심 키·열 | DDL 근거 |
 |---|---|---|
+| sku | PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본 | [V102](../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql). FK 없는 SKU 원본. 기존 판매 HTTP·Product 판매 조회를 전환했고 실제 PostgreSQL 이행/업무를 검증했다. Order/Cart 최종 통합은 후행 PR에서 확인한다. |
 | sales_info | PK id; UQ product_id; status; snapshot_version; product_name_snapshot | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V16](../../../../services/commercecore-service/src/main/resources/db/migration/V16__sales_snapshot_version.sql) · [V19](../../../../services/commercecore-service/src/main/resources/db/migration/V19__sales_product_name_snapshot.sql) |
 | sales_stock | PK/FK sales_info_id; available; reserved | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) |
 | orders | PK id; UQ order_number, (member_id,idempotency_key); sales_info_id; payment_group_id; status; discount_amount; payable_amount | [V1](../../../../services/commercecore-service/src/main/resources/db/migration/V1__commerce_baseline.sql) · [V2](../../../../services/commercecore-service/src/main/resources/db/migration/V2__member_commerce_expand.sql) · [V3](../../../../services/commercecore-service/src/main/resources/db/migration/V3__member_commerce_contract.sql) · [V4](../../../../services/commercecore-service/src/main/resources/db/migration/V4__payment_groups.sql) · [V7](../../../../services/commercecore-service/src/main/resources/db/migration/V7__order_discount_snapshots.sql) · [V11](../../../../services/commercecore-service/src/main/resources/db/migration/V11__refunded_order_status.sql) |
@@ -32,6 +33,7 @@
 
 | 출발 | 도착 | 구분·조건 |
 |---|---|---|
+| sku.product_id | product.id | 논리 참조 · 상품당 여러 SKU, FK 없음. 상품 생성/주문 때 앱 검증. |
 | sales_stock.sales_info_id | sales_info.id | 물리 FK · 판매별 재고 1행 |
 | orders.sales_info_id | sales_info.id | 물리 FK · 주문의 판매 대상 |
 | orders.payment_group_id | payment_group.id | 물리 FK · nullable 묶음 참조 |

@@ -2,6 +2,8 @@
 
 여러 단계·의존성·불확실성이 있는 작업은 `active/<이슈>-<주제>/README.md`에서 목표·범위·진행 상태·검증·관련 자료를 연결한다. 내용이 필요한 판단·조사 자료만 같은 폴더에 추가한다.
 
+진행 중 계획: [#334 SKU 현재 가격·재고 통합](active/334-sku-module/README.md)
+
 진행 작업: [#333 Product 모듈 설계·구현](active/333-product-module/README.md) — Product 독립 구현·회귀 진행, 공유 통합 검사 중.
 
 완료 작업: [#330 문서 하네스](completed/330-document-harness/README.md)

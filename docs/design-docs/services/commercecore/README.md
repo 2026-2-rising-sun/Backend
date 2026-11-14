@@ -4,10 +4,11 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: `cc91c09b`의 공통 코드 위 Product #333의 V101·제어/삭제 구현을 반영한다. SKU·Cart·Order의 후속 이행은 각 담당 통합 후 갱신하며 운영 환경 검증 자료와 구분한다.
+기준: `cc91c09b` 공통 모델에 Product #333의 `729d2d5f`와 #334 SKU를 통합했다. 판매 HTTP·Product 판매 조회는 SKU 원본을 사용하고, 기존 Order/Cart 경로는 후행 PR이 통합한다. 공개 다중 SKU/대표가·가격 정렬은 보류이며 운영 배포 결과와 구분한다.
 
 ## 문서
 
+- [SKU 모듈 목표·구현 진행 상태](../../commercecore/sku/README.md): V102/V3·내부 거래 포트의 별도 상세. 아래 기존 Sales 설명과 전환 상태를 구분한다.
 - [API HTML](api.html) · [계약 YAML](../../../../contracts/api/commercecore-service.yaml)
 - [DB ERD 설명](erd.md) · [관계도](erd.html)
 - [Product 상세 ERD·전체 상태](../../commercecore/product/README.md)

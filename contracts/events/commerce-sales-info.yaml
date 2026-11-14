@@ -249,13 +249,13 @@ components:
           format: int64
           minimum: 1
           maximum: 9223372036854775807
-          description: 판매정보 ID
+          description: SKU 식별자. 기존 Sales ID를 기본 SKU ID로 보존하며 호환 필드명 salesId를 유지한다.
         productId:
           type: integer
           format: int64
           minimum: 1
           maximum: 9223372036854775807
-          description: 상품 ID
+          description: 상품 ID. 여러 SKU가 같은 productId를 공유할 수 있으므로 사본 키와 버전 비교는 salesId 기준이다.
         snapshotVersion:
           type: integer
           format: int64
