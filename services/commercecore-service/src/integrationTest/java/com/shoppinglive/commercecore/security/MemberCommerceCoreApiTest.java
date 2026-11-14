@@ -55,6 +55,10 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
     @BeforeEach
     void seed() {
         clean();
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 1L, SELLER);
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 2L, SELLER);
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, 1, 1000, SalesStatus.ON_SALE, 10, 0);
         productLookup.register(new ProductSnapshot(1L, "상품", null));
         productLookup.register(new ProductSnapshot(2L, "새 상품", null));
         salesId = sales.save(new Sales(1L, 1000L, SalesStatus.ON_SALE)).getId();
@@ -69,6 +73,8 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
         items.deleteAll();
         stocks.deleteAll();
         sales.deleteAll();
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id IN (1,2)");
         productLookup.clear();
     }
 

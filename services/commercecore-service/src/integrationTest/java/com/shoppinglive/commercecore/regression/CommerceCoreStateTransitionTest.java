@@ -90,6 +90,8 @@ class CommerceCoreStateTransitionTest
         orderRepository.deleteAll();
         stockRepository.deleteAll();
         salesRepository.deleteAll();
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id=920");
         productLookup.clear();
     }
 
@@ -193,29 +195,34 @@ class CommerceCoreStateTransitionTest
                 .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
     }
 
-    @DisplayName("재고가 0이면 ON_SALE로 변경하지 않는다")
+    @DisplayName("0재고 SKU는 수동 상태를 ON_SALE로 저장하고 외부에는 SOLD_OUT을 반환한다")
     @ParameterizedTest
     @EnumSource(
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
-    void rejectsOnSaleTransitionWhenStockIsZero(SalesStatus current) throws Exception {
-        jdbc.update(
-                "UPDATE sku SET sale_status = ? WHERE id = ?",
-                current == SalesStatus.SOLD_OUT ? "ON_SALE" : current.name(),
-                salesId);
-        jdbc.update("UPDATE sku SET available = 0 WHERE id = ?", salesId);
-        var result =
-                mvc.perform(
-                        patch("/v1/sales/{id}/status", salesId)
+    void derivesSoldOutWhenStartingZeroStockSku(SalesStatus current) throws Exception {
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 920L, SELLER);
+        long skuId =
+                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                        jdbc, 920, 10000, current, 0, 0);
+        mvc.perform(
+                        patch("/v1/sales/{id}/status", skuId)
                                 .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"status\":\"ON_SALE\"}"));
-        if (current == SalesStatus.READY || current == SalesStatus.ON_SALE) {
-            result.andExpect(status().isConflict());
-        } else {
-            result.andExpect(status().isOk());
-            assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
-        }
+                                .content("{\"status\":\"ON_SALE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                                        "$.status")
+                                .value("SOLD_OUT"));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT sale_status FROM sku WHERE id=?", String.class, skuId))
+                .isEqualTo("ON_SALE");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT available FROM sku WHERE id=?", Integer.class, skuId))
+                .isZero();
     }
 
     @DisplayName("판매자가 재고를 보충하면 품절만 해제하고 다른 상태는 유지한다")

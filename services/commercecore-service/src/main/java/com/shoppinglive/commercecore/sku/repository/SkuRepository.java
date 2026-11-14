@@ -48,6 +48,14 @@ public class SkuRepository {
                 VIEW);
     }
 
+    public List<SkuView> findByProductIds(Collection<Long> productIds) {
+        if (productIds.isEmpty()) return List.of();
+        return jdbc.query(
+                "SELECT " + FIELDS + " FROM sku WHERE product_id IN (:ids) ORDER BY product_id,id",
+                Map.of("ids", productIds),
+                VIEW);
+    }
+
     public long create(Long productId, long price, int available, String productName) {
         GeneratedKeyHolder key = new GeneratedKeyHolder();
         jdbc.update(

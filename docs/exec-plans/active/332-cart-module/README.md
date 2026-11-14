@@ -1,6 +1,6 @@
 # #332 Cart 모듈 구현 계획
 
-상태: 진행 중 · 코드 작성·선행 통합·검증 수행 중
+상태: Cart 독립 구현·선행 통합 검증 완료 · 후행 Order 전체 거래 검증 대기
 
 자료: [설계](../../../design-docs/commercecore/cart/설계.md) · [ADR](../../../adr/0332-cart-sku-boundary.md) · [ERD MD](../../../design-docs/commercecore/cart/ERD.md) · [ERD HTML](../../../design-docs/commercecore/cart/ERD.html) · [워크로그](../../../worklog/2026-11-13.md) · [이슈 #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 정책 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
@@ -32,7 +32,7 @@ Cart를 cart 패키지로 분리하고 SKU별 항목·수량·소유권을 관�
 - [ ] 기존 단일 SKU 주문·결제/환불 호출자와 데이터/권한 회귀 확인. 기존 Sales 경로 전환의 선행 한계 분리.
 - [ ] Core YAML 최종 편집자 Order가 [Cart API 조각](cart-api-fragment.yaml)을 통합하고 생성 API/소비자 의미를 검증.
 - [x] 코드·실행 결과와 MD/HTML·현행 Core 설명을 맞추고 1280/390px 일반 viewport 화면·링크 확인.
-- [ ] Cart PR 한 개를 SKU 브랜치 base로 전달. 계약/연계 미완료면 완성 PR로 보고하지 않음.
+- [x] Draft PR341을 SKU 브랜치 base로 전달. 후행 거래/계약 미완료를 표시하고 완성 PR로 보고하지 않음.
 
 ## 포트와 소유 파일
 
@@ -84,3 +84,17 @@ Spotless·문서123개·생성 API HTML6개/설계 HTML28개 최신성은 통과
 ### Product 승인 API 후속 통합
 
 코디네이터 승인으로 Product `447b0056902dd0bac4262c113f8c93a8653ce251`을 `22289dbf`로 merge했다. 충돌은 워크로그 한 곳으로 양쪽 기록을 모두 보존했다. Cart 원본 API 경로는 이전과 의미가 동일함을 YAML 구조 비교로 확인했고 신규 SKU 조회 조각은 중복 적용하지 않았다. Cart 단위13/H2통합20·Spotless 재검증 통과, API 경로 구조 검사·문서124개·생성 API HTML6/설계HTML28 최신성 통과다. 이 병합 후 실제 PG/전체Core 회귀는 재실행하지 않았으며 이전30실패·Sales 원본전환 미완료가 해소됐다고 보지 않는다.
+
+### 2026-11-14 복구 체크포인트
+
+시작 `d85332a9`에서 Cart 단위13·H2 독립14 통과와 CartOrder6건 중4실패를 재현했다. `createFromCart → doCreate → SalesStockJpaRepository.reserve`는 구 경로이므로 현재 SKU 원본 기대 수량과 일치하지 않는다. 전체 CI299건 중34실패·2스킵과 독립 구현을 구분한다. Order `c3d96569`에는 Cart API 조각/fixture 후속이 포함됐다는 인계를 받았으나 Cart 자체 원본 YAML은 이전 스키마이며 역merge하지 않는다.
+
+PostgreSQL 성공 정리와 수량 변경 경합 테스트를 추가하고 실제 PostgreSQL16·V103 이행을 재검증한다. 선행 SKU 검증 SHA 일반 merge 뒤 핵심/전체 Core 실패 변화를 확인해 정확 SHA를 Order에 전달한다. [복구 실행 기록](../../../worklog/2026-11-14.md#332-cart-복구-검증)을 현재 결과 원본으로 사용하며 이전 통과를 최종 SHA의 결과로 재사용하지 않는다.
+
+### 최신 인계 기준
+
+검증된 SKU `1a09aacd`를 Cart `41328b7e`에 일반 merge한 코드 기준은 `8397dca2`다. 전체 Core 단위165/독립 Cart H2 14/실제 PostgreSQL13/V103이행3은 실패·오류·스킵0이다. 전체 통합309개 중33실패·2스킵이며 CI43584182526도 동일하다. 이전34실패 중 Member API1개가 해소됐고 CartOrder4/PaymentGroup27/CartCouponPreview1/SalesInfoEvent1은 후행 Order의 Sales→SKU 연결·fixture 변경에 의존한다. 독립 Cart 완료와 전체 거래 통합 완료를 구분하므로 계획은 active에 둔다.
+
+공통 HTML 모바일 select 폭 문제는 단일 담당 배정에 따라 `ae903c3d`에서 원본 CSS만 보완하고 설계28/API6개를 재생성했다. 문서 하네스46·문서127·생성물 최신성이 통과했고 실제390px 페이지폭390/select경계14~376/필터1÷17·1280px 정상·Cart 내부스크롤을 확인했다. SKU 문서 후속 `c0f3a52c`도 `bfe54902`로 일반 merge했다. 이 문서 후속들에는 Java/SQL/계약 원본 diff가 없어 `8397dca2`의 코드 검증을 재사용한다.
+
+Cart 브랜치 YAML은 이전 응답 스키마이고 실제 Cart 조각은 후행 Order `c3d96569`에 통합됐다는 인계가 있다. 역merge나 임의 중복 적용 없이 최종 Order 통합 HEAD에서 계약/소비자/거래를 검증한다. #340의 새 연결·편집 제한 정책은 계속 보류다. 원문 FigJam465:1282의 확정 동작을 코드/테스트에 대조했고 구현 전 표기와 후속 쿠폰 결정은 구분해 코디네이터에 전달했다.

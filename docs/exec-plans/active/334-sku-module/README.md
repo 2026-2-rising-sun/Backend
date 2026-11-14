@@ -1,10 +1,10 @@
 # #334 SKU 현재 가격·재고 통합 구현 계획
 
-상태: 내부 기반 구현 중 · 모듈 연계·외부 다중 SKU 세부 사항 조율 중
+상태: 단일 판매 API·Product 조회의 SKU 전환 검증 중 · 공개 다중 SKU 흐름 보류
 
 2026-11-13 후속 구현 Task `task_65aabcea44d3`/`ctx_af90941ad5c7`를 시작했다. 사용자의 코드·MD/HTML 구현 지시가 아래 과거 착수 대기를 대체한다. Core V102·Catalog V3와 적용 순서는 코디네이터 기술 조정으로 배정됐다. 같은 세션 Sol Medium 적용은 코디네이터가 저장·재조회했다. [모듈 상세·ERD·상태 HTML](../../../design-docs/commercecore/sku/README.md)을 실제 코드와 함께 갱신한다.
 
-현재 SkuService/SkuRepository/SkuView/SkuEventTracker·V102, Catalog SKU별 사본/V3를 작성했고 포트 signature를 세 담당자에게 전달했다. 기존 Sales API·Order/Product 호출 전환과 API 계약 조각은 아직 완료 전이며 이 중간 상태를 독립 배포하지 않는다. 대표가·가격 정렬·다중 SKU 활성화 미결정은 독립 내부 기반 구현을 막지 않는다.
+현재 SkuService/SkuRepository/SkuView/SkuEventTracker·V102, Catalog SKU별 사본/V3 위에 Product729d2d5f를 일반 merge했다. Sales HTTP 등록·변경·조회와 Product 판매 조회는 SkuSalesService를 통해 SKU 원본으로 전환했으며 API 의미·오류 조각을 Order 최종 편집자에게 전달했다. 기존 Order/Cart 연계는 후행 PR에서 통합하므로 이 중간 상태를 독립 배포하지 않는다. 대표가·가격 정렬·다중 SKU 활성화 미결정은 독립 내부 기반 구현을 막지 않는다.
 
 관련 자료: [이슈 #334](https://github.com/2026-2-rising-sun/Backend/issues/334) · [ADR 0334](../../../adr/0334-sku-price-inventory.md) · [작업 기록](../../../worklog/2026-11-13.md) · [SKU FigJam](https://www.figma.com/board/1lr73O8XYEhMGHAgWAEeOv/?node-id=424-1279)
 
@@ -235,3 +235,22 @@ PostgreSQL은 격리 DB와 COMMERCECORE_TEST_POSTGRES_ 환경 설정을 확인�
 - 최종 전달은 SKU #334 PR 한 개다. Inventory #335 별도 PR·독립 Payment 개편·승인 없는 병합/배포는 포함하지 않는다.
 
 현재 실제 변경은 Core SKU 내부 기반·V102, Catalog SKU별 사본·V3와 테스트·문서다. FigJam은 코디네이터만 편집한다. 기존 Sales API/거래 호출 전환·실제 PostgreSQL·계약 통합이 남아 있으며 다른 채팅의 기존 결정을 재질문하거나 초기화하지 않는다.
+
+
+## 2026-11-14 복구 후 구현
+
+시작0b36ba47·clean에서 fetch 및 origin/dev ff-only 확인 후 Product729d2d5f를 merge1b9b4d5b로 통합했다. 충돌은 서비스 ERD/지도·실행 계획·워크로그의 양쪽 내용을 보존하고 생성 HTML을 재생성해 해결했다. 다른 워크트리와 FigJam은 편집하지 않았다.
+
+기존 판매 HTTP는 SkuSalesService의 실제 Product 본인·미삭제 잠금/검증과 SKU·Outbox만 사용한다. 기존 단일 상품 등록은 Product 배타 잠금으로 중복 생성 경합을 직렬화하며 여러 SKU 생성 내부 포트와 구분한다. 가격·수량·상태 변경은 SKU 행을 잠그고 조건부 갱신한다. findByProductIds 배치 포트와 판매자 내부 listSkus를 제공하며, Product 먼저 페이지→일괄SKU 조회 및 페이지 전 상태필터로 N+1/상품 중복 건수를 방지한다.
+
+공개 다중 SKU 생성·판매자 HTTP 목록·고객 옵션 선택·상품별 공개 skus[]·대표가·새 가격 정렬·Live 다중 SKU는 미완/보류다. 기존 단일 응답에 복수 SKU가 있으면 Core409/Catalog503이며 임의 대표값은 없다. 기존 SalesService/RegistrationService와 sales_info/sales_stock은 선행 브랜치의 Order 호환·이력 경로로 남는다. Order #331이 신규 등록의 식별/거래/완료/해제·보상 경로를 SKU에 연결하고 sales_info_id 과거 참조를 보존한다. 이 브랜치만으로 전체 원본 전환·운영 배포 완료를 주장하지 않는다.
+
+[API 의미·오류 조각](api-changes.md), [현행 판매 상태](../../../design-docs/services/commercecore/states/sales.md), [목표 ERD/상태](../../../design-docs/commercecore/sku/README.md)를 현재 코드에 맞췄다. V102/V3 번호와 Product→SKU→Cart→Order 순서는 코디네이터 기술 배정이며 사용자 개별 번호 확정으로 기록하지 않는다.
+
+실제 전용 PostgreSQL16 검증: V102 이행3건·SKU/Product연계 및 동시선점8건·CatalogV3 이행1건 실패/오류/스킵0이었다. 기존Sales ID/값·시퀀스, 누락재고/모순상태 거절, Product 삭제 후 기존 예약 완료/해제/복구, Outbox 실패 롤백, 동시10요청 재고5만 선점을 확인했다. 추가 페이지·전체제어 보존 시나리오를 보강했으므로 최종 재실행 결과는 후속 기록에 남긴다. H2/Mock·실제PG·외부Kafka·CI는 구분한다.
+
+
+최종 PostgreSQL 재검증은 SKU업무11·V102이행3·CatalogV3이행1·Catalog사본업무9, 총24건 실패/오류/스킵0이었다. 같은 Catalog 저장소 H2 9건도 통과했다. 페이지/전체 제어 보존과 같은 영속성 컨텍스트의 Product 최신 버전 잠금 회귀를 포함한다. 실제 실행의 상세와 실패 수정은 [2026-11-14 워크로그](../../../worklog/2026-11-14-sku.md), Core API 원본 반영은 Order 최종 통합 PR을 따른다. 공개 다중 SKU/후행 통합이 남아 계획은 active로 유지한다.
+
+
+최신 소스1a09aacd의 전체 하네스 재실행은 Gradle build 종료0·3분3초, Core152/295(외부Kafka2스킵)·Catalog12/82 실패/오류0이었다. Notification 비활성3건과 외부DB미실행까지 포함해 하네스는exit2/incomplete, 검사중diff변경없음이다. 별도 실제PG24건/H2 9건과 구분하며 최종 계약·거래 연계 전까지 [PR344](https://github.com/2026-2-rising-sun/Backend/pull/344)는 Draft로 유지한다.

@@ -46,7 +46,7 @@ Core V101 Product → V102 SKU → V103 Cart → V104 Order 순서다. 적용된
 
 ## 성공 정리와 실패 복구
 
-Order 트랜잭션은 선택 Cart 행을 ID순으로 잠그고 Product/SKU 검증·예약을 수행한다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
+최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 현재 Cart 브랜치의 Order는 구 Sales 경로가 남아 있다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
 
 Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 작성하지 않는다. SKU READY/판매 상태와 Order 결제 상태를 Cart에 복제하지 않는다.
 
@@ -57,4 +57,4 @@ Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 �
 - [CartSelectionPort.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartSelectionPort.java)
 - [CartSelectionServiceTest.java](../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/cart/service/CartSelectionServiceTest.java)
 
-최종 Cart 단위 13개·H2 통합 20개·실제 PostgreSQL 잠금/롤백 12개·Flyway 이행 3개는 실패/오류/스킵 0이다. 전체 Core 통합은 298개 중 30개 실패·외부 Kafka 2개 스킵으로 후속 Order fixture·Sales 쓰기 전환과 API 원본 통합이 남았다. MD와 HTML은 같은 모델을 설명하며 운영 적용 증거와 구분한다.
+2026-11-13 체크포인트의 Cart 단위13/H2통합20/실제 PostgreSQL12/Flyway3 통과는 당시 결과다. `d85332a9`의 CI는299개 중34실패·2스킵이며, 현재 독립 Cart 검증과 선행 SKU 통합 뒤 결과는 [2026-11-14 복구 기록](../../../worklog/2026-11-14.md#332-cart-복구-검증)에서 확인한다. Cart 원본 YAML은 이전 스키마이고 Order `c3d96569`에 Cart 계약 조각이 통합됐다는 인계를 받았다. 전체 거래·계약 검증은 최종 Order 통합 HEAD에서 수행하며 운영 적용 증거와 구분한다.

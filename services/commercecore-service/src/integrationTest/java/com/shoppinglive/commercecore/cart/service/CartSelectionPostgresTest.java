@@ -180,6 +180,73 @@ class CartSelectionPostgresTest extends CartSelectionServiceTest {
         }
     }
 
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("수량 변경 거래를 기다린 성공 정리는 이전 버전의 항목을 삭제하지 않는다")
+    void preservesQuantityChangeCommittedWhileCleanupWaits() throws Exception {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        CartSelection selected =
+                transaction.execute(
+                        status -> {
+                            CartItem item =
+                                    cartItems.saveAndFlush(new CartItem(MEMBER, 501L, 1301L, 2));
+                            return new CartSelection(item.getId(), item.getVersion());
+                        });
+        var changed = new CountDownLatch(1);
+        var commitChange = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var update =
+                    executor.submit(
+                            () ->
+                                    transaction.executeWithoutResult(
+                                            status -> {
+                                                CartItem item =
+                                                        cartItems
+                                                                .lockOwned(
+                                                                        selected.itemId(), MEMBER)
+                                                                .orElseThrow();
+                                                item.changeQuantity(5);
+                                                cartItems.saveAndFlush(item);
+                                                changed.countDown();
+                                                await(commitChange);
+                                            }));
+            assertThat(changed.await(5, TimeUnit.SECONDS)).isTrue();
+            var cleanup =
+                    executor.submit(
+                            () ->
+                                    transaction.execute(
+                                            status -> {
+                                                port.lockForCompletion(
+                                                        MEMBER, List.of(selected.itemId()));
+                                                return port.deletePurchased(
+                                                        MEMBER, List.of(selected));
+                                            }));
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(5))
+                    .untilAsserted(
+                            () ->
+                                    assertThat(
+                                                    jdbc.queryForObject(
+                                                            "SELECT count(*) FROM pg_stat_activity WHERE application_name=? AND wait_event_type='Lock'",
+                                                            Integer.class,
+                                                            SCHEMA))
+                                            .isGreaterThan(0));
+            assertThat(cleanup.isDone()).isFalse();
+            commitChange.countDown();
+            update.get(5, TimeUnit.SECONDS);
+            assertThat(cleanup.get(5, TimeUnit.SECONDS)).isZero();
+            CartItem remaining = cartItems.findById(selected.itemId()).orElseThrow();
+            assertThat(remaining.getQuantity()).isEqualTo(5);
+            assertThat(remaining.getVersion()).isEqualTo(selected.version() + 1);
+        } finally {
+            commitChange.countDown();
+            executor.shutdownNow();
+            transaction.executeWithoutResult(status -> cartItems.deleteById(selected.itemId()));
+        }
+    }
+
     private static void await(CountDownLatch latch) {
         try {
             if (!latch.await(10, TimeUnit.SECONDS)) {

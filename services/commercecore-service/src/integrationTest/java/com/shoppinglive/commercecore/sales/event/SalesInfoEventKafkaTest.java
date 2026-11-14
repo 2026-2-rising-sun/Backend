@@ -11,7 +11,7 @@ import com.shoppinglive.commercecore.order.service.OrderService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.time.Duration;
@@ -49,7 +49,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
-    @Autowired SalesService sales;
+    @Autowired SkuSalesService sales;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired InMemoryProductLookupStub productLookup;
@@ -71,6 +71,9 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
                 if (!(exists.getCause() instanceof TopicExistsException)) throw exists;
             }
         }
+        new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(
+                        new org.springframework.core.io.ClassPathResource("cart/sku-fixture.sql"))
+                .execute(jdbc.getDataSource());
         long productId = UUID.randomUUID().getMostSignificantBits() >>> 1;
         productLookup.register(new ProductSnapshot(productId, "Kafka 검증 상품", null, SELLER, true));
         jdbc.update(
@@ -91,10 +94,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
                                 StringDeserializer.class,
                                 "value.deserializer",
                                 StringDeserializer.class))) {
-            var partitions =
-                    consumer.partitionsFor(SalesInfoEventContract.TOPIC_NAME).stream()
-                            .map(p -> new TopicPartition(p.topic(), p.partition()))
-                            .toList();
+            var partitions = List.of(new TopicPartition(SalesInfoEventContract.TOPIC_NAME, 0));
             consumer.assign(partitions);
             consumer.seekToEnd(partitions);
             partitions.forEach(consumer::position);
@@ -114,8 +114,8 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
                             .getContentAsString();
             long id = mapper.readTree(response).get("id").asLong();
             assertThat(id).isPositive();
-            sales.changePrice(id, 2000L);
-            sales.changeStatus(id, SalesStatus.ON_SALE);
+            sales.changePrice(id, 2000L, SELLER);
+            sales.changeStatus(id, SalesStatus.ON_SALE, SELLER);
             String member = UUID.randomUUID().toString();
             var order =
                     creation.create(

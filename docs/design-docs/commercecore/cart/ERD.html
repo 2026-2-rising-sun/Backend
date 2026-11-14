@@ -15,10 +15,10 @@
     <div class="eyebrow">COMMERCECORE / CART #332</div>
     <h1>SKU마다 따로 담고,<br>구매한 원본 항목만 정리합니다</h1>
     <p class="lead">옵션이 다른 상품은 별도 SKU 항목으로 관리합니다. 기존에 담긴 항목에 판매정보가 없더라도 지우지 않고 남겨 두며, 주문 선택에서는 이용 불가로 처리합니다.</p>
-    <p><span class="badge">Cart 검증 통과 · 전체 연계 검증 대기</span></p>
-    <p class="meta">기준: <code>cc91c09b</code> 위의 Cart 구현 변경 · <a href="ERD.md">MD 원본</a> · <a href="설계.md">상세 설계</a> · <a href="../../../exec-plans/active/332-cart-module/README.md">구현 계획</a> · <a href="../../services/commercecore/erd.html">현행 Core 전체 ERD</a></p>
+    <p><span class="badge">Cart 구현 반영 · 전체 연계 검증 중</span></p>
+    <p class="meta">기준: <code>d85332a9</code> 이후 Cart 복구 검증 · <a href="ERD.md">MD 원본</a> · <a href="설계.md">상세 설계</a> · <a href="../../../exec-plans/active/332-cart-module/README.md">구현 계획</a> · <a href="../../services/commercecore/erd.html">현행 Core 전체 ERD</a></p>
   </header>
-  <aside class="notice"><strong>현재 데이터와 목표 모델을 구분합니다.</strong> <code>sku_id</code>는 Cart 엔티티와 V103 확장에 반영 중입니다. 실제 PostgreSQL 16에서 Flyway 이행 3개·선택 잠금/롤백 12개를 통과했습니다. 전체 Core 거래 회귀의 실패와 계약 원본 통합은 후속 작업입니다. nullable SKU는 기존 항목의 보존을 위한 것이며 가격·재고 원본을 Cart에 만드는 의미가 아닙니다.</aside>
+  <aside class="notice"><strong>Cart 구현과 전체 거래 검증을 구분합니다.</strong> <code>sku_id</code>는 Cart 엔티티와 V103에 반영됐습니다. 이전 체크포인트의 PostgreSQL 16 이행 3개·잠금/롤백 12개 통과와 현재 복구 검증은 <a href="../../../worklog/2026-11-14.md#332-cart-복구-검증">실행 기록</a>에서 구분합니다. 현재 Cart 브랜치의 Order는 구 Sales 경로가 남아 있고, Cart 계약은 후행 Order <code>c3d96569</code>에서 통합됐다는 인계를 받았습니다. nullable SKU는 기존 항목의 보존을 위한 것이며 가격·재고 원본을 Cart에 만드는 의미가 아닙니다.</aside>
   <section aria-labelledby="relationships">
     <h2 id="relationships">상품·SKU·회원과 Cart의 관계</h2>
     <p class="meta">점선은 논리 참조입니다. 아래 관계에 물리 FK를 추가하지 않습니다. 좁은 화면에서는 도표 안을 가로로 이동할 수 있습니다.</p>

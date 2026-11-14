@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
@@ -37,17 +35,22 @@ class FirewallRejectionHttpTest extends CommerceCoreSecurityTestSupport {
     @Autowired ObjectMapper mapper;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired com.shoppinglive.commercecore.sku.service.SkuService skus;
     private Long saleId;
 
     @BeforeEach
     void seed() {
-        saleId = sales.save(new Sales(123L, 1000L, SalesStatus.ON_SALE)).getId();
-        stocks.save(new SalesStock(saleId, 10, 0));
-        prepareLegacyTradeFixtures();
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 123L, SELLER);
+        saleId =
+                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                        jdbc, 123, 1000, SalesStatus.ON_SALE, 10, 0);
     }
 
     @AfterEach
     void clean() {
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id=123");
         stocks.deleteAll();
         sales.deleteAll();
     }
@@ -106,10 +109,12 @@ class FirewallRejectionHttpTest extends CommerceCoreSecurityTestSupport {
     }
 
     private void unchanged() {
-        assertThat(sales.count()).isEqualTo(1);
-        assertThat(sales.findById(saleId).orElseThrow().getPrice()).isEqualTo(1000L);
-        assertThat(legacyStock(saleId).getAvailable()).isEqualTo(10);
-        assertThat(legacyStock(saleId).getReserved()).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM sku", Long.class)).isEqualTo(1);
+        assertThat(skus.findBySkuIds(java.util.List.of(saleId)).getFirst().price())
+                .isEqualTo(1000L);
+        assertThat(skus.findBySkuIds(java.util.List.of(saleId)).getFirst().available())
+                .isEqualTo(10);
+        assertThat(skus.findBySkuIds(java.util.List.of(saleId)).getFirst().reserved()).isZero();
     }
 
     private HttpResponse<String> request(String method, String path, String bearer)

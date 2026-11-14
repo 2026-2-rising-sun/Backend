@@ -42,7 +42,7 @@ paths:
         category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
 
         q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400
-        INVALID_REQUEST다.'
+        INVALID_REQUEST다. 상품당 단일 SKU의 기존 공개 응답을 유지한다. 복수 SKU 사본의 저장은 지원하지만 대표가·가격 정렬·공개 옵션 선택은 미확정이며, 단일 판매 응답으로 축약할 수 없는 복수 SKU는 503 판매정보 조회 불가로 구분한다.'
       parameters:
       - name: q
         in: query

@@ -34,6 +34,11 @@ public class SkuService {
         return repository.findByProductId(productId);
     }
 
+    @Transactional(readOnly = true)
+    public List<SkuView> findByProductIds(Collection<Long> productIds) {
+        return repository.findByProductIds(sortedIds(productIds));
+    }
+
     /** 호출자가 Product를 ID순 공유 잠금·검증한 뒤 SKU를 ID순으로 잠근다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public List<SkuView> lockForOrder(Collection<Long> skuIds) {
