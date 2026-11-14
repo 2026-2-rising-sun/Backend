@@ -24,8 +24,6 @@ import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.security.MessageDigest;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -37,7 +35,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -60,7 +57,7 @@ class PaymentGroupCheckoutService {
     private final CouponPreviewService couponPreview;
     private final CouponReservationService couponReservations;
     private final PaymentGroupEventPublisher notificationEvents;
-    private final Duration expiration;
+    private final OrderTimeSource time;
     private final OrderSheetLifecycleService sheetLifecycle;
     @PersistenceContext private EntityManager entityManager;
 
@@ -79,7 +76,7 @@ class PaymentGroupCheckoutService {
             CouponPreviewService couponPreview,
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents,
-            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration,
+            OrderTimeSource time,
             OrderSheetLifecycleService sheetLifecycle) {
         this.groups = groups;
         this.orders = orders;
@@ -95,7 +92,7 @@ class PaymentGroupCheckoutService {
         this.couponPreview = couponPreview;
         this.couponReservations = couponReservations;
         this.notificationEvents = notificationEvents;
-        this.expiration = expiration;
+        this.time = time;
         this.sheetLifecycle = sheetLifecycle;
     }
 
@@ -248,14 +245,15 @@ class PaymentGroupCheckoutService {
                     PaymentGroup group =
                             groups.saveAndFlush(
                                     new PaymentGroup(
-                                            "PG-" + UUID.randomUUID(),
-                                            member,
-                                            key,
-                                            fingerprint,
-                                            total,
-                                            Instant.now().plus(expiration),
-                                            quote.discountAmount(),
-                                            couponId));
+                                                    "PG-" + UUID.randomUUID(),
+                                                    member,
+                                                    key,
+                                                    fingerprint,
+                                                    total,
+                                                    time.now().plusSeconds(600),
+                                                    quote.discountAmount(),
+                                                    couponId)
+                                            .useLegacyDeadlinePolicy());
                     for (Item item : quote.items()) {
                         var s = currentSales.get(item.productId());
                         Order order =
@@ -299,18 +297,19 @@ class PaymentGroupCheckoutService {
         PaymentGroup group =
                 groups.saveAndFlush(
                         new PaymentGroup(
-                                "PG-" + UUID.randomUUID(),
-                                order.getMemberId(),
-                                key,
-                                fingerprint(
-                                        List.of(
-                                                order.getOrderNumber(),
-                                                couponId == null ? "" : couponId,
-                                                discountAmount)),
-                                order.getTotalAmount(),
-                                order.getExpiresAt(),
-                                discountAmount,
-                                couponId));
+                                        "PG-" + UUID.randomUUID(),
+                                        order.getMemberId(),
+                                        key,
+                                        fingerprint(
+                                                List.of(
+                                                        order.getOrderNumber(),
+                                                        couponId == null ? "" : couponId,
+                                                        discountAmount)),
+                                        order.getTotalAmount(),
+                                        order.getExpiresAt(),
+                                        discountAmount,
+                                        couponId)
+                                .useLegacyDeadlinePolicy());
         order.attachGroup(group, sourceVersion);
         orders.saveAndFlush(order);
         notificationEvents.publish("PaymentGroupCreated", group.getId(), Map.of());
@@ -319,13 +318,13 @@ class PaymentGroupCheckoutService {
 
     GroupResponse get(String member, String number) {
         PaymentGroup found = owned(member, number);
-        if (found.isOrderSheet()) sheetLifecycle.expire(found.getId());
+        if (found.enforcesDeadline()) sheetLifecycle.expire(found.getId());
         return tx.execute(t -> response(owned(member, number)));
     }
 
     Optional<GroupResponse> active(String member) {
         for (var group : groups.findByMemberIdAndStatusIn(member, ACTIVE)) {
-            if (group.isOrderSheet()) sheetLifecycle.expire(group.getId());
+            if (group.enforcesDeadline()) sheetLifecycle.expire(group.getId());
         }
         return tx.execute(
                 t ->

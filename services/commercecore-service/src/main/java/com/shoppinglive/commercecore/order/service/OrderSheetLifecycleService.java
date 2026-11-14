@@ -87,7 +87,7 @@ public class OrderSheetLifecycleService {
                         t -> {
                             guard.lock(member);
                             PaymentGroup group = locked(found.getId());
-                            if (group.getStatus() == OrderStatus.PENDING_PAYMENT
+                            if (awaitingPayment(group)
                                     && !group.getExpiresAt().isAfter(time.now())) {
                                 expireLocked(group);
                                 return new Start(null, true);
@@ -167,14 +167,17 @@ public class OrderSheetLifecycleService {
 
     public boolean expire(long id) {
         PaymentGroup found = groups.findById(id).orElseThrow();
-        guard.ensure(found.getMemberId());
+        // 생성·결제·재요청 트랜잭션은 guard를 먼저 확보한다. 이미 잠근 채 진입할 때
+        // REQUIRES_NEW ensure로 추가 연결을 기다리지 않는다.
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) guard.ensure(found.getMemberId());
         return Boolean.TRUE.equals(
                 tx.execute(
                         t -> {
                             guard.lock(found.getMemberId());
                             PaymentGroup group = locked(id);
-                            if (!group.isOrderSheet()
-                                    || group.getStatus() != OrderStatus.PENDING_PAYMENT
+                            if (!group.enforcesDeadline()
+                                    || !awaitingPayment(group)
                                     || group.getExpiresAt().isAfter(time.now())) return false;
                             expireLocked(group);
                             return true;
@@ -222,8 +225,7 @@ public class OrderSheetLifecycleService {
                             }
                             if (!Objects.equals(group.getPaymentId(), result.paymentId()))
                                 throw conflict("결제 결과 대상이 다릅니다.");
-                            if (group.getStatus() == OrderStatus.PENDING_PAYMENT
-                                    && !group.getExpiresAt().isAfter(time.now()))
+                            if (awaitingPayment(group) && !group.getExpiresAt().isAfter(time.now()))
                                 expireLocked(group);
                             if (group.getStatus() == OrderStatus.FAILED
                                     && "EXPIRED".equals(group.getFailureReason())) {
@@ -232,8 +234,7 @@ public class OrderSheetLifecycleService {
                                 deliveries.record(delivery, result, result.status().name());
                                 return true;
                             }
-                            if (group.getStatus() != OrderStatus.PENDING_PAYMENT)
-                                throw conflict("결제 결과 대상 주문의 상태가 다릅니다.");
+                            if (!awaitingPayment(group)) throw conflict("결제 결과 대상 주문의 상태가 다릅니다.");
                             List<Order> items = items(group);
                             boolean success = result.status() == PaymentStatus.SUCCESS;
                             if (success) {
@@ -245,11 +246,17 @@ public class OrderSheetLifecycleService {
                                                 .toList();
                                 if (!cartIds.isEmpty())
                                     cart.lockForCompletion(group.getMemberId(), cartIds);
-                                couponReservations.confirmForOrder(
-                                        group.getMemberId(), group.getCouponId(), group.getId());
+                                if (group.isOrderSheet())
+                                    couponReservations.confirmForOrder(
+                                            group.getMemberId(),
+                                            group.getCouponId(),
+                                            group.getId());
+                                else
+                                    couponReservations.confirm(
+                                            group.getMemberId(), group.getCouponId());
                                 for (var item : items) {
-                                    transition(item, "PAID");
-                                    skus.consume(item.getSkuId(), item.getQuantity());
+                                    transition(group, item, "PAID");
+                                    skus.consume(item.getTradeSkuId(), item.getQuantity());
                                 }
                                 var purchased =
                                         items.stream()
@@ -295,6 +302,11 @@ public class OrderSheetLifecycleService {
                         }));
     }
 
+    private boolean awaitingPayment(PaymentGroup group) {
+        return group.getStatus() == OrderStatus.PENDING_PAYMENT
+                || (!group.isOrderSheet() && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING);
+    }
+
     private void expireLocked(PaymentGroup group) {
         releaseItems(group, "FAILED");
         group.expireOrderSheet();
@@ -309,19 +321,23 @@ public class OrderSheetLifecycleService {
         couponReservations.release(group.getMemberId(), group.getCouponId());
         // 완료/해제는 신규 거래 검증 포트를 쓰지 않는다. SKU 판매 중지 뒤에도 수량을 반환한다.
         for (var item : items) {
-            transition(item, status);
-            skus.release(item.getSkuId(), item.getQuantity());
+            transition(group, item, status);
+            skus.release(item.getTradeSkuId(), item.getQuantity());
         }
     }
 
-    private void transition(Order item, String next) {
-        if (orders.transitionStatus(item.getId(), "PENDING_PAYMENT", next) != 1)
+    private void transition(PaymentGroup group, Order item, String next) {
+        String previous =
+                group.isOrderSheet() || group.getPaymentId() == null
+                        ? "PENDING_PAYMENT"
+                        : "PAYMENT_CONFIRMING";
+        if (orders.transitionStatus(item.getId(), previous, next) != 1)
             throw new IllegalStateException("주문항목의 적용 상태가 다릅니다.");
     }
 
     private List<Order> items(PaymentGroup group) {
         return orders.findByPaymentGroupIdOrderByIdAsc(group.getId()).stream()
-                .sorted(Comparator.comparing(Order::getSkuId))
+                .sorted(Comparator.comparing(Order::getTradeSkuId))
                 .toList();
     }
 

@@ -77,8 +77,11 @@ class OrderCreationServiceTest {
     @Mock private com.shoppinglive.commercecore.order.service.PurchaseGuard purchaseGuard;
     @Mock private com.shoppinglive.commercecore.order.service.PaymentGroupService paymentGroups;
 
+    @Mock private OrderTimeSource time;
+
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(time.now()).thenAnswer(i -> java.time.Instant.now());
         orderCreationService =
                 new OrderCreationService(
                         orderRepository,
@@ -90,7 +93,7 @@ class OrderCreationServiceTest {
                         transactionTemplate,
                         purchaseGuard,
                         paymentGroups,
-                        Duration.ofMinutes(15));
+                        time);
     }
 
     private CreateOrderCommand command(int quantity, Long expectedTotalAmount) {
@@ -205,12 +208,10 @@ class OrderCreationServiceTest {
         reservationSucceeds(3);
 
         Instant before = Instant.now();
+        org.mockito.Mockito.when(time.now()).thenReturn(before);
         Order order = orderCreationService.create(command(1, null), null).order();
 
-        assertThat(order.getExpiresAt())
-                .isNotNull()
-                .isAfter(before.plus(Duration.ofMinutes(14)))
-                .isBefore(before.plus(Duration.ofMinutes(16)));
+        assertThat(order.getExpiresAt()).isEqualTo(before.plusSeconds(600));
     }
 
     // ----- 품절 자동 전이 -----

@@ -14,7 +14,6 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class PaymentGroupLifecycleService {
     private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
     private final OrderSheetLifecycleService sheets;
+    private final OrderTimeSource time;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final com.shoppinglive.commercecore.sku.service.SkuService skus;
@@ -43,6 +43,7 @@ class PaymentGroupLifecycleService {
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
             OrderSheetLifecycleService sheets,
+            OrderTimeSource time,
             OrderJpaRepository orders,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentDeliveryStore payments,
@@ -56,6 +57,7 @@ class PaymentGroupLifecycleService {
         this.telemetry = telemetry;
         this.groups = groups;
         this.sheets = sheets;
+        this.time = time;
         this.orders = orders;
         this.skus = skus;
         this.payments = payments;
@@ -73,19 +75,23 @@ class PaymentGroupLifecycleService {
             var accepted = sheets.start(member, number, key, null);
             return dispatcher.paymentAfterCommit(accepted.paymentId());
         }
+        if (found.enforcesDeadline()) sheets.expire(found.getId());
         guard.ensure(member);
         PaymentExecution accepted =
                 tx.execute(
                         t -> {
                             guard.lock(member);
                             PaymentGroup g = lockedGroup(found.getId());
+                            if (g.enforcesDeadline()
+                                    && (sheets.expire(g.getId())
+                                            || "EXPIRED".equals(g.getFailureReason()))) return null;
                             if (g.getPaymentId() != null) {
                                 if (Objects.equals(payments.key(g.getPaymentId()), key))
                                     return payments.payment(g.getPaymentId());
                                 throw conflict("이미 결제를 시작했습니다. 기존 결과를 확인해 주세요.");
                             }
                             if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                                    || !g.getExpiresAt().isAfter(Instant.now()))
+                                    || !g.getExpiresAt().isAfter(time.now()))
                                 throw conflict("결제를 시작할 수 없는 주문입니다.");
                             List<Order> children =
                                     orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
@@ -110,6 +116,7 @@ class PaymentGroupLifecycleService {
                             }
                             return request;
                         });
+        if (accepted == null) throw conflict("주문의 10분 기한이 지났습니다.");
         // 전달 요청과 주문 상태를 커밋한 뒤 HTTP를 호출한다. 0원도 Payment 원본을 저장한다.
         return dispatcher.paymentAfterCommit(accepted.paymentId());
     }
@@ -119,6 +126,7 @@ class PaymentGroupLifecycleService {
         PaymentExecution p = payments.payment(id);
         if (!Objects.equals(p.paymentGroupId(), g.getId()))
             throw error(ErrorCode.NOT_FOUND, "결제를 찾을 수 없습니다.");
+        if (g.enforcesDeadline()) sheets.expire(g.getId());
         return dispatcher.payment(id);
     }
 
@@ -128,6 +136,7 @@ class PaymentGroupLifecycleService {
             sheets.cancel(member, number);
             return;
         }
+        if (found.enforcesDeadline() && sheets.expire(found.getId())) return;
         guard.ensure(member);
         tx.executeWithoutResult(
                 t -> {
@@ -145,14 +154,14 @@ class PaymentGroupLifecycleService {
 
     boolean expire(Long groupId) {
         PaymentGroup found = groups.findById(groupId).orElseThrow();
-        if (found.isOrderSheet()) return sheets.expire(groupId);
+        if (found.enforcesDeadline()) return sheets.expire(groupId);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {
                     guard.lock(found.getMemberId());
                     PaymentGroup g = lockedGroup(groupId);
                     if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                            || g.getExpiresAt().isAfter(Instant.now())) {
+                            || g.getExpiresAt().isAfter(time.now())) {
                         return false;
                     }
                     close(g, OrderStatus.EXPIRED);

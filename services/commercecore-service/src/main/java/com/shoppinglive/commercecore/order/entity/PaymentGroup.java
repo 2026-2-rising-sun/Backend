@@ -75,6 +75,16 @@ public class PaymentGroup extends BaseEntity {
         return policyVersion == 1;
     }
 
+    /** 기존 행은 0, 주문서는 1, 신규 구 API 주문은 2로 저장 기한을 강제한다. */
+    public boolean enforcesDeadline() {
+        return policyVersion == 1 || policyVersion == 2;
+    }
+
+    public PaymentGroup useLegacyDeadlinePolicy() {
+        policyVersion = 2;
+        return this;
+    }
+
     public void useOrderSheetPolicy() {
         policyVersion = 1;
     }

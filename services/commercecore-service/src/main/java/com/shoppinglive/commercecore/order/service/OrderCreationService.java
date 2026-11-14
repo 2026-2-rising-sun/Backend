@@ -21,8 +21,6 @@ import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,7 +29,6 @@ import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -75,7 +72,7 @@ public class OrderCreationService {
     private final CartItemRepository cartItems;
     private final TransactionTemplate transactionTemplate;
     @PersistenceContext private EntityManager entityManager;
-    private final Duration expiration;
+    private final OrderTimeSource time;
     private final PurchaseGuard purchaseGuard;
     private final PaymentGroupService paymentGroups;
 
@@ -89,9 +86,7 @@ public class OrderCreationService {
             TransactionTemplate transactionTemplate,
             PurchaseGuard purchaseGuard,
             PaymentGroupService paymentGroups,
-            // 기본값을 둔 이유: 테스트 클래스패스의 application.yml 이 main 쪽을 가리므로 통합
-            // 테스트에서는 이 속성이 보이지 않는다. 운영 값은 main application.yml 이 정한다.
-            @Value("${commercecore.order.expiration.duration:PT15M}") Duration expiration) {
+            OrderTimeSource time) {
         this.orderRepository = orderRepository;
         this.trading = trading;
         this.skus = skus;
@@ -99,7 +94,7 @@ public class OrderCreationService {
         this.orderNumberGenerator = orderNumberGenerator;
         this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
-        this.expiration = expiration;
+        this.time = time;
         this.purchaseGuard = purchaseGuard;
         this.paymentGroups = paymentGroups;
     }
@@ -178,7 +173,7 @@ public class OrderCreationService {
                         order.getRequestedTotalAmount(), request.expectedTotalAmount())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
         }
-        return OrderCreationResult.replayed(order);
+        return replayResult(order);
     }
 
     private void validateKey(String key, boolean required) {
@@ -313,7 +308,7 @@ public class OrderCreationService {
                                     command.memberId(),
                                     productName,
                                     idempotencyKey,
-                                    Instant.now().plus(expiration),
+                                    time.now().plusSeconds(600),
                                     command.sourceCartItemId(),
                                     command.expectedTotalAmount(),
                                     coupon.discountAmount());
@@ -359,6 +354,15 @@ public class OrderCreationService {
                                 : order.getPaymentGroup().getCouponId(),
                         command.couponId())) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 주문 요청에 사용된 멱등키입니다.");
+        }
+        return replayResult(order);
+    }
+
+    private OrderCreationResult replayResult(Order order) {
+        if (order.getPaymentGroup() != null && order.getPaymentGroup().enforcesDeadline()) {
+            paymentGroups.expire(order.getPaymentGroup().getId());
+            return OrderCreationResult.replayed(
+                    orderRepository.findById(order.getId()).orElseThrow());
         }
         return OrderCreationResult.replayed(order);
     }

@@ -1,7 +1,6 @@
 package com.shoppinglive.commercecore.order.service;
 
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import java.time.Instant;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,16 +10,18 @@ import org.springframework.stereotype.Component;
 public class PaymentGroupExpirationScheduler {
     private final PaymentGroupRepository groups;
     private final PaymentGroupService service;
+    private final OrderTimeSource time;
 
     public PaymentGroupExpirationScheduler(
-            PaymentGroupRepository groups, PaymentGroupService service) {
+            PaymentGroupRepository groups, PaymentGroupService service, OrderTimeSource time) {
         this.groups = groups;
         this.service = service;
+        this.time = time;
     }
 
     @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")
     public void run() {
-        for (Long id : groups.expired(Instant.now(), PageRequest.of(0, 100))) {
+        for (Long id : groups.expired(time.now(), PageRequest.of(0, 100))) {
             try {
                 service.expire(id);
             } catch (RuntimeException e) {

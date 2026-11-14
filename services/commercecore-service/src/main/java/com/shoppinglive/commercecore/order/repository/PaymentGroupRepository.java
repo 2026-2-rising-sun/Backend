@@ -20,6 +20,6 @@ public interface PaymentGroupRepository extends JpaRepository<PaymentGroup, Long
     Optional<PaymentGroup> lockById(@Param("id") Long id);
 
     @Query(
-            "select g.id from PaymentGroup g where g.status=com.shoppinglive.commercecore.order.entity.OrderStatus.PENDING_PAYMENT and g.expiresAt < :time order by g.expiresAt,g.id")
+            "select g.id from PaymentGroup g where (g.status=com.shoppinglive.commercecore.order.entity.OrderStatus.PENDING_PAYMENT or (g.policyVersion=2 and g.status=com.shoppinglive.commercecore.order.entity.OrderStatus.PAYMENT_CONFIRMING)) and g.expiresAt <= :time order by g.expiresAt,g.id")
     List<Long> expired(@Param("time") Instant time, org.springframework.data.domain.Pageable page);
 }

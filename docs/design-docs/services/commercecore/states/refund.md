@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: #331 Core V104·Payment V4 구현. 기존 버전0과 신규 주문서 버전1을 구분한다. 실제 검증 결과·전체 회귀 진행 상태는 [워크로그](../../../../worklog/2026-11-13.md)를 따른다.
+기준: #331 Core V104·Payment V4 구현. 기존 저장 행의 버전0, 신규 주문서 버전1, 신규 구 API 주문 버전2를 구분한다. 버전1/2는 모두 최초10분이며 기존 행의 저장기한은 바꾸지 않는다. 실제 검증 결과·전체 회귀 진행 상태는 [워크로그](../../../../worklog/2026-11-13.md)를 따른다.
 
 [시각 자료](refund.html)
 
@@ -17,7 +17,7 @@ commercecore.refunds.execution-enabled가 꺼져 있으면 일반 USER 환불을
 | 신규 | PROCESSING | 성공한 원결제·소유자·기간·대상·누적 금액·멱등 원문을 검사하고 refund_request와 대상을 영속화한다. |
 | PROCESSING | UNKNOWN | Payment의 유효한 미확정 응답을 전달 기록과 환불 요청에 반영한다. |
 | UNKNOWN | PROCESSING | Payment의 현재 미확정 스냅샷에 따라 다시 PROCESSING을 기록할 수 있다. |
-| PROCESSING | SUCCESS | 원문·금액·대상 검증 후 버전0은 주문 PAID→REFUNDED, 버전1은 성공 수량에 따른 PARTIALLY_REFUNDED/REFUNDED와 재고 복원을 같은 트랜잭션에서 처리한다. |
+| PROCESSING | SUCCESS | 원문·금액·대상 검증 후 구 API 버전0/2는 주문 PAID→REFUNDED, 버전1은 성공 수량에 따른 PARTIALLY_REFUNDED/REFUNDED와 재고 복원을 같은 트랜잭션에서 처리한다. |
 | UNKNOWN | SUCCESS | 조회·이벤트로 확정된 성공 결과를 같은 결과 처리 경로로 반영한다. |
 | PROCESSING | FAILED | 확정 실패를 기록하며 성공 환불의 재고 복원을 수행하지 않는다. |
 | UNKNOWN | FAILED | 실행 결과가 실패로 확정된 경우에만 변경한다. |

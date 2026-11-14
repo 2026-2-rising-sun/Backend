@@ -765,9 +765,9 @@ class PaymentGroupIntegrationTest
         stock(salesB, 10, 0);
     }
 
-    @DisplayName("만료는 예약 재고를 한 번만 복구하고 결제 확인 중인 묶음은 만료시키지 않는다")
+    @DisplayName("신규 묶음은 확인 중에도 원래 기한에 만료하고 예약 재고를 한 번만 복구한다")
     @Test
-    void expiryRestoresAllReservedStockOnceAndDoesNotExpireConfirmingGroups() {
+    void expiryRestoresAllReservedStockOnceIncludingNewConfirmingGroups() {
         var group = create("expiry").group();
         Long id =
                 groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
@@ -781,7 +781,7 @@ class PaymentGroupIntegrationTest
         assertThat(service.expire(id)).isTrue();
         assertThat(service.expire(id)).isFalse();
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                .isEqualTo(OrderStatus.EXPIRED);
+                .isEqualTo(OrderStatus.FAILED);
         stock(salesA, 10, 0);
         stock(salesB, 10, 0);
         var confirming = create("confirming").group();
@@ -790,9 +790,10 @@ class PaymentGroupIntegrationTest
                 "UPDATE payment_group SET expires_at=? WHERE id=?",
                 Timestamp.from(Instant.now().minusSeconds(60)),
                 attempt.getPaymentGroupId());
+        assertThat(service.expire(attempt.getPaymentGroupId())).isTrue();
         assertThat(service.expire(attempt.getPaymentGroupId())).isFalse();
-        stock(salesA, 8, 2);
-        stock(salesB, 9, 1);
+        stock(salesA, 10, 0);
+        stock(salesB, 10, 0);
     }
 
     @DisplayName("결제 성공은 재고를 소진하고 수정되지 않은 선택 장바구니 항목만 삭제한다")

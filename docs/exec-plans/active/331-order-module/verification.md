@@ -1,8 +1,8 @@
 # Order 최종 통합 검증
 
-2026-11-14. 코드 기준 `a68c31dabc1ae024d5b22c695a2fe42aa61a7dde`, base `cc91c09b753a12a352bda65481210e264d3e88b0`.
+2026-11-14. 아래 기존 전체 하네스의 코드 기준 `a68c31dabc1ae024d5b22c695a2fe42aa61a7dde`, base `cc91c09b753a12a352bda65481210e264d3e88b0`.
 
-**코드·로컬 검증 및 코드 HEAD CI는 통과했다. 사용자 영향 세 항목은 확인 대기이므로 PR은 Draft, 실행 계획은 active다.** [계획](README.md) · [워크로그](../../../worklog/2026-11-14.md) · [직접 합의와 구분하는 구현 선택](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택).
+**코드·로컬 검증 및 코드 HEAD CI는 통과했다. 사용자 영향 두 항목은 확인 대기이므로 PR은 Draft, 실행 계획은 active다.** [계획](README.md) · [워크로그](../../../worklog/2026-11-14.md) · [직접 합의와 구분하는 구현 선택](../../../design-docs/commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택).
 
 ## 저장·선행·범위
 
@@ -63,4 +63,16 @@ scripts/check.sh --base origin/dev --external
 
 Order ERD/상태 HTML의1280·390px, fit/100%/확대·축소·내부 가로 이동, MD 링크/복귀, 페이지 overflow와 콘솔을 실제 Orca browser로 확인했다. 공통 ERD의 Cart select 폭 CSS도 보존한다. [ERD 캡처](../../../design-docs/commercecore/order/assets/order-erd-desktop.png) · [상태 모바일](../../../design-docs/commercecore/order/assets/order-state-mobile.png).
 
-확인 대기 세 항목은 **구 API 신규 주문15분**, **미확정 환불1건 제한**, **일반 환불flag-off의 COMPENSATION 예외**다. 직접 사용자 선택 근거는 없으며 현재 동작·영향·대안을 상세설계8절에 명시했다. 답을 받은 것으로 간주하지 않고 임의 변경하지 않는다. 이 때문에 정책 전체 완료를 선언하거나 계획을 completed로 옮기지 않는다.
+확인 대기 두 항목은 **미확정 환불1건 제한**, **일반 환불flag-off의 COMPENSATION 예외**다. 직접 사용자 선택 근거는 없으며 현재 동작·영향·대안을 상세설계8절에 명시했다. 답을 받은 것으로 간주하지 않고 임의 변경하지 않는다. 이 때문에 정책 전체 완료를 선언하거나 계획을 completed로 옮기지 않는다.
+
+## 후속 사용자 확정: 모든 새 주문10분
+
+사용자는 모든 새 주문10분과 이미 생성된 주문의 기한 보존을 직접 선택했다. 구 API 신규15분 선택은 폐기했다. 정책1 주문서와 정책2 신규 구 API 단건·Cart단건/묶음은 DB시각+600초를 저장한다. 이미 저장된 정책0 행의15분/번호/금액/참조는 변경하지 않으며 DDL이나 backfill은 추가하지 않았다.
+
+설정 기본값만 바꾸지 않았다. 신규 구 API의 PAYMENT_CONFIRMING과 UNKNOWN도 생성 시 기한을 유지하고, 조회/재요청·결제시작·확정/미확정결과·스케줄러가 저장된 기한을 판정한다. 경계는 now>=expires_at이며 만료 뒤 늦은 성공은 기존 영속 보상을 사용한다. 구 API의 결제확인 응답과 항목환불 계약은 유지한다.
+
+OrderDeadlinePostgresTest는 신규5경로와 동일키 재전송/기한보존, 기존정책0의15분 행/확인중 호환, 정확경계 조회/결제시작거절/취소/재요청, UNKNOWN·늦은실제HTTP성공·스케줄러 및599/600초 결제결과를 검증한다. 14건 모두 실제 PostgreSQL/독립 Payment HTTP·Mock gateway에서 통과했다. 최종 후속 회귀는 Core 단위169/통합309/실제PG176/이행23, Payment 단위8/통합8/실제PG41/이행6으로 실패0·오류0이며 Core 통합의 외부Kafka2는 스킵이다. 고유 결과740건 중738실행/2스킵이며 별도 PostgreSQL 업무·이행246건은 스킵0이다. 명령은 위 전용 환경에서 두 서비스 build/postgresTest/migrationTest를 실행했다. 이 후속 범위에서 전체1362나 실제 외부Kafka를 재실행했다고 쓰지 않는다. 최종 SHA/CI는 PR/최종인계에서 별도 확인한다.
+
+진행환불1건과 일반환불off 보상예외는 미선택이다. off 중 일반환불 접수는 PROCESSING/전달원문을 저장하고 실행을 막으므로 미확정1건제한과 결합해 추가환불이 막힐 수 있다. 이미외부전달된요청은 flag 변경으로취소되지않는다. 해당동작은 변경하지않았다.
+
+후속 문서137·API HTML6·설계 HTML28 최신성, API매핑과 이벤트7계약/22예시/29직렬화 표본도 통과했다. Order HTML두개는390/1280px의 client=scroll(390/1265), 콘솔0과10분/보류문구를 실제 브라우저로 확인했다. 실제PG제공자/운영·Redis·배포는 실행하지 않았다. 외부Kafka2는 기존a68c31da의 실제브로커 증거와 이번스킵을 분리한다.

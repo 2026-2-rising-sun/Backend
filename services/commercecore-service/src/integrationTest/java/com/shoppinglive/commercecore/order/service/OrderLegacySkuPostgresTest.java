@@ -54,12 +54,12 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
         assertThat(available(501)).isEqualTo(18);
         assertThat(reserved(501)).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT policy_version FROM payment_group", Integer.class))
-                .isZero();
+                .isEqualTo(2);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM expires_at-created_at)::BIGINT FROM payment_group",
                                 Long.class))
-                .isBetween(899L, 900L);
+                .isBetween(599L, 600L);
         assertThatThrownBy(() -> create(1)).isInstanceOf(BusinessException.class);
         assertThat(legacy("legacy").getId()).isEqualTo(order.getId());
         assertThat(
@@ -151,7 +151,7 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("기존 취소와 만료는 원래 15분 기한·상태를 유지하며 SKU 예약만 한 번 해제한다")
+    @DisplayName("신규 구 API 주문의 취소와 만료는 SKU 예약을 한 번만 해제한다")
     void legacyCancellationAndExpiryRemainCompatible() {
         var first = legacy("cancel");
         legacyGroups.cancel(MEMBER_A, first.getPaymentGroup().getGroupNumber());

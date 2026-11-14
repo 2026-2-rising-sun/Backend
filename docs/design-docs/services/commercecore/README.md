@@ -4,7 +4,7 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103을 통합했다. 판매 HTTP·Product 판매 조회와 Cart 현재가/가용 재고는 SKU 원본을 사용한다. Order V104/Payment V4와 구/신규 거래 경로를 통합했고 전체 회귀를 검증했다. Order의 사용자 영향 세 항목은 [확인 대기](../../commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택)다. 공개 다중 SKU/대표가·가격 정렬은 보류이며 운영 배포 결과와 구분한다.
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103을 통합했다. 판매 HTTP·Product 판매 조회와 Cart 현재가/가용 재고는 SKU 원본을 사용한다. Order V104/Payment V4와 구/신규 거래 경로를 통합했고 전체 회귀를 검증했다. Order의 사용자 영향 두 항목은 [확인 대기](../../commercecore/order/설계.md#8-직접-합의와-구분하는-구현-선택)다. 공개 다중 SKU/대표가·가격 정렬은 보류이며 운영 배포 결과와 구분한다.
 
 ## 문서
 

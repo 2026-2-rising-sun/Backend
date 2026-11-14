@@ -6,7 +6,7 @@
 
 | 논리 개념 | 실제 물리 원본 | 실제 관계·불변조건 |
 |---|---|---|
-| Order | payment_group | BIGINT PK 유지. 새 group_number는 UUID, 기존 번호 보존. policy_version=1은10분, 버전0은 과거TTL 유지. failure_reason/coupon_order_item_id 추가 |
+| Order | payment_group | BIGINT PK 유지. 새 group_number는 UUID, 기존 번호 보존. policy_version=1(주문서)/2(신규 구 API)는10분, 버전0은 과거TTL 유지. failure_reason/coupon_order_item_id 추가 |
 | OrderItem | orders | payment_group_id로1:N. sku_id, product_id_snapshot, seller_id_snapshot, main_image_snapshot. 생성 시 단가·수량·상품명 보존. 할인액은 결제 원문 저장 전 확정 |
 | RefundRequest | refund_request | 한 주문에0:N. 회원/키/원문·금액·상태·purpose(USER/COMPENSATION)·종료 요청 참조. root 잠금으로 미확정 USER 한 건만 허용 |
 | RefundItem | refund_target_order | (refund_request_id,order_id) 복합 PK. quantity/refund_amount 고정. 한 구매 항목은 여러 부분 환불에 포함 가능; 성공 수량·금액 합계로 한도 검사 |

@@ -63,6 +63,12 @@ public class OrderPaymentOutcomeService {
         this.notificationEvents = notificationEvents;
     }
 
+    public void expireIfDue(PaymentExecution result) {
+        if (result.paymentGroupId() == null) return;
+        PaymentGroup group = groups.findById(result.paymentGroupId()).orElseThrow();
+        if (group.enforcesDeadline()) sheets.expire(group.getId());
+    }
+
     public boolean apply(PaymentExecution result) {
         if (!result.status().isConfirmedOutcome())
             throw new IllegalArgumentException("확정된 결제 결과가 필요합니다.");
@@ -72,7 +78,7 @@ public class OrderPaymentOutcomeService {
     private boolean applyGroup(PaymentExecution result) {
         Long id = result.paymentId();
         PaymentGroup found = groups.findById(result.paymentGroupId()).orElseThrow();
-        if (found.isOrderSheet()) return sheets.apply(result);
+        if (found.enforcesDeadline()) return sheets.apply(result);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {
