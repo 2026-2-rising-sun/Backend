@@ -28,7 +28,7 @@ public class SellerProductCatalogQueryService {
             throw invalid("판매 상태 또는 페이지 범위가 올바르지 않습니다.");
         }
         String where =
-                " WHERE p.seller_id = :sellerId AND "
+                " WHERE p.seller_id = :sellerId AND p.deleted_at IS NULL AND "
                         + (status == SalesDisplayStatus.NOT_REGISTERED
                                 ? "s.product_id IS NULL"
                                 : "s.status = :status");
@@ -50,7 +50,7 @@ public class SellerProductCatalogQueryService {
                         Long.class);
         List<SellerProductSummary> rows =
                 jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_id, p.created_at, s.price, st.available FROM product p LEFT JOIN sales_info s ON s.product_id = p.id LEFT JOIN sales_stock st ON st.sales_info_id = s.id"
+                        "SELECT p.id, p.name, p.main_image_id, p.created_at, p.sale_enabled, s.price, st.available FROM product p LEFT JOIN sales_info s ON s.product_id = p.id LEFT JOIN sales_stock st ON st.sales_info_id = s.id"
                                 + where
                                 + " ORDER BY p.created_at DESC, p.id DESC LIMIT :size OFFSET :offset",
                         params,
@@ -62,7 +62,8 @@ public class SellerProductCatalogQueryService {
                                         rs.getTimestamp("created_at").toInstant(),
                                         status,
                                         rs.getObject("price", Long.class),
-                                        rs.getObject("available", Integer.class)));
+                                        rs.getObject("available", Integer.class),
+                                        rs.getBoolean("sale_enabled")));
         long count = Objects.requireNonNull(total);
         return new SellerProductPage(rows, page, size, count, (int) ((count + size - 1) / size));
     }

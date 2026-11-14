@@ -37,6 +37,11 @@ public class Product {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column(nullable = false)
+    private boolean saleEnabled = true;
+
+    private Instant deletedAt;
+
     protected Product() {}
 
     public Long getId() {
@@ -77,5 +82,13 @@ public class Product {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public boolean isSaleEnabled() {
+        return saleEnabled;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
     }
 }

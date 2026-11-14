@@ -4,6 +4,8 @@
 
 진행 중 계획: [#334 SKU 현재 가격·재고 통합](active/334-sku-module/README.md)
 
+진행 작업: [#333 Product 모듈 설계·구현](active/333-product-module/README.md) — Product 독립 구현·회귀 진행, 공유 통합 검사 중.
+
 완료 작업: [#330 문서 하네스](completed/330-document-harness/README.md)
 
 완료 기준을 확인한 뒤 작업 폴더를 `completed/`로 옮기고 링크를 갱신한다. 남은 과제는 [기술부채](tech-debt.md)와 후속 이슈로 연결한다. 진행 중인 필수 작업을 완료 처리하지 않는다.

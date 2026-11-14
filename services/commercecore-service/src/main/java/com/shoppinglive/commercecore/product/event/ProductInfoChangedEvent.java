@@ -14,4 +14,6 @@ public record ProductInfoChangedEvent(
         String sellerId,
         long version,
         Instant createdAt,
-        Instant updatedAt) {}
+        Instant updatedAt,
+        boolean saleEnabled,
+        Instant deletedAt) {}

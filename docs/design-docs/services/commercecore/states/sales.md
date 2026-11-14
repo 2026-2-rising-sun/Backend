@@ -8,6 +8,8 @@
 
 ## 범위와 불변조건
 
+이 문서는 레거시 Sales 상태 전이를 설명한다. Product #333의 [전체 제어 상태](../../../commercecore/product/상태관리도.md)는 별도이며 전체 중지/재개에서 개별 Sales/SKU 상태나 수량을 덮어쓰지 않는다. 신규 거래의 전체 허용 검사는 ProductTradingService 포트에 구현했고 Order/SKU 연결은 후속 통합에서 확인한다.
+
 판매자가 직접 지정할 대상은 ON_SALE·PRIVATE다. SOLD_OUT에서 재고 없이 ON_SALE을 요청하면 상태를 유지한다. READY에서 재고 없이 시작하면 거절한다. 전이는 이전 상태 조건부 UPDATE로 경쟁 변경을 감지한다. 재고 수량과 외부 표시 상태를 혼동하지 않는다.
 
 ## 전이
