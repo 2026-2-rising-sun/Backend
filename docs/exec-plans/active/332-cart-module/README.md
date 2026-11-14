@@ -84,3 +84,9 @@ Spotless·문서123개·생성 API HTML6개/설계 HTML28개 최신성은 통과
 ### Product 승인 API 후속 통합
 
 코디네이터 승인으로 Product `447b0056902dd0bac4262c113f8c93a8653ce251`을 `22289dbf`로 merge했다. 충돌은 워크로그 한 곳으로 양쪽 기록을 모두 보존했다. Cart 원본 API 경로는 이전과 의미가 동일함을 YAML 구조 비교로 확인했고 신규 SKU 조회 조각은 중복 적용하지 않았다. Cart 단위13/H2통합20·Spotless 재검증 통과, API 경로 구조 검사·문서124개·생성 API HTML6/설계HTML28 최신성 통과다. 이 병합 후 실제 PG/전체Core 회귀는 재실행하지 않았으며 이전30실패·Sales 원본전환 미완료가 해소됐다고 보지 않는다.
+
+### 2026-11-14 복구 체크포인트
+
+시작 `d85332a9`에서 Cart 단위13·H2 독립14 통과와 CartOrder6건 중4실패를 재현했다. `createFromCart → doCreate → SalesStockJpaRepository.reserve`는 구 경로이므로 현재 SKU 원본 기대 수량과 일치하지 않는다. 전체 CI299건 중34실패·2스킵과 독립 구현을 구분한다. Order `c3d96569`에는 Cart API 조각/fixture 후속이 포함됐다는 인계를 받았으나 Cart 자체 원본 YAML은 이전 스키마이며 역merge하지 않는다.
+
+PostgreSQL 성공 정리와 수량 변경 경합 테스트를 추가하고 실제 PostgreSQL16·V103 이행을 재검증한다. 선행 SKU 검증 SHA 일반 merge 뒤 핵심/전체 Core 실패 변화를 확인해 정확 SHA를 Order에 전달한다. [복구 실행 기록](../../../worklog/2026-11-14.md#332-cart-복구-검증)을 현재 결과 원본으로 사용하며 이전 통과를 최종 SHA의 결과로 재사용하지 않는다.
