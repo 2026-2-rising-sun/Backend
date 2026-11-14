@@ -5,7 +5,7 @@
 
 결제 생성·결제창·승인·결과 불명 복구·만료를 다룬다. 환불은 [환불](refund.md), 분개는 [원장](ledger.md)에 있다.
 
-- 설계 근거: [이벤트 스토밍 v41](../exec-plans/active/337-payment-redesign/event-storming-v41.html) — `#f1`–`#f6`, `#api`, `#states`, `#toss`, `#mapping`. `EC n`은 그 문서 `#edge` 표의 번호다.
+- 설계 근거: [Payment 목표 설계](../design-docs/services/payment/design.html) — `#f1`–`#f6`, `#api`, `#states`, `#toss`, `#mapping`. `EC n`은 그 문서 `#edge` 표의 번호다.
 - 지금 코드가 아니라 **교체할 목표 동작**이다. 현재 구현의 기준은 [주문·결제](order-payment.md)에 있고, 교체 PR에서 함께 정리한다([ADR 0337-2](../adr/0337-2-payment-replacement.md)).
 - ID는 바꾸지 않는다. 테스트 `@DisplayName`에 ID를 넣는다. 예: `"[PAY-CREATE-03] 같은 orderRef에 금액이 다르면 거절한다"`.
 - `(제안)` 표시 오류 코드는 원본에 없어 새로 정한 값이다.
@@ -17,8 +17,8 @@
 | 메서드·경로 | 요청 | 성공 응답 |
 |---|---|---|
 | `POST /v1/internal/payments` | `orderRef, buyerId(UUID), amount, expiresAt, sellerAmounts[{sellerOrderNumber, sellerId, amount, commissionRate(0–1, 주문 시점 복사)}]` | 201·200 `{paymentId, status, pgOrderId, amount, expiresAt}` |
-| `POST /v1/internal/payments/{orderRef}/checkout` | 없음 | 200 `{pgOrderId, amount, expiresAt}` |
-| `POST /v1/internal/payments/confirm` | `buyerId, paymentKey, orderId(= pg_order_id), amount` | 200 `{paymentId, status: APPROVED}` · 202 `{paymentId, status: PENDING}` · 422 `{status: DECLINED, code, message}` |
+| `POST /v1/internal/payments/{orderRef}/checkouts` | 없음 | 201 `{pgOrderId, amount, expiresAt}` |
+| `POST /v1/internal/payments/{orderRef}/approval` | `buyerId, paymentKey, pgOrderId(토스 orderId), amount` | 200 `{paymentId, status: APPROVED}` · 202 `{paymentId, status: PENDING}`(헤더 `Location: /v1/internal/payments/{orderRef}`) · 422 `{status: DECLINED, code, message}` |
 | `GET /v1/internal/payments/{orderRef}` | 없음 | 200 `{paymentId, status, amount, refundedAmount, pgOrderId, approvedAt}` |
 
 ## 데이터 불변식
@@ -42,10 +42,10 @@
 
 ## 승인
 
-입력은 Commerce가 넘긴 buyerId와 브라우저 값 `{paymentKey, orderId(= pg_order_id), amount}`다. 결제는 orderId의 마지막 `-` 앞부분(order_ref)으로 찾는다(order_ref에도 `-`가 있다). 토스 호출은 DB 트랜잭션 밖에서 한다. 검증 실패가 여럿이면 아래 01→02→03 순서와 01 안의 순서(404 → 403 → 400)로 하나만 돌려준다.
+입력은 경로의 orderRef, Commerce가 넘긴 buyerId, 브라우저 값 `{paymentKey, orderId, amount}`다. Commerce는 토스 orderId를 `pgOrderId`로 넘긴다. 결제는 경로의 orderRef로 찾고, pgOrderId의 마지막 `-` 앞부분이 orderRef와 같은지 확인한다(order_ref에도 `-`가 있다). 토스 호출은 DB 트랜잭션 밖에서 한다. 검증 실패가 여럿이면 아래 01→02→03 순서와 01 안의 순서(404 → 400 `ORDER_ID_MISMATCH` → 403 → 400 `AMOUNT_MISMATCH`)로 하나만 돌려준다.
 
-- [ ] **PAY-CONFIRM-01** 결제가 없으면 404, 구매자가 다르면 403 `BUYER_MISMATCH`, 금액이 다르면 400 `AMOUNT_MISMATCH`. 토스를 부르지 않는다. (EC 11, 12)
-- [ ] **PAY-CONFIRM-02** orderId가 현재 pg_order_id가 아니면 409 `STALE_CHECKOUT`(제안). 토스를 부르지 않는다. (EC 10)
+- [ ] **PAY-CONFIRM-01** 결제가 없으면 404, pgOrderId가 경로의 orderRef 것이 아니면 400 `ORDER_ID_MISMATCH`(제안), 구매자가 다르면 403 `BUYER_MISMATCH`, 금액이 다르면 400 `AMOUNT_MISMATCH`. 토스를 부르지 않는다. (EC 11, 12)
+- [ ] **PAY-CONFIRM-02** pgOrderId가 현재 pg_order_id가 아니면 409 `STALE_CHECKOUT`(제안). 토스를 부르지 않는다. (EC 10)
 - [ ] **PAY-CONFIRM-03** expires_at이 지났으면 409 `PAYMENT_CLOSED`. 토스를 부르지 않는다. (EC 17)
 - [ ] **PAY-CONFIRM-04** 검증을 통과하면 CREATED→APPROVING으로 바꾸고 pg_payment_key를 저장한 뒤 멱등 키 `confirm-{pg_order_id}`로 토스 승인을 부른다. (EC 23)
 - [ ] **PAY-CONFIRM-05** 같은 결제에 승인 요청이 동시에 와도 토스 호출은 1번이다. 나머지는 처리 중이면 202, 이미 승인됐으면 200. (EC 13, 14)

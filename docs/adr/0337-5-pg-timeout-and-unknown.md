@@ -2,7 +2,7 @@
 
 결정 상태: 제안
 구현 상태: [결제 요구사항](../requirements/payment.md)의 PAY-CONFIRM·PAY-PG·PAY-RECOVER
-관련 자료: [응답 시간 예산](../exec-plans/active/337-payment-redesign/event-storming-v41.html#api) · [결과 불명](../exec-plans/active/337-payment-redesign/event-storming-v41.html#f4) · [토스 흐름](../exec-plans/active/337-payment-redesign/event-storming-v41.html#toss)
+관련 자료: [응답 시간 예산](../design-docs/services/payment/design.html#api) · [결과 불명](../design-docs/services/payment/design.html#f4) · [토스 흐름](../design-docs/services/payment/design.html#toss)
 
 ## 문제
 

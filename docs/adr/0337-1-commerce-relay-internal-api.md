@@ -2,7 +2,7 @@
 
 결정 상태: 제안
 구현 상태: [결제 요구사항](../requirements/payment.md)에서 추적
-관련 자료: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md) · [이벤트 스토밍 API](../exec-plans/active/337-payment-redesign/event-storming-v41.html#api)
+관련 자료: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md) · [Payment 목표 설계 API](../design-docs/services/payment/design.html#api)
 
 ## 문제
 

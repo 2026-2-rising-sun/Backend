@@ -28,13 +28,13 @@ dev ─ PR4 토스 클라이언트 (병렬 가능, PR5 전에 dev 병합) ──
 - [ ] **PR3 원장** #338 `payment-ledger` · base PR2 · S · LED-01, LED-03–05, LED-APPROVE-01
   - `ledger/service`. 중복은 `ON CONFLICT DO NOTHING` + 영향 행 수. 호출자 트랜잭션에 참여.
 - [ ] **PR4 토스 클라이언트** #338 `toss-client` · base `dev` · M · PAY-PG-01–04
-  - `client/toss`. `MockRestServiceServer`. 타임아웃 분류는 예외 → 결과 매핑 단위 테스트로 충분하다. 설정 `TOSS_SECRET_KEY`.
+  - `client/toss`. `MockRestServiceServer`. 타임아웃 분류는 예외 → 결과 매핑 단위 테스트로 충분하다. 시크릿 키 등 설정 이름은 구현하면서 정한다.
 - [ ] **PR5 승인 처리(서비스)** #338 `payment-approval` · base PR3(PR4 병합 뒤 rebase) · L · PAY-CONFIRM-01–10, 12, PAY-EVENT-01–02
   - 컨트롤러 없음. 트랜잭션: ① 검증 + CREATED→APPROVING 커밋 → ② 트랜잭션 밖 토스 호출 + pg_call → ③ 결과 반영.
   - 이벤트: `contracts/events/payment-execution-results.yaml`을 새 `PaymentApproved`로 교체. 키·aggregateId = orderRef(문자열). 메시지마다 `examples`, 발행 객체 직렬화 테스트가 `build/contract-samples`를 남긴다. EC 30(재시작 후 발행)은 common-module outbox 테스트에 맡긴다.
   - 갱신할 문서: `design-docs/services/payment/states/payment.md`·`.html`.
 - [ ] **PR6 승인 API · 8초** #338 `payment-confirm-api` · base PR5 · M · PAY-CONFIRM-11과 승인 HTTP 매핑
-  - 결과 → HTTP(요구사항 API 표): 승인 200 · 처리 중 202 · 거절 422 · 없음 404 · `BUYER_MISMATCH` 403 · `AMOUNT_MISMATCH` 400 · `PAYMENT_CLOSED`·`STALE_CHECKOUT` 409 · `PG_UNAVAILABLE` 503.
+  - 결과 → HTTP(요구사항 API 표): 승인 200 · 처리 중 202(`Location` 헤더) · 거절 422 · 없음 404 · `ORDER_ID_MISMATCH`·`AMOUNT_MISMATCH` 400 · `BUYER_MISMATCH` 403 · `PAYMENT_CLOSED`·`STALE_CHECKOUT` 409 · `PG_UNAVAILABLE` 503.
   - PR5와 나눈 이유: 엔드포인트가 8초 대기 없이 먼저 배포되면 Payment가 Commerce 10초보다 오래 기다린다([ADR 0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)).
   - 갱신할 문서: `api.html`.
 - [ ] **PR7 복구 · 만료** `payment-recovery` · base PR6 · M · PAY-RECOVER-01–05, PAY-EXPIRE-01

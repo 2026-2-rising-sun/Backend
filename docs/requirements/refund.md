@@ -3,7 +3,7 @@
 상태: 초안
 검증: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md)
 
-Payment가 승인된 환불을 실행하는 기준이다. 환불해도 되는지는 Commerce가 정한다. 근거: [이벤트 스토밍 v41](../exec-plans/active/337-payment-redesign/event-storming-v41.html) `#f7`, `#f6`, `#api`, `#contract`. 현재 구현 설명은 [환불 설계](../design-docs/refund.md)에 있고, 교체 PR에서 함께 정리한다.
+Payment가 승인된 환불을 실행하는 기준이다. 환불해도 되는지는 Commerce가 정한다. 근거: [Payment 목표 설계](../design-docs/services/payment/design.html) `#f7`, `#f6`, `#api`, `#contract`. 현재 구현 설명은 [환불 설계](../design-docs/refund.md)에 있고, 교체 PR에서 함께 정리한다.
 
 이 문서는 환불 구현을 시작할 때 다시 다듬는다.
 

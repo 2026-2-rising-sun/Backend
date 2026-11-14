@@ -3,7 +3,7 @@
 상태: 초안
 검증: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md)
 
-돈이 움직이는 상태 변경마다 복식 분개를 남긴다([ADR 0337-4](../adr/0337-4-ledger-double-entry.md)). 계정과 분개 규칙의 근거는 [이벤트 스토밍 v41](../exec-plans/active/337-payment-redesign/event-storming-v41.html#f9)이다. 정산·지급 분개는 해당 단계를 시작할 때 추가한다.
+돈이 움직이는 상태 변경마다 복식 분개를 남긴다([ADR 0337-4](../adr/0337-4-ledger-double-entry.md)). 계정과 분개 규칙의 근거는 [Payment 목표 설계](../design-docs/services/payment/design.html#f9)이다. 정산·지급 분개는 해당 단계를 시작할 때 추가한다.
 
 ## 공통
 

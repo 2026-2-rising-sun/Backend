@@ -5,7 +5,7 @@
 관련 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md) · [환불](../../../requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)
 단계 문서: [M1 결제 1차](m1-payment.md)
-자료: [목표 설계와 작은 판단](decision.md) · [이벤트 스토밍 v41](event-storming-v41.html) (2026-11-13 고정 사본. 이후 원본은 요구사항 MD다)
+자료: [목표 설계와 작은 판단](decision.md) · [Payment 목표 설계](../../../design-docs/services/payment/design.html) (그림·예시 자료. 원본은 요구사항 MD와 ADR이다)
 
 ## 목표와 범위
 
@@ -61,7 +61,7 @@ M1 하위 이슈는 #337의 GitHub 하위 이슈로 연결한다. 이슈 하나 
 
 1. 블록의 요구사항 ID마다 테스트가 있다. PR 본문 "검증"에 `ID → 테스트`를 적는다.
 2. `scripts/check.sh --base <부모 브랜치 또는 origin/dev>` 통과. Payment postgres 테스트는 `PAYMENT_TEST_POSTGRES_URL/USER/PASSWORD`와 `--external`로 실행한다([도구](../../../guides/tooling.md)).
-3. 블록의 "갱신할 문서"를 코드와 함께 고쳤다. `scripts/check-docs.sh`, `scripts/render-api-docs.sh --check` 통과.
+3. 블록의 "갱신할 문서"를 코드와 함께 고쳤다. 요구사항·API·상태를 바꾸면 [Payment 목표 설계](../../../design-docs/services/payment/design.html)도 같은 PR에서 고친다. `scripts/check-docs.sh`, `scripts/render-api-docs.sh --check` 통과.
 4. CI 통과. size 라벨 `size/L` 이하. 넘으면 PR 본문에 이유 한 줄(`db/payment-migration` SQL과 삭제 줄도 크기에 들어간다).
 5. 작성 세션이 아닌 세션의 독립 리뷰. 질문: ID마다 테스트가 실제로 그 조건을 검사하나 / 돈이 두 번 움직이지 않나 / 모든 상태 변경이 이전 상태 조건부 UPDATE이고 0행을 처리하나 / 트랜잭션 안에서 토스를 부르지 않나 / 범위 밖을 구현하지 않았나.
 
@@ -91,7 +91,7 @@ gh pr edit <내-PR> --base dev && git push --force-with-lease
 
 | 단계 | PR (예상) |
 |---|---|
-| M2 주문 연동 | 착수 때 Commerce 쪽 설계. 결제 생성 호출·재시도, 승인 중계와 "결제 확인 중" 잠금, `PaymentApproved` 소비, 정체 해소 조회(원본 `#commerce`·`#checkout`). 끝에 토스 테스트 키로 결제위젯 → Commerce → Payment 수동 확인 |
+| M2 주문 연동 | 착수 때 Commerce 쪽 설계. 결제 생성 호출·재시도, 승인 중계와 "결제 확인 중" 잠금, `PaymentApproved` 소비, 정체 해소 조회(원본 `#commerce`·`#checkout`). 기존 CommerceCore 결제 코드(재전달·소비자·만료 배치)를 고쳐 쓸지 교체할지 먼저 정한다(원본 `#commerce` 대응표). 끝에 토스 테스트 키로 결제위젯 → Commerce → Payment 수동 확인 |
 | M3 환불 | R1 V5 + 접수 API(REF-ACCEPT-*) → R2 실행·결과 이벤트(REF-EXEC-01–03, REF-EVENT-01, LED-REFUND-01) → R3 복구·늦은 승인 소비(REF-EXEC-04, REF-LATE-*) → Commerce 환불 연동 |
 | 후순위 | 대사: V6 + 원장 대사 → 거래 대사·자동 보정(EC 38). 정산: V7 + `PurchaseConfirmed` → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 서킷 브레이커 → 2차 PG → 웹훅 |
 
@@ -107,7 +107,7 @@ Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 
 ## 인계
 
-- 완료: 이벤트 스토밍 v41, 요구사항 초안 3개, ADR 0337-1–5 제안, 이 계획.
+- 완료: Payment 목표 설계 HTML, 요구사항 초안 3개, ADR 0337-1–5 제안, 이 계획.
 - 남은 일: M1 하위 이슈 생성·연결 → 스펙 문서 PR 리뷰·병합 → ADR 채택 → M1 시작(기존 코드 삭제·토스 클라이언트부터).
 - 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. M1의 삭제·스키마 PR과 겹치므로 병합 순서와 마이그레이션 번호를 그 담당과 먼저 정한다.
-- 폴더를 옮기거나 `completed/`로 보낼 때: 요구사항·ADR이 `event-storming-v41.html`을 가리키므로 링크를 함께 고치고 `scripts/check-docs.sh`로 확인한다.
+- 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.

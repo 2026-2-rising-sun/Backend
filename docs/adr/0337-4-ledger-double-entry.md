@@ -2,7 +2,7 @@
 
 결정 상태: 제안
 구현 상태: [원장 요구사항](../requirements/ledger.md)에서 추적
-관련 자료: [이벤트 스토밍 원장](../exec-plans/active/337-payment-redesign/event-storming-v41.html#f9)
+관련 자료: [Payment 목표 설계 원장](../design-docs/services/payment/design.html#f9)
 
 ## 문제
 

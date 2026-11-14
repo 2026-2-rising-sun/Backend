@@ -2,7 +2,7 @@
 
 결정 상태: 제안
 구현 상태: [결제 요구사항](../requirements/payment.md), [환불 요구사항](../requirements/refund.md)에서 추적
-관련 자료: [이벤트 계약](../exec-plans/active/337-payment-redesign/event-storming-v41.html#contract) · [Saga](../exec-plans/active/337-payment-redesign/event-storming-v41.html#saga)
+관련 자료: [이벤트 계약](../design-docs/services/payment/design.html#contract) · [Saga](../design-docs/services/payment/design.html#saga)
 
 ## 문제
 
