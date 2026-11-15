@@ -11,8 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 기존 발행 코드는 지웠지만 CommerceCore가 아직 소비하는 결제 결과 계약의 직렬화 표본을 남긴다. 이벤트 표본 검사가 0건이 되지 않게 한다.
- * shortcut: 실제 발행자가 아닌 손으로 만든 payload다. #338 승인 처리에서 PaymentApprovedContractTest로 바꾼다.
+ * 기존 발행 코드는 지웠지만 CommerceCore가 아직 소비하는 결제 결과 계약의 직렬화 표본을 남긴다. 이벤트 표본 검사가 0건이 되지 않게 한다. shortcut: 실제
+ * 발행자가 아닌 손으로 만든 payload다. #338 승인 처리에서 PaymentApprovedContractTest로 바꾼다.
  */
 class ExecutionEventContractTest {
     @Test
