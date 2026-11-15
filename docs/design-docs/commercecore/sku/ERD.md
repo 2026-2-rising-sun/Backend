@@ -1,5 +1,7 @@
 # SKU 데이터 모델
 
+통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+
 <!-- visual: relations -->
 
 상태: #334 SKU 저장·내부 거래 포트와 기존 단일 판매 API 전환을 반영한다. Product `729d2d5f` 통합 기준이다. V102/V3 실제 PostgreSQL 이행과 SKU 업무·Outbox 롤백을 검증했다. 공개 다중 SKU 흐름과 Order/Cart 최종 통합은 별도다.
@@ -30,7 +32,7 @@
 | 대상 | 조건 | 구현·검토 상태 |
 |---|---|---|
 | 금액 | KRW 1원 단위 양의 정수 | price BIGINT, 1원 이상. 향후 환불/배분의 정밀도·잔여 원 규칙은 재검토. 가격 이력/예약 가격 추가 없음. |
-| 재고 | available>=0, reserved>=0 | 조건부 UPDATE, 합산/증감은 BIGINT로 범위를 확인해 INTEGER 오버플로 거절. |
+| 재고 | available>=0, reserved>=0, available+reserved<=2147483647 | 판매자 증감·환불 restock의 조건부 UPDATE가 BIGINT 합산으로 예약 해제 공간을 보존한다. 기존 두 INTEGER 열은 유지하며 새 업무상 수량한도를 정한 것이 아니다. |
 | 판매 의도 | READY/ON_SALE/PRIVATE | READY는 생성 전용. ON_SALE+available=0이면 외부 SOLD_OUT 표시. |
 | 이벤트 버전 | snapshot_version>0 | 최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. DB version과 구분. |
 | 이름 사본 | product_name_snapshot | 기존 sales-info 호환용 등록 시 이름 사본. 상품 표현정보의 원본은 Product. |
