@@ -15,5 +15,5 @@
 
 ## 사건별 분개
 
-- [ ] **LED-APPROVE-01** 결제 승인: 차변 PG 보관금(`PG_CUSTODY`) / 대변 구매자 예수금(`BUYER_DEPOSIT`), 결제 금액. 사건 키 (`PAYMENT_APPROVED`, payment.id).
+- [x] **LED-APPROVE-01** 결제 승인: 차변 PG 보관금(`PG_CUSTODY`) / 대변 구매자 예수금(`BUYER_DEPOSIT`), 결제 금액. 사건 키 (`PAYMENT_APPROVED`, payment.id).
 - [ ] **LED-REFUND-01** 환불 성공: 차변 `BUYER_DEPOSIT` / 대변 `PG_CUSTODY`, 환불 금액. 사건 키 (`REFUND_SUCCEEDED`, refund.id). 구매확정 전후 모두 같다.

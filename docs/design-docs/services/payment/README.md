@@ -17,16 +17,16 @@
 
 ## 현재 코드 (결제 재설계 구현 중)
 
-결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 원장 서비스(`LedgerService.record`: 호출자 트랜잭션 안에서 사건당 한 번 분개)는 있지만 아직 부르는 곳이 없다. 승인·토스 호출·스케줄러는 아직 없다(#338·#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
+결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(`ApprovalService`·`PaymentOutcomeService`)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·`PaymentApproved` outbox에 한 트랜잭션으로 반영한다. 승인 HTTP 엔드포인트·8초 대기와 스케줄러는 아직 없다(#338 다음 PR·#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
 
 - API: [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml). `X-Service-Token`(commercecore)만 허용하고, 허용 목록(`/v1/internal/payments`, `…/{orderRef}`, `…/{orderRef}/checkouts`, `…/{orderRef}/approval`) 밖의 `/v1/internal/**`는 403이다. 승인 경로는 컨트롤러가 없다(#338).
 - 결제 키는 `orderRef`다. 같은 orderRef 생성은 `INSERT … ON CONFLICT DO NOTHING`의 영향 행 수로 판단하고, 결제창은 `CREATED`·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 [#348 설계서](../../../exec-plans/active/337-payment-redesign/phase1/348-create-api.md#api).
 - DB: [ERD 설명](erd.md) · [관계도](erd.html)
-- 결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.
+- 상태: [결제 상태](states/payment.md) · [시각 자료](states/payment.html)
+- 결과 이벤트: [계약 YAML](../../../../contracts/events/payment-execution-results.yaml). `PaymentApproved`(키 orderRef)로 교체했다(호환 깨짐). CommerceCore 소비자는 아직 옛 `PaymentExecutionResolved`를 기다리므로 주문 연동(Phase 2) 전까지 통합 환경 결제는 동작하지 않는다.
 
 아래 문서는 지운 Mock 구현의 기록이다. 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`.
 
-- [결제 실행](states/payment.md) · [시각 자료](states/payment.html)
 - [환불 실행](states/refund.md) · [시각 자료](states/refund.html)
 - 서비스 간 흐름: [주문·결제](../../order-payment.md) · [환불](../../refund.md)
 

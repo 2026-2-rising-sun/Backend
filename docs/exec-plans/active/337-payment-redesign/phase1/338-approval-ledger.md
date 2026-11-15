@@ -22,8 +22,8 @@
 
 ```text
 payment/controller   ApprovalController            POST /v1/internal/payments/{orderRef}/approval
-payment/service      ApprovalService               ①검증·APPROVING → ②토스 → ③반영. 8초 대기
-                     PaymentOutcomeService         ③반영 함수들: applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
+payment/service      ApprovalService               start(①검증·APPROVING) · process(②토스 → ③반영). 8초 대기는 PR6
+                     PaymentOutcomeService         ③반영 함수들: insertCall · applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
 client/toss          TossPaymentsClient            confirm · getPayment · cancel. 결과 분류(TossResult)
 ledger/service       LedgerService                 record(refType, refId, lines) → boolean. 호출자 트랜잭션에 참여
 ```
@@ -149,12 +149,12 @@ UPDATE payment
 | `Success` + 응답 검증 실패 | 아래 "보상 취소" | pg_call `SUCCESS` + CANCEL 행, ERROR 로그 | 409 `PAYMENT_CLOSED` |
 | `Declined`(첫 호출) | `CREATED`, `approving_at = NULL`, **`pg_order_id = NULL`** · `WHERE id AND status = 'APPROVING'` | pg_call `DECLINED` + `result_code` | 422 `DECLINED` |
 | `NotSent`(첫 호출) | 같은 변경 | pg_call `NOT_SENT` | 503 `PG_UNAVAILABLE` |
-| `Unknown`, 또는 재호출 뒤 `Success`가 아닌 모든 결과 | `UNKNOWN`, `next_check_at = now() + 10s`, `check_deadline_at = now() + 30m` · `WHERE status = 'APPROVING'` | pg_call `UNKNOWN` 유지 | 202 `{paymentId, status: PENDING}` |
+| `Unknown`, 또는 재호출 뒤 `Success`가 아닌 모든 결과 | `UNKNOWN`, `next_check_at = now() + 10s`, `check_deadline_at = now() + 30m` · `WHERE status = 'APPROVING'` | 첫 호출 pg_call은 `UNKNOWN` 유지. 재호출 pg_call에는 그 호출의 결과(`DECLINED`·`NOT_SENT`·`UNKNOWN`)를 남긴다 | 202 `{paymentId, status: PENDING}` |
 
 - 응답 검증(PAY-CONFIRM-06): `status = DONE`, `orderId = pg_order_id`, `totalAmount = amount`, `paymentKey = 보낸 값`. 하나라도 다르면 실패다.
 - **CREATED로 되돌릴 때 `pg_order_id`를 NULL로 비운다.** 같은 pgOrderId로 다시 승인하면 멱등 키 `confirm-{pg_order_id}`가 재사용되어 토스가 첫 거절 응답을 돌려줄 수 있다. 비워 두면 그 요청은 409 `STALE_CHECKOUT`이 되고, Commerce는 `POST …/checkouts`로 새 결제창을 연다(PAY-CONFIRM-08 "새 결제창으로 다시 승인").
 - `applyDone`의 조건부 UPDATE가 **0행이면 다시 읽는다.** APPROVED면 이미 반영된 것이므로 끝낸다(분개·outbox 없음, 중복 없음). 그 밖의 상태(CREATED·CANCELED 등)면 토스에서는 승인됐는데 우리는 다른 상태라는 뜻이다. ERROR 로그를 남기고 아래 보상 취소로 보낸다. 돈만 빠진 채 끝나는 경로를 남기지 않는다.
-- **`applyDone(paymentId, tossPayment)`는 #349의 조회 DONE도 같은 함수로 처리한다.** 승인 반영 코드는 한 곳에만 있다.
+- **`applyDone(paymentId, pgCallId, tossPayment) → boolean`은 #349의 조회 DONE도 같은 함수로 처리한다.** 승인 반영 코드는 한 곳에만 있다. 응답은 DB 값(`pg_order_id`·`amount`·`pg_payment_key`)과 비교한다. 결제가 이미 APPROVED면 응답 검증 없이 true로 끝낸다(승인된 결제는 보상 취소하지 않는다). false면 호출자가 트랜잭션 밖에서 `compensate`를 부른다. 토스 응답에 `approvedAt`이 없으면 DB `now()`를 쓴다.
 
 **보상 취소**(PAY-CONFIRM-07): 취소 대상은 **토스 응답의 `paymentKey`**다(DB 값이 아니다. 검증 실패는 토스가 다른 결제를 응답했을 수 있다는 뜻이다). 순서: ⓐ pg_call(kind=CANCEL, outcome=UNKNOWN, idempotency_key=`cancel-{시도의 pg_order_id}`) INSERT 커밋 → ⓑ 트랜잭션 밖에서 `cancel(응답 paymentKey, "승인 응답 불일치", 키)` → ⓒ 한 트랜잭션에서 pg_call 결과 + `CANCELED`(`WHERE status IN ('APPROVING','UNKNOWN','CREATED')`, 0행이면 상태는 그대로 두고 ERROR 로그). 시도의 pg_order_id는 ①에서 읽어 메모리에 들고 있는 값을 쓴다(DB 값은 이미 NULL일 수 있다). 분개는 쓰지 않는다(확정된 돈이 없다고 본다). 취소 결과가 불명이어도 CANCELED로 두고 ERROR 로그를 남긴다(감수, 거래 대사가 다시 잡는다).
 
@@ -281,7 +281,7 @@ CommerceCore는 아직 `PaymentExecutionResolved`를 기다린다. Phase 2 전�
 |---|---|---|---|---|
 | PR3 원장 | `ledger/service`, `Journal` | #348 PR2 | `feat/#338-payment-ledger` | — |
 | PR4 토스 클라이언트 | `client/toss`, 설정 | `dev`(병렬, PR5 전에 병합) | `feat/#338-toss-client` | — |
-| PR5 승인 처리 | `ApprovalService`·`PaymentOutcomeService`(컨트롤러 없음), 이벤트 계약 교체 | PR3(PR4 병합 뒤 rebase) | `feat/#338-payment-approval` | `states/payment.md`·`.html` |
+| PR5 승인 처리 | `ApprovalService`·`PaymentOutcomeService`(컨트롤러 없음), 이벤트 계약 교체 | PR3(PR4 브랜치를 merge로 포함) | `feat/#338-payment-approval` | `states/payment.md`·`.html` |
 | PR6 승인 API · 8초 | `ApprovalController`, 8초 대기, 계약 YAML | PR5 | `feat/#338-payment-approval-api` | `api.html` |
 
 PR5와 PR6을 나누는 이유: 8초 대기 없이 엔드포인트가 먼저 배포되면 Payment가 Commerce 10초보다 오래 기다린다([ADR 0337-5](../../../../adr/0337-5-pg-timeout-and-unknown.md)). PR6이 #338을 `Closes`한다.
