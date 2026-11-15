@@ -66,12 +66,12 @@
 
 ## 결과 불명 복구 · 만료
 
-- [ ] **PAY-RECOVER-01** APPROVING이 3분 넘게 남아 있으면 UNKNOWN으로 옮겨 조회 대상에 넣는다. (EC 22)
-- [ ] **PAY-RECOVER-02** UNKNOWN 결제를 저장된 paymentKey로 조회한다. DONE이면 PAY-CONFIRM-06과 같은 처리를 한다. 주문이 이미 닫혔어도 같다. (EC 21, 37)
-- [ ] **PAY-RECOVER-03** 조회 결과가 ABORTED·EXPIRED면 CREATED, CANCELED(전액 취소)면 CANCELED, 그 밖이면 UNKNOWN을 유지하고 10초·30초·1분·5분 간격으로 다시 조회한다.
-- [ ] **PAY-RECOVER-04** 조회 마감이 지나면 조회를 멈추고 알림(ERROR 로그)을 남긴다. 이후는 거래 대사가 맡는다.
-- [ ] **PAY-EXPIRE-01** 만료 시각이 지난 CREATED 결제는 CANCELED가 된다. 승인과 동시에 일어나도 한쪽만 반영된다. (EC 31, 35)
-- [ ] **PAY-RECOVER-05** 여러 인스턴스가 같은 결제를 동시에 처리해도 상태 변경·분개·이벤트는 1번이다.
+- [x] **PAY-RECOVER-01** APPROVING이 3분 넘게 남아 있으면 UNKNOWN으로 옮겨 조회 대상에 넣는다. (EC 22)
+- [x] **PAY-RECOVER-02** UNKNOWN 결제를 저장된 paymentKey로 조회한다. DONE이면 PAY-CONFIRM-06과 같은 처리를 한다. 주문이 이미 닫혔어도 같다. (EC 21, 37)
+- [x] **PAY-RECOVER-03** 조회 결과가 ABORTED·EXPIRED면 CREATED, CANCELED(전액 취소)면 CANCELED, 그 밖이면 UNKNOWN을 유지하고 10초·30초·1분·5분 간격으로 다시 조회한다.
+- [x] **PAY-RECOVER-04** 조회 마감이 지나면 조회를 멈추고 알림(ERROR 로그)을 남긴다. 이후는 거래 대사가 맡는다.
+- [x] **PAY-EXPIRE-01** 만료 시각이 지난 CREATED 결제는 CANCELED가 된다. 승인과 동시에 일어나도 한쪽만 반영된다. (EC 31, 35)
+- [x] **PAY-RECOVER-05** 여러 인스턴스가 같은 결제를 동시에 처리해도 상태 변경·분개·이벤트는 1번이다.
 
 ## 결과 이벤트
 

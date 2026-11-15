@@ -1171,7 +1171,7 @@ approve(orderRef, buyerId, req) {                   // POST /internal/payments/{
   <li>조회 결과는 흐름 2, 3의 이벤트로 합쳐집니다. 그래서 "승인됐을 때 할 일"은 한 곳에만 만들면 됩니다.</li>
   <li>최대 조회 시간과 간격은 제안값입니다. 팀이 정합니다.</li>
 </ul></div>
-<p><strong>그 밖의 조회 결과:</strong> 토스가 <code>DONE</code>, <code>ABORTED</code>·<code>EXPIRED</code>가 아닌 상태(<code>IN_PROGRESS</code> 등)를 주면 UNKNOWN을 유지하고 다음 조회를 예약합니다. <code>check_deadline_at</code>이 지나면 알림 후 대사로 넘깁니다.</p>
+<p><strong>그 밖의 조회 결과:</strong> <code>CANCELED</code>(전액 취소)면 분개 없이 CANCELED로 닫고 WARN 로그, <code>PARTIAL_CANCELED</code>면 UNKNOWN을 유지하고 사람 확인 ERROR 로그를 남깁니다. 그 밖의 상태(<code>IN_PROGRESS</code> 등)는 UNKNOWN을 유지하고 다음 조회를 예약합니다. <code>check_deadline_at</code>이 지나면 알림 후 대사로 넘깁니다.</p>
 </section>
 
 <!-- 5 결과 전달 -->

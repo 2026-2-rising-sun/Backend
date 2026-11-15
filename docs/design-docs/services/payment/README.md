@@ -17,7 +17,7 @@
 
 ## 현재 코드 (결제 재설계 구현 중)
 
-결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(`ApprovalService`·`PaymentOutcomeService`)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·`PaymentApproved` outbox에 한 트랜잭션으로 반영한다. 승인 API(`ApprovalController`)는 검증·APPROVING 전환 뒤 토스 호출·반영을 가상 스레드에 넘기고 최대 8초(`payment.approval.response-wait`)만 기다려, 넘으면 202 PENDING으로 답한다. 결과 불명 조회·만료 스케줄러는 아직 없다(#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
+결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(`ApprovalService`·`PaymentOutcomeService`)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·`PaymentApproved` outbox에 한 트랜잭션으로 반영한다. 승인 API(`ApprovalController`)는 검증·APPROVING 전환 뒤 토스 호출·반영을 가상 스레드에 넘기고 최대 8초(`payment.approval.response-wait`)만 기다려, 넘으면 202 PENDING으로 답한다. 결과 불명 복구·만료 스케줄러 3개(`ApprovingSweeper`: APPROVING 3분 정체 → UNKNOWN, `UnknownPaymentPoller`: UNKNOWN을 토스에 조회해 확정·마감 30분 뒤 ERROR 로그, `PaymentExpiryJob`: 만료된 CREATED → CANCELED)가 `payment.recovery.enabled`(기본 켜짐)일 때 돈다. 분산 락은 없고 조건부 UPDATE로 한 번만 반영한다(#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
 
 - API: [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml). `X-Service-Token`(commercecore)만 허용하고, 허용 목록(`/v1/internal/payments`, `…/{orderRef}`, `…/{orderRef}/checkouts`, `…/{orderRef}/approval`) 밖의 `/v1/internal/**`는 403이다.
 - 결제 키는 `orderRef`다. 같은 orderRef 생성은 `INSERT … ON CONFLICT DO NOTHING`의 영향 행 수로 판단하고, 결제창은 `CREATED`·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 [#348 설계서](../../../exec-plans/active/337-payment-redesign/phase1/348-create-api.md#api).
