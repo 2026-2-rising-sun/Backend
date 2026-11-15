@@ -1,4 +1,4 @@
-# M1 결제 1차
+# Phase 1 결제 1차
 
 상태: 대기
 상위 계획: [#337 결제 서비스 재설계](README.md) · 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md)
@@ -13,7 +13,7 @@ dev ─ PR4 토스 클라이언트 (병렬 가능, PR5 전에 dev 병합) ──
 ```
 
 - [ ] **PR0 기존 결제 코드 삭제** #347 `payment-legacy-removal` · base `dev` · 크기 XL 가능(삭제 줄)
-  - 범위: payment-service의 기존 패키지·`PaymentScenarioController`·Mock 엔진·그 테스트, `contracts/api/payment-service.yaml`의 기존 경로. CommerceCore 결제 모듈은 주문 연동 단계에서 바꾸므로 건드리지 않는다.
+  - 범위: payment-service의 기존 패키지·`PaymentScenarioController`·Mock 엔진·그 테스트, `contracts/api/payment-service.yaml`의 기존 경로. CommerceCore 결제 모듈은 Phase 2(주문 연동)에서 바꾸므로 건드리지 않는다.
   - 남길 것: `PaymentServiceApplication`, V1–V3 파일, `event_outbox`.
   - 확인: 컨트롤러 없이 기동(컨텍스트 로드 테스트 1개), `scripts/check.sh --base origin/dev`. commercecore 테스트가 깨지면 그 부분만 남기고 PR 본문에 적는다.
   - 갱신할 문서: `design-docs/services/payment/*`(기존 상태·ERD 설명 제거, API HTML 재생성), `design-docs/order-payment.md`·`refund.md`의 Payment 부분, `requirements/order-payment.md`의 Payment 기준.

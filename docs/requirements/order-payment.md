@@ -3,6 +3,8 @@
 상태: 초안
 검증: [현재 설계와 테스트 근거](../design-docs/order-payment.md)
 
+**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](../design-docs/services/payment/README.md)에 있다.
+
 ## 수용 기준
 
 - [ ] 동일 멱등 키와 동일 원문은 같은 주문·실행 결과로 연결된다.
