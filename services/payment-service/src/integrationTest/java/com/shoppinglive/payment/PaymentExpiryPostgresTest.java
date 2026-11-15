@@ -25,7 +25,7 @@ class PaymentExpiryPostgresTest extends RecoveryPostgresTestSupport {
 
     void expiresIn(ApproveCommand c, long millis) {
         jdbc.update(
-                "UPDATE payment SET expires_at = now() + ? * INTERVAL '1' MILLISECOND WHERE order_ref = ?",
+                "UPDATE payment SET expires_at = now() + ? * INTERVAL '0.001' SECOND WHERE order_ref = ?",
                 millis,
                 c.orderRef());
     }
