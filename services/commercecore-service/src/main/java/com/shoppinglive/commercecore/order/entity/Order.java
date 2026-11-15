@@ -157,6 +157,11 @@ public class Order extends BaseEntity {
         this.salesInfoId = null;
     }
 
+    public void recordSkuSource(Long skuId, Long productId, String sellerId) {
+        recordSkuSource(skuId, productId);
+        this.sellerIdSnapshot = sellerId;
+    }
+
     public Long getProductIdSnapshot() {
         return productIdSnapshot;
     }

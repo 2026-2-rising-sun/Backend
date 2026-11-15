@@ -199,7 +199,7 @@ public class OrderCreationService {
 
         for (int attempt = 1; attempt <= ORDER_NUMBER_RETRY; attempt++) {
             try {
-                return persist(command, product.name(), idempotencyKey);
+                return persist(command, product, idempotencyKey);
             } catch (DataIntegrityViolationException e) {
                 if (violatesUniqueConstraint(e, "uk_orders_member_idempotency")) {
                     // 실패한 트랜잭션이 종료된 뒤 다른 요청이 커밋한 주문을 조회한다.
@@ -248,7 +248,7 @@ public class OrderCreationService {
      * 생성 때 다시 검증한다".
      */
     private OrderCreationResult persist(
-            CreateOrderCommand command, String productName, String idempotencyKey) {
+            CreateOrderCommand command, ProductSnapshot product, String idempotencyKey) {
 
         return transactionTemplate.execute(
                 status -> {
@@ -306,13 +306,13 @@ public class OrderCreationService {
                                     command.buyerName(),
                                     command.buyerPhone(),
                                     command.memberId(),
-                                    productName,
+                                    product.name(),
                                     idempotencyKey,
                                     time.now().plusSeconds(600),
                                     command.sourceCartItemId(),
                                     command.expectedTotalAmount(),
                                     coupon.discountAmount());
-                    order.recordSkuSource(sales.skuId(), command.productId());
+                    order.recordSkuSource(sales.skuId(), command.productId(), product.sellerId());
                     order.recordSourceCartVersion(command.sourceCartItemVersion());
                     order = orderRepository.saveAndFlush(order);
 

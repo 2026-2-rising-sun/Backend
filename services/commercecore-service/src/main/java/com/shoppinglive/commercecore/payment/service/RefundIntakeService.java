@@ -11,7 +11,6 @@ import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
 import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository;
 import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository.ExistingRequest;
-import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
 import com.shoppinglive.commercecore.sku.dto.SkuView;
 import com.shoppinglive.commercecore.sku.service.SkuService;
@@ -25,7 +24,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -285,17 +283,27 @@ public class RefundIntakeService {
         } catch (ArithmeticException overflow) {
             throw new BusinessException(ErrorCode.CONFLICT, "환불 금액 범위를 초과했습니다.");
         }
-        Set<Long> salesIds = targets.stream().map(Order::getTradeSkuId).collect(Collectors.toSet());
+        Set<Long> missingProductSources =
+                targets.stream()
+                        .filter(order -> order.getProductIdSnapshot() == null)
+                        .map(Order::getTradeSkuId)
+                        .collect(Collectors.toSet());
         Map<Long, Long> productIds =
-                skus.findBySkuIds(salesIds).stream()
+                skus.findBySkuIds(missingProductSources).stream()
                         .collect(Collectors.toMap(SkuView::skuId, SkuView::productId));
-        if (!productIds.keySet().containsAll(salesIds)) {
+        for (Order order : targets) {
+            if (order.getProductIdSnapshot() != null)
+                productIds.put(order.getTradeSkuId(), order.getProductIdSnapshot());
+        }
+        if (targets.stream().anyMatch(order -> !productIds.containsKey(order.getTradeSkuId()))) {
             throw new BusinessException(ErrorCode.CONFLICT, "주문 상품 스냅샷을 확인할 수 없습니다.");
         }
-        Map<Long, String> sellerIds = new HashMap<>();
-        for (ProductSnapshot product : productLookup.findProducts(productIds.values())) {
-            sellerIds.put(product.id(), product.sellerId());
-        }
+        Set<Long> missingSellers =
+                targets.stream()
+                        .filter(order -> order.getSellerIdSnapshot() == null)
+                        .map(order -> productIds.get(order.getTradeSkuId()))
+                        .collect(Collectors.toSet());
+        Map<Long, String> historicalSellers = productLookup.findHistoricalSellerIds(missingSellers);
 
         Long requestId =
                 insertRequest(group.getId(), memberId, idempotencyKey, fingerprint, amount, now);
@@ -317,7 +325,9 @@ public class RefundIntakeService {
                     requestId,
                     order.getId(),
                     productIds.get(order.getTradeSkuId()),
-                    sellerIds.get(productIds.get(order.getTradeSkuId())),
+                    order.getSellerIdSnapshot() != null
+                            ? order.getSellerIdSnapshot()
+                            : historicalSellers.get(productIds.get(order.getTradeSkuId())),
                     order.getPayableAmount(),
                     Timestamp.from(now),
                     order.getQuantity());

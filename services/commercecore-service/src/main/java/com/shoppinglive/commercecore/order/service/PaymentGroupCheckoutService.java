@@ -230,6 +230,10 @@ class PaymentGroupCheckoutService {
                                                     com.shoppinglive.commercecore.sku.dto.SkuView
                                                             ::productId,
                                                     s -> s));
+                    var products =
+                            productLookup.findProducts(selectedByProduct.keySet()).stream()
+                                    .collect(
+                                            java.util.stream.Collectors.toMap(p -> p.id(), p -> p));
                     long total = 0;
                     for (Item item : quote.items()) {
                         var s = currentSales.get(item.productId());
@@ -271,7 +275,12 @@ class PaymentGroupCheckoutService {
                                         item.itemId(),
                                         expected,
                                         item.discountAmount());
-                        order.recordSkuSource(s.skuId(), item.productId());
+                        order.recordSkuSource(
+                                s.skuId(),
+                                item.productId(),
+                                products.containsKey(item.productId())
+                                        ? products.get(item.productId()).sellerId()
+                                        : null);
                         order.attachGroup(group, item.version());
                         orders.saveAndFlush(order);
                         skus.reserve(s.skuId(), item.quantity());
