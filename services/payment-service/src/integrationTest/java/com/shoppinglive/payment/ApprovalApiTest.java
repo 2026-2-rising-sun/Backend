@@ -287,6 +287,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     void lateSuccessAnswersPendingThenApproves() throws Exception {
         String orderRef = created();
         AtomicInteger activeConnections = new AtomicInteger(-1);
+        CountDownLatch called = new CountDownLatch(1);
         HikariDataSource hikari = dataSource.unwrap(HikariDataSource.class);
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenAnswer(
@@ -294,6 +295,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
                             // 토스를 기다리는 동안 요청 스레드도 토스 호출도 DB 연결을 잡지 않는다
                             activeConnections.set(
                                     hikari.getHikariPoolMXBean().getActiveConnections());
+                            called.countDown();
                             release.await(10, TimeUnit.SECONDS);
                             return new TossResult.Success(done(orderRef));
                         });
@@ -303,8 +305,8 @@ class ApprovalApiTest extends PaymentApiTestSupport {
         long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         assertThat(elapsedMs).as("응답 대기 300ms 근처에서 답한다").isBetween(250L, 3000L);
         assertThat(status(orderRef)).isEqualTo("APPROVING");
+        assertThat(called.await(10, TimeUnit.SECONDS)).isTrue();
         assertThat(activeConnections.get()).isZero();
-        assertThat(hikari.getHikariPoolMXBean().getActiveConnections()).isZero();
 
         release.countDown();
         awaitStatus(orderRef, "APPROVED");

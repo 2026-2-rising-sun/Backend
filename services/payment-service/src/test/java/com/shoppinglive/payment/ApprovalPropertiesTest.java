@@ -26,4 +26,15 @@ class ApprovalPropertiesTest {
                             assertThat(wait).isLessThan(Duration.ofSeconds(10));
                         });
     }
+
+    @Test
+    @DisplayName("[PAY-CONFIRM-11] 응답 대기가 Commerce 타임아웃 10초 이상이거나 음수면 기동하지 않는다")
+    void rejectsWaitNotShorterThanCommerceTimeout() {
+        for (String wait : new String[] {"10s", "12s", "-1s"}) {
+            new ApplicationContextRunner()
+                    .withUserConfiguration(Config.class)
+                    .withPropertyValues("payment.approval.response-wait=" + wait)
+                    .run(context -> assertThat(context).as(wait).hasFailed());
+        }
+    }
 }

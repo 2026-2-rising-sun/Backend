@@ -163,7 +163,7 @@ UPDATE payment
 - 요청 스레드는 ①을 직접 하고, ②③ 작업을 `Executors.newVirtualThreadPerTaskExecutor()`(Java 21)로 넘겨 `future.get(남은 시간)`으로 기다린다. **8초는 컨트롤러 진입 시각부터 잰다**(①에 걸린 시간을 뺀다). 실행기는 컨트롤러 필드다. `Executor` 빈으로 두면 Boot 기본 작업 실행기가 물러나기 때문이다. 종료 때 `shutdown()`만 하고 기다리지 않는다(끝나지 못한 결제는 APPROVING에 남아 #349가 확정한다).
 - 8초 안에 끝나면 ③의 응답을 준다. 넘으면 **202 `{paymentId, status: PENDING}`**과 헤더 `Location: /v1/internal/payments/{orderRef}`를 주고, 작업은 계속 돈다(결과는 이벤트로 나간다). 타임아웃 때 `future.cancel`을 부르지 않는다(인터럽트가 토스 호출·반영을 끊지 않게).
 - ②③에서 예외가 나면(DB 장애 등) 작업 안에서 ERROR 로그를 남기고 요청에는 202로 답한다. 결제는 처리 중(APPROVING)이므로 "APPROVING·UNKNOWN은 외부에 PENDING" 결정과 같다(2026-11-16 구현 때 정함). 200은 ③이 커밋한 뒤에만 나가므로 "DB는 APPROVED인데 응답은 202"는 생겨도 반대는 생기지 않는다.
-- 설정: `payment.approval.response-wait` 기본 `8s`(`ApprovalProperties`). ①이 DB 연결 대기 등으로 늦어지는 시간은 이 대기로 막지 못한다.
+- 설정: `payment.approval.response-wait` 기본 `8s`(`ApprovalProperties`). 0 이상 10초 미만이 아니면 기동하지 않는다(Commerce 10초보다 먼저 답하게). ①이 DB 연결 대기 등으로 늦어지는 시간은 이 대기로 막지 못한다.
 - 동시 실행 수 제한은 두지 않는다(벌크헤드 범위 밖). ADR 0337-5의 "크기를 제한한 별도 스레드 풀" 문장은 이 결정에 맞게 정정 메모를 단다(이 PR).
 
 ### 응답 예시

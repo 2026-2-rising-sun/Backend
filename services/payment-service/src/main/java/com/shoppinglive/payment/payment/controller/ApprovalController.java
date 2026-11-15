@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
@@ -80,8 +81,15 @@ public class ApprovalController {
     }
 
     private ApprovalResult await(Attempt attempt, long deadline) {
-        Future<ApprovalResult> future = workers.submit(() -> process(attempt));
         ApprovalResult pending = new ApprovalResult.Pending(attempt.paymentId());
+        Future<ApprovalResult> future;
+        try {
+            future = workers.submit(() -> process(attempt));
+        } catch (RejectedExecutionException e) {
+            // 종료 중. 이미 APPROVING을 커밋했으므로 정체 정리(#349)가 확정한다
+            log.error("[승인 처리 거부: 종료 중] paymentId={}", attempt.paymentId());
+            return pending;
+        }
         try {
             return future.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
         } catch (TimeoutException e) {
@@ -99,7 +107,7 @@ public class ApprovalController {
     private ApprovalResult process(Attempt attempt) {
         try {
             return approvals.process(attempt);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | Error e) {
             // 대기가 끝난 뒤에는 아무도 future를 읽지 않으므로 여기서 남긴다
             log.error("[승인 반영 실패] paymentId={}. 정체 정리(#349)가 확정한다", attempt.paymentId(), e);
             throw e;
