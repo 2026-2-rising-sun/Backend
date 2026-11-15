@@ -73,7 +73,7 @@ class TossClientConfigurationTest {
                         + doneBody.length()
                         + "\r\n\r\n"
                         + doneBody;
-        try (RawServer server = RawServer.respond(response, Duration.ZERO)) {
+        try (RawServer server = RawServer.respond(response, Duration.ofSeconds(2))) {
             new ApplicationContextRunner()
                     .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration.class))
                     .withUserConfiguration(TossClientConfiguration.class)
@@ -83,7 +83,8 @@ class TossClientConfigurationTest {
                             () -> builder -> builder.defaultHeader("X-Request-Id", "internal-id"))
                     .withPropertyValues(
                             "payment.toss.base-url=http://127.0.0.1:" + server.port(),
-                            "payment.toss.secret-key=" + SECRET)
+                            "payment.toss.secret-key=" + SECRET,
+                            "payment.toss.read-timeout=5s")
                     .run(
                             context ->
                                     assertThat(
@@ -189,7 +190,7 @@ class TossClientConfigurationTest {
 
         private void handle(String rawResponse, Duration holdOpen) {
             try (Socket connection = socket.accept()) {
-                request.complete(readHeaders(connection.getInputStream()));
+                request.complete(readRequest(connection.getInputStream()));
                 connection.getOutputStream().write(rawResponse.getBytes(StandardCharsets.UTF_8));
                 connection.getOutputStream().flush();
                 Thread.sleep(holdOpen);
@@ -198,7 +199,8 @@ class TossClientConfigurationTest {
             }
         }
 
-        private static String readHeaders(InputStream input) throws IOException {
+        /** 본문까지 다 읽는다. 읽지 않은 데이터를 남기고 닫으면 연결이 리셋되어 응답을 잃을 수 있다. */
+        private static String readRequest(InputStream input) throws IOException {
             ByteArrayOutputStream headers = new ByteArrayOutputStream();
             while (!headers.toString(StandardCharsets.ISO_8859_1).contains("\r\n\r\n")) {
                 int next = input.read();
@@ -207,7 +209,18 @@ class TossClientConfigurationTest {
                 }
                 headers.write(next);
             }
-            return headers.toString(StandardCharsets.ISO_8859_1);
+            String head = headers.toString(StandardCharsets.ISO_8859_1);
+            input.readNBytes(contentLength(head));
+            return head;
+        }
+
+        private static int contentLength(String head) {
+            for (String line : head.split("\r\n")) {
+                if (line.toLowerCase().startsWith("content-length:")) {
+                    return Integer.parseInt(line.substring("content-length:".length()).trim());
+                }
+            }
+            return 0;
         }
 
         @Override
