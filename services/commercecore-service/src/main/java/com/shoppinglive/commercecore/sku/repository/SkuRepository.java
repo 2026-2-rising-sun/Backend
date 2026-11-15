@@ -91,7 +91,8 @@ public class SkuRepository {
     public int adjustAvailable(Long id, int delta) {
         return update(
                 "available=available+:value",
-                "CAST(available AS BIGINT)+:value BETWEEN 0 AND 2147483647",
+                "CAST(available AS BIGINT)+:value>=0"
+                        + " AND CAST(available AS BIGINT)+reserved+:value<=2147483647",
                 id,
                 delta);
     }

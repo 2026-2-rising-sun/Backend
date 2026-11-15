@@ -228,6 +228,50 @@ class SkuSalesIntegrationTest
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    @DisplayName("판매자 증감 거절은 예약과 이벤트를 보존하고 경계 보충 뒤 전량 해제가 가능하다")
+    void sellerAdjustmentPreservesReservedHeadroom() {
+        var sku = register(10);
+        sales.changeStatus(sku.skuId(), SalesStatus.ON_SALE, "seller");
+        tx.executeWithoutResult(t -> skus.reserve(sku.skuId(), 2));
+        long count = events.count();
+        assertThatThrownBy(
+                        () -> sales.adjustAvailable(sku.skuId(), Integer.MAX_VALUE - 8, "seller"))
+                .isInstanceOf(
+                        com.shoppinglive.commercecore.sales.exception.InsufficientStockException
+                                .class);
+        assertThat(events.count()).isEqualTo(count);
+        sales.adjustAvailable(sku.skuId(), Integer.MAX_VALUE - 10, "seller");
+        tx.executeWithoutResult(t -> skus.release(sku.skuId(), 2));
+        var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
+        assertThat(current.available()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(current.reserved()).isZero();
+    }
+
+    @Test
+    @DisplayName("환불 restock도 예약 공간을 보존하며 거절 시 수량·버전·Outbox가 롤백된다")
+    void refundRestockPreservesHeadroomAndRollsBack() {
+        var sku = register(4);
+        sales.changeStatus(sku.skuId(), SalesStatus.ON_SALE, "seller");
+        tx.executeWithoutResult(
+                t -> {
+                    skus.reserve(sku.skuId(), 2);
+                    skus.consume(sku.skuId(), 1);
+                });
+        sales.adjustAvailable(sku.skuId(), Integer.MAX_VALUE - 4, "seller");
+        var before = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
+        long count = events.count();
+        assertThatThrownBy(() -> tx.executeWithoutResult(t -> skus.restock(sku.skuId(), 2)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(skus.findBySkuIds(List.of(sku.skuId())).getFirst()).isEqualTo(before);
+        assertThat(events.count()).isEqualTo(count);
+        tx.executeWithoutResult(t -> skus.restock(sku.skuId(), 1));
+        tx.executeWithoutResult(t -> skus.release(sku.skuId(), 1));
+        var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
+        assertThat(current.available()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(current.reserved()).isZero();
+    }
+
     @Autowired
     com.shoppinglive.commercecore.product.service.SellerProductCatalogQueryService filters;
 
