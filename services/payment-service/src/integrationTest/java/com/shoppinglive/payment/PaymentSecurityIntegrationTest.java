@@ -53,6 +53,13 @@ class PaymentSecurityIntegrationTest extends PaymentApiTestSupport {
         checkout("OD-NOPE01")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("NOT_READY"));
+        mvc.perform(
+                        post("/v1/internal/payments/OD-NOPE01/approval")
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
     @Test
