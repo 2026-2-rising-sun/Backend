@@ -1,5 +1,7 @@
 # 주문·결제 서비스 간 흐름
 
+**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](services/payment/README.md)에 있다.
+
 <!-- visual: relations -->
 
 현재 공개 legacy는 기존 dev의 Payment 계약과 기본15분/결제확인 중 예약유지 동작이다. 가격·재고 포트는 SKU 원본으로 전환했다. 신규 주문서 공개API·금전·종료/보상 연동은현재PR에서제외했다. [Order현재범위](commercecore/order/설계.md) · [후속인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 전체설계미충족·머지불가이며 MockGateway/실제PG·HTTP와운영제공자검증을구분한다.

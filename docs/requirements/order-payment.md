@@ -1,5 +1,7 @@
 # 주문·결제 수용 기준
 
+**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](../design-docs/services/payment/README.md)에 있다.
+
 상태: 진행 중
 검증: [현재 구현과 미충족](../design-docs/commercecore/order/설계.md) · [보완 계획](../exec-plans/active/331-order-audit-fixes/README.md)
 
