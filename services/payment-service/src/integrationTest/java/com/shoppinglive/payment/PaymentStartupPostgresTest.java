@@ -12,7 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.web.bind.annotation.RestController;
 
 /** H2 create-drop이 아니라 실제 PostgreSQL·Flyway·ddl-auto validate로 기동되는지 확인한다. */
 @SpringBootTest(
@@ -38,10 +37,9 @@ class PaymentStartupPostgresTest {
     @Autowired ApplicationContext context;
 
     @Test
-    @DisplayName("PostgreSQL에서 Flyway 적용과 ddl-auto validate를 거쳐 컨트롤러 없이 기동한다")
+    @DisplayName("PostgreSQL에서 Flyway 적용과 ddl-auto validate를 거쳐 기동한다")
     void startsOnPostgresWithFlywayAndValidate() {
         assertThat(context.getEnvironment().getProperty("spring.jpa.hibernate.ddl-auto"))
                 .isEqualTo("validate");
-        assertThat(context.getBeansWithAnnotation(RestController.class)).isEmpty();
     }
 }
