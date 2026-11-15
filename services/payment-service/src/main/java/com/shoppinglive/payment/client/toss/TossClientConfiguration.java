@@ -25,13 +25,16 @@ public class TossClientConfiguration {
     private static final Logger log = LoggerFactory.getLogger(TossClientConfiguration.class);
 
     @Bean
-    TossPaymentsClient tossPaymentsClient(RestClient.Builder builder, TossProperties properties) {
+    // Boot의 RestClient.Builder는 공통 커스터마이저(내부 요청 ID 헤더)를 붙이므로 쓰지 않는다.
+    TossPaymentsClient tossPaymentsClient(TossProperties properties) {
         if (!StringUtils.hasText(properties.secretKey())) {
             log.warn(
                     "payment.toss.secret-key(PAYMENT_TOSS_SECRET_KEY)가 비어 있어 토스를 호출하지 않고 모든 호출을 NotSent로 돌려준다.");
             return TossPaymentsClient.withoutSecretKey();
         }
-        return new TossPaymentsClient(configure(builder.clone(), properties).build());
+        return new TossPaymentsClient(
+                configure(RestClient.builder(), properties).build(),
+                properties.connectTimeout().plus(properties.readTimeout()));
     }
 
     static RestClient.Builder configure(RestClient.Builder builder, TossProperties properties) {

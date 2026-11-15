@@ -4,8 +4,15 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.http.HttpConnectTimeoutException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.springframework.http.HttpStatusCode;
@@ -28,16 +35,23 @@ public class TossPaymentsClient {
 
     private static final Set<String> OUR_KEY_BAD_REQUEST_CODES = Set.of("INVALID_API_KEY");
 
+    // 본문 읽기가 멈춰도 데드라인에 끝내려고 호출을 별도 가상 스레드에서 실행한다.
+    private static final ExecutorService CALLS = Executors.newVirtualThreadPerTaskExecutor();
+
     /** null이면 시크릿 키가 없어 토스를 호출하지 않는다. */
     private final RestClient restClient;
 
-    public TossPaymentsClient(RestClient restClient) {
+    private final Duration responseDeadline;
+
+    /** responseDeadline은 헤더와 본문을 합친 호출 전체 대기 한도다. 넘으면 Unknown이다. */
+    public TossPaymentsClient(RestClient restClient, Duration responseDeadline) {
         this.restClient = restClient;
+        this.responseDeadline = responseDeadline;
     }
 
     /** 시크릿 키 없이 기동했을 때 쓴다. 모든 호출이 요청을 보내지 않고 NotSent다. */
     static TossPaymentsClient withoutSecretKey() {
-        return new TossPaymentsClient(null);
+        return new TossPaymentsClient(null, Duration.ZERO);
     }
 
     /** orderId·amount는 요청 값이 아닌 DB에 저장한 값을 넘긴다. */
@@ -85,6 +99,28 @@ public class TossPaymentsClient {
         if (restClient == null) {
             return new TossResult.NotSent("payment.toss.secret-key 미설정");
         }
+        Future<TossResult> call = CALLS.submit(() -> send(request, isExpectedStatus));
+        try {
+            return call.get(responseDeadline.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException exception) {
+            call.cancel(true);
+            return new TossResult.Unknown("응답 데드라인 초과");
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            call.cancel(true);
+            return new TossResult.Unknown("응답 대기 중 인터럽트");
+        } catch (ExecutionException exception) {
+            if (exception.getCause() instanceof Error error) {
+                throw error;
+            }
+            return new TossResult.Unknown(
+                    "호출 예외: " + exception.getCause().getClass().getSimpleName());
+        }
+    }
+
+    private TossResult send(
+            Function<RestClient, RestClient.RequestHeadersSpec<?>> request,
+            Predicate<String> isExpectedStatus) {
         try {
             return request.apply(restClient)
                     .exchange((ignored, response) -> classify(response, isExpectedStatus));
