@@ -11,7 +11,7 @@
 
 | 포함 | 요구사항 ID |
 |---|---|
-| 원장 서비스 | LED-01, LED-03–05, LED-APPROVE-01 |
+| 원장 서비스 | LED-01–05, LED-APPROVE-01(분개 내용은 승인 처리 PR에서 호출·검증) |
 | 토스 클라이언트 | PAY-PG-01–04 |
 | 승인 처리(서비스) | PAY-CONFIRM-01–10, 12, PAY-EVENT-01–02 |
 | 승인 API · 8초 | PAY-CONFIRM-11, 승인 HTTP 매핑 |
@@ -25,7 +25,7 @@ payment/controller   ApprovalController            POST /v1/internal/payments/{o
 payment/service      ApprovalService               ①검증·APPROVING → ②토스 → ③반영. 8초 대기
                      PaymentOutcomeService         ③반영 함수들: applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
 client/toss          TossPaymentsClient            confirm · getPayment · cancel. 결과 분류(TossResult)
-ledger/service       LedgerService                 record(refType, refId, lines). 호출자 트랜잭션에 참여
+ledger/service       LedgerService                 record(refType, refId, lines) → boolean. 호출자 트랜잭션에 참여
 ```
 
 ## 1. 토스 클라이언트 (`client.toss`)
@@ -197,14 +197,14 @@ UPDATE payment
 ## 3. 원장 (`ledger.service`)
 
 ```java
-// 호출자 트랜잭션 필수 (Propagation.MANDATORY, LED-04)
-void record(RefType refType, String refId, List<Line> lines)
-record Line(Account account, long debit, long credit, String sellerId) {}
+// 호출자 트랜잭션 필수 (Propagation.MANDATORY, LED-04). 새로 기록하면 true, 이미 있으면 false
+boolean record(LedgerRefType refType, String refId, List<Journal.Line> lines)
+record Line(LedgerAccount account, long debit, long credit, String sellerId) {}
 ```
 
-- `Journal.of(...)`가 줄 2개 이상, 각 줄 한쪽만 > 0, 차변 합 = 대변 합을 검사한다. 어기면 `IllegalArgumentException`, 아무것도 저장하지 않는다(LED-01).
-- `INSERT INTO ledger_journal … ON CONFLICT DO NOTHING`(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태) → 0행이면 이미 기록된 사건이므로 줄을 넣지 않고 끝낸다(LED-03).
-- 수정·삭제 메서드를 만들지 않는다(LED-05).
+- `Journal`·`Journal.Line` 생성자가 줄 2개 이상, 각 줄 한쪽만 > 0(음수 거절), `SELLER_PAYABLE` 줄의 판매자 ID(LED-02), 차변 합 = 대변 합(`Math.addExact`로 넘침 거절)을 검사한다. 어기면 `IllegalArgumentException`, DB에 닿기 전이라 아무것도 저장하지 않는다(LED-01).
+- `INSERT INTO ledger_journal … ON CONFLICT DO NOTHING`(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태) → 0행이면 이미 기록된 사건이므로 줄을 넣지 않고 false로 끝낸다(LED-03). H2 `create-drop`이 같은 UNIQUE를 만들도록 `LedgerJournal`에 `@UniqueConstraint`를 둔다.
+- 수정·삭제 메서드를 만들지 않는다. 원장 리포지토리는 `JpaRepository`가 아닌 `Repository`로 좁혀 삭제 메서드를 물려받지 않는다(LED-05).
 
 **결제 승인 분개**(LED-APPROVE-01): 사건 키 (`PAYMENT_APPROVED`, `payment.id` 문자열)
 
@@ -246,7 +246,7 @@ payload:
 
 | ID | 테스트(제안 이름) | 종류 |
 |---|---|---|
-| LED-01, 03–05 | `LedgerServiceTest` | 통합(H2) + 중복은 `@Tag("postgres")` |
+| LED-01–05 | `JournalTest`(검사), `LedgerServiceTest`(H2 저장·롤백·메서드), `LedgerServicePostgresTest`(중복·동시 중복·롤백) | 단위 · 통합(H2) · `@Tag("postgres")` |
 | LED-APPROVE-01 | `ApprovalOutcomePostgresTest` 안 분개 검증 | `@Tag("postgres")` |
 | PAY-PG-01–04 | `TossPaymentsClientTest`(`MockRestServiceServer`), `TossResultClassifierTest`(예외·상태·코드 → 결과) | 단위 |
 | PAY-CONFIRM-01–03 | `ApprovalValidationTest`(토스 호출 0번 검증) | 통합 |
