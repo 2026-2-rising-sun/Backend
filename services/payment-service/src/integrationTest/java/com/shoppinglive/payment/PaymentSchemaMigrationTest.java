@@ -98,9 +98,30 @@ class PaymentSchemaMigrationTest {
         jdbc.update(PAYMENT_INSERT, ref(50), 30000L, 0L, "CREATED");
 
         // 51자는 VARCHAR(64) 안이라 CHECK만 막는다.
-        rejected(CHECK_VIOLATION, "payment_order_ref_check", PAYMENT_INSERT, ref(5), 30000L, 0L, "CREATED");
-        rejected(CHECK_VIOLATION, "payment_order_ref_check", PAYMENT_INSERT, ref(51), 30000L, 0L, "CREATED");
-        rejected(UNIQUE_VIOLATION, "payment_order_ref_key", PAYMENT_INSERT, six, 30000L, 0L, "CREATED");
+        rejected(
+                CHECK_VIOLATION,
+                "payment_order_ref_check",
+                PAYMENT_INSERT,
+                ref(5),
+                30000L,
+                0L,
+                "CREATED");
+        rejected(
+                CHECK_VIOLATION,
+                "payment_order_ref_check",
+                PAYMENT_INSERT,
+                ref(51),
+                30000L,
+                0L,
+                "CREATED");
+        rejected(
+                UNIQUE_VIOLATION,
+                "payment_order_ref_key",
+                PAYMENT_INSERT,
+                six,
+                30000L,
+                0L,
+                "CREATED");
     }
 
     @Test
@@ -109,8 +130,22 @@ class PaymentSchemaMigrationTest {
         jdbc.update(PAYMENT_INSERT, ref(20), 30000L, 0L, "APPROVED");
         jdbc.update(PAYMENT_INSERT, ref(20), 30000L, 30000L, "REFUNDED");
 
-        rejected(CHECK_VIOLATION, "ck_payment_refunded", PAYMENT_INSERT, ref(20), 30000L, -1L, "APPROVED");
-        rejected(CHECK_VIOLATION, "ck_payment_refunded", PAYMENT_INSERT, ref(20), 30000L, 30001L, "REFUNDED");
+        rejected(
+                CHECK_VIOLATION,
+                "ck_payment_refunded",
+                PAYMENT_INSERT,
+                ref(20),
+                30000L,
+                -1L,
+                "APPROVED");
+        rejected(
+                CHECK_VIOLATION,
+                "ck_payment_refunded",
+                PAYMENT_INSERT,
+                ref(20),
+                30000L,
+                30001L,
+                "REFUNDED");
     }
 
     @Test
@@ -118,27 +153,61 @@ class PaymentSchemaMigrationTest {
     void statusInSevenValues() {
         for (String status :
                 new String[] {
-                    "CREATED", "APPROVING", "APPROVED", "UNKNOWN", "CANCELED", "PARTIALLY_REFUNDED", "REFUNDED"
+                    "CREATED",
+                    "APPROVING",
+                    "APPROVED",
+                    "UNKNOWN",
+                    "CANCELED",
+                    "PARTIALLY_REFUNDED",
+                    "REFUNDED"
                 }) {
             jdbc.update(PAYMENT_INSERT, ref(20), 30000L, 0L, status);
         }
 
-        rejected(CHECK_VIOLATION, "ck_payment_status", PAYMENT_INSERT, ref(20), 30000L, 0L, "PENDING");
-        rejected(CHECK_VIOLATION, "ck_payment_status", PAYMENT_INSERT, ref(20), 30000L, 0L, "created");
+        rejected(
+                CHECK_VIOLATION,
+                "ck_payment_status",
+                PAYMENT_INSERT,
+                ref(20),
+                30000L,
+                0L,
+                "PENDING");
+        rejected(
+                CHECK_VIOLATION,
+                "ck_payment_status",
+                PAYMENT_INSERT,
+                ref(20),
+                30000L,
+                0L,
+                "created");
     }
 
     @Test
     @DisplayName("결제·판매자별 금액은 0보다 크고 수수료율은 0–1이다")
     void amountsArePositive() {
-        rejected(CHECK_VIOLATION, "payment_amount_check", PAYMENT_INSERT, ref(20), 0L, 0L, "CREATED");
+        rejected(
+                CHECK_VIOLATION,
+                "payment_amount_check",
+                PAYMENT_INSERT,
+                ref(20),
+                0L,
+                0L,
+                "CREATED");
 
         String orderRef = ref(20);
         jdbc.update(PAYMENT_INSERT, orderRef, 30000L, 0L, "CREATED");
-        long paymentId = jdbc.queryForObject("SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
+        long paymentId =
+                jdbc.queryForObject(
+                        "SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
         String sellerInsert =
                 "INSERT INTO payment_seller_amount(payment_id, seller_order_number, seller_id, amount,"
                         + " commission_rate) VALUES (?, ?, '7a1c0000-0000-4000-8000-000000000001', ?, ?)";
-        jdbc.update(sellerInsert, paymentId, orderRef + "-S1", 30000L, new java.math.BigDecimal("1.0000"));
+        jdbc.update(
+                sellerInsert,
+                paymentId,
+                orderRef + "-S1",
+                30000L,
+                new java.math.BigDecimal("1.0000"));
         rejected(
                 CHECK_VIOLATION,
                 "payment_seller_amount_amount_check",
@@ -163,13 +232,59 @@ class PaymentSchemaMigrationTest {
         long journalId = journal("PAYMENT_APPROVED", ref(10));
         jdbc.update(ENTRY_INSERT, journalId, "PG_CUSTODY", 30000L, 0L, null);
         jdbc.update(ENTRY_INSERT, journalId, "BUYER_DEPOSIT", 0L, 30000L, null);
-        jdbc.update(ENTRY_INSERT, journalId, "SELLER_PAYABLE", 0L, 27000L, "7a1c0000-0000-4000-8000-000000000001");
+        jdbc.update(
+                ENTRY_INSERT,
+                journalId,
+                "SELLER_PAYABLE",
+                0L,
+                27000L,
+                "7a1c0000-0000-4000-8000-000000000001");
 
-        rejected(CHECK_VIOLATION, "ck_ledger_side", ENTRY_INSERT, journalId, "PG_CUSTODY", 0L, 0L, null);
-        rejected(CHECK_VIOLATION, "ck_ledger_side", ENTRY_INSERT, journalId, "PG_CUSTODY", 100L, 100L, null);
-        rejected(CHECK_VIOLATION, "ck_ledger_side", ENTRY_INSERT, journalId, "PG_CUSTODY", -1L, 0L, null);
-        rejected(CHECK_VIOLATION, "ck_ledger_side", ENTRY_INSERT, journalId, "PG_CUSTODY", 100L, -5L, null);
-        rejected(CHECK_VIOLATION, "ck_ledger_seller", ENTRY_INSERT, journalId, "SELLER_PAYABLE", 0L, 27000L, null);
+        rejected(
+                CHECK_VIOLATION,
+                "ck_ledger_side",
+                ENTRY_INSERT,
+                journalId,
+                "PG_CUSTODY",
+                0L,
+                0L,
+                null);
+        rejected(
+                CHECK_VIOLATION,
+                "ck_ledger_side",
+                ENTRY_INSERT,
+                journalId,
+                "PG_CUSTODY",
+                100L,
+                100L,
+                null);
+        rejected(
+                CHECK_VIOLATION,
+                "ck_ledger_side",
+                ENTRY_INSERT,
+                journalId,
+                "PG_CUSTODY",
+                -1L,
+                0L,
+                null);
+        rejected(
+                CHECK_VIOLATION,
+                "ck_ledger_side",
+                ENTRY_INSERT,
+                journalId,
+                "PG_CUSTODY",
+                100L,
+                -5L,
+                null);
+        rejected(
+                CHECK_VIOLATION,
+                "ck_ledger_seller",
+                ENTRY_INSERT,
+                journalId,
+                "SELLER_PAYABLE",
+                0L,
+                27000L,
+                null);
     }
 
     @Test
@@ -218,7 +333,9 @@ class PaymentSchemaMigrationTest {
     }
 
     static String ref(int length) {
-        String chars = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+        String chars =
+                UUID.randomUUID().toString().replace("-", "")
+                        + UUID.randomUUID().toString().replace("-", "");
         return chars.substring(0, length);
     }
 }

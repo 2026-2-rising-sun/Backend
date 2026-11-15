@@ -66,8 +66,11 @@ class PaymentEntityPersistenceTest {
     @Test
     @DisplayName("새 결제는 CREATED·첫 결제창·환불 0으로 저장되고 생성·변경 시각이 채워진다")
     void paymentRoundTrip() {
-        Instant expiresAt = Instant.now().plus(10, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS);
-        Long id = payments.save(new Payment("OD-20261110-K7Q2M9XA", BUYER, 30000L, expiresAt)).getId();
+        Instant expiresAt =
+                Instant.now().plus(10, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MICROS);
+        Long id =
+                payments.save(new Payment("OD-20261110-K7Q2M9XA", BUYER, 30000L, expiresAt))
+                        .getId();
         em.flush();
         em.clear();
 
@@ -91,21 +94,42 @@ class PaymentEntityPersistenceTest {
     @DisplayName("판매자별 금액·PG 호출 기록·분개가 결제 ID·분개 ID로 저장되고 다시 읽힌다")
     void childrenRoundTrip() {
         Long paymentId =
-                payments.save(new Payment("OD-20261110-CHILD001", BUYER, 30000L, Instant.now().plusSeconds(600)))
+                payments.save(
+                                new Payment(
+                                        "OD-20261110-CHILD001",
+                                        BUYER,
+                                        30000L,
+                                        Instant.now().plusSeconds(600)))
                         .getId();
         sellerAmounts.save(
-                new PaymentSellerAmount(paymentId, "OD-20261110-CHILD001-S1", SELLER, 20000L, new BigDecimal("0.1000")));
+                new PaymentSellerAmount(
+                        paymentId,
+                        "OD-20261110-CHILD001-S1",
+                        SELLER,
+                        20000L,
+                        new BigDecimal("0.1000")));
         sellerAmounts.save(
-                new PaymentSellerAmount(paymentId, "OD-20261110-CHILD001-S2", SELLER, 10000L, new BigDecimal("0.0550")));
-        pgCalls.save(new PgCall(paymentId, PgCallKind.CONFIRM, "OD-20261110-CHILD001-1", "confirm-key"));
-        Long journalId = journals.save(new LedgerJournal(LedgerRefType.PAYMENT_APPROVED, paymentId.toString())).getId();
+                new PaymentSellerAmount(
+                        paymentId,
+                        "OD-20261110-CHILD001-S2",
+                        SELLER,
+                        10000L,
+                        new BigDecimal("0.0550")));
+        pgCalls.save(
+                new PgCall(paymentId, PgCallKind.CONFIRM, "OD-20261110-CHILD001-1", "confirm-key"));
+        Long journalId =
+                journals.save(
+                                new LedgerJournal(
+                                        LedgerRefType.PAYMENT_APPROVED, paymentId.toString()))
+                        .getId();
         entries.save(new LedgerEntry(journalId, LedgerAccount.PG_CUSTODY, 30000L, 0L, null));
         entries.save(new LedgerEntry(journalId, LedgerAccount.BUYER_DEPOSIT, 0L, 30000L, null));
         em.flush();
         em.clear();
 
         assertThat(sellerAmounts.findByPaymentId(paymentId))
-                .extracting(PaymentSellerAmount::getSellerOrderNumber, PaymentSellerAmount::getAmount)
+                .extracting(
+                        PaymentSellerAmount::getSellerOrderNumber, PaymentSellerAmount::getAmount)
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple("OD-20261110-CHILD001-S1", 20000L),
                         org.assertj.core.groups.Tuple.tuple("OD-20261110-CHILD001-S2", 10000L));
@@ -114,7 +138,11 @@ class PaymentEntityPersistenceTest {
                 .usingElementComparator(BigDecimal::compareTo)
                 .containsExactlyInAnyOrder(new BigDecimal("0.1"), new BigDecimal("0.055"));
 
-        PgCall call = pgCalls.findAll().stream().filter(c -> c.getPaymentId().equals(paymentId)).findFirst().orElseThrow();
+        PgCall call =
+                pgCalls.findAll().stream()
+                        .filter(c -> c.getPaymentId().equals(paymentId))
+                        .findFirst()
+                        .orElseThrow();
         assertThat(call.getKind()).isEqualTo(PgCallKind.CONFIRM);
         assertThat(call.getOutcome()).isEqualTo(PgCallOutcome.UNKNOWN);
         assertThat(call.getIdempotencyKey()).isEqualTo("confirm-key");
@@ -122,13 +150,15 @@ class PaymentEntityPersistenceTest {
         assertThat(call.getRespondedAt()).isNull();
 
         LedgerJournal journal =
-                journals.findByRefTypeAndRefId(LedgerRefType.PAYMENT_APPROVED, paymentId.toString()).orElseThrow();
+                journals.findByRefTypeAndRefId(LedgerRefType.PAYMENT_APPROVED, paymentId.toString())
+                        .orElseThrow();
         assertThat(journal.getId()).isEqualTo(journalId);
         assertThat(journal.getCreatedAt()).isNotNull();
         assertThat(entries.findByJournalId(journalId))
                 .extracting(LedgerEntry::getAccount, LedgerEntry::getDebit, LedgerEntry::getCredit)
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple(LedgerAccount.PG_CUSTODY, 30000L, 0L),
-                        org.assertj.core.groups.Tuple.tuple(LedgerAccount.BUYER_DEPOSIT, 0L, 30000L));
+                        org.assertj.core.groups.Tuple.tuple(
+                                LedgerAccount.BUYER_DEPOSIT, 0L, 30000L));
     }
 }
