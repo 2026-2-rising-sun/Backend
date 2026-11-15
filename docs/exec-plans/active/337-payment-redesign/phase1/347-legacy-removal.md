@@ -109,7 +109,7 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 - `src/integrationTest/resources/application.yml`에 `commercecore.payment-client.base-url: http://127.0.0.1:1`을 둔다. fixture가 없으면 Core 결제 호출이 기본값 `localhost:8086`으로 간다. 로컬에서 띄운 Payment에 테스트가 닿지 않게 막는다
 - `src/integrationTest`의 `payment/**`에서 옛 Payment 클래스나 fixture를 쓰는 테스트 16개 파일과 지원 클래스 `RefundTestSupport` 삭제. 남긴 것: `RefundApiDisabledTest`, `RefundApiRequestValidationTest`, `RefundSchemaPostgresTest`, `PaymentDatabaseTestSupport`(주문 테스트가 쓴다)
 
-**아래 테스트는 모두 주문 연동에서 새 Payment 계약으로 복구할 회귀다.**
+**"복구할 회귀"로 표시한 항목은 주문 연동에서 새 Payment 계약으로 다시 만든다.** 지운 파일 16개의 메서드는 모두 복구할 회귀다. "되살림"은 리뷰 뒤 결제 없이 성립하는 부분만 다시 넣은 것이다.
 
 ### 지운 테스트 파일 (16개, 메서드 84개)
 
@@ -202,33 +202,35 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 
 ### 일부만 지운 주문 테스트 (6개 파일)
 
-결제와 무관한 단언은 살렸다. 옛 Payment DB를 지우던 정리 줄(`payments.deleteAll()`, `mock_gateway_result` 삭제, 시나리오 초기화)은 Core DB와 무관해 대체 없이 뺐다.
+결제와 무관한 단언은 살렸다. 옛 Payment DB를 지우던 정리 줄(`payments.deleteAll()`, `mock_gateway_result` 삭제, 시나리오 초기화)은 Core DB와 무관해 대체 없이 뺐다. 구분: 삭제 = 메서드 전체 삭제, 이름 변경 = 줄이면서 이름을 바꿈, 줄임 = 같은 이름으로 일부만 뺌, 경우 제거 = 파라미터 경우만 뺌.
 
-| 파일 | 지우거나 줄인 메서드 | 검사하던 것 | 남은 테스트 |
-|---|---|---|---|
-| `PaymentGroupIntegrationTest` | `couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure` | 취소·만료·확정 결제 실패 시 쿠폰 예약 해제 | 12 |
-| | `singleOrderCouponIsReservedSnapshottedAndConsumedAfterPaymentSuccess` | 단건 주문 쿠폰 스냅샷과 결제 성공 후 사용 처리 | |
-| | `singleOrderCouponReservationIsReleasedByCancellationExpiryAndDefinitiveFailure` | 단건 주문 취소·만료·확정 실패 시 쿠폰 예약 해제 | |
-| | `singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved` | 결제 결과 미확정 동안 쿠폰 예약 유지 | |
-| | `onePaymentSuccessConsumesStockAndDeletesOnlyUneditedSelectedCartRows` | 결제 성공 시 재고 소진과 수정되지 않은 선택 장바구니만 삭제 | |
-| | `unconfirmedGatewayResultRetainsCouponCartAndStockUntilConfirmedOnce` | 미확정 게이트웨이 결과는 확정 전까지 쿠폰·장바구니·재고 유지, 확정은 한 번 | |
-| | `failedPaymentReturnsAllStockLeavesCartAndAllowsNewGroup` | 결제 실패 시 전체 재고 복구, 장바구니 유지, 새 묶음 허용 | |
-| | `gatewayApprovalSurvivesLocalApplyRollbackAndRetryUsesOneRecordedApproval` | 로컬 반영 롤백 뒤 재시도가 저장된 승인 하나를 사용 | |
-| | `concurrentStartAndCancelCommitExactlyOneTransition` | 결제 시작과 취소 동시 실행 시 전이 하나만 커밋 | |
-| | `concurrentResolveRecordsOneApprovalAndConsumesEveryProductOnce` | 결과 동시 반영 시 승인·재고 소진 한 번 | |
-| | `fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce` | 전액 할인 묶음의 0원 확정과 쿠폰·재고·장바구니 반영(0원도 Payment가 확정한다) | |
-| | `concurrentZeroPaymentStartsReturnOneCompletedAttempt` | 0원 결제 동시 시작 시 완료된 시도 하나 | |
-| | `zeroPaymentHttpResponseSignalsCompletionWithOk` | 0원 결제 HTTP 200 완료 응답 | |
-| | `singleOrderFullyDiscountedCouponCompletesWithoutGatewayAndConsumesCoupon` | 전액 할인 단건 주문 확정과 쿠폰 사용 처리 | |
-| | `couponIsReservedWithDiscountSnapshotsAndIdempotentReplay`(줄임) | 끝의 "만료된 쿠폰도 결제 성공 시 USED" 부분만 뺐다. 할인 스냅샷·예약·재요청 단언은 남김 | |
-| `SalesInfoEventIntegrationTest` | `failedPaymentRestoresStockButSuccessfulPaymentDoesNotChangePayload` | 결제 실패의 재고 복구 이벤트, 결제 성공은 payload 불변 | 8 |
-| `CommerceCoreStateTransitionTest` | `rollsBackPaymentAndOrderConfirmationWhenStockUpdateFails` | 결제 결과 반영 중 재고 처리 실패 시 결제·주문 확정 롤백 | 11 |
-| | `allowsNewOrderAfterRestoringLastReservedItem`·`preservesPrivateStatusWhenRestoringStock`의 `fail` 경우 | 결제 실패로 재고가 복구되는 경로(취소·만료 경우는 남김) | |
-| `CartOrderIntegrationTest` | `cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay` → `cartDoesNotReserveAndReplayReturnsSameOrder`(줄임) | 결제 성공 뒤 선택 장바구니 항목 삭제 부분만 뺐다. 재고 미예약·재전송 멱등·다른 금액 재사용 거절은 남김 | 6 |
-| `MemberCommerceCoreApiTest` | `cartOrderPaymentAndHistoryUseSameMemberAndPreserveParentPaymentOwnership` → `cartOrderAndPaymentStartUseSameMember`(줄임) | 결제 완료(PAID) 대기, 결제 상세 SUCCESS, 다른 주문의 결제 ID 404, 주문 이력 2건, 결제 후 장바구니 삭제를 뺐다(두 번째 주문은 첫 주문이 결제돼야 만들 수 있다). 장바구니·주문 소유권과 결제 시작 200은 남김 | 11 |
-| `OrderCheckoutApiTest` | 없음 | 정리 줄만 뺐다 | 12 |
+| 파일 | 메서드(삭제 전 → 뒤) | 구분 | 빠진 것 | 표시 |
+|---|---|---|---|---|
+| `PaymentGroupIntegrationTest` | `onePaymentSuccessConsumesStockAndDeletesOnlyUneditedSelectedCartRows` | 삭제 | 결제 성공 시 재고 소진, 수정되지 않은 선택 장바구니만 삭제 | 복구할 회귀 |
+| | `unconfirmedGatewayResultRetainsCouponCartAndStockUntilConfirmedOnce` | 삭제 | 미확정 게이트웨이 결과는 확정 전까지 쿠폰·장바구니·재고 유지, 확정은 한 번 | 복구할 회귀 |
+| | `failedPaymentReturnsAllStockLeavesCartAndAllowsNewGroup` | 삭제 | 결제 실패 시 전체 재고 복구, 장바구니 유지, 새 묶음 허용 | 복구할 회귀 |
+| | `gatewayApprovalSurvivesLocalApplyRollbackAndRetryUsesOneRecordedApproval` | 삭제 | 로컬 반영 롤백 뒤 재시도가 저장된 승인 하나를 사용 | 복구할 회귀 |
+| | `concurrentStartAndCancelCommitExactlyOneTransition` | 삭제 | 결제 시작과 취소 동시 실행 시 전이 하나만 커밋 | 복구할 회귀 |
+| | `concurrentResolveRecordsOneApprovalAndConsumesEveryProductOnce` | 삭제 | 결과 동시 반영 시 승인·재고 소진 한 번 | 복구할 회귀 |
+| | `concurrentZeroPaymentStartsReturnOneCompletedAttempt` | 삭제 | 0원 결제 동시 시작 시 완료된 시도 하나(0원도 Payment가 확정한다) | 복구할 회귀 |
+| | `zeroPaymentHttpResponseSignalsCompletionWithOk` | 삭제 | 0원 결제 HTTP 200 완료 응답 | 복구할 회귀 |
+| | `fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce` → `fullyDiscountedGroupIsCreatedWithZeroPayableAndReservedCoupon` | 이름 변경 | 0원 확정(PAID)·쿠폰 USED·재고 소진·장바구니 삭제·재요청 같은 시도. 견적·0원 생성·쿠폰 예약은 되살림 | 복구할 회귀 · 되살림 |
+| | `couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure` → `couponReservationIsReleasedOnCancellationAndExpiry` | 이름 변경 | 확정 결제 실패 시 쿠폰 해제. 취소·만료 해제는 되살림 | 복구할 회귀 · 되살림 |
+| | `singleOrderCouponIsReservedSnapshottedAndConsumedAfterPaymentSuccess` → `singleOrderCouponIsReservedAndSnapshotted` | 이름 변경 | 결제 성공 뒤 쿠폰 USED·PAID·재고 소진. 할인 스냅샷·예약은 되살림 | 복구할 회귀 · 되살림 |
+| | `singleOrderCouponReservationIsReleasedByCancellationExpiryAndDefinitiveFailure` → `singleOrderCouponReservationIsReleasedByCancellationAndExpiry` | 이름 변경 | 확정 결제 실패 시 해제. 취소·만료 해제와 재고 복구는 되살림 | 복구할 회귀 · 되살림 |
+| | `singleOrderFullyDiscountedCouponCompletesWithoutGatewayAndConsumesCoupon` → `singleOrderFullyDiscountedCouponIsCreatedWithZeroPayable` | 이름 변경 | 0원 확정·쿠폰 USED·PAID. 0원 생성·예약은 되살림 | 복구할 회귀 · 되살림 |
+| | `singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved` | 줄임 | `DELAYED_SUCCESS` 시나리오 지정. 지금은 Payment에 닿지 않아 결과가 없는 상태로 미확정·쿠폰 예약 유지를 확인한다(되살림) | 복구할 회귀 · 되살림 |
+| | `couponIsReservedWithDiscountSnapshotsAndIdempotentReplay` | 줄임 | 만료된 쿠폰도 결제 성공 시 USED. 할인 스냅샷·예약·재요청은 남김 | 복구할 회귀 |
+| `SalesInfoEventIntegrationTest` | `failedPaymentRestoresStockButSuccessfulPaymentDoesNotChangePayload` | 삭제 | 결제 실패의 재고 복구 이벤트, 결제 성공은 payload 불변 | 복구할 회귀 |
+| `CommerceCoreStateTransitionTest` | `rollsBackPaymentAndOrderConfirmationWhenStockUpdateFails` | 삭제 | 결제 결과 반영 중 재고 처리 실패 시 결제·주문 확정 롤백 | 복구할 회귀 |
+| | `allowsNewOrderAfterRestoringLastReservedItem`, `preservesPrivateStatusWhenRestoringStock` | 경우 제거 | `fail`(결제 실패로 재고 복구) 경우. `cancel`·`expire`는 남김 | 복구할 회귀 |
+| `CartOrderIntegrationTest` | `cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay` → `cartDoesNotReserveAndReplayReturnsSameOrder` | 이름 변경 | 결제 성공 뒤 PAID와 선택 장바구니 항목 삭제. 재고 미예약·재전송 멱등·다른 금액 재사용 거절은 남김 | 복구할 회귀 |
+| `MemberCommerceCoreApiTest` | `cartOrderPaymentAndHistoryUseSameMemberAndPreserveParentPaymentOwnership` → `cartOrderPaymentStartAndHistoryUseSameMemberAndPreserveParentPaymentOwnership` | 이름 변경 | 결제 완료(PAID) 대기, 결제 상세 SUCCESS, 결제 뒤 장바구니 0건, 같은 회원 두 번째 주문. 상위 결제 소유권 404(다른 회원의 주문으로)·이력(1건)·재고 7은 되살림 | 복구할 회귀 · 되살림 |
+| `OrderCheckoutApiTest` | 없음 | 정리 줄만 | — | — |
 
-`MemberCommerceCoreApiTest`는 옛 Payment를 직접 import하지 않았지만, 기반 클래스의 fixture가 결제를 끝내 주는 데 기대고 있었다. 그래서 실행해 보고서야 찾았다.
+`MemberCommerceCoreApiTest`는 옛 Payment를 직접 import하지 않았지만, 기반 클래스의 fixture가 결제를 끝내 주는 데 기대고 있어 실행해 보고서야 찾았다.
+
+남은 테스트(실행 수): `PaymentGroupIntegrationTest` 18, `SalesInfoEventIntegrationTest` 8, `CommerceCoreStateTransitionTest` 11, `CartOrderIntegrationTest` 6, `MemberCommerceCoreApiTest` 11, `OrderCheckoutApiTest` 12.
 
 ## PR 나누기
 
