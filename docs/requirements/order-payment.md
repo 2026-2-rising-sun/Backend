@@ -3,7 +3,7 @@
 상태: 초안
 검증: [현재 설계와 테스트 근거](../design-docs/order-payment.md)
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](../design-docs/services/payment/README.md)에 있다.
+**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](../design-docs/services/payment/README.md)에 있다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 결제·환불 호출은 403을 받는다.
 
 ## 수용 기준
 

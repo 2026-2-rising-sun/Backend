@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](../README.md)에 있다.
+**코드 삭제됨:** 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다. 새 설계는 [Payment 도메인 홈](../README.md)에 있다.
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
 
@@ -27,11 +27,11 @@ PENDING은 미사용 호환 값, TIMEOUT은 과거 호환 terminal이다. 현재
 
 ## 구현과 검증 근거
 
-- [PaymentService.java](../../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentService.java)
-- [PaymentRecoveryStore.java](../../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentRecoveryStore.java)
-- [PaymentAttempt.java](../../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentAttempt.java)
-- [PaymentStatus.java](../../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentStatus.java)
+- `PaymentService.java`(#347에서 삭제)
+- `PaymentRecoveryStore.java`(#347에서 삭제)
+- `PaymentAttempt.java`(#347에서 삭제)
+- `PaymentStatus.java`(#347에서 삭제)
 
-관련 기존 테스트: [PaymentBoundaryPostgresTest.java](../../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentBoundaryPostgresTest.java) · [PaymentRecoveryStorePostgresTest.java](../../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentRecoveryStorePostgresTest.java).
+관련 기존 테스트: `PaymentBoundaryPostgresTest.java`(#347에서 삭제) · `PaymentRecoveryStorePostgresTest.java`(#347에서 삭제).
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.

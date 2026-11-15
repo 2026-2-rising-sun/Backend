@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](README.md)에 있다.
+**코드 삭제됨:** 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다. 새 설계는 [Payment 도메인 홈](README.md)에 있다.
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
 
@@ -40,6 +40,6 @@ retry_count는 0~3이며 lease_token과 lease_until의 NULL 여부가 같아야 
 - [V2__event_outbox.sql](../../../../services/payment-service/src/main/resources/db/payment-migration/V2__event_outbox.sql)
 - [V3__outbox_worker_claim.sql](../../../../services/payment-service/src/main/resources/db/payment-migration/V3__outbox_worker_claim.sql)
 
-JPA 매핑: [PaymentAttempt.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentAttempt.java).
+JPA 매핑: `PaymentAttempt.java`(#347에서 삭제).
 
 JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본다. 상태·제약을 변경할 때 이 문서와 HTML을 재생성하고 실제 DB 검증 여부를 별도로 기록한다.

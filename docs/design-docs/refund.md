@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](services/payment/README.md)에 있다.
+**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](services/payment/README.md)에 있다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 결제·환불 호출은 403을 받는다.
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
 
