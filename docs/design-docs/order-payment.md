@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
+현재 공개 legacy는 기존 dev의 Payment 계약과 기본15분/결제확인 중 예약유지 동작이다. 가격·재고 포트는 SKU 원본으로 전환했다. 신규 주문서 공개API·금전·종료/보상 연동은현재PR에서제외했다. [Order현재범위](commercecore/order/설계.md) · [후속인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 전체설계미충족·머지불가이며 MockGateway/실제PG·HTTP와운영제공자검증을구분한다.
 
 [시각 자료](order-payment.html)
 
@@ -28,3 +28,5 @@
 - [Payment 결제 실행](services/payment/states/payment.md)
 
 [공통 Outbox](services/common-module/outbox.md) · [이벤트 계약](../../contracts/events)
+
+목표설계의 CommerceCore PENDING은생성부터600초, PAYMENT_PROCESSING은실제실행진입부터별도600초다. 두타이머와UNKNOWN종료/조회/보상계약은기존legacy표와같다고주장하지않는다. 새공개입구·Payment계약변경·503차단은이번PR에추가하지않는다.

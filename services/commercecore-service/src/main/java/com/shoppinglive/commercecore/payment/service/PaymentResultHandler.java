@@ -55,7 +55,6 @@ public class PaymentResultHandler {
             return false;
         }
         if (!p.status().isConfirmedOutcome()) {
-            orderOutcomes.expireIfDue(p);
             tx.executeWithoutResult(t -> store.record(d, p, p.status().name()));
             return false;
         }

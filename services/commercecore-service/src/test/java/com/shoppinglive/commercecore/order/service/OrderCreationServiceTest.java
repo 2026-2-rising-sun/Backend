@@ -93,7 +93,8 @@ class OrderCreationServiceTest {
                         transactionTemplate,
                         purchaseGuard,
                         paymentGroups,
-                        time);
+                        time,
+                        java.time.Duration.ofMinutes(15));
     }
 
     private CreateOrderCommand command(int quantity, Long expectedTotalAmount) {
@@ -200,7 +201,7 @@ class OrderCreationServiceTest {
 
     /** 결제 기한이 없으면 이정 님의 만료 스케줄러가 대상을 찾지 못해, 결제 없이 이탈한 주문의 재고가 영원히 묶인다. */
     @Test
-    @DisplayName("주문 생성 시 결제 기한을 설정한다")
+    @DisplayName("공개 legacy 주문은 기존 dev의 설정된15분 기한을 보존한다")
     void setsPaymentDeadline() {
         productExists();
         executeTransactionInline();
@@ -211,7 +212,7 @@ class OrderCreationServiceTest {
         org.mockito.Mockito.when(time.now()).thenReturn(before);
         Order order = orderCreationService.create(command(1, null), null).order();
 
-        assertThat(order.getExpiresAt()).isEqualTo(before.plusSeconds(600));
+        assertThat(order.getExpiresAt()).isEqualTo(before.plusSeconds(900));
     }
 
     // ----- 품절 자동 전이 -----

@@ -153,10 +153,16 @@ class RefundIntakeServicePostgresTest extends RefundTestSupport {
                 .isInstanceOf(BusinessException.class);
     }
 
-    @DisplayName("판매자가 없는 기존 상품도 환불할 수 있다")
+    @DisplayName("생성 당시 판매자 스냅샷이 없는 과거 주문도 원래 금액으로 환불할 수 있다")
     @Test
     void legacyProductWithoutSellerCanStillBeRefunded() {
         var group = createAndPay();
+        // 생성 당시에도 소유자 출처가 없던 과거 주문을 준비한다. 신규 저장 원본을 현재 조회로 지우지 않는다.
+        jdbc.update(
+                "UPDATE orders SET seller_id_snapshot=NULL WHERE payment_group_id=?",
+                groups.findByGroupNumberAndMemberId(group.groupNumber(), MEMBER_A)
+                        .orElseThrow()
+                        .getId());
         productLookup.register(new ProductSnapshot(81001L, "A", null, null));
 
         var result =

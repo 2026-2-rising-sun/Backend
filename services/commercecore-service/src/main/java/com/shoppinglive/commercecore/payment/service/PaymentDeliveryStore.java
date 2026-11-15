@@ -85,37 +85,6 @@ public class PaymentDeliveryStore {
                 id);
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void compensatingRefund(
-            long refundId,
-            Long paymentId,
-            Long orderId,
-            Long groupId,
-            String number,
-            long amount,
-            String closureRequestId) {
-        refund(refundId, paymentId, orderId, groupId, number, amount);
-        var d = byRefund(refundId);
-        jdbc.update(
-                "UPDATE payment_delivery_request SET command=? WHERE id=?",
-                json(
-                        new RefundCommand(
-                                d.requestId(),
-                                refundId,
-                                paymentId,
-                                orderId,
-                                groupId,
-                                number,
-                                amount,
-                                closureRequestId)),
-                d.id());
-    }
-
-    public boolean compensation(Delivery d) {
-        return "REFUND".equals(d.kind())
-                && read(d.command(), RefundCommand.class).orderClosureRequestId() != null;
-    }
-
     private long insert(
             String requestId,
             String kind,
@@ -220,10 +189,7 @@ public class PaymentDeliveryStore {
     }
 
     public List<Delivery> due(boolean includeRefunds) {
-        String kind =
-                includeRefunds
-                        ? ""
-                        : " AND (kind='PAYMENT' OR core_refund_request_id IN (SELECT id FROM refund_request WHERE purpose='COMPENSATION'))";
+        String kind = includeRefunds ? "" : " AND kind='PAYMENT'";
         return jdbc.query(
                 "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP"
                         + kind

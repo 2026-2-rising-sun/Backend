@@ -71,18 +71,17 @@ public class PaymentGroup extends BaseEntity {
         this.payableAmount = totalAmount - discount;
     }
 
+    public boolean usesLegacyExecution() {
+        return policyVersion == 0;
+    }
+
     public boolean isOrderSheet() {
         return policyVersion == 1;
     }
 
-    /** 기존 행은 0, 주문서는 1, 신규 구 API 주문은 2로 저장 기한을 강제한다. */
+    /** 공개 legacy 경로는 기존 정책0을 유지한다. 내부 주문서 도메인1만600초를 적용한다. */
     public boolean enforcesDeadline() {
-        return policyVersion == 1 || policyVersion == 2;
-    }
-
-    public PaymentGroup useLegacyDeadlinePolicy() {
-        policyVersion = 2;
-        return this;
+        return policyVersion == 1;
     }
 
     public void useOrderSheetPolicy() {

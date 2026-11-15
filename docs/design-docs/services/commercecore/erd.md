@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order V104/Payment V4를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 코드 통합 검증은 완료했고 사용자 영향 확인은 남아 있으며 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](../../commercecore/sku/ERD.md) · [Order 상세](../../commercecore/order/ERD.md).
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order 독립 V104를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 독립 결함 보완과 범위 정정 검증 중이며 전체설계는 미충족·머지불가다. 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](../../commercecore/sku/ERD.md) · [Order 상세](../../commercecore/order/ERD.md).
 
 [시각 자료](erd.html) · [Cart 모듈 상세 ERD](../../commercecore/cart/ERD.md) · [Order 전체 관계도](../../commercecore/order/ERD.html)
 
@@ -22,10 +22,9 @@
 | coupon_definition | PK id; seller_id; issuance_limit; issued_count; snapshot_version; starts_at/ends_at/expires_at | [V5](../../../../services/commercecore-service/src/main/resources/db/migration/V5__coupon_definitions.sql) · [V17](../../../../services/commercecore-service/src/main/resources/db/migration/V17__coupon_display_snapshot_version.sql) |
 | coupon_target | PK (coupon_id,product_id) | [V5](../../../../services/commercecore-service/src/main/resources/db/migration/V5__coupon_definitions.sql) |
 | member_coupon | PK id; UQ (coupon_id,member_id); status AVAILABLE/RESERVED/USED; used_payment_group_id | [V6](../../../../services/commercecore-service/src/main/resources/db/migration/V6__member_coupons.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
-| refund_request | PK id; UQ (member_id,idempotency_key); payment_group_id; status; retry_count; next_action_at; purpose/order_closure_request_id | [V9](../../../../services/commercecore-service/src/main/resources/db/migration/V9__refund_requests.sql) · [V15](../../../../services/commercecore-service/src/main/resources/db/migration/V15__refund_recovery_leases.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
+| refund_request | PK id; UQ (member_id,idempotency_key); payment_group_id; status; retry_count; next_action_at | [V9](../../../../services/commercecore-service/src/main/resources/db/migration/V9__refund_requests.sql) · [V15](../../../../services/commercecore-service/src/main/resources/db/migration/V15__refund_recovery_leases.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
 | refund_target_order | PK (refund_request_id,order_id); product/seller snapshot; quantity/refund_amount | [V9](../../../../services/commercecore-service/src/main/resources/db/migration/V9__refund_requests.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
 | event_outbox | PK id; UQ event_id; payload; published_at; claim_token/lease_until; next_attempt_at | [V18](../../../../services/commercecore-service/src/main/resources/db/migration/V18__event_outbox.sql) · [V20](../../../../services/commercecore-service/src/main/resources/db/migration/V20__outbox_worker_claim.sql) |
-| order_payment_closure | PK closure_request_id; UQ payment_request_id/payment_id; 종료 시각·원문·전달 재시도 | [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
 | payment_delivery_request | PK id; UQ request_id, core_refund_request_id; kind; order_id; payment_group_id; payment_id; command; result; status | [V21](../../../../services/commercecore-service/src/main/resources/db/migration/V21__payment_delivery_requests.sql) |
 | product_image | PK id; UQ storage_key; content_type; size_bytes; width/height | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) |
 | product | PK id; UQ idempotency_key; main_image_id; seller_id; category; version; sale_enabled; deleted_at | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) · [V101](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql) |
@@ -91,3 +90,5 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 ## Order V104 상세
 
 논리 Order=payment_group/OrderItem=orders 매핑과 수량 환불·종료 기록 관계는 [모듈 ERD](../../commercecore/order/ERD.md)에 있다. 전체 관계도는 그 모듈 HTML을 사용한다. 이 페이지의 생성 HTML은 테이블/관계 요약이며 통합 ER 그림을 대체하지 않는다. 기존 PK·번호·당시 금액·Cart 출처·활성TTL을 유지한다.
+
+신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는기존policy0/기본15분이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.

@@ -64,9 +64,6 @@ public abstract class CommerceCoreSecurityTestSupport {
             DELETE FROM payment_group g WHERE NOT EXISTS
                 (SELECT 1 FROM orders o WHERE o.payment_group_id = g.id)
             """);
-            if (paymentFixture != null)
-                paymentFixture.jdbc.update(
-                        "DELETE FROM payment_order_control c WHERE NOT EXISTS (SELECT 1 FROM payment_attempt a WHERE a.payment_id=c.payment_id)");
         }
     }
 

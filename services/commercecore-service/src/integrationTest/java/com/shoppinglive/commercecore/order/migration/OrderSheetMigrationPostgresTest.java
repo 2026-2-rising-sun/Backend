@@ -74,7 +74,7 @@ class OrderSheetMigrationPostgresTest {
                 .isEqualTo(2);
         assertThat(
                         number(
-                                "SELECT COUNT(*) FROM refund_request WHERE id=71 AND purpose='USER' AND status='FAILED' AND refund_amount=6000"))
+                                "SELECT COUNT(*) FROM refund_request WHERE id=71 AND status='FAILED' AND refund_amount=6000"))
                 .isEqualTo(1);
         assertThat(number("SELECT COUNT(*) FROM cart_item WHERE id=12 AND sku_id=41 AND version=7"))
                 .isEqualTo(1);

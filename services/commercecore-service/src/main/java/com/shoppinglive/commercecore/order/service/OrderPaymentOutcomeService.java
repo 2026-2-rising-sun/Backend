@@ -25,7 +25,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class OrderPaymentOutcomeService {
-    private final OrderSheetLifecycleService sheets;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
@@ -40,7 +39,6 @@ public class OrderPaymentOutcomeService {
 
     public OrderPaymentOutcomeService(
             PaymentGroupRepository groups,
-            OrderSheetLifecycleService sheets,
             OrderJpaRepository orders,
             CartItemRepository cart,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
@@ -51,7 +49,6 @@ public class OrderPaymentOutcomeService {
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents) {
         this.groups = groups;
-        this.sheets = sheets;
         this.orders = orders;
         this.cart = cart;
         this.skus = skus;
@@ -63,12 +60,6 @@ public class OrderPaymentOutcomeService {
         this.notificationEvents = notificationEvents;
     }
 
-    public void expireIfDue(PaymentExecution result) {
-        if (result.paymentGroupId() == null) return;
-        PaymentGroup group = groups.findById(result.paymentGroupId()).orElseThrow();
-        if (group.enforcesDeadline()) sheets.expire(group.getId());
-    }
-
     public boolean apply(PaymentExecution result) {
         if (!result.status().isConfirmedOutcome())
             throw new IllegalArgumentException("확정된 결제 결과가 필요합니다.");
@@ -78,7 +69,6 @@ public class OrderPaymentOutcomeService {
     private boolean applyGroup(PaymentExecution result) {
         Long id = result.paymentId();
         PaymentGroup found = groups.findById(result.paymentGroupId()).orElseThrow();
-        if (found.enforcesDeadline()) return sheets.apply(result);
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {

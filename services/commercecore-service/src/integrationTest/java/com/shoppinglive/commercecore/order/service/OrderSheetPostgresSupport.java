@@ -49,14 +49,12 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
     @Autowired JdbcTemplate jdbc;
     @Autowired OrderSheetService sheets;
     @Autowired OrderSheetLifecycleService lifecycle;
-    @Autowired OrderSheetRefundService refunds;
     @Autowired PaymentGroupService legacyGroups;
     @Autowired PaymentGroupRepository groups;
     @Autowired PaymentDeliveryStore deliveries;
     @Autowired PaymentDispatcher dispatcher;
     @Autowired PaymentClient client;
     @Autowired PaymentResultHandler handler;
-    @Autowired OrderClosureDeliveryService closures;
     @Autowired RefundBoundaryTestDriver refundDriver;
     @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired MockMvc mvc;
@@ -68,7 +66,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
                         "refund_target_order",
                         "payment_delivery_request",
                         "refund_request",
-                        "order_payment_closure",
                         "orders",
                         "payment_group",
                         "member_purchase_guard",
@@ -87,7 +84,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
                         "mock_refund_result",
                         "refund_execution",
                         "mock_gateway_result",
-                        "payment_order_control",
                         "payment_attempt",
                         "event_outbox")) paymentServer.jdbc.update("DELETE FROM " + table);
         paymentServer.reset();
@@ -160,40 +156,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
                 .order();
     }
 
-    PaymentExecution start(OrderSheetResponse order, boolean coupon) {
-        long expected =
-                order.totalAmount()
-                        - (coupon
-                                ? Math.min(
-                                        order.items().getFirst().totalAmount(),
-                                        jdbc.queryForObject(
-                                                "SELECT fixed_discount FROM coupon_definition WHERE id=?",
-                                                Long.class,
-                                                COUPON))
-                                : 0);
-        var accepted =
-                lifecycle.start(
-                        MEMBER_A,
-                        order.orderNumber(),
-                        "pay:" + order.orderNumber(),
-                        expected,
-                        coupon ? COUPON : null,
-                        coupon ? order.items().getFirst().orderItemId() : null);
-        dispatcher.payment(accepted.paymentId());
-        return accepted;
-    }
-
-    OrderSheetResponse paid(OrderSheetResponse order, boolean coupon) {
-        var payment = start(order, coupon);
-        paymentServer
-                .context
-                .getBean(com.shoppinglive.payment.service.PaymentService.class)
-                .resolvePayment(payment.paymentId());
-        dispatcher.payment(payment.paymentId());
-        assertThat(sheets.get(MEMBER_A, order.orderNumber()).status()).isEqualTo("PAID");
-        return sheets.get(MEMBER_A, order.orderNumber());
-    }
-
     long groupId(OrderSheetResponse order) {
         return jdbc.queryForObject(
                 "SELECT id FROM payment_group WHERE group_number=?",
@@ -221,21 +183,5 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
                 String.class,
                 MEMBER_A,
                 COUPON);
-    }
-
-    OrderSheetRefundService.Creation request(OrderSheetResponse order, int quantity, String key) {
-        return refunds.request(
-                MEMBER_A,
-                order.orderNumber(),
-                key,
-                new OrderSheetRefundRequest(
-                        List.of(
-                                new OrderSheetRefundRequest.Item(
-                                        order.items().getFirst().orderItemId(), quantity))));
-    }
-
-    OrderSheetRefundResponse complete(OrderSheetResponse order, long id) {
-        refundDriver.execute(id);
-        return refunds.get(MEMBER_A, order.orderNumber(), id);
     }
 }

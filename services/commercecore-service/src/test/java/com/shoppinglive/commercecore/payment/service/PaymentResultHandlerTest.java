@@ -46,19 +46,7 @@ class PaymentResultHandlerTest {
     void setup() {
         var orderOutcomes =
                 new OrderPaymentOutcomeService(
-                        groups,
-                        mock(
-                                com.shoppinglive.commercecore.order.service
-                                        .OrderSheetLifecycleService.class),
-                        orders,
-                        cart,
-                        stock,
-                        store,
-                        guard,
-                        tx,
-                        jdbc,
-                        coupons,
-                        events);
+                        groups, orders, cart, stock, store, guard, tx, jdbc, coupons, events);
         handler = new PaymentResultHandler(store, orderOutcomes, refunds, tx, jdbc);
     }
 

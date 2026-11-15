@@ -13,7 +13,6 @@ public class RefundMockEngine {
     private static final Logger log = LoggerFactory.getLogger(RefundMockEngine.class);
     private final RefundExecutionService executions;
     private final boolean enabled;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final ScheduledExecutorService scheduler =
             Executors.newScheduledThreadPool(
                     2,
@@ -23,30 +22,17 @@ public class RefundMockEngine {
                         return thread;
                     });
 
-    public RefundMockEngine(RefundExecutionService executions, boolean enabled) {
-        this(executions, enabled, null);
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
     public RefundMockEngine(
             RefundExecutionService executions,
             @org.springframework.beans.factory.annotation.Value(
                             "${payment.refunds.execution-enabled:false}")
-                    boolean enabled,
-            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+                    boolean enabled) {
         this.executions = executions;
         this.enabled = enabled;
-        this.jdbc = jdbc;
     }
 
     public void schedule(long refundRequestId) {
-        if (!enabled
-                && (jdbc == null
-                        || !Boolean.TRUE.equals(
-                                jdbc.queryForObject(
-                                        "SELECT EXISTS(SELECT 1 FROM refund_execution WHERE id=? AND order_closure_request_id IS NOT NULL)",
-                                        Boolean.class,
-                                        refundRequestId)))) return;
+        if (!enabled) return;
         scheduler.submit(
                 () -> {
                     try {

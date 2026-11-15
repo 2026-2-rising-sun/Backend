@@ -4,7 +4,7 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103을 통합했다. 판매 HTTP·Product 판매 조회와 Cart 현재가/가용 재고는 SKU 원본을 사용한다. Order V104/Payment V4와 구/신규 거래 경로를 통합했고 전체 회귀를 검증했다. Order 기존 범위는 완료했고 별도 후속은 [사용자 요청으로 보류](../../commercecore/order/설계.md#9-직접-합의와-구분하는-구현-선택)다. 공개 다중 SKU/대표가·가격 정렬은 보류이며 운영 배포 결과와 구분한다.
+현재 기준: Product/SKU/Cart 감사 보완 통합과 CommerceCore 독립 Order 범위다. Payment 추가 변경과 종속 신규 실행은 제외 중이며 기존 legacy는 dev 계약을 유지한다. 내부 주문서 PENDING600초·스냅샷·선점·로컬만료는 별도 도메인이다. PENDING/실행PROCESSING 각각600초 목표의 공개연동은미구현이며 **전체설계미충족·머지불가**다. [Order현재범위](../../commercecore/order/설계.md)에서 기존실행·현재범위·후속을 구분한다. 공개 다중SKU/대표가/가격순·옵션은보류다.
 
 ## 문서
 

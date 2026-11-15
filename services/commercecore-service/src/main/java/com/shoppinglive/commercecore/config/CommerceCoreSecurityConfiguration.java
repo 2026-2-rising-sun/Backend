@@ -97,8 +97,6 @@ public class CommerceCoreSecurityConfiguration {
                                             "/v1/product-images/{id}")
                                     .permitAll()
                                     .requestMatchers(
-                                            "/v1/order-sheets",
-                                            "/v1/order-sheets/**",
                                             "/v1/orders",
                                             "/v1/orders/**",
                                             "/v1/cart/items",

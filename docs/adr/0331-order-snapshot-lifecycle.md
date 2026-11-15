@@ -2,7 +2,9 @@
 
 결정 상태: 핵심 정책 및 후속 U2/U3 채택. U1도 단가 우선/남은 실결제액 상한으로 채택됐다. 물리 PK/테이블명 보존 확장안은 구현 착수 지시에서 채택됐다.
 
-구현 상태: 기존 범위 구현 완료 후 2026-11-15 최종 감사 결함 보완·재검증 중. [실행 계획](../exec-plans/completed/331-order-module/README.md) · [상세설계](../design-docs/commercecore/order/설계.md) · [기록](../worklog/2026-11-13.md#331-order-설계-통합-검토-준비)
+구현 상태: Payment 담당범위 정정·독립 결함 보완 검증 중. 원래 설계 미충족·머지 불가. [실행 계획](../exec-plans/completed/331-order-module/README.md) · [상세설계](../design-docs/commercecore/order/설계.md) · [기록](../worklog/2026-11-13.md#331-order-설계-통합-검토-준비)
+
+아래 2026-11-14까지의 정책·구현 설명은 당시 기록이며 현재 PR의 제공 범위는 마지막 후속 정정과 현재 계획을 따른다.
 
 ## 문제
 
@@ -65,3 +67,7 @@ Order #331은 사용자 환불 범위·업무 적용과 주문 경계를 맡고 
 [#345](https://github.com/2026-2-rising-sun/Backend/issues/345)·[#346](https://github.com/2026-2-rising-sun/Backend/issues/346) 및 #340 보류는 유지한다. 검증 결과는 [2026-11-15 기록](../worklog/2026-11-15.md#331-삭제-상품-환불의-판매자-출처와-cart-선택-계약-보완)에서 기존 실행과 구분한다.
 
 Payment 추가 변경과 종속 Core 연동은 사용자 범위 정정에 따라 제외 검토 중이다. 기존 검증은 보존된 Mock 구현의 당시 결과이며 채택된 ADR0337의 M2/M3 연동 완료가 아니다. 신규 실행 차단 여부는 사용자 결정 대기이며 승인 전 기한 완화·무보상 실행·임의503을 적용하지 않는다.
+
+## 2026-11-15 최신 기한 요구와 미구현
+
+사용자 직접 확정은 PENDING 생성부터600초, 실제 실행 진입부터 PAYMENT_PROCESSING 별도600초다. 준비데이터 생성/재전송으로 실행기한을 시작·연장하지 않는다. PROCESSING 만료가 PG실패확정·즉시해제 승인은 아니며 UNKNOWN의 종료/조회/보상계약은 별도 정의가 필요하다. 내부PENDING600초 외 새상태/실행타이머·공개금전연동·legacy기한확대는 현재 미충족이다. [현재계획](../exec-plans/active/331-order-audit-fixes/README.md) · [CommerceCore측인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 기존시스템을넘어Payment를수정하지않고전체설계완료/머지가능으로표시하지않는다.

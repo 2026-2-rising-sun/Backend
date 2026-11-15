@@ -26,8 +26,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 class PaymentGroupLifecycleService {
     private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
-    private final OrderSheetLifecycleService sheets;
     private final OrderTimeSource time;
+    private final OrderSheetLifecycleService localOrders;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final com.shoppinglive.commercecore.sku.service.SkuService skus;
@@ -42,8 +42,8 @@ class PaymentGroupLifecycleService {
 
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
-            OrderSheetLifecycleService sheets,
             OrderTimeSource time,
+            OrderSheetLifecycleService localOrders,
             OrderJpaRepository orders,
             com.shoppinglive.commercecore.sku.service.SkuService skus,
             PaymentDeliveryStore payments,
@@ -56,8 +56,8 @@ class PaymentGroupLifecycleService {
             ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
         this.telemetry = telemetry;
         this.groups = groups;
-        this.sheets = sheets;
         this.time = time;
+        this.localOrders = localOrders;
         this.orders = orders;
         this.skus = skus;
         this.payments = payments;
@@ -71,20 +71,12 @@ class PaymentGroupLifecycleService {
 
     PaymentExecution start(String member, String number, String key) {
         PaymentGroup found = owned(member, number);
-        if (found.isOrderSheet()) {
-            var accepted = sheets.start(member, number, key, null);
-            return dispatcher.paymentAfterCommit(accepted.paymentId());
-        }
-        if (found.enforcesDeadline()) sheets.expire(found.getId());
         guard.ensure(member);
         PaymentExecution accepted =
                 tx.execute(
                         t -> {
                             guard.lock(member);
                             PaymentGroup g = lockedGroup(found.getId());
-                            if (g.enforcesDeadline()
-                                    && (sheets.expire(g.getId())
-                                            || "EXPIRED".equals(g.getFailureReason()))) return null;
                             if (g.getPaymentId() != null) {
                                 if (Objects.equals(payments.key(g.getPaymentId()), key))
                                     return payments.payment(g.getPaymentId());
@@ -126,17 +118,11 @@ class PaymentGroupLifecycleService {
         PaymentExecution p = payments.payment(id);
         if (!Objects.equals(p.paymentGroupId(), g.getId()))
             throw error(ErrorCode.NOT_FOUND, "결제를 찾을 수 없습니다.");
-        if (g.enforcesDeadline()) sheets.expire(g.getId());
         return dispatcher.payment(id);
     }
 
     void cancel(String member, String number) {
         PaymentGroup found = owned(member, number);
-        if (found.isOrderSheet()) {
-            sheets.cancel(member, number);
-            return;
-        }
-        if (found.enforcesDeadline() && sheets.expire(found.getId())) return;
         guard.ensure(member);
         tx.executeWithoutResult(
                 t -> {
@@ -154,7 +140,8 @@ class PaymentGroupLifecycleService {
 
     boolean expire(Long groupId) {
         PaymentGroup found = groups.findById(groupId).orElseThrow();
-        if (found.enforcesDeadline()) return sheets.expire(groupId);
+        if (found.isOrderSheet()) return localOrders.expire(groupId);
+        if (!found.usesLegacyExecution()) return false;
         guard.ensure(found.getMemberId());
         return tx.execute(
                 t -> {
@@ -212,6 +199,7 @@ class PaymentGroupLifecycleService {
 
     private PaymentGroup owned(String member, String number) {
         return groups.findByGroupNumberAndMemberId(number, member)
+                .filter(g -> g.usesLegacyExecution())
                 .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "주문 묶음을 찾을 수 없습니다."));
     }
 

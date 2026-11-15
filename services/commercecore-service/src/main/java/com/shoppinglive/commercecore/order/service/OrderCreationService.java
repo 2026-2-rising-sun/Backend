@@ -73,6 +73,7 @@ public class OrderCreationService {
     private final TransactionTemplate transactionTemplate;
     @PersistenceContext private EntityManager entityManager;
     private final OrderTimeSource time;
+    private final java.time.Duration expiration;
     private final PurchaseGuard purchaseGuard;
     private final PaymentGroupService paymentGroups;
 
@@ -86,7 +87,10 @@ public class OrderCreationService {
             TransactionTemplate transactionTemplate,
             PurchaseGuard purchaseGuard,
             PaymentGroupService paymentGroups,
-            OrderTimeSource time) {
+            OrderTimeSource time,
+            @org.springframework.beans.factory.annotation.Value(
+                            "${commercecore.order.expiration.duration:PT15M}")
+                    java.time.Duration expiration) {
         this.orderRepository = orderRepository;
         this.trading = trading;
         this.skus = skus;
@@ -95,6 +99,7 @@ public class OrderCreationService {
         this.cartItems = cartItems;
         this.transactionTemplate = transactionTemplate;
         this.time = time;
+        this.expiration = expiration;
         this.purchaseGuard = purchaseGuard;
         this.paymentGroups = paymentGroups;
     }
@@ -308,7 +313,7 @@ public class OrderCreationService {
                                     command.memberId(),
                                     product.name(),
                                     idempotencyKey,
-                                    time.now().plusSeconds(600),
+                                    time.now().plus(expiration),
                                     command.sourceCartItemId(),
                                     command.expectedTotalAmount(),
                                     coupon.discountAmount());

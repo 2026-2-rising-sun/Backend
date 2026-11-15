@@ -119,6 +119,7 @@ public class RefundIntakeService {
             Collection<Long> requestedCartItemIds) {
         PaymentGroup owned =
                 groups.findByGroupNumberAndMemberId(groupNumber, memberId)
+                        .filter(group -> group.usesLegacyExecution())
                         .orElseThrow(
                                 () ->
                                         new BusinessException(
@@ -198,6 +199,7 @@ public class RefundIntakeService {
 
         PaymentGroup owned =
                 groups.findByGroupNumberAndMemberId(groupNumber, memberId)
+                        .filter(group -> group.usesLegacyExecution())
                         .orElseThrow(
                                 () ->
                                         new BusinessException(
@@ -220,9 +222,6 @@ public class RefundIntakeService {
             return new RequestResult(queries.load(existing.id(), groupNumber), false);
         }
 
-        if (group.isOrderSheet())
-            throw new BusinessException(
-                    ErrorCode.SERVICE_UNAVAILABLE, "SKU 주문의 부분 환불 정책을 확정한 뒤 접수를 지원합니다.");
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         if (group.getStatus() != OrderStatus.PAID
                 || groupOrders.isEmpty()

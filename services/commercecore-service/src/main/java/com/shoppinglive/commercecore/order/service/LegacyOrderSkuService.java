@@ -44,11 +44,10 @@ public class LegacyOrderSkuService {
         var candidates = skus.findByProductId(productId);
         if (candidates.isEmpty()) throw new SalesNotFoundException("상품의 SKU가 없습니다.");
         if (candidates.size() != 1)
-            throw new BusinessException(
-                    ErrorCode.CONFLICT, "여러 SKU 상품은 /v1/order-sheets로 주문해 주세요.");
+            throw new BusinessException(ErrorCode.CONFLICT, "여러 SKU 상품의 공개 주문은 아직 지원하지 않습니다.");
         long id = candidates.getFirst().skuId();
         if (selectedSkuId != null && selectedSkuId != id)
-            throw new BusinessException(ErrorCode.CONFLICT, "옵션 SKU는 /v1/order-sheets로 주문해 주세요.");
+            throw new BusinessException(ErrorCode.CONFLICT, "옵션 SKU의 공개 주문은 아직 지원하지 않습니다.");
         return id;
     }
 }

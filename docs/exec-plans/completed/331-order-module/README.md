@@ -1,5 +1,6 @@
 # #331 Order 구현과 통합 검증
 
+**역사 기록:** e08b8aea 보존 구현의 당시 범위/실행이다. 2026-11-15 Payment 담당경계 정정으로 현재 PR의 신규 금전·종료/보상·legacy600초 확대는 제외했다. [현재 보완 계획](../../active/331-order-audit-fixes/README.md)의 미충족 원래 수용 기준을 따르며 전체설계완료·머지가능으로 읽지 않는다.
 상태: **기존 범위 구현·검증 완료**. 코드 기준 `840825635f370960679621a7aa9a8237fe27bffb`, Draft PR #343(base Cart). 사용자는 지금 기존 작업을 마무리하고 [#345 동시 환불](https://github.com/2026-2-rising-sun/Backend/issues/345)·[#346 결제 준비/실행 기한 분리](https://github.com/2026-2-rising-sun/Backend/issues/346)는 나중에 전용 작업 공간에서 진행하도록 요청했다. 두 후속은 사용자 요청으로 보류하며 이 계획의 완료를 정책 전체 승인·운영 검증·후속 구현 완료로 확대하지 않는다.
 
 [이슈 #331](https://github.com/2026-2-rising-sun/Backend/issues/331) · [ADR 0331](../../../adr/0331-order-snapshot-lifecycle.md) · [상세설계](../../../design-docs/commercecore/order/설계.md) · [ERD](../../../design-docs/commercecore/order/ERD.md) · [상태](../../../design-docs/commercecore/order/상태관리도.md) · [워크로그](../../../worklog/2026-11-13.md) · [실제 검증 보고](verification.md)

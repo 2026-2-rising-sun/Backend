@@ -16,7 +16,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 
 @SpringBootTest(
         properties = {
@@ -136,92 +135,81 @@ class LegacyOrderSellerSnapshotPostgresTest extends OrderSheetPostgresSupport {
     @ValueSource(booleans = {false, true})
     @DisplayName("상품 중지·삭제는 신규 주문만 차단하고 기존 선점 주문의 기한과 결제 권한을 보존한다")
     void reservedOrdersSurviveProductClosure(boolean deleted) {
-        var sheet = create(1);
+        var original =
+                creation.create(
+                                new CreateOrderCommand(
+                                        101L, 1, "구매자", "01012345678", MEMBER_A, 4000L),
+                                "reserved")
+                        .order();
+        var expires = original.getExpiresAt();
         if (deleted) products.delete(101L, version(), SELLER);
         else products.changeSaleState(101L, false, version(), SELLER);
-        assertThatThrownBy(
-                        () ->
-                                sheets.create(
-                                        MEMBER_B,
-                                        "new",
-                                        new CreateOrderSheetRequest(
-                                                List.of(new CreateOrderSheetRequest.Item(501L, 1)),
-                                                null,
-                                                "구매자",
-                                                "01012345678")))
-                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
         assertThatThrownBy(
                         () ->
                                 creation.create(
                                         new CreateOrderCommand(
                                                 101L, 1, "구매자", "01012345678", MEMBER_B, 4000L),
-                                        "new-legacy"))
+                                        "new"))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
-        var payment = start(sheet, false);
-        Awaitility.await()
-                .atMost(Duration.ofSeconds(10))
-                .untilAsserted(
-                        () -> {
-                            dispatcher.payment(payment.paymentId());
-                            assertThat(sheets.get(MEMBER_A, sheet.orderNumber()).status())
-                                    .isEqualTo("PAID");
-                        });
-        assertThat(sheets.get(MEMBER_A, sheet.orderNumber()).expiresAt())
-                .isEqualTo(sheet.expiresAt());
+        payLegacy(original.getPaymentGroup().getGroupNumber());
+        assertThat(
+                        jdbc.queryForObject(
+                                        "SELECT expires_at FROM orders", java.sql.Timestamp.class)
+                                .toInstant())
+                .isEqualTo(expires);
         assertThat(available(501)).isEqualTo(19);
         assertThat(reserved(501)).isZero();
     }
 
+    @Autowired com.shoppinglive.commercecore.sku.service.SkuSalesService stockChanges;
+
     @Test
-    @DisplayName("신규 주문서 Cart 선택100개는 수락하고101개는 계약대로 거절한다")
-    void acceptsHundredCartItemsButRejectsHundredOne() throws Exception {
-        var selections = new ArrayList<Map<String, Long>>();
-        for (long i = 0; i < 101; i++) selections.add(Map.of("itemId", i + 1, "version", 0L));
-        var json = new com.fasterxml.jackson.databind.ObjectMapper();
-        mvc.perform(
-                        post("/v1/order-sheets")
-                                .header("Authorization", bearer(MEMBER_A))
-                                .header("X-Idempotency-Key", "limit101")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        json.writeValueAsString(
-                                                Map.of(
-                                                        "cartItems",
-                                                        selections,
-                                                        "buyerName",
-                                                        "구매자",
-                                                        "buyerPhone",
-                                                        "01012345678"))))
-                .andExpect(status().isBadRequest());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_group", Integer.class))
-                .isZero();
-        selections.clear();
-        for (long i = 0; i < 100; i++) {
-            long product = 201 + i, sku = 601 + i;
-            jdbc.update(
-                    "INSERT INTO product(id,name,description,main_image_id,seller_id,category,sale_enabled,version,created_at,updated_at) VALUES (?,?,'설명',1,?,'FASHION',TRUE,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
-                    product,
-                    "상품" + product,
-                    SELLER);
-            seedSku(sku, product, 1, 1);
-            selections.add(Map.of("itemId", cartItem(product, sku), "version", 0L));
-        }
-        mvc.perform(
-                        post("/v1/order-sheets")
-                                .header("Authorization", bearer(MEMBER_A))
-                                .header("X-Idempotency-Key", "limit100")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        json.writeValueAsString(
-                                                Map.of(
-                                                        "cartItems",
-                                                        selections,
-                                                        "buyerName",
-                                                        "구매자",
-                                                        "buyerPhone",
-                                                        "01012345678"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.items.length()").value(100));
+    @DisplayName("기존 환불 금전성공 뒤 재고상한은 Core만 롤백하고 재고여유 복구 후 같은 원문으로 수렴한다")
+    void recoversLocalRestockAfterMoneyRefundSucceeded() {
+        var order =
+                creation.create(
+                                new CreateOrderCommand(
+                                        101L, 1, "구매자", "01012345678", MEMBER_A, 4000L),
+                                "headroom")
+                        .order();
+        String number = order.getPaymentGroup().getGroupNumber();
+        payLegacy(number);
+        stockChanges.adjustAvailable(501L, Integer.MAX_VALUE - 19, SELLER);
+        var refund = intake.request(MEMBER_A, number, "headroom-refund", List.of()).refund();
+        String originalRequest = deliveries.byRefund(refund.id()).requestId();
+        assertThatThrownBy(() -> refundDriver.execute(refund.id()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT status FROM refund_execution", String.class))
+                .isEqualTo("SUCCESS");
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT refund_amount FROM refund_execution", Long.class))
+                .isEqualTo(4000);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM refund_request WHERE id=?",
+                                String.class,
+                                refund.id()))
+                .isEqualTo("PROCESSING");
+        assertThat(legacyGroups.get(MEMBER_A, number).status().name()).isEqualTo("PAID");
+        assertThat(deliveries.byRefund(refund.id()).terminal()).isFalse();
+        assertThat(available(501)).isEqualTo(Integer.MAX_VALUE);
+        stockChanges.adjustAvailable(501L, -1, SELLER);
+        assertThat(dispatcher.refund(refund.id())).isTrue();
+        assertThat(deliveries.byRefund(refund.id()).requestId()).isEqualTo(originalRequest);
+        assertThat(legacyGroups.get(MEMBER_A, number).status().name()).isEqualTo("REFUNDED");
+        assertThat(available(501)).isEqualTo(Integer.MAX_VALUE);
+        assertThat(dispatcher.refund(refund.id())).isFalse();
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM refund_execution", Long.class))
+                .isEqualTo(1);
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_refund_result", Long.class))
+                .isEqualTo(1);
     }
 
     private long cartItem(long product, long sku) {
