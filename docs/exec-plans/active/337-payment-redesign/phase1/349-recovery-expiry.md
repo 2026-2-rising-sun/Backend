@@ -73,8 +73,8 @@ SELECT id FROM payment
 
 | 순서 | 할 일 |
 |---|---|
-| 1 | `check_deadline_at` < now()면 **조회를 멈춘다**: `UPDATE … SET next_check_at = NULL WHERE id AND status = 'UNKNOWN' AND next_check_at IS NOT NULL AND check_deadline_at < now()`. 1행일 때만 ERROR 로그 1번. 끝 (PAY-RECOVER-04) |
-| 2 | **다음 조회를 먼저 예약해 이번 조회를 선점한다**(아래 "다음 조회 예약" UPDATE에 `AND next_check_at <= now() AND check_deadline_at >= now()`). 0행이면 UNKNOWN이 아니거나 다른 인스턴스가 먼저 집었으므로 건너뛴다 |
+| 1 | 마감 시각의 마지막 조회까지 끝났으면 **조회를 멈춘다**: `UPDATE … SET next_check_at = NULL WHERE id AND status = 'UNKNOWN' AND next_check_at <= now() AND next_check_at > check_deadline_at`. 1행일 때만 ERROR 로그 1번. 끝 (PAY-RECOVER-04) |
+| 2 | **다음 조회를 먼저 예약해 이번 조회를 선점한다**(아래 "다음 조회 예약" UPDATE에 `AND next_check_at <= now() AND next_check_at <= check_deadline_at`). 0행이면 UNKNOWN이 아니거나 다른 인스턴스가 먼저 집었으므로 건너뛴다 |
 | 3 | 같은 트랜잭션에서 pg_call(kind=QUERY, outcome=UNKNOWN) INSERT, 커밋 |
 | 4 | 토스 `getPayment(pg_payment_key)` — 트랜잭션 밖 |
 | 5 | 결과에 따라 아래 표, 한 트랜잭션 |
@@ -102,15 +102,22 @@ SELECT id FROM payment
 | 그 이상 | `now + 5분` | 5분, 마감까지 반복 |
 
 ```sql
-UPDATE payment SET next_check_at = LEAST(now() + CASE … END, check_deadline_at), updated_at = now()
- WHERE id = :id AND status = 'UNKNOWN' AND next_check_at <= now() AND check_deadline_at >= now();
+UPDATE payment SET next_check_at = CASE WHEN now() >= check_deadline_at THEN check_deadline_at + INTERVAL '1' SECOND
+                                       ELSE LEAST(now() + CASE … END, check_deadline_at) END, updated_at = now()
+ WHERE id = :id AND status = 'UNKNOWN' AND next_check_at <= now() AND next_check_at <= check_deadline_at;
 ```
+
+(구현, 리뷰 반영) 다음 조회가 마감에 맞춰지면 그 시각의 조회를 **마지막 조회**로 한 번 한다. 마감이 지난 뒤 하는 조회는 다음 시각을 마감 + 1초로 두고, 다음 차례에 1이 멈추며 그 조회 결과를 `lastPgStatus`로 남긴다. 서버가 오래 멈춰 예약된 조회가 마감 뒤로 밀린 경우도 마지막으로 한 번 조회한다. 처음 구현은 마감 시각 조회를 하지 않고 멈춰 `lastPgStatus`가 몇 분 전 값이었다.
+
+`t0`는 저장하지 않고 `check_deadline_at − check-deadline 설정`으로 계산한다. 그래서 `check-deadline`을 바꾸면 이미 UNKNOWN인 결제의 **간격 선택만** 달라진다(마감은 행에 저장된 값이라 그대로다). 운영 중에 바꿀 일이 생기면 기존 UNKNOWN이 모두 닫힌 뒤 바꾼다.
 
 (구현) `:next`를 Java에서 만들지 않고 `CASE`로 DB `now()`에서 고른다. 시계가 DB 하나라 테스트는 시각 컬럼을 과거 값으로 넣어 만든다(`Clock` 주입 없음). 예약을 토스 호출 **전에** 하므로 조회 중 서버가 죽거나 예외가 나도 같은 결제를 곧바로 다시 집지 않는다.
 
 다음 조회는 마감을 넘기지 않는다(마감 로그가 늦게 찍히지 않게). 스위퍼가 UNKNOWN으로 옮긴 결제는 `next_check_at = now()`로 바로 조회한다. 이미 3분 넘게 멈춘 결제라 10초를 더 기다릴 이유가 없다(PAY-CONFIRM-10의 10초는 승인 직후 UNKNOWN에만 적용).
 
 **마감까지 IN_PROGRESS로 남는 경우**: ①을 커밋하고 토스를 부르기 전에 서버가 죽으면 토스 상태는 IN_PROGRESS로 남는다. 인증 유효 시간이 지나면 토스가 EXPIRED로 바꾸므로 보통 조회 중에 CREATED로 돌아간다. 마감(30분)까지 바뀌지 않으면 UNKNOWN에 그대로 두고 ERROR 로그로 사람이 확인한다. 자동으로 CREATED로 돌리지 않는다(돈이 나갔는지 모른다).
+
+`PARTIAL_CANCELED` 사람 확인 로그는 `pg_status`가 바뀔 때만 남긴다(같은 결과가 조회마다 와도 1번). (구현, 리뷰 반영)
 
 **조회 마감 로그 형식**(ERROR, 한 줄):
 

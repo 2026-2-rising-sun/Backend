@@ -160,50 +160,56 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             nativeQuery = true)
     List<Long> findDueChecks(@Param("limit") int limit);
 
-    /** 마감이 지났으면 조회 대상에서 뺀다. 1행일 때만 ERROR 로그를 남겨 인스턴스가 여럿이어도 1번이다(PAY-RECOVER-04). */
+    /**
+     * 마감 시각의 마지막 조회까지 끝났으면({@code next_check_at > check_deadline_at}, {@link #claimCheck} 참고) 조회
+     * 대상에서 뺀다. 1행일 때만 ERROR 로그를 남겨 인스턴스가 여럿이어도 1번이다(PAY-RECOVER-04).
+     */
     @Modifying(clearAutomatically = true)
     @Query(
             value =
                     """
                     UPDATE payment SET next_check_at = NULL, updated_at = now()
                      WHERE id = :id AND status = 'UNKNOWN'
-                       AND next_check_at IS NOT NULL AND check_deadline_at < now()
+                       AND next_check_at <= now() AND next_check_at > check_deadline_at
                     """,
             nativeQuery = true)
     int stopChecking(@Param("id") long id);
 
     /**
      * 이번 조회를 선점하며 다음 조회를 예약한다. 불명이 된 시각 t0 = 마감 − 설정 마감에서 지난 시간이 40초 미만이면 30초, 100초 미만이면 1분, 그 이상이면
-     * 5분 뒤이고 마감을 넘기지 않는다(PAY-RECOVER-03). 토스를 부르기 전에 미뤄 두므로 다른 인스턴스는 0행이고, 조회 중 예외가 나도 같은 결제를 곧바로
-     * 다시 집지 않는다.
+     * 5분 뒤이고 마감을 넘기지 않는다(PAY-RECOVER-03). 마감 시각이 지나서 하는 조회는 마지막 조회다: 다음 시각을 마감 + 1초로 두어 다음 차례에
+     * {@link #stopChecking}이 멈추게 한다. 토스를 부르기 전에 미뤄 두므로 다른 인스턴스는 0행이고, 조회 중 예외가 나도 같은 결제를 곧바로 다시 집지
+     * 않는다.
      */
     @Modifying(clearAutomatically = true)
     @Query(
             value =
                     """
                     UPDATE payment
-                       SET next_check_at = LEAST(
-                               now() + CASE
-                                   WHEN now() - (check_deadline_at - :deadlineSeconds * INTERVAL '1' SECOND)
-                                        < INTERVAL '40' SECOND THEN INTERVAL '30' SECOND
-                                   WHEN now() - (check_deadline_at - :deadlineSeconds * INTERVAL '1' SECOND)
-                                        < INTERVAL '100' SECOND THEN INTERVAL '1' MINUTE
-                                   ELSE INTERVAL '5' MINUTE END,
-                               check_deadline_at),
+                       SET next_check_at = CASE
+                               WHEN now() >= check_deadline_at THEN check_deadline_at + INTERVAL '1' SECOND
+                               ELSE LEAST(
+                                   now() + CASE
+                                       WHEN now() - (check_deadline_at - :deadlineSeconds * INTERVAL '1' SECOND)
+                                            < INTERVAL '40' SECOND THEN INTERVAL '30' SECOND
+                                       WHEN now() - (check_deadline_at - :deadlineSeconds * INTERVAL '1' SECOND)
+                                            < INTERVAL '100' SECOND THEN INTERVAL '1' MINUTE
+                                       ELSE INTERVAL '5' MINUTE END,
+                                   check_deadline_at) END,
                            updated_at = now()
                      WHERE id = :id AND status = 'UNKNOWN'
-                       AND next_check_at <= now() AND check_deadline_at >= now()
+                       AND next_check_at <= now() AND next_check_at <= check_deadline_at
                     """,
             nativeQuery = true)
     int claimCheck(@Param("id") long id, @Param("deadlineSeconds") long deadlineSeconds);
 
-    /** 조회 결과가 아직 확정이 아니면 마지막 토스 상태만 남긴다(마감 로그의 lastPgStatus). */
+    /** 조회 결과가 아직 확정이 아니면 마지막 토스 상태만 남긴다(마감 로그의 lastPgStatus). 0이면 이미 같은 상태였다. */
     @Modifying(clearAutomatically = true)
     @Query(
             value =
                     """
                     UPDATE payment SET pg_status = :pgStatus, updated_at = now()
-                     WHERE id = :id AND status = 'UNKNOWN'
+                     WHERE id = :id AND status = 'UNKNOWN' AND pg_status IS DISTINCT FROM :pgStatus
                     """,
             nativeQuery = true)
     int updateUnknownPgStatus(@Param("id") long id, @Param("pgStatus") String pgStatus);

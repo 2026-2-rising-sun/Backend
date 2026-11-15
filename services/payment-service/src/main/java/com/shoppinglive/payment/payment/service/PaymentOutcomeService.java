@@ -224,11 +224,14 @@ public class PaymentOutcomeService {
                 // 돈이 모두 돌아갔다(토스에서 직접 취소했거나 보상 취소 응답을 잃음). UNKNOWN은 분개가 없어 쓰지 않는다
                 if (payments.cancelUnknown(paymentId) == 1) {
                     log.warn("결과 불명 결제가 토스에서 전액 취소돼 CANCELED로 닫았다: paymentId={}", paymentId);
+                } else {
+                    log.warn("UNKNOWN이 아니어서 CANCELED로 닫지 않았다: paymentId={}", paymentId);
                 }
             }
             default -> {
-                payments.updateUnknownPgStatus(paymentId, pgStatus);
-                if ("PARTIAL_CANCELED".equals(pgStatus)) {
+                // 상태가 바뀔 때만 1행이라 PARTIAL_CANCELED 사람 확인 로그가 조회마다 반복되지 않는다
+                if (payments.updateUnknownPgStatus(paymentId, pgStatus) == 1
+                        && "PARTIAL_CANCELED".equals(pgStatus)) {
                     log.error(
                             "[사람 확인 필요] 결과 불명 결제가 토스에서 부분 취소 상태다: paymentId={}, pgStatus={}",
                             paymentId,

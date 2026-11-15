@@ -124,12 +124,13 @@ class UnknownPaymentPollerPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(row.get("next_check_at")).isNull();
         assertThat(journals(c.orderRef())).isZero();
         assertThat(outboxRows(c.orderRef())).isEmpty();
-        assertThat(output.getAll()).contains("WARN").contains("paymentId=" + id);
+        assertThat(output.getAll())
+                .contains("전액 취소돼 CANCELED로 닫았다: paymentId=" + id + System.lineSeparator());
     }
 
     @Test
     @DisplayName(
-            "[PAY-RECOVER-03] 조회가 PARTIAL_CANCELED면 UNKNOWN을 유지하고 사람 확인용 ERROR 로그를 남긴 뒤 다음 조회를 예약한다")
+            "[PAY-RECOVER-03] 조회가 PARTIAL_CANCELED면 UNKNOWN을 유지하고 사람 확인용 ERROR 로그를 남긴 뒤 다음 조회를 예약한다. 같은 결과가 다시 와도 로그는 1번")
     void partialCanceledNeedsHuman(CapturedOutput output) {
         ApproveCommand c = unknown(Duration.ofSeconds(15));
         tossAnswers(c, new TossResult.Success(withStatus(c, "PARTIAL_CANCELED")));
@@ -141,7 +142,14 @@ class UnknownPaymentPollerPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(payment(c.orderRef()).get("pg_status")).isEqualTo("PARTIAL_CANCELED");
         assertThat(secondsToNextCheck(c.orderRef())).isCloseTo(30.0, within(2.0));
         assertThat(journals(c.orderRef())).isZero();
-        assertThat(output.getAll()).contains("ERROR").contains("paymentId=" + id);
+
+        jdbc.update("UPDATE payment SET next_check_at = now() WHERE order_ref = ?", c.orderRef());
+        poller.poll();
+        verify(toss, times(2)).getPayment(c.paymentKey());
+        String line = "부분 취소 상태다: paymentId=" + id + ",";
+        String all = output.getAll();
+        assertThat(all).contains(line);
+        assertThat(all.indexOf(line)).isEqualTo(all.lastIndexOf(line));
     }
 
     /** 불명이 된 뒤 지난 시간 → 다음 조회까지 남은 초(10초·30초·1분·5분). */
@@ -170,6 +178,21 @@ class UnknownPaymentPollerPostgresTest extends RecoveryPostgresTestSupport {
         poller.poll();
 
         assertThat(secondsToNextCheck(c.orderRef())).isCloseTo(60.0, within(2.0));
+    }
+
+    @Test
+    @DisplayName("[PAY-RECOVER-03] 토스 조회 중 예외가 나도 다음 조회는 이미 예약돼 있어 같은 결제를 곧바로 다시 조회하지 않는다")
+    void exceptionDoesNotRetryImmediately() {
+        ApproveCommand c = unknown(Duration.ofSeconds(15));
+        when(toss.getPayment(c.paymentKey())).thenThrow(new IllegalStateException("예상 못한 오류"));
+
+        poller.poll();
+        poller.poll();
+
+        verify(toss, times(1)).getPayment(c.paymentKey());
+        assertThat(status(c.orderRef())).isEqualTo("UNKNOWN");
+        assertThat(secondsToNextCheck(c.orderRef())).isCloseTo(30.0, within(2.0));
+        assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:UNKNOWN", "QUERY:UNKNOWN");
     }
 
     @Test
@@ -205,6 +228,34 @@ class UnknownPaymentPollerPostgresTest extends RecoveryPostgresTestSupport {
 
         verify(toss, never()).getPayment(c.paymentKey());
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:UNKNOWN");
+    }
+
+    @Test
+    @DisplayName(
+            "[PAY-RECOVER-04] 마감 시각에 예약된 조회는 마지막으로 1번 하고, 그 결과가 확정이 아니면 다음 차례에 멈추며 그 결과를 lastPgStatus로 남긴다")
+    void lastCheckAtDeadline(CapturedOutput output) {
+        ApproveCommand c = unknown(Duration.ofMinutes(30).plusSeconds(1));
+        jdbc.update(
+                "UPDATE payment SET next_check_at = check_deadline_at WHERE order_ref = ?",
+                c.orderRef());
+        tossAnswers(c, new TossResult.Success(withStatus(c, "WAITING_FOR_DEPOSIT")));
+
+        poller.poll();
+        assertThat(status(c.orderRef())).isEqualTo("UNKNOWN");
+        assertThat(payment(c.orderRef()).get("next_check_at")).isNotNull();
+        poller.poll();
+
+        verify(toss, times(1)).getPayment(c.paymentKey());
+        assertThat(payment(c.orderRef()).get("next_check_at")).isNull();
+        assertThat(output.getAll())
+                .contains(
+                        "payment.recovery.deadline paymentId="
+                                + paymentId(c.orderRef())
+                                + " orderRef="
+                                + c.orderRef()
+                                + " pgOrderId="
+                                + c.pgOrderId()
+                                + " lastPgStatus=WAITING_FOR_DEPOSIT");
     }
 
     @Test
