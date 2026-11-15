@@ -1,6 +1,6 @@
 # ADR 0337-5: PG 결과를 모르면 UNKNOWN으로 두고 조회로 확정한다
 
-결정 상태: 제안
+결정 상태: 채택
 구현 상태: [결제 요구사항](../requirements/payment.md)의 PAY-CONFIRM·PAY-PG·PAY-RECOVER
 관련 자료: [응답 시간 예산](../design-docs/services/payment/design.html#api) · [결과 불명](../design-docs/services/payment/design.html#f4) · [토스 흐름](../design-docs/services/payment/design.html#toss)
 

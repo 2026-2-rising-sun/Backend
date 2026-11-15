@@ -1,6 +1,6 @@
 # ADR 0337-2: 기존 결제 구현을 호환 없이 교체한다
 
-결정 상태: 제안
+결정 상태: 채택
 구현 상태: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md)의 기존 결제 코드 삭제 단계
 관련 자료: [현재 Payment 모듈 문서](../design-docs/services/payment/README.md)
 

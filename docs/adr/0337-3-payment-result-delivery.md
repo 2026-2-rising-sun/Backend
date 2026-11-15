@@ -1,6 +1,6 @@
 # ADR 0337-3: 결제 결과는 outbox 이벤트로 알리고 판단은 Commerce가 한다
 
-결정 상태: 제안
+결정 상태: 채택
 구현 상태: [결제 요구사항](../requirements/payment.md), [환불 요구사항](../requirements/refund.md)에서 추적
 관련 자료: [이벤트 계약](../design-docs/services/payment/design.html#contract) · [Saga](../design-docs/services/payment/design.html#saga)
 

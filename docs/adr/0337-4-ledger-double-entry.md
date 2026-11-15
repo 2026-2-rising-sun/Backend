@@ -1,6 +1,6 @@
 # ADR 0337-4: 원장은 상태 변경과 같은 트랜잭션에서 복식 분개한다
 
-결정 상태: 제안
+결정 상태: 채택
 구현 상태: [원장 요구사항](../requirements/ledger.md)에서 추적
 관련 자료: [Payment 목표 설계 원장](../design-docs/services/payment/design.html#f9)
 
