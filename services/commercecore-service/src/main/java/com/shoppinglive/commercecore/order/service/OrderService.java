@@ -56,7 +56,7 @@ public class OrderService {
                         .findByOrderNumberAndMemberId(orderNumber, memberId)
                         .orElseThrow(
                                 () -> new OrderNotFoundException("주문을 찾을 수 없습니다: " + orderNumber));
-        if (order.getPaymentGroup() != null && order.getPaymentGroup().enforcesDeadline()) {
+        if (order.getPaymentGroup() != null) {
             groups.expire(order.getPaymentGroup().getId());
             return orderRepository
                     .findByOrderNumberAndMemberId(orderNumber, memberId)

@@ -95,7 +95,10 @@ class PaymentGroupLifecycleService {
                                             g.getPayableAmount(),
                                             key,
                                             null);
-                            g.transition(OrderStatus.PAYMENT_CONFIRMING);
+                            var processingStartedAt = time.now();
+                            if (!g.getExpiresAt().isAfter(processingStartedAt))
+                                throw conflict("결제를 시작할 수 없는 주문입니다.");
+                            g.beginProcessing(processingStartedAt);
                             g.setPaymentId(request.paymentId());
                             groups.saveAndFlush(g);
                             for (Order child : children) {
@@ -139,21 +142,7 @@ class PaymentGroupLifecycleService {
     }
 
     boolean expire(Long groupId) {
-        PaymentGroup found = groups.findById(groupId).orElseThrow();
-        if (found.isOrderSheet()) return localOrders.expire(groupId);
-        if (!found.usesLegacyExecution()) return false;
-        guard.ensure(found.getMemberId());
-        return tx.execute(
-                t -> {
-                    guard.lock(found.getMemberId());
-                    PaymentGroup g = lockedGroup(groupId);
-                    if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                            || g.getExpiresAt().isAfter(time.now())) {
-                        return false;
-                    }
-                    close(g, OrderStatus.EXPIRED);
-                    return true;
-                });
+        return localOrders.expire(groupId);
     }
 
     private PaymentGroup lockedGroup(Long id) {
@@ -175,8 +164,9 @@ class PaymentGroupLifecycleService {
                     terminal == OrderStatus.CANCELLED
                             ? orders.cancelOrder(child.getId())
                             : jdbc.update(
-                                    "UPDATE orders SET status='EXPIRED',cancelled_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='PENDING_PAYMENT'",
-                                    child.getId());
+                                    "UPDATE orders SET status='EXPIRED',cancelled_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status=?",
+                                    child.getId(),
+                                    g.getStatus().name());
             if (changed != 1) {
                 throw new IllegalStateException("결제 묶음 종료 상태가 일치하지 않습니다.");
             }

@@ -91,4 +91,6 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 
 논리 Order=payment_group/OrderItem=orders 매핑과 수량 환불·종료 기록 관계는 [모듈 ERD](../../commercecore/order/ERD.md)에 있다. 전체 관계도는 그 모듈 HTML을 사용한다. 이 페이지의 생성 HTML은 테이블/관계 요약이며 통합 ER 그림을 대체하지 않는다. 기존 PK·번호·당시 금액·Cart 출처·활성TTL을 유지한다.
 
-신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는기존policy0/기본15분이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.
+신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는policy0/신규기본600초이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.
+
+V105는 별도 처리기한 컬럼과 늦은 승인 환불 필요 기록을 추가한다. 기존 생성기한·상태·정책0/1/2 확인중 데이터의 null 처리기한은 보존한다. Payment DB/제어행/종료API는 수정하지 않는다. 새 환불 이벤트 생산·결과 소비는 미완이다.

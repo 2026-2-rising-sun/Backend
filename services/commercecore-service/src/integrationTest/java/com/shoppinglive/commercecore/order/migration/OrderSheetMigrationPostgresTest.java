@@ -93,6 +93,31 @@ class OrderSheetMigrationPostgresTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("V105는 기존 정책0·1·2 확인중 주문의 기한을 임의로 계산하거나 상태를 바꾸지 않는다")
+    void preservesExistingProcessingPoliciesAndDeadline() throws Exception {
+        migration("104").migrate();
+        sql("UPDATE payment_group SET status='PAYMENT_CONFIRMING' WHERE id=11");
+        for (int policy : new int[] {1, 2}) {
+            sql(
+                    "INSERT INTO payment_group(group_number,member_id,request_key,fingerprint,total_amount,discount_amount,payable_amount,status,expires_at,version,created_at,updated_at,policy_version) "
+                            + "VALUES ('old-policy-"
+                            + policy
+                            + "','member-"
+                            + policy
+                            + "','old','old',8000,2000,6000,'PAYMENT_CONFIRMING','2026-11-13T00:15:00Z',3,'2026-11-13T00:00:00Z','2026-11-13T00:00:00Z',"
+                            + policy
+                            + ")");
+        }
+        migration("105").migrate();
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM payment_group WHERE status='PAYMENT_CONFIRMING' AND processing_expires_at IS NULL AND expires_at-created_at=INTERVAL '15 minutes' AND version=3"))
+                .isEqualTo(3);
+        assertThat(number("SELECT COUNT(*) FROM late_approval_refund")).isZero();
+        migration("105").validate();
+    }
+
     private Flyway migration(String target) {
         return Flyway.configure()
                 .dataSource(url, user, password)

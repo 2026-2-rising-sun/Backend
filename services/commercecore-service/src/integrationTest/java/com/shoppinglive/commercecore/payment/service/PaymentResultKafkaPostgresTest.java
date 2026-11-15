@@ -25,7 +25,9 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
     KafkaTemplate<String, String> kafka;
 
     @Autowired RefundIntakeService refunds;
-    @Autowired PaymentResultHandler handler;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    PaymentResultHandler handler;
 
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(
             name = "boundaryPaymentClient")
@@ -178,6 +180,55 @@ class PaymentResultKafkaPostgresTest extends RefundTestSupport {
                 .isEqualTo(1);
         var order = orders.findByPaymentGroupIdOrderByIdAsc(result.paymentGroupId()).getFirst();
         assertThat(legacyStock(order.getTradeSkuId()).getAvailable()).isEqualTo(3);
+        assertThat(legacyStock(order.getTradeSkuId()).getReserved()).isZero();
+    }
+
+    @Test
+    @DisplayName("처리 만료 뒤 Kafka 승인 중복과 HTTP 결과는 환불 필요 한 건만 남기고 주문을 복구하지 않는다")
+    void expiredApprovalKafkaAndHttpResultsRecordOneRequiredRefund() throws Exception {
+        var created =
+                paymentGroups
+                        .create(
+                                MEMBER_A,
+                                List.of(
+                                        new com.shoppinglive.commercecore.order.service
+                                                .PaymentGroupService.Selection(
+                                                a.getId(), a.getVersion())),
+                                "구매자",
+                                "01012345678",
+                                20000,
+                                "late-kafka-order")
+                        .group();
+        var payment = paymentGroups.start(MEMBER_A, created.groupNumber(), "late-kafka-pay");
+        assertThat(
+                        paymentServer
+                                .context
+                                .getBean(com.shoppinglive.payment.service.PaymentService.class)
+                                .resolvePayment(payment.paymentId()))
+                .isTrue();
+        jdbc.update(
+                "UPDATE payment_group SET processing_expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
+                payment.paymentGroupId());
+        clearInvocations(handler);
+        send("PaymentExecutionResolved", "payment.execution-results.v1", payment.requestId());
+        send("PaymentExecutionResolved", "payment.execution-results.v1", payment.requestId());
+        await().atMost(Duration.ofSeconds(20))
+                .untilAsserted(
+                        () -> {
+                            verify(handler, times(2)).payment(any());
+                            assertThat(
+                                            jdbc.queryForObject(
+                                                    "SELECT COUNT(*) FROM late_approval_refund",
+                                                    Long.class))
+                                    .isEqualTo(1);
+                        });
+        assertThat(handler.payment(client.get(payment.paymentId()))).isFalse();
+        assertThat(paymentGroups.get(MEMBER_A, created.groupNumber()).status().name())
+                .isEqualTo("EXPIRED");
+        assertThat(jdbc.queryForObject("SELECT status FROM late_approval_refund", String.class))
+                .isEqualTo("REQUIRED");
+        var order = orders.findByPaymentGroupIdOrderByIdAsc(payment.paymentGroupId()).getFirst();
+        assertThat(legacyStock(order.getTradeSkuId()).getAvailable()).isEqualTo(5);
         assertThat(legacyStock(order.getTradeSkuId()).getReserved()).isZero();
     }
 

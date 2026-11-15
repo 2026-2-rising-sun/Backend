@@ -33,6 +33,6 @@ commercecore.refunds.execution-enabled가 꺼져 있으면 REFUND 전달을 하�
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
-## 2026-11-15 현재 PR 경계
+## 2026-11-16 현재 PR 경계
 
-공개 legacy는기존dev 계약과 기본15분/확인중호환을유지하고수량명령은SKU원본을쓴다. 내부주문서의스냅샷·선점·로컬PENDING600초만남기며신규공개주문서/금전/종료·보상/수량환불어댑터와legacy600초확대분은미완으로분리했다. PENDING600초·실행진입부터PROCESSING별도600초는최신사용자요구지만새상태/타이머·UNKNOWN종료계약은미구현/연동미확정이다. 전체설계미충족·머지불가다. [현재Order범위](../../../commercecore/order/설계.md) · [후속인계](../../../../exec-plans/active/331-order-audit-fixes/payment-handoff.md)
+새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.

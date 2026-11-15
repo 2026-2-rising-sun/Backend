@@ -56,9 +56,8 @@ public class OrderSheetLifecycleService {
                         t -> {
                             guard.lock(found.getMemberId());
                             PaymentGroup group = locked(id);
-                            if (!group.enforcesDeadline()
-                                    || !awaitingPayment(group)
-                                    || group.getExpiresAt().isAfter(time.now())) return false;
+                            if (!awaitingPayment(group)
+                                    || !group.paymentDeadlineReached(time.now())) return false;
                             expireLocked(group);
                             return true;
                         }));
@@ -92,11 +91,11 @@ public class OrderSheetLifecycleService {
 
     private boolean awaitingPayment(PaymentGroup group) {
         return group.getStatus() == OrderStatus.PENDING_PAYMENT
-                || (!group.isOrderSheet() && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING);
+                || group.getStatus() == OrderStatus.PAYMENT_CONFIRMING;
     }
 
     private void expireLocked(PaymentGroup group) {
-        releaseItems(group, "FAILED");
+        releaseItems(group, "EXPIRED");
         group.expireOrderSheet();
         groups.saveAndFlush(group);
         events.publish(
@@ -114,10 +113,7 @@ public class OrderSheetLifecycleService {
     }
 
     private void transition(PaymentGroup group, Order item, String next) {
-        String previous =
-                group.isOrderSheet() || group.getPaymentId() == null
-                        ? "PENDING_PAYMENT"
-                        : "PAYMENT_CONFIRMING";
+        String previous = group.getStatus().name();
         if (orders.transitionStatus(item.getId(), previous, next) != 1)
             throw new IllegalStateException("주문항목의 적용 상태가 다릅니다.");
     }

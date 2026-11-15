@@ -86,6 +86,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         if (jdbc == null) {
             return;
         }
+        jdbc.update("DELETE FROM late_approval_refund");
         jdbc.update("DELETE FROM event_outbox");
         paymentServer.jdbc.update("DELETE FROM mock_refund_result");
         paymentServer.jdbc.update("DELETE FROM refund_execution");

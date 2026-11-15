@@ -89,7 +89,7 @@ public class OrderCreationService {
             PaymentGroupService paymentGroups,
             OrderTimeSource time,
             @org.springframework.beans.factory.annotation.Value(
-                            "${commercecore.order.expiration.duration:PT15M}")
+                            "${commercecore.order.expiration.duration:PT10M}")
                     java.time.Duration expiration) {
         this.orderRepository = orderRepository;
         this.trading = trading;
@@ -364,7 +364,7 @@ public class OrderCreationService {
     }
 
     private OrderCreationResult replayResult(Order order) {
-        if (order.getPaymentGroup() != null && order.getPaymentGroup().enforcesDeadline()) {
+        if (order.getPaymentGroup() != null) {
             paymentGroups.expire(order.getPaymentGroup().getId());
             return OrderCreationResult.replayed(
                     orderRepository.findById(order.getId()).orElseThrow());

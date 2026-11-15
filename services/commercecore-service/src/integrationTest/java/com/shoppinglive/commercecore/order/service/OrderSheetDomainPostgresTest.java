@@ -67,7 +67,7 @@ class OrderSheetDomainPostgresTest extends OrderSheetPostgresSupport {
         assertThat(lifecycle.expire(groupId(order))).isTrue();
         assertThat(lifecycle.expire(groupId(order))).isFalse();
         assertThat(available(501)).isEqualTo(20);
-        assertThat(sheets.get(MEMBER_A, order.orderNumber()).status()).isEqualTo("FAILED");
+        assertThat(sheets.get(MEMBER_A, order.orderNumber()).status()).isEqualTo("EXPIRED");
         assertNoFinancialExecution();
     }
 

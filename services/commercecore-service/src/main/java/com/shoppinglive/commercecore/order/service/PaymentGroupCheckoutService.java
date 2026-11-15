@@ -78,7 +78,7 @@ class PaymentGroupCheckoutService {
             PaymentGroupEventPublisher notificationEvents,
             OrderTimeSource time,
             @org.springframework.beans.factory.annotation.Value(
-                            "${commercecore.order.expiration.duration:PT15M}")
+                            "${commercecore.order.expiration.duration:PT10M}")
                     java.time.Duration expiration) {
         this.groups = groups;
         this.orders = orders;
@@ -354,6 +354,7 @@ class PaymentGroupCheckoutService {
                 g.getPayableAmount(),
                 g.getCouponId(),
                 g.getExpiresAt(),
+                g.getProcessingExpiresAt(),
                 orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream()
                         .map(OrderResponse::from)
                         .toList(),

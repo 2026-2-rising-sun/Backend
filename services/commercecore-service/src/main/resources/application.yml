@@ -54,7 +54,7 @@ commercecore:
     execution-enabled: true
   order:
     expiration:
-      duration: PT15M
+      duration: PT10M
   image:
     storage:
       dir: ${COMMERCECORE_IMAGE_DIR:${user.home}/.shoppinglive/commercecore-images}

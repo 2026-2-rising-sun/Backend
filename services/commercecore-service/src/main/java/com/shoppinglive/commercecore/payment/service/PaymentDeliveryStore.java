@@ -1,6 +1,7 @@
 package com.shoppinglive.commercecore.payment.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shoppinglive.commercecore.order.service.OrderTimeSource;
 import com.shoppinglive.commercecore.payment.dto.*;
 import com.shoppinglive.commercecore.payment.entity.*;
 import com.shoppinglive.common.core.*;
@@ -16,10 +17,12 @@ import org.springframework.transaction.annotation.*;
 public class PaymentDeliveryStore {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final OrderTimeSource time;
 
-    public PaymentDeliveryStore(JdbcTemplate jdbc, ObjectMapper mapper) {
+    public PaymentDeliveryStore(JdbcTemplate jdbc, ObjectMapper mapper, OrderTimeSource time) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.time = time;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -31,7 +34,7 @@ public class PaymentDeliveryStore {
             String key,
             PaymentScenario scenario) {
         String requestId = UUID.randomUUID().toString();
-        Instant now = Instant.now();
+        Instant now = time.now();
         long id =
                 insert(
                         requestId, "PAYMENT", orderId, groupId, number, amount, key, null, null,
@@ -76,7 +79,7 @@ public class PaymentDeliveryStore {
                         "refund-" + refundId,
                         paymentId,
                         refundId,
-                        Instant.now());
+                        time.now());
         jdbc.update(
                 "UPDATE payment_delivery_request SET command=? WHERE id=?",
                 json(
@@ -211,14 +214,14 @@ public class PaymentDeliveryStore {
                 "UPDATE payment_delivery_request SET result=?,status=?,next_action_at=? WHERE id=? AND status IN ('PROCESSING','UNKNOWN')",
                 json(result),
                 status,
-                Timestamp.from(Instant.now().plusSeconds(1)),
+                Timestamp.from(time.now().plusSeconds(1)),
                 d.id());
     }
 
     public void delay(Delivery d) {
         jdbc.update(
                 "UPDATE payment_delivery_request SET next_action_at=? WHERE id=?",
-                Timestamp.from(Instant.now().plusSeconds(1)),
+                Timestamp.from(time.now().plusSeconds(1)),
                 d.id());
     }
 

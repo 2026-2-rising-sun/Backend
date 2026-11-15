@@ -40,6 +40,9 @@ public class PaymentGroup extends BaseEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Column(name = "processing_expires_at")
+    private Instant processingExpiresAt;
+
     @Column(name = "payment_id")
     private Long paymentId;
 
@@ -79,11 +82,6 @@ public class PaymentGroup extends BaseEntity {
         return policyVersion == 1;
     }
 
-    /** 공개 legacy 경로는 기존 정책0을 유지한다. 내부 주문서 도메인1만600초를 적용한다. */
-    public boolean enforcesDeadline() {
-        return policyVersion == 1;
-    }
-
     public void useOrderSheetPolicy() {
         policyVersion = 1;
     }
@@ -94,7 +92,7 @@ public class PaymentGroup extends BaseEntity {
     }
 
     public void expireOrderSheet() {
-        status = OrderStatus.FAILED;
+        status = OrderStatus.EXPIRED;
         failureReason = "EXPIRED";
     }
 
@@ -187,6 +185,27 @@ public class PaymentGroup extends BaseEntity {
 
     public Instant getExpiresAt() {
         return expiresAt;
+    }
+
+    public Instant getProcessingExpiresAt() {
+        return processingExpiresAt;
+    }
+
+    public Instant paymentDeadline() {
+        return status == OrderStatus.PAYMENT_CONFIRMING ? processingExpiresAt : expiresAt;
+    }
+
+    public boolean paymentDeadlineReached(Instant now) {
+        Instant deadline = paymentDeadline();
+        return deadline != null && !deadline.isAfter(now);
+    }
+
+    /** 승인 실행을 처음 접수할 때만 처리 기한을 정한다. 생성 기한은 바꾸지 않는다. */
+    public void beginProcessing(Instant now) {
+        if (status != OrderStatus.PENDING_PAYMENT || !expiresAt.isAfter(now))
+            throw new IllegalStateException("결제를 시작할 수 없는 주문입니다.");
+        processingExpiresAt = now.plusSeconds(600);
+        status = OrderStatus.PAYMENT_CONFIRMING;
     }
 
     public Long getPaymentId() {

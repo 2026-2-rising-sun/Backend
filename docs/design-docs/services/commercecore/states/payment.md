@@ -8,7 +8,7 @@
 
 ## 범위와 불변조건
 
-Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·결과 사본이다. 커밋 후 전달하며 복구 스케줄러가 같은 원문을 재전달한다. terminal 이후 늦은 PROCESSING/UNKNOWN으로 덮어쓰지 않는다. PENDING·TIMEOUT 호환 값은 신규 흐름에 그리지 않는다.
+Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·결과 사본이다. 커밋 후 전달하며 복구 스케줄러가 같은 원문을 재전달한다. terminal 이후 늦은 PROCESSING/UNKNOWN으로 덮어쓰지 않는다. 전달 생성/재시도 시각과 due 조회는 같은 DB시각을 사용해 JVM 시각 차이로 새 요청이 미래로 보이는 일을 막는다. PENDING·TIMEOUT 호환 값은 신규 흐름에 그리지 않는다.
 
 ## 전이
 
@@ -18,7 +18,7 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 | PROCESSING | UNKNOWN | Payment가 유효한 미확정 결과를 반환하면 저장한다. 전송 예외만으로 확정 실패를 만들지 않는다. |
 | UNKNOWN | PROCESSING | Payment가 원문과 일치하는 PROCESSING 응답을 반환하면 미확정 스냅샷을 갱신할 수 있다. |
 | PROCESSING | SUCCESS | requestId·결제/주문/묶음 ID·금액·시각을 검증한 확정 결과를 주문 처리와 같은 트랜잭션에 기록한다. |
-| UNKNOWN | SUCCESS | 재전달·조회·이벤트로 확정 결과를 확인하면 주문 성공과 함께 반영한다. |
+| UNKNOWN | SUCCESS | 재전달·조회·이벤트로 확정 결과를 확인하면 기한 내 주문 성공 또는 기한 후 환불 필요 사실과 함께 반영한다. |
 | PROCESSING | FAILED | 동일 원문의 확정 실패만 반영한다. |
 | UNKNOWN | FAILED | 조회로 확정 실패를 확인한 경우. 단순 통신 시간 초과와 구분한다. |
 
@@ -33,6 +33,6 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
-## 2026-11-15 현재 PR 경계
+## 2026-11-16 현재 PR 경계
 
-공개 legacy는기존dev 계약과 기본15분/확인중호환을유지하고수량명령은SKU원본을쓴다. 내부주문서의스냅샷·선점·로컬PENDING600초만남기며신규공개주문서/금전/종료·보상/수량환불어댑터와legacy600초확대분은미완으로분리했다. PENDING600초·실행진입부터PROCESSING별도600초는최신사용자요구지만새상태/타이머·UNKNOWN종료계약은미구현/연동미확정이다. 전체설계미충족·머지불가다. [현재Order범위](../../../commercecore/order/설계.md) · [후속인계](../../../../exec-plans/active/331-order-audit-fixes/payment-handoff.md)
+새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.

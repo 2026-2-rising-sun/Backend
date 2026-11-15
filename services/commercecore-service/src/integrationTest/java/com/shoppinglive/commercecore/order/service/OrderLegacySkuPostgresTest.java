@@ -44,7 +44,7 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("단일SKU 구API는 현재SKU 가격·재고와 기존15분 계약을 사용한다")
+    @DisplayName("단일SKU 구API는 현재SKU 가격·재고와 신규600초 기한을 사용한다")
     void legacyCreationReadsSingleSkuSource() {
         assertThat(quote.preview(101L, 2).unitPrice()).isEqualTo(4000);
         var order = legacy("legacy");
@@ -59,7 +59,7 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
                         jdbc.queryForObject(
                                 "SELECT EXTRACT(EPOCH FROM expires_at-created_at)::BIGINT FROM payment_group",
                                 Long.class))
-                .isBetween(899L, 900L);
+                .isBetween(599L, 600L);
         assertThatThrownBy(() -> create(1)).isInstanceOf(BusinessException.class);
         assertThat(legacy("legacy").getId()).isEqualTo(order.getId());
         assertThat(

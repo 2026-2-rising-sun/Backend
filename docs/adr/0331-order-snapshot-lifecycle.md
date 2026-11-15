@@ -71,3 +71,18 @@ Payment 추가 변경과 종속 Core 연동은 사용자 범위 정정에 따라
 ## 2026-11-15 최신 기한 요구와 미구현
 
 사용자 직접 확정은 PENDING 생성부터600초, 실제 실행 진입부터 PAYMENT_PROCESSING 별도600초다. 준비데이터 생성/재전송으로 실행기한을 시작·연장하지 않는다. PROCESSING 만료가 PG실패확정·즉시해제 승인은 아니며 UNKNOWN의 종료/조회/보상계약은 별도 정의가 필요하다. 내부PENDING600초 외 새상태/실행타이머·공개금전연동·legacy기한확대는 현재 미충족이다. [현재계획](../exec-plans/active/331-order-audit-fixes/README.md) · [CommerceCore측인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 기존시스템을넘어Payment를수정하지않고전체설계완료/머지가능으로표시하지않는다.
+
+## 2026-11-16 별도 처리 기한과 Commerce 소유 경계
+
+결정 상태: 채택. 앞 절의 "PROCESSING 만료 시 해제 미확정"은 아래 사용자 확정으로 대체한다. 구현 전체 완료를 뜻하지 않는다.
+
+- 공개·DB 상태명 `PENDING_PAYMENT`와 `PAYMENT_CONFIRMING`은 호환 보존하며 의미는 각각 PENDING과 PROCESSING이다. 새 enum 값이나 기존 상태 일괄 변환을 추가하지 않는다.
+- 새 주문은 생성부터600초다. 저장된 `expires_at`은 유지한다. 실제 승인 실행을 처음 접수할 때 `processing_expires_at=DB시각+600초`와 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 재시도는 같은 requestId를 쓰며 기한을 연장하지 않는다.
+- 준비 데이터 생성은 PENDING을 유지해야 한다. 현재 공개 legacy는 준비 API 없이 실행을 접수한다. 팀원 Payment 생성·승인 중계로 교체하는 작업은 미완이다.
+- PROCESSING 기한 도달은 주문 EXPIRED와 재고·쿠폰 선점해제다. Payment 실패 확정은 아니다. 잠금 뒤 DB시각으로 판정하고, 스케줄러보다 승인 결과가 먼저 와도 만료를 먼저 적용한다.
+- 만료·취소 뒤 성공은 주문을 복구하지 않는다. `late_approval_refund`에 `late-{paymentId}`로 환불 필요 사실을 결과와 함께 저장한다. 현재 REQUIRED는 환불 접수·Kafka 전달·환불 완료가 아니다.
+- 목표는 환불 필요 사실과 `RefundRequested(LATE_APPROVAL)` outbox를 같은 트랜잭션에 저장하고 환불 결과를 소비하는 것이다. 팀원 실제 계약/소비자가 아직 없어 이번 독립 구현은 REQUIRED 기록까지만 제공한다. 주문 종료 API나 Payment 제어 행은 만들지 않는다.
+- Core HTTP 전달 기록의 생성/재시도도 due 조회와 같은 DB시각을 쓴다. JVM시각을 섞지 않는다.
+- V105는 컬럼과 Core 환불 필요 테이블만 추가한다. 기존 확인중 정책0/1/2의 시작시각을 추측하거나 타이머를 소급 적용하지 않는다. 해당 행의 운영 이행과 이미 다른 V104를 적용한 환경의 체크섬 문제는 미완이다.
+
+[현재 작업·계약 조사](../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 결과](../worklog/2026-11-16.md)

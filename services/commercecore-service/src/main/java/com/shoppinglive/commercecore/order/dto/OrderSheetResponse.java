@@ -14,6 +14,7 @@ public record OrderSheetResponse(
         long discountAmount,
         long payableAmount,
         Instant expiresAt,
+        Instant processingExpiresAt,
         Long paymentId,
         String couponId,
         Long couponOrderItemId,
@@ -21,7 +22,8 @@ public record OrderSheetResponse(
     public static OrderSheetResponse from(PaymentGroup group, List<Order> items) {
         String status =
                 switch (group.getStatus()) {
-                    case PENDING_PAYMENT, PAYMENT_CONFIRMING -> "PENDING";
+                    case PENDING_PAYMENT -> "PENDING";
+                    case PAYMENT_CONFIRMING -> "PROCESSING";
                     default -> group.getStatus().name();
                 };
         return new OrderSheetResponse(
@@ -32,6 +34,7 @@ public record OrderSheetResponse(
                 group.getDiscountAmount(),
                 group.getPayableAmount(),
                 group.getExpiresAt(),
+                group.getProcessingExpiresAt(),
                 group.getPaymentId(),
                 group.getCouponId(),
                 group.getCouponOrderItemId(),
