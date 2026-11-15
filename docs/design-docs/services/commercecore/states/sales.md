@@ -8,7 +8,7 @@
 
 ## 범위와 불변조건
 
-SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생성 전용이며 돌아갈 수 없다. SOLD_OUT은 ON_SALE이고 available=0일 때만 외부에 표시하는 호환 enum이다. 판매 시작은 초기 재고0에서도 가능하다. Product 전체 허용·미삭제와 SKU 상태·available을 함께 확인해 신규 주문을 판단한다. Product 전체 중지/재개는 SKU 상태나 수량을 덮어쓰지 않는다.
+SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생성 전용이며 돌아갈 수 없다. SOLD_OUT은 ON_SALE이고 available=0일 때만 외부에 표시하는 호환 enum이다. 현재 기술 동작은 초기 재고0에서도 판매 시작이 가능하다. 이 성공/거절 정책은 직접 사용자 답변 대기 중이며 이번 수정에서는 바꾸지 않는다. Product 전체 허용·미삭제와 SKU 상태·available을 함께 확인해 신규 주문을 판단한다. Product 전체 중지/재개는 SKU 상태나 수량을 덮어쓰지 않는다.
 
 ## 전이
 
@@ -36,3 +36,5 @@ SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생
 - [실행 계획·결과](../../../../exec-plans/active/334-sku-module/README.md)
 
 기존 SalesService/RegistrationService·테이블은 이 브랜치의 전환 전 Order 호환·이력용이다. 판매 HTTP와 Product 판매 조회는 이 경로를 사용하지 않는다. 최종 Order/Cart 통합·실제 브로커 검증은 후행 PR에서 확인하며 이 중간 브랜치를 독립 배포하지 않는다.
+
+통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 예약 해제 공간과 환불 복구 상한은 [SKU 수량 상세](../../../commercecore/sku/상태관리도.md#정수-범위와-남은-제한)를 따른다.
