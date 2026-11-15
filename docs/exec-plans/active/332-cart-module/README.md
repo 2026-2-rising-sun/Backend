@@ -103,9 +103,11 @@ Cart 브랜치 YAML은 이전 응답 스키마이고 실제 Cart 조각은 후�
 
 사용자가 최종 감사 결함의 구현·검증·커밋·push·Draft PR 반영을 승인했다. Cart 독립 `6f9dda99`와 최종 Order 통합 감사 `5048413b`를 구분한다. [Order 완료 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)은 그 시점의 기존 범위를 설명하고, 더 넓은 감사의 별도 실패/소비자 결함은 이번 후속 기록으로 연결한다. 과거 워크로그를 현재 결과로 바꾸지 않는다.
 
-- [ ] Frontend 격리 `fix/cart-product-group-compat`에서 그룹 응답의 상품·Cart·SKU 식별자/수량/version/가격을 보존하고 현재 단일 SKU 흐름을 복구한다.
-- [ ] 실제 Backend 응답과 브라우저에서 조회/선택/수량 변경/삭제/쿠폰 견적/주문 호출을 검증한다. mock 테스트와 구분한다.
+- [x] Frontend 격리 `fix/cart-product-group-compat`에서 그룹 응답의 상품·Cart·SKU 식별자/수량/version/가격을 보존하고 현재 단일 SKU 흐름을 복구한다.
+- [x] 실제 Backend 응답과 브라우저에서 조회/선택/수량 변경/삭제/쿠폰 견적/주문 호출을 검증한다. mock 테스트와 구분한다.
 - [ ] 신규 주문서 cartItems 최대100개는 스키마 소유자인 Order가 계약·생성 HTML·100/101 경계를 보완한다. Cart 브랜치에 Order 스키마를 복제하지 않고 직접 SKU 상한도 추가하지 않는다.
-- [ ] SKU 검증 SHA를 일반 merge하고 영향 검증 뒤 Cart/Frontend 정확 SHA·Draft PR·CI를 인계한다. Order 역merge는 하지 않는다.
+- [x] SKU 검증 SHA를 일반 merge하고 영향 검증 뒤 Cart/Frontend 정확 SHA·Draft PR·CI를 인계한다. Order 역merge는 하지 않는다.
 
 미답변 담기 판매조건·재고0 판매시작·판매중지 공개노출은 현재 동작을 유지하며 사용자 확정으로 표시하지 않는다. #340/#345/#346 및 공개 다중 SKU·대표가·옵션 보류는 그대로다. 실제 실행·계약 소유 이전·검증 환경과 한계는 [2026-11-15 기록](../../../worklog/2026-11-15.md)에 남긴다.
+
+최종 독립 소비자 검증은 Order `d588f70a28730f1dff6030e72a43139b06802866` + Frontend `3abc8113ecd2f9770e1f1977b8bb8dcaef025c03`에서 실제 브라우저1건 통과했다. 신규 order-sheets 공개 API는 최종 축소 범위에서 제외되므로 max100 계약 과제는 Order의 후속 범위로 남는다. 기존 Cart API의 생성/조회/선택/수량/version/삭제/쿠폰견적/주문201과 정리는 확인했고 결제는 실행하지 않았다. 전체 통합·기한600/600 및 후속 정책까지 완료하지 않았으므로 계획은 active에 유지한다.
