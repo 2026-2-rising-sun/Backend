@@ -1,6 +1,8 @@
 # SKU 모듈 구현과 목표 설계
 
-상태: 기존 단일 SKU 판매 API·상품 조회를 SKU 원본으로 전환하고 통합 검증 중이다. Product `729d2d5f`를 일반 merge했다. 공개 다중 SKU 생성·조회/옵션 선택·대표가·가격 정렬은 보류다. 운영 배포 결과와 구분한다.
+통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+
+상태: 기존 단일 SKU 판매 API·상품 조회를 SKU 원본으로 전환했다. 최종 감사 후속의 모듈별 검사와 PR 상태는 [2026-11-15 기록](../../../worklog/2026-11-15-sku.md)을 따른다. Product `729d2d5f`를 일반 merge했다. 공개 다중 SKU 생성·조회/옵션 선택·대표가·가격 정렬은 보류다. 운영 배포 결과와 구분한다.
 
 - [ERD 원본](ERD.md) · [ERD HTML](ERD.html)
 - [판매 상태·수량 원본](상태관리도.md) · [상태 HTML](상태관리도.html)

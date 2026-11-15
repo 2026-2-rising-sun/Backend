@@ -1,6 +1,8 @@
 # #334 SKU 현재 가격·재고 통합 구현 계획
 
-상태: 단일 판매 API·Product 조회의 SKU 전환 검증 중 · 공개 다중 SKU 흐름 보류
+통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+
+상태: 단일 판매 API·Product 조회의 SKU 전환 구현 · 감사 결함 수정과 영향 검사 완료 · 공개 다중 SKU 흐름 보류
 
 2026-11-13 후속 구현 Task `task_65aabcea44d3`/`ctx_af90941ad5c7`를 시작했다. 사용자의 코드·MD/HTML 구현 지시가 아래 과거 착수 대기를 대체한다. Core V102·Catalog V3와 적용 순서는 코디네이터 기술 조정으로 배정됐다. 같은 세션 Sol Medium 적용은 코디네이터가 저장·재조회했다. [모듈 상세·ERD·상태 HTML](../../../design-docs/commercecore/sku/README.md)을 실제 코드와 함께 갱신한다.
 
@@ -254,3 +256,9 @@ PostgreSQL은 격리 DB와 COMMERCECORE_TEST_POSTGRES_ 환경 설정을 확인�
 
 
 최신 소스1a09aacd의 전체 하네스 재실행은 Gradle build 종료0·3분3초, Core152/295(외부Kafka2스킵)·Catalog12/82 실패/오류0이었다. Notification 비활성3건과 외부DB미실행까지 포함해 하네스는exit2/incomplete, 검사중diff변경없음이다. 별도 실제PG24건/H2 9건과 구분하며 최종 계약·거래 연계 전까지 [PR344](https://github.com/2026-2-rising-sun/Backend/pull/344)는 Draft로 유지한다.
+
+## 2026-11-15 최종 감사 후속 수정
+
+Catalog 목록의 복수 SKU 차단 우회와 재고 보충에 의한 예약 해제 공간 침범을 수정한다. 기존 주문 결제 허용 답변을 유지하고 재고0 시작·중지상품 노출·Cart 담기 미답변 정책은 바꾸지 않는다. 이전 검증 수와 당시 후행통합 대기는 역사 기록으로 남기며 현재 통합 감사 기준은 상단 Order5048413b다. 이 브랜치는 Order 역merge 없이 기존 Product→SKU stack을 보존한다. 공개 다중 SKU/옵션/대표가가 보류이므로 전체 목표를 완료로 옮기지 않는다.
+
+실제 검사·실패·수정·PR 결과는 [2026-11-15 기록](../../../worklog/2026-11-15-sku.md)으로 이어진다.

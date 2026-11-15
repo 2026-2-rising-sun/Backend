@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `cc91c09b` 위 Product #333 구현. Core V101·Catalog V2 SQL과 Java 매핑을 설명한다. 이 문서는 운영 DB 적용 결과가 아니다. SKU는 #334의 제공 포트/목표 관계이며 아직 이 브랜치에 V102가 통합되지 않았다.
+기준: `cc91c09b` 위 Product #333 구현. Core V101·Catalog V2 SQL과 Java 매핑을 설명한다. 이 문서는 운영 DB 적용 결과가 아니다. SKU V102도 이 브랜치에 통합돼 있으며 Product 체크포인트의 목표 관계를 현재 저장/내부 포트로 구현했다. 공개 다중 SKU 계약은 보류다.
 
 [시각 자료](ERD.html)
 
@@ -15,7 +15,7 @@
 | Core product | id BIGINT PK; name VARCHAR(100); description VARCHAR(2000); main_image_id BIGINT; seller_id VARCHAR(36); category VARCHAR(32); sale_enabled BOOLEAN; deleted_at TIMESTAMPTZ; version BIGINT; 감사시각 | main_image_id NOT NULL·인덱스 유지, idempotency_key UNIQUE 유지. 신규 sale_enabled=false, 기존 행 true 보존. 삭제 시 전체 false CHECK. [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) · [V101](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql) |
 | Core product_image | id BIGINT PK; storage_key UNIQUE; content_type; size_bytes; width/height | 상품에 파일을 복사하지 않고 이미지 ID로 참조한다. V101에서 이미지 FK만 제거한다. 상품 삭제/대표 이미지 변경으로 공유 파일을 삭제하지 않는다. |
 | Catalog product | Core id PK; 공통 표현·이미지 URL·seller/category; sale_enabled; deleted_at; version; 원본 감사시각 | 사본이며 원본 쓰기 API가 아니다. 더 큰 version만 반영하고 삭제 사실은 보존한다. 구형 이벤트의 생략된 제어 필드는 true/null. [V2](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql) |
-| Core event_outbox | event_id UNIQUE; aggregate_id; payload; 전달·재시도 필드 | 실제 Product 변경과 같은 트랜잭션. 전체 snapshot에 saleEnabled/deletedAt 포함. [생산자](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/event/ProductInfoEventPublisher.java) |
+| Core event_outbox | event_id UNIQUE; message_key; payload; 전달·재시도 필드 | 실제 Product 변경과 같은 트랜잭션. 전체 snapshot에 saleEnabled/deletedAt 포함. [생산자](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/event/ProductInfoEventPublisher.java) |
 | SKU — #334 통합 목표 | id BIGINT PK; product_id BIGINT; 현재 price; available/reserved; 개별 sale_status; version | Product 한 개에 0..N개. 옵션 없는 실제 판매 단위도 기본 SKU 사용. FK 없음. 이 테이블 SQL/가격·수량 갱신은 SKU 담당 소유다. |
 
 ## 관계
@@ -42,3 +42,5 @@
 - [현재 서비스 ERD](../../services/commercecore/erd.md) · [상태 원본](상태관리도.md) · [실제 실행 기록](../../../worklog/2026-11-13.md)
 
 테스트 경로와 실제 통과는 구분한다. H2는 업무·원자성 회귀, PostgreSQL은 공유 잠금/경합·V101/V2 이행 증거다. HTML은 설명 자료이며 DB·브로커 실행 증거가 아니다.
+
+Product 이벤트 envelope의 논리 aggregateId는 Core Outbox의 물리 message_key로 저장한다. aggregate_id 열이 있다는 뜻이 아니다. 통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
