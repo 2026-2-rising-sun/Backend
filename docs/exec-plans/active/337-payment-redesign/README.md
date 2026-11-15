@@ -5,7 +5,7 @@
 관련 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md) · [환불](../../../requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)
 Phase 문서: [Phase 1 결제 1차](phase1-payment.md)
-자료: [목표 설계와 작은 판단](decision.md) · [Payment 목표 설계](../../../design-docs/services/payment/design.html) (그림·예시 자료. 원본은 요구사항 MD와 ADR이다)
+자료: [목표 설계와 작은 판단](decision.md) · [Payment 도메인 홈](../../../design-docs/services/payment/README.md)(새 설계와 현재 코드 문서 목록) · [목표 설계](../../../design-docs/services/payment/design.html)(그림·예시. 원본은 요구사항 MD와 ADR)
 
 ## 목표와 범위
 
