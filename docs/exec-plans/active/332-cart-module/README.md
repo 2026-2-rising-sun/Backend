@@ -1,6 +1,6 @@
 # #332 Cart 모듈 구현 계획
 
-상태: Cart 독립 구현·선행 통합 검증 완료 · 후행 Order 전체 거래 검증 대기
+상태: Cart 독립 구현·Order 통합 반영 · 최종 감사의 소비자/API 호환 보완 진행 중
 
 자료: [설계](../../../design-docs/commercecore/cart/설계.md) · [ADR](../../../adr/0332-cart-sku-boundary.md) · [ERD MD](../../../design-docs/commercecore/cart/ERD.md) · [ERD HTML](../../../design-docs/commercecore/cart/ERD.html) · [워크로그](../../../worklog/2026-11-13.md) · [이슈 #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 정책 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
@@ -98,3 +98,14 @@ PostgreSQL 성공 정리와 수량 변경 경합 테스트를 추가하고 실�
 공통 HTML 모바일 select 폭 문제는 단일 담당 배정에 따라 `ae903c3d`에서 원본 CSS만 보완하고 설계28/API6개를 재생성했다. 문서 하네스46·문서127·생성물 최신성이 통과했고 실제390px 페이지폭390/select경계14~376/필터1÷17·1280px 정상·Cart 내부스크롤을 확인했다. SKU 문서 후속 `c0f3a52c`도 `bfe54902`로 일반 merge했다. 이 문서 후속들에는 Java/SQL/계약 원본 diff가 없어 `8397dca2`의 코드 검증을 재사용한다.
 
 Cart 브랜치 YAML은 이전 응답 스키마이고 실제 Cart 조각은 후행 Order `c3d96569`에 통합됐다는 인계가 있다. 역merge나 임의 중복 적용 없이 최종 Order 통합 HEAD에서 계약/소비자/거래를 검증한다. #340의 새 연결·편집 제한 정책은 계속 보류다. 원문 FigJam465:1282의 확정 동작을 코드/테스트에 대조했고 구현 전 표기와 후속 쿠폰 결정은 구분해 코디네이터에 전달했다.
+
+### 2026-11-15 최종 감사 후속
+
+사용자가 최종 감사 결함의 구현·검증·커밋·push·Draft PR 반영을 승인했다. Cart 독립 `6f9dda99`와 최종 Order 통합 감사 `5048413b`를 구분한다. [Order 완료 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)은 그 시점의 기존 범위를 설명하고, 더 넓은 감사의 별도 실패/소비자 결함은 이번 후속 기록으로 연결한다. 과거 워크로그를 현재 결과로 바꾸지 않는다.
+
+- [ ] Frontend 격리 `fix/cart-product-group-compat`에서 그룹 응답의 상품·Cart·SKU 식별자/수량/version/가격을 보존하고 현재 단일 SKU 흐름을 복구한다.
+- [ ] 실제 Backend 응답과 브라우저에서 조회/선택/수량 변경/삭제/쿠폰 견적/주문 호출을 검증한다. mock 테스트와 구분한다.
+- [ ] 신규 주문서 cartItems 최대100개는 스키마 소유자인 Order가 계약·생성 HTML·100/101 경계를 보완한다. Cart 브랜치에 Order 스키마를 복제하지 않고 직접 SKU 상한도 추가하지 않는다.
+- [ ] SKU 검증 SHA를 일반 merge하고 영향 검증 뒤 Cart/Frontend 정확 SHA·Draft PR·CI를 인계한다. Order 역merge는 하지 않는다.
+
+미답변 담기 판매조건·재고0 판매시작·판매중지 공개노출은 현재 동작을 유지하며 사용자 확정으로 표시하지 않는다. #340/#345/#346 및 공개 다중 SKU·대표가·옵션 보류는 그대로다. 실제 실행·계약 소유 이전·검증 환경과 한계는 [2026-11-15 기록](../../../worklog/2026-11-15.md)에 남긴다.
