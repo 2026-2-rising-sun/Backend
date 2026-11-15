@@ -21,8 +21,8 @@
 ## 구성 요소
 
 ```text
-payment/controller   ApprovalController            POST /v1/internal/payments/{orderRef}/approval
-payment/service      ApprovalService               start(①검증·APPROVING) · process(②토스 → ③반영). 8초 대기는 PR6
+payment/controller   ApprovalController            POST /v1/internal/payments/{orderRef}/approval. ①을 부르고 ②③을 가상 스레드에 넘겨 8초 대기
+payment/service      ApprovalService               start(①검증·APPROVING) · process(②토스 → ③반영)
                      PaymentOutcomeService         ③반영 함수들: insertCall · applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
 client/toss          TossPaymentsClient            confirm · getPayment · cancel. 결과 분류(TossResult)
 ledger/service       LedgerService                 record(refType, refId, lines) → boolean. 호출자 트랜잭션에 참여
@@ -160,9 +160,10 @@ UPDATE payment
 
 ### 8초 대기 (PAY-CONFIRM-11)
 
-- 요청 스레드는 ②③ 작업을 `Executors.newVirtualThreadPerTaskExecutor()`(Java 21)로 넘기고 `future.get(8, SECONDS)`로 기다린다.
-- 8초 안에 끝나면 ③의 응답을 준다. 넘으면 **202 `{paymentId, status: PENDING}`**과 헤더 `Location: /v1/internal/payments/{orderRef}`를 주고, 작업은 계속 돈다(결과는 이벤트로 나간다).
-- 설정: `payment.approval.response-wait` 기본 `8s`(제안).
+- 요청 스레드는 ①을 직접 하고, ②③ 작업을 `Executors.newVirtualThreadPerTaskExecutor()`(Java 21)로 넘겨 `future.get(남은 시간)`으로 기다린다. **8초는 컨트롤러 진입 시각부터 잰다**(①에 걸린 시간을 뺀다). 실행기는 컨트롤러 필드다. `Executor` 빈으로 두면 Boot 기본 작업 실행기가 물러나기 때문이다. 종료 때 `shutdown()`만 하고 기다리지 않는다(끝나지 못한 결제는 APPROVING에 남아 #349가 확정한다).
+- 8초 안에 끝나면 ③의 응답을 준다. 넘으면 **202 `{paymentId, status: PENDING}`**과 헤더 `Location: /v1/internal/payments/{orderRef}`를 주고, 작업은 계속 돈다(결과는 이벤트로 나간다). 타임아웃 때 `future.cancel`을 부르지 않는다(인터럽트가 토스 호출·반영을 끊지 않게).
+- ②③에서 예외가 나면(DB 장애 등) 작업 안에서 ERROR 로그를 남기고 요청에는 202로 답한다. 결제는 처리 중(APPROVING)이므로 "APPROVING·UNKNOWN은 외부에 PENDING" 결정과 같다(2026-11-16 구현 때 정함). 200은 ③이 커밋한 뒤에만 나가므로 "DB는 APPROVED인데 응답은 202"는 생겨도 반대는 생기지 않는다.
+- 설정: `payment.approval.response-wait` 기본 `8s`(`ApprovalProperties`). ①이 DB 연결 대기 등으로 늦어지는 시간은 이 대기로 막지 못한다.
 - 동시 실행 수 제한은 두지 않는다(벌크헤드 범위 밖). ADR 0337-5의 "크기를 제한한 별도 스레드 풀" 문장은 이 결정에 맞게 정정 메모를 단다(이 PR).
 
 ### 응답 예시
@@ -255,7 +256,7 @@ payload:
 | PAY-CONFIRM-01–03 | `ApprovalValidationTest`(토스 호출 0번 검증) | 통합 |
 | PAY-CONFIRM-04, 05 | `ApprovalConcurrencyPostgresTest`(동시 2건 → 토스 1번) | `@Tag("postgres")` |
 | PAY-CONFIRM-06–10, 12 | `ApprovalOutcomePostgresTest`(결과 5종 × 상태·pg_call·분개·outbox 행 수) | `@Tag("postgres")` |
-| PAY-CONFIRM-11 | `ApprovalResponseWaitTest`(토스 지연 → 202 + Location, 이후 APPROVED) | 통합 |
+| PAY-CONFIRM-01–03, 05–11 (HTTP) | `ApprovalApiTest`(H2, 대기 300ms: 응답 코드·본문, 토스 지연 → 202 + Location → APPROVED·CREATED, 대기 중 DB 연결 0), `ApprovalApiPostgresTest`(UNKNOWN 202, 보상 취소 409, 지연 뒤 UNKNOWN·APPROVED), `ApprovalPropertiesTest`(기본 8초 < 10초) | 통합 · `@Tag("postgres")` · 단위 |
 | PAY-EVENT-01–02 | `PaymentApprovedContractTest`(표본 생성) | 단위 |
 
 토스는 항상 `MockRestServiceServer` 또는 테스트 대역으로 대체한다. 실제 토스 테스트 키 호출은 Phase 2 끝의 수동 확인에서 한다.
