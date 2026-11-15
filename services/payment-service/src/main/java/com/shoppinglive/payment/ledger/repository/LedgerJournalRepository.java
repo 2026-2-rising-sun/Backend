@@ -8,10 +8,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/** 분개 머리는 넣고 읽기만 한다. {@code JpaRepository}의 삭제 메서드를 물려받지 않으려고 {@link Repository}를 쓴다(LED-05). */
+/**
+ * 분개 머리는 넣고 읽기만 한다. {@code JpaRepository}의 삭제 메서드를 물려받지 않으려고 {@link Repository}를 쓴다(LED-05). 머리는
+ * {@link #insertIfAbsent}로만 넣는다(save는 PostgreSQL UNIQUE 예외로 트랜잭션을 중단시킬 수 있다).
+ */
 public interface LedgerJournalRepository extends Repository<LedgerJournal, Long> {
-    LedgerJournal save(LedgerJournal journal);
-
     Optional<LedgerJournal> findByRefTypeAndRefId(LedgerRefType refType, String refId);
 
     /**

@@ -1,7 +1,9 @@
 package com.shoppinglive.payment;
 
 import static com.shoppinglive.payment.ledger.entity.LedgerAccount.BUYER_DEPOSIT;
+import static com.shoppinglive.payment.ledger.entity.LedgerAccount.COMMISSION_REVENUE;
 import static com.shoppinglive.payment.ledger.entity.LedgerAccount.PG_CUSTODY;
+import static com.shoppinglive.payment.ledger.entity.LedgerAccount.SELLER_PAYABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,6 +77,29 @@ class LedgerServiceTest extends PaymentApiTestSupport {
         assertThat(rows.get(1)).containsEntry("ACCOUNT", "BUYER_DEPOSIT");
         assertThat(((Number) rows.get(1).get("DEBIT")).longValue()).isZero();
         assertThat(((Number) rows.get(1).get("CREDIT")).longValue()).isEqualTo(30000L);
+    }
+
+    @Test
+    @DisplayName("[LED-02] 판매자 미지급금 줄은 판매자 ID와 함께 저장된다")
+    void storesSellerId() {
+        String refId = newRefId();
+
+        tx.execute(
+                s ->
+                        ledger.record(
+                                LedgerRefType.PURCHASE_CONFIRMED,
+                                refId,
+                                List.of(
+                                        new Line(BUYER_DEPOSIT, 30000, 0, null),
+                                        new Line(SELLER_PAYABLE, 0, 27000, SELLER),
+                                        new Line(COMMISSION_REVENUE, 0, 3000, null))));
+
+        List<Map<String, Object>> rows = entries(refId);
+        assertThat(rows).hasSize(3);
+        assertThat(rows.get(1))
+                .containsEntry("ACCOUNT", "SELLER_PAYABLE")
+                .containsEntry("SELLER_ID", SELLER);
+        assertThat(rows.get(2).get("SELLER_ID")).isNull();
     }
 
     @Test
@@ -182,14 +206,10 @@ class LedgerServiceTest extends PaymentApiTestSupport {
                                 .filter(m -> Modifier.isPublic(m.getModifiers()))
                                 .map(Method::getName))
                 .containsExactly("record");
-        assertThat(
-                        Stream.of(LedgerJournalRepository.class, LedgerEntryRepository.class)
-                                .flatMap(c -> Arrays.stream(c.getMethods()))
-                                .map(Method::getName))
-                .noneMatch(
-                        n ->
-                                n.startsWith("delete")
-                                        || n.startsWith("update")
-                                        || n.startsWith("remove"));
+        // 허용 목록과 정확히 같아야 한다. 쓰기 메서드가 새로 생기면 여기서 걸린다
+        assertThat(Arrays.stream(LedgerJournalRepository.class.getMethods()).map(Method::getName))
+                .containsExactlyInAnyOrder("insertIfAbsent", "findByRefTypeAndRefId");
+        assertThat(Arrays.stream(LedgerEntryRepository.class.getMethods()).map(Method::getName))
+                .containsExactlyInAnyOrder("save", "saveAll", "findByJournalId");
     }
 }

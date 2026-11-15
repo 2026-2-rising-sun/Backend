@@ -62,7 +62,7 @@ class JournalTest {
                                         new Line(PG_CUSTODY, Long.MAX_VALUE, 0, null),
                                         new Line(PG_CUSTODY, Long.MAX_VALUE, 0, null),
                                         new Line(BUYER_DEPOSIT, 0, 1, null)))
-                .isInstanceOf(ArithmeticException.class);
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -127,5 +127,15 @@ class JournalTest {
                                         new Line(null, 1, 0, null),
                                         new Line(BUYER_DEPOSIT, 0, 1, null)))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    @DisplayName("[LED-02] 사건 ID나 판매자 ID가 빈 문자열이면 거절한다")
+    void blankIds() {
+        List<Line> lines =
+                List.of(new Line(PG_CUSTODY, 1, 0, null), new Line(BUYER_DEPOSIT, 0, 1, null));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new Journal(LedgerRefType.PAYMENT_APPROVED, " ", lines));
+        assertThatIllegalArgumentException().isThrownBy(() -> new Line(SELLER_PAYABLE, 0, 1, ""));
     }
 }
