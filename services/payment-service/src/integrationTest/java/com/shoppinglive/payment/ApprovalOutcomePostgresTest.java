@@ -30,11 +30,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 승인 ②③: 토스 결과별 상태·pg_call·분개·outbox. 토스 호출 중에는 트랜잭션이 없고 APPROVING이 이미 커밋돼 있어야 한다. */
+@ExtendWith(OutputCaptureExtension.class)
 class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     @Autowired TransactionTemplate tx;
 
@@ -141,6 +145,53 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:UNKNOWN");
         assertThat(journals(c.orderRef())).isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "[PAY-CONFIRM-07] 보상 취소가 거절되면 CANCELED는 두고 취소 기록에 결과 코드를 남기며 사람 확인용 ERROR 로그를 남긴다(자동 재시도 없음)")
+    void compensationFailureNeedsHuman(CapturedOutput output) {
+        ApproveCommand c = newPayment();
+        TossPayment wrongAmount =
+                new TossPayment(c.paymentKey(), c.pgOrderId(), "DONE", c.amount() + 1, null, true);
+        when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
+                .thenReturn(new TossResult.Success(wrongAmount));
+        when(toss.cancel(anyString(), anyString(), anyString()))
+                .thenReturn(new TossResult.Declined("NOT_CANCELABLE_PAYMENT", "취소할 수 없는 결제"));
+
+        assertThat(approvals.approve(c)).isInstanceOf(ApprovalResult.Closed.class);
+
+        long id = paymentId(c.orderRef());
+        assertThat(status(c.orderRef())).isEqualTo("CANCELED");
+        assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:DECLINED");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT result_code FROM pg_call WHERE payment_id = ? AND kind = 'CANCEL'",
+                                String.class,
+                                id))
+                .isEqualTo("NOT_CANCELABLE_PAYMENT");
+        verify(toss, times(1)).cancel(anyString(), anyString(), anyString());
+        assertThat(output.getAll())
+                .contains("[사람 확인 필요] 보상 취소가 확정되지 않았다: paymentId=" + id)
+                .contains("orderRef=" + c.orderRef())
+                .contains("paymentKey=" + c.paymentKey())
+                .contains("amount=30000");
+    }
+
+    @Test
+    @DisplayName("[PAY-CONFIRM-07] 보상 취소 직전에 다른 반영이 먼저 승인했으면 CANCELED로 선점하지 못하고 토스 취소를 부르지 않는다")
+    void compensationSkipsApprovedPayment() {
+        ApproveCommand c = newPayment();
+        when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
+                .thenReturn(new TossResult.Success(done(c)));
+        approvals.approve(c);
+        long id = paymentId(c.orderRef());
+
+        assertThat(outcomes.compensate(id, c.pgOrderId(), c.paymentKey())).isFalse();
+
+        assertThat(status(c.orderRef())).isEqualTo("APPROVED");
+        assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS");
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
     }
 
     @Test
@@ -337,7 +388,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(outboxRows(c.orderRef())).isEmpty();
 
         when(toss.cancel(anyString(), anyString(), anyString())).thenReturn(unknown());
-        outcomes.compensate(id, c.pgOrderId(), c.paymentKey());
+        assertThat(outcomes.compensate(id, c.pgOrderId(), c.paymentKey())).isTrue();
         verify(toss)
                 .cancel(
                         org.mockito.ArgumentMatchers.eq(c.paymentKey()),

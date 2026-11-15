@@ -141,36 +141,59 @@ public class PaymentOutcomeService {
     }
 
     /**
-     * 토스에서는 승인됐는데 우리가 승인으로 반영할 수 없는 결제를 전액 취소하고 CANCELED로 둔다(PAY-CONFIRM-07). 트랜잭션 밖에서 부른다.
+     * 토스에서는 승인됐는데 우리가 승인으로 반영할 수 없는 결제를 CANCELED로 선점한 뒤 전액 취소한다(PAY-CONFIRM-07). 트랜잭션 밖에서 부른다. 선점
+     * UPDATE가 0행이고 결제가 승인(이후) 상태면 다른 반영이 이겼으므로 취소하지 않고 false다. 취소가 성공이 아니면 자동 재시도 없이 사람이 확인한다(ERROR
+     * 로그).
      *
      * @param attemptPgOrderId 그 승인 시도의 pg_order_id. 결제 행의 값은 이미 비워졌을 수 있어 호출자가 들고 있는 값을 쓴다
      * @param paymentKey 취소할 토스 결제. 토스 응답의 paymentKey다
+     * @return true면 취소를 시도했고 결제는 CANCELED다. false면 결제가 이미 승인돼 취소하지 않았다
      */
-    public void compensate(long paymentId, String attemptPgOrderId, String paymentKey) {
+    public boolean compensate(long paymentId, String attemptPgOrderId, String paymentKey) {
         String key = "cancel-" + attemptPgOrderId;
         Long callId =
                 tx.execute(
-                        s ->
-                                pgCalls.save(
-                                                new PgCall(
-                                                        paymentId,
-                                                        PgCallKind.CANCEL,
-                                                        attemptPgOrderId,
-                                                        key))
-                                        .getId());
-        TossResult result = toss.cancel(paymentKey, COMPENSATION_REASON, key);
-        tx.executeWithoutResult(
-                s -> {
-                    record(Objects.requireNonNull(callId), result);
-                    if (payments.markCanceled(paymentId) == 0) {
-                        log.error(
-                                "보상 취소 뒤 결제를 CANCELED로 바꾸지 못했다(상태 확인 필요): paymentId={}", paymentId);
-                    }
-                });
-        if (!(result instanceof TossResult.Success)) {
-            // 감수: CANCELED로 두고 거래 대사가 다시 잡는다
-            log.error("보상 취소 결과가 확정되지 않았다: paymentId={}, result={}", paymentId, result);
+                        s -> {
+                            if (payments.markCanceled(paymentId) == 0) {
+                                PaymentStatus now =
+                                        payments.findById(paymentId).orElseThrow().getStatus();
+                                if (now != PaymentStatus.CANCELED) {
+                                    log.error(
+                                            "보상 취소 대상이 이미 {} 상태라 취소하지 않는다: paymentId={}",
+                                            now,
+                                            paymentId);
+                                    return null;
+                                }
+                            }
+                            return pgCalls.save(
+                                            new PgCall(
+                                                    paymentId,
+                                                    PgCallKind.CANCEL,
+                                                    attemptPgOrderId,
+                                                    key))
+                                    .getId();
+                        });
+        if (callId == null) {
+            return false;
         }
+        TossResult result = toss.cancel(paymentKey, COMPENSATION_REASON, key);
+        Payment payment =
+                tx.execute(
+                        s -> {
+                            record(callId, result);
+                            return payments.findById(paymentId).orElseThrow();
+                        });
+        if (!(result instanceof TossResult.Success)) {
+            // 감수: DB는 CANCELED인데 토스 결제는 남았을 수 있다. 자동 재시도 없이 사람이 확인한다
+            log.error(
+                    "[사람 확인 필요] 보상 취소가 확정되지 않았다: paymentId={}, orderRef={}, paymentKey={}, amount={}, result={}",
+                    paymentId,
+                    payment.getOrderRef(),
+                    paymentKey,
+                    payment.getAmount(),
+                    result);
+        }
+        return true;
     }
 
     private void revertToCreated(long paymentId) {

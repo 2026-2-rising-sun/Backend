@@ -57,7 +57,7 @@ public class ApprovalService {
             long paymentId, String paymentKey, String pgOrderId, long amount, long pgCallId)
             implements Start {
         String idempotencyKey() {
-            return "confirm-" + pgOrderId;
+            return confirmKey(pgOrderId);
         }
     }
 
@@ -116,6 +116,10 @@ public class ApprovalService {
         return new ApprovalResult.PgUnavailable(paymentId);
     }
 
+    private static String confirmKey(String pgOrderId) {
+        return "confirm-" + pgOrderId;
+    }
+
     private TossResult confirm(Attempt attempt) {
         return toss.confirm(
                 attempt.paymentKey(),
@@ -128,10 +132,13 @@ public class ApprovalService {
         if (outcomes.applyDone(attempt.paymentId(), callId, response)) {
             return new ApprovalResult.Approved(attempt.paymentId());
         }
-        // 응답의 paymentKey를 취소한다. 응답 불일치는 토스가 다른 결제를 승인했다는 뜻일 수 있다
+        // 응답의 paymentKey를 취소한다. 응답 불일치는 토스가 다른 결제를 승인했다는 뜻일 수 있다.
+        // 응답에 키가 없으면 보낸 키로 취소한다(돈이 움직인 뒤 예외로 끝내지 않는다)
         String target =
                 response.paymentKey() != null ? response.paymentKey() : attempt.paymentKey();
-        outcomes.compensate(attempt.paymentId(), attempt.pgOrderId(), target);
+        if (!outcomes.compensate(attempt.paymentId(), attempt.pgOrderId(), target)) {
+            return new ApprovalResult.Approved(attempt.paymentId()); // 다른 반영이 먼저 승인했다
+        }
         return new ApprovalResult.Closed(attempt.paymentId());
     }
 
@@ -160,7 +167,7 @@ public class ApprovalService {
             throw new PaymentException(
                     PaymentError.PAYMENT_CLOSED); // 여전히 CREATED면 만료(PAY-CONFIRM-03)
         }
-        String key = "confirm-" + command.pgOrderId();
+        String key = confirmKey(command.pgOrderId());
         long callId =
                 pgCalls.save(new PgCall(id, PgCallKind.CONFIRM, command.pgOrderId(), key)).getId();
         return new Attempt(

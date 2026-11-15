@@ -111,7 +111,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             nativeQuery = true)
     int markUnknown(@Param("id") long id);
 
-    /** 보상 취소 뒤. 승인·환불 상태는 건드리지 않는다. */
+    /** 보상 취소 전 선점. 이 UPDATE가 커밋되면 승인 반영(applyDone)이 0행이 된다. 승인·환불 상태는 건드리지 않는다. */
     @Modifying(clearAutomatically = true)
     @Query(
             value =
