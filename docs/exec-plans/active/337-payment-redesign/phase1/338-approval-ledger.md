@@ -78,8 +78,11 @@ HTTP 클라이언트는 Spring `RestClient`(+ JDK `HttpClient` 요청 팩토리)
 | HTTP 429 | `NotSent` | 호출 제한 |
 | HTTP 400 + code ∈ {`ALREADY_PROCESSED_PAYMENT`, `ALREADY_PROCESSING_REQUEST`}, HTTP 403 `FORBIDDEN_CONSECUTIVE_REQUEST` | `Unknown` | PAY-PG-02. 앞선 요청이 처리 중일 수 있다 |
 | 그 밖의 HTTP 4xx (카드 거절 403 `REJECT_CARD_COMPANY` 등 포함) | `Declined(code, message)` | PAY-PG-02 |
-| HTTP 200, 본문 `status = DONE` | `Success(payment)` | 값 검증은 ③에서 |
-| HTTP 200, 본문 파싱 실패 또는 `status ≠ DONE`(`IN_PROGRESS` 등) | `Unknown` | 조회로 확정한다. 보상 취소로 보내지 않는다 |
+| HTTP 200, 본문 `status`가 호출별 기대 상태 | `Success(payment)` | 값 검증은 ③에서 |
+| HTTP 200, 본문 파싱 실패 또는 `status`가 기대 상태가 아님(`IN_PROGRESS` 등) | `Unknown` | 조회로 확정한다. 보상 취소로 보내지 않는다 |
+| 그 밖의 HTTP 상태(1xx·3xx·200이 아닌 2xx) | `Unknown` | 분류하지 못한 응답 |
+
+200의 기대 상태는 호출마다 다르다. `confirm`은 `DONE`, `cancel`은 `CANCELED`(전액 취소)다. `getPayment`는 본문만 읽히면 어떤 `status`든 `Success`로 돌려주고 판단은 호출자(#349의 PAY-RECOVER-02–03)가 한다. 4xx·5xx·예외 줄은 세 호출에 같게 적용한다.
 
 > **요구사항 수정:** 기존 PAY-PG-01은 "401·403·429는 보내지 않음"이었다. 토스 승인 API는 카드 거절 대부분(`REJECT_CARD_PAYMENT`, `REJECT_CARD_COMPANY`, `FDS_ERROR` 등)을 **403**으로 준다([토스 오류 코드](https://docs.tosspayments.com/reference/error-codes), 2026-11-15 확인). 그대로 두면 카드 거절이 "결제사 연결 불가"로 보인다. 403은 위 2개 코드만 "보내지 않음"으로 보도록 요구사항 문장을 이 PR에서 함께 고친다. 돈 쪽 결과는 같다(둘 다 CREATED로 돌아간다). 바뀌는 것은 응답 코드(503 → 422)뿐이다.
 
