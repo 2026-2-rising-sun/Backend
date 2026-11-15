@@ -4,12 +4,12 @@
 
 ## 독립 범위
 
-- [ ] 신규legacy seller스냅샷/과거NULL불변소유자/삭제필터/판매자권한과정상거래회귀.
-- [ ] Product중지·삭제후기선점결제허용/신규차단 사용자확정회귀.
-- [ ] 내부1:N스냅샷·원자선점·동일키기한불변·PENDING600초·로컬만료반환.
-- [ ] 신규공개주문서·금전입구제외와legacyAPI우회실행불가·기존공개legacy유지.
-- [ ] Payment우리추가분원상분리·최신dev팀원변경보존·종료된어댑터테스트목록기록.
-- [ ] 최종소스 전체/실제PG/독립Kafka/Cart소비자·문서/브라우저·exactHEAD CI와한계기록.
+- [x] 신규legacy seller스냅샷/과거NULL불변소유자/삭제필터/판매자권한과정상거래회귀.
+- [x] Product중지·삭제후기선점결제허용/신규차단 사용자확정회귀.
+- [x] 내부1:N스냅샷·원자선점·동일키기한불변·PENDING600초·로컬만료반환.
+- [x] 신규공개주문서·금전입구제외와legacyAPI우회실행불가·기존공개legacy유지.
+- [x] Payment우리추가분원상분리·최신dev팀원변경보존·종료된어댑터테스트목록기록.
+- [x] 최종소스 전체/실제PG/독립Kafka/Cart소비자·문서/브라우저·exactHEAD CI와한계기록.
 
 ## 원래 설계 미충족 — 완료로 표시하지 않음
 
@@ -19,3 +19,14 @@
 - [ ] UNKNOWN 기한초과종료·조회·늦은승인보상계약과 실제수량환불/쿠폰복원어댑터.
 
 [후속요구·소유자/상태/기한표](payment-handoff.md) · [이전검증](../../completed/331-order-module/verification.md). PENDING/PROCESSING각600초는사용자직접결정이며Payment새설계구현권한은아니다. #340/#345/#346별도워크스페이스는미재개,Cart판매조건/0재고판매시작/중지공개노출은미답변이다. Draft유지·devmerge/배포금지·운영PG미검증.
+
+
+## 현재 범위의 실행 결과
+
+코드 검증 SHA `c81f5c2b0be35bbdc417438c1f9094925c23724c`, dev 기준 `df36802e`. `scripts/check.sh --base origin/dev --external` 최종고유JUnit task1339건 실패0·오류0·스킵0(실행820/동일입력UP-TO-DATE519, Member/Notification단위NO-SOURCE는0건). 단위·H2·실제PostgreSQL·외부Kafka를같은종류로합산해실제PG라고부르지않는다.
+
+전용Postgres업무197건(Catalog11/Core154/Live5/Payment기존27)·이행26건(Catalog3/Core23)이통과했다. Notification통합106에는별도조건부PG경합3건이포함되며중복합산하지않는다. 기본외부Kafka2건은H2생산DB+독립hostKafka다. 원본테스트/단언변경없이전용PG스키마+같은독립Kafka로추가2건도통과했고V104실제이행/판매Outbox7건published_at/실제소비를확인했다. 원격코드CI43703280065는658건 실패0/오류0/외부Kafka2스킵이며로컬외부증거와구분한다.
+
+첫전체9700f04c는고유937건중H2구기대1실패였고이벤트표본미실행이다. 실패/fixture준비오류와미커밋진단은보존했으며 dev원본legacy계약복원후최종1339와구분한다. 문서156/API6/설계30최신성 및390/1280브라우저를별도로검사했다. Cart실제앱은d588f70a에서CRUD/쿠폰견적/주문/취소·정리를확인했고결제0,묶음GET응답미캡처/샘플이미지404는성공으로세지않는다. d588이후생산소스·계약차이0(테스트메서드·문서만변경)으로재사용한다.
+
+이부분검증의통과는위의원래설계미충족체크박스를완료하지않는다. 계획은active로유지하며PR343 Draft·머지불가다. 이후문서기록커밋의정확HEAD CI/remote일치/clean은PR과최종인계보고에서다시확인한다.
