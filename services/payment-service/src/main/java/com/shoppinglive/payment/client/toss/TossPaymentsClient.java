@@ -23,6 +23,8 @@ public class TossPaymentsClient {
             Set.of("ALREADY_PROCESSED_PAYMENT", "ALREADY_PROCESSING_REQUEST");
     private static final String CONSECUTIVE_REQUEST_FORBIDDEN_CODE =
             "FORBIDDEN_CONSECUTIVE_REQUEST";
+    private static final String IDEMPOTENT_REQUEST_PROCESSING_CODE =
+            "IDEMPOTENT_REQUEST_PROCESSING";
 
     private static final Set<String> OUR_KEY_BAD_REQUEST_CODES = Set.of("INVALID_API_KEY");
 
@@ -135,7 +137,8 @@ public class TossPaymentsClient {
             return new TossResult.NotSent("HTTP " + statusCode + " " + code);
         }
         if ((statusCode == 400 && POSSIBLY_IN_FLIGHT_BAD_REQUEST_CODES.contains(code))
-                || (statusCode == 403 && CONSECUTIVE_REQUEST_FORBIDDEN_CODE.equals(code))) {
+                || (statusCode == 403 && CONSECUTIVE_REQUEST_FORBIDDEN_CODE.equals(code))
+                || (statusCode == 409 && IDEMPOTENT_REQUEST_PROCESSING_CODE.equals(code))) {
             return new TossResult.Unknown("HTTP " + statusCode + " " + code);
         }
         return new TossResult.Declined(code, error.message());
