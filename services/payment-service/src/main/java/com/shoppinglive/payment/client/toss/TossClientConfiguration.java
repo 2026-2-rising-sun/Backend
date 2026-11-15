@@ -3,6 +3,8 @@ package com.shoppinglive.payment.client.toss;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,8 +22,15 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties(TossProperties.class)
 public class TossClientConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(TossClientConfiguration.class);
+
     @Bean
     TossPaymentsClient tossPaymentsClient(RestClient.Builder builder, TossProperties properties) {
+        if (!StringUtils.hasText(properties.secretKey())) {
+            log.warn(
+                    "payment.toss.secret-key(PAYMENT_TOSS_SECRET_KEY)가 비어 있어 토스를 호출하지 않고 모든 호출을 NotSent로 돌려준다.");
+            return TossPaymentsClient.withoutSecretKey();
+        }
         return new TossPaymentsClient(configure(builder.clone(), properties).build());
     }
 
@@ -29,10 +38,6 @@ public class TossClientConfiguration {
         if (!StringUtils.hasText(properties.baseUrl())) {
             throw new IllegalStateException(
                     "payment.toss.base-url(PAYMENT_TOSS_BASE_URL) 설정이 필요합니다.");
-        }
-        if (!StringUtils.hasText(properties.secretKey())) {
-            throw new IllegalStateException(
-                    "payment.toss.secret-key(PAYMENT_TOSS_SECRET_KEY) 설정이 필요합니다.");
         }
         HttpClient httpClient =
                 HttpClient.newBuilder().connectTimeout(properties.connectTimeout()).build();

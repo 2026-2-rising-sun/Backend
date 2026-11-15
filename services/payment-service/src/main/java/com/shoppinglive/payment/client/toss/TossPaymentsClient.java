@@ -6,6 +6,7 @@ import java.net.ConnectException;
 import java.net.http.HttpConnectTimeoutException;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -23,53 +24,68 @@ public class TossPaymentsClient {
     private static final String CONSECUTIVE_REQUEST_FORBIDDEN_CODE =
             "FORBIDDEN_CONSECUTIVE_REQUEST";
 
+    private static final Set<String> OUR_KEY_BAD_REQUEST_CODES = Set.of("INVALID_API_KEY");
+
+    /** null이면 시크릿 키가 없어 토스를 호출하지 않는다. */
     private final RestClient restClient;
 
     public TossPaymentsClient(RestClient restClient) {
         this.restClient = restClient;
     }
 
+    /** 시크릿 키 없이 기동했을 때 쓴다. 모든 호출이 요청을 보내지 않고 NotSent다. */
+    static TossPaymentsClient withoutSecretKey() {
+        return new TossPaymentsClient(null);
+    }
+
     /** orderId·amount는 요청 값이 아닌 DB에 저장한 값을 넘긴다. */
     public TossResult confirm(
             String paymentKey, String orderId, long amount, String idempotencyKey) {
         return call(
-                restClient
-                        .post()
-                        .uri("/v1/payments/confirm")
-                        .header(IDEMPOTENCY_KEY, idempotencyKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(
-                                Map.of(
-                                        "paymentKey",
-                                        paymentKey,
-                                        "orderId",
-                                        orderId,
-                                        "amount",
-                                        amount)),
+                client ->
+                        client.post()
+                                .uri("/v1/payments/confirm")
+                                .header(IDEMPOTENCY_KEY, idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(
+                                        Map.of(
+                                                "paymentKey",
+                                                paymentKey,
+                                                "orderId",
+                                                orderId,
+                                                "amount",
+                                                amount)),
                 "DONE"::equals);
     }
 
     /** 상태 판단은 호출자가 한다. 본문이 읽히면 어떤 status든 Success다. */
     public TossResult getPayment(String paymentKey) {
-        return call(restClient.get().uri("/v1/payments/{paymentKey}", paymentKey), status -> true);
+        return call(
+                client -> client.get().uri("/v1/payments/{paymentKey}", paymentKey),
+                status -> true);
     }
 
     /** 금액을 보내지 않아 전액 취소한다. */
     public TossResult cancel(String paymentKey, String cancelReason, String idempotencyKey) {
         return call(
-                restClient
-                        .post()
-                        .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
-                        .header(IDEMPOTENCY_KEY, idempotencyKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(Map.of("cancelReason", cancelReason)),
+                client ->
+                        client.post()
+                                .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+                                .header(IDEMPOTENCY_KEY, idempotencyKey)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(Map.of("cancelReason", cancelReason)),
                 "CANCELED"::equals);
     }
 
     private TossResult call(
-            RestClient.RequestHeadersSpec<?> request, Predicate<String> isExpectedStatus) {
+            Function<RestClient, RestClient.RequestHeadersSpec<?>> request,
+            Predicate<String> isExpectedStatus) {
+        if (restClient == null) {
+            return new TossResult.NotSent("payment.toss.secret-key 미설정");
+        }
         try {
-            return request.exchange((ignored, response) -> classify(response, isExpectedStatus));
+            return request.apply(restClient)
+                    .exchange((ignored, response) -> classify(response, isExpectedStatus));
         } catch (RuntimeException exception) {
             return classify(exception);
         }
@@ -106,14 +122,16 @@ public class TossPaymentsClient {
         if (!status.is4xxClientError()) {
             return new TossResult.Unknown("분류하지 못한 HTTP " + statusCode);
         }
+        if (statusCode == 401 || statusCode == 429) {
+            return new TossResult.NotSent("HTTP " + statusCode);
+        }
         TossError error = readOrNull(response, TossError.class);
         if (error == null || error.code() == null || error.code().isBlank()) {
             return new TossResult.Unknown("HTTP " + statusCode + " 오류 code를 읽지 못함");
         }
         String code = error.code();
-        if (statusCode == 401
-                || (statusCode == 403 && OUR_CONFIGURATION_FORBIDDEN_CODES.contains(code))
-                || statusCode == 429) {
+        if ((statusCode == 400 && OUR_KEY_BAD_REQUEST_CODES.contains(code))
+                || (statusCode == 403 && OUR_CONFIGURATION_FORBIDDEN_CODES.contains(code))) {
             return new TossResult.NotSent("HTTP " + statusCode + " " + code);
         }
         if ((statusCode == 400 && POSSIBLY_IN_FLIGHT_BAD_REQUEST_CODES.contains(code))
