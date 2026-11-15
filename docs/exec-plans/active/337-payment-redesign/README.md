@@ -1,6 +1,6 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — 결제 1차 착수 대기
+상태: 진행 중 — 구현 보류. 모든 단계의 설계·계획을 확정한 뒤 M1부터 구현한다(2026-11-15 결정)
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md) · [환불](../../../requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)
@@ -9,7 +9,12 @@
 
 ## 목표와 범위
 
-Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부터 완성한다**: 결제 1건이 끝까지 정확하게 끝나는 것이 먼저고, 대사·정산·지급은 후순위다. 기존 구현과 호환을 맞추지 않는다([ADR 0337-2](../../../adr/0337-2-payment-replacement.md)). 주문·재고·쿠폰은 CommerceCore 범위다.
+Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부터 완성한다**: 결제 1건이 끝까지 정확하게 끝나는 것이 먼저고, 대사·정산·지급은 후순위다. 기존 구현과 호환을 맞추지 않는다([ADR 0337-2](../../../adr/0337-2-payment-replacement.md)).
+
+- **이 계획이 맡는 것**: Payment 전체(M1·M3·후순위)와 결제에 연관된 주문 흐름(M2 주문 연동). 결제와 주문이 겹치는 설계는 이 계획이 우선한다.
+- **도메인 분리**: M2는 #337의 하위 이슈로 두되 `service:commercecore` 라벨, 별도 단계 문서, 별도 세션으로 진행한다. 두 도메인은 계약(`contracts/`)과 ADR로만 잇는다.
+- **CommerceCore 범위**: 재고·쿠폰, 주문 모듈 구조(#331).
+- **범위 밖**(만들지 않음, 필요하면 별도 요구사항): 토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커, 토스 지급대행 실연동·셀러 등록(지급은 Mock), 스케줄러 분산 락, Redis 등 경합 최적화.
 
 ## 로드맵
 
@@ -26,12 +31,12 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | **M3 환불** | 환불 접수·실행·늦은 승인 환불 + 환불 주문 연동 | 착수 때 | REF-*, LED-REFUND-01 | 대기 |
 | 후순위 | 대사 → 정산 → 지급 → 선택(서킷 브레이커·2차 PG·웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
 
-M1 하위 이슈는 #337의 GitHub 하위 이슈로 연결한다. 이슈 하나 = 확인 가능한 기능 하나(PR 1–4개). PR은 자기 이슈를 `Refs`로 연결하고 그 이슈의 마지막 PR에서 `Closes`한다.
+모든 단계의 이슈는 #337의 GitHub 하위 이슈로 연결하고, #337 본문의 로드맵 체크리스트에 추가한다. 이슈 하나 = 확인 가능한 기능 하나(PR 1–4개). PR은 자기 이슈를 `Refs`로 연결하고 그 이슈의 마지막 PR에서 `Closes`한다.
 
 ### 단계별 구체화
 
 - 이 README는 전체 로드맵과 진행 방식만 가진다. PR 블록·종료 검증은 단계마다 `m<n>-<주제>.md` 한 파일에 쓴다.
-- 단계를 시작할 때 그 단계 문서와 요구사항을 구체화하는 **문서 PR을 먼저** 올린다(작으면 첫 구현 PR에 넣는다). M1은 #339가 그 역할을 하고 [m1-payment.md](m1-payment.md)가 그 결과다. 끝난 단계 문서는 지우지 않고 계획과 함께 `completed/`로 간다.
+- 단계마다 하위 이슈를 만들고, 그 단계 문서와 요구사항을 구체화하는 **문서 PR을 먼저** 올린다(작으면 첫 구현 PR에 넣는다). 이 계획은 모든 단계의 문서 PR을 병합한 뒤 구현을 시작한다. M1은 #339가 그 역할을 하고 [m1-payment.md](m1-payment.md)가 그 결과다. 끝난 단계 문서는 지우지 않고 계획과 함께 `completed/`로 간다.
 - 구현 PR 본문에는 그 PR의 요구사항 ID와 동작, 구현 방식, 아키텍처·성능 변경점, 학습 포인트(핵심 문법 예시)를 쓴다.
 
 ### 후순위를 위해 지금 남기는 것
@@ -87,7 +92,7 @@ gh pr edit <내-PR> --base dev && git push --force-with-lease
 끝: PR 게이트 결과(검사 출력 요약, ID→테스트 표)를 보고한다. 커밋·푸시·PR 생성은 지시가 있을 때만.
 ```
 
-## M2 이후 (착수 때 문서 PR로 구체화한다)
+## M2 이후 (단계 문서 PR로 구체화한다)
 
 | 단계 | PR (예상) |
 |---|---|
@@ -99,7 +104,7 @@ gh pr edit <내-PR> --base dev && git push --force-with-lease
 
 | 필요한 것 | 담당 | 시점 |
 |---|---|---|
-| 새 생성·승인 API 호출, `PaymentApproved` 소비 | M2 주문 연동. 주문 결제 전이를 맡은 [#331](https://github.com/2026-2-rising-sun/Backend/issues/331) 담당과 조율 | M1 직후. M1 PR0 병합부터 M2 완료까지 통합 개발 환경의 결제는 동작하지 않는다 |
+| 새 생성·승인 API 호출, `PaymentApproved` 소비 | M2 주문 연동. [#331](https://github.com/2026-2-rising-sun/Backend/issues/331)의 Order 구조 위에서 진행하고, 겹치는 결제 흐름은 이 설계를 따른다 | M1 직후. M1 PR0 병합부터 M2 완료까지 통합 개발 환경의 결제는 동작하지 않는다 |
 | `RefundRequested` 발행, 환불 API 호출 | M3 환불 주문 연동 | M3 |
 | `PurchaseConfirmed` 발행 | #331 | 정산 착수 때 |
 
@@ -108,6 +113,6 @@ Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 ## 인계
 
 - 완료: Payment 목표 설계 HTML, 요구사항 초안 3개, ADR 0337-1–5 채택, 이 계획.
-- 남은 일: M1 시작(기존 코드 삭제·토스 클라이언트부터).
-- 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. M1의 삭제·스키마 PR과 겹치므로 병합 순서와 마이그레이션 번호를 그 담당과 먼저 정한다.
+- 남은 일: M2·M3·후순위 단계 문서 PR → 전체 확정 → M1 구현 시작(기존 코드 삭제·토스 클라이언트부터).
+- 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·`payment_order_control`·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 M1 스키마는 `V4`를 그대로 쓴다. 남은 채 병합되면 `V5`로 옮기고 그 테이블도 함께 지운다.
 - 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.
