@@ -18,10 +18,10 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | 단계 | 목표 | 이슈 | 요구사항 | 상태 |
 |---|---|---|---|---|
 | S | 스펙·결정·계획 문서 | #337 (PR #339) | 이 폴더, 요구사항 3개, ADR 0337-1–5 | 리뷰 중 |
-| **M1 결제 1차** | 기존 코드 삭제 | 생성 예정 | — | 대기 |
-| | 결제 생성·결제창·조회 API | 생성 예정 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 대기 |
+| **M1 결제 1차** | 기존 코드 삭제 | #347 | — | 대기 |
+| | 결제 생성·결제창·조회 API | #348 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 대기 |
 | | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 대기 |
-| | 결과 불명 복구와 만료 | 생성 예정 | PAY-RECOVER·EXPIRE | 대기 |
+| | 결과 불명 복구와 만료 | #349 | PAY-RECOVER·EXPIRE | 대기 |
 | **M2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | 착수 때 | 착수 때 Commerce 요구사항 작성. #331 담당과 범위 조율 | 대기 |
 | **M3 환불** | 환불 접수·실행·늦은 승인 환불 + 환불 주문 연동 | 착수 때 | REF-*, LED-REFUND-01 | 대기 |
 | 후순위 | 대사 → 정산 → 지급 → 선택(서킷 브레이커·2차 PG·웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
@@ -108,6 +108,6 @@ Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 ## 인계
 
 - 완료: Payment 목표 설계 HTML, 요구사항 초안 3개, ADR 0337-1–5 제안, 이 계획.
-- 남은 일: M1 하위 이슈 생성·연결 → 스펙 문서 PR 리뷰·병합 → ADR 채택 → M1 시작(기존 코드 삭제·토스 클라이언트부터).
+- 남은 일: 스펙 문서 PR 리뷰·병합 → ADR 채택 → M1 시작(기존 코드 삭제·토스 클라이언트부터).
 - 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. M1의 삭제·스키마 PR과 겹치므로 병합 순서와 마이그레이션 번호를 그 담당과 먼저 정한다.
 - 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.
