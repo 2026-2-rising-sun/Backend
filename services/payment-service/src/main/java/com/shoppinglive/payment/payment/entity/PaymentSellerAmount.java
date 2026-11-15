@@ -19,7 +19,12 @@ public class PaymentSellerAmount {
     @Column(name = "payment_id", nullable = false, updatable = false)
     private Long paymentId;
 
-    @Column(name = "seller_order_number", nullable = false, updatable = false, length = 64)
+    @Column(
+            name = "seller_order_number",
+            nullable = false,
+            unique = true,
+            updatable = false,
+            length = 64)
     private String sellerOrderNumber;
 
     @Column(name = "seller_id", nullable = false, updatable = false, length = 36)

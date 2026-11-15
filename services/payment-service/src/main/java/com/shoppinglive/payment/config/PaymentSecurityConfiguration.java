@@ -34,8 +34,17 @@ public class PaymentSecurityConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(
                         e -> e.authenticationEntryPoint(errors).accessDeniedHandler(errors))
-                // 열린 내부 경로가 없다. 새 결제 경로는 #348에서 SERVICE_commercecore로 연다.
-                .authorizeHttpRequests(a -> a.anyRequest().denyAll())
+                .authorizeHttpRequests(
+                        a ->
+                                a.requestMatchers(
+                                                "/v1/internal/payments",
+                                                "/v1/internal/payments/*",
+                                                "/v1/internal/payments/*/checkouts",
+                                                // 경로만 미리 허용한다. 승인 컨트롤러는 #338이 만든다.
+                                                "/v1/internal/payments/*/approval")
+                                        .hasAuthority("SERVICE_commercecore")
+                                        .anyRequest()
+                                        .denyAll())
                 .addFilterBefore(
                         new ServiceTokenAuthenticationFilter(callers, errors),
                         AnonymousAuthenticationFilter.class)

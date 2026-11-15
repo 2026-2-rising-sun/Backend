@@ -25,7 +25,8 @@ public class Payment extends AuditedEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "order_ref", nullable = false, updatable = false, length = 64)
+    // unique는 DDL과 같게 둔다. H2 create-drop 테스트의 ON CONFLICT가 이 제약에 기댄다.
+    @Column(name = "order_ref", nullable = false, unique = true, updatable = false, length = 64)
     private String orderRef;
 
     @Column(name = "buyer_id", nullable = false, updatable = false, length = 36)
@@ -48,13 +49,13 @@ public class Payment extends AuditedEntity {
     @Column(name = "pg_provider", nullable = false, length = 32)
     private String pgProvider;
 
-    @Column(name = "pg_order_id", length = 64)
+    @Column(name = "pg_order_id", unique = true, length = 64)
     private String pgOrderId;
 
     @Column(name = "checkout_seq", nullable = false)
     private Integer checkoutSeq = 0;
 
-    @Column(name = "pg_payment_key", length = 200)
+    @Column(name = "pg_payment_key", unique = true, length = 200)
     private String pgPaymentKey;
 
     @Column(name = "pg_status", length = 32)
