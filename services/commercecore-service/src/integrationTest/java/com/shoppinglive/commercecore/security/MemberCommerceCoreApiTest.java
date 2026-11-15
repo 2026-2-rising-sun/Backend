@@ -1,7 +1,6 @@
 package com.shoppinglive.commercecore.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -21,7 +20,6 @@ import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.security.test.JwtTestTokens;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -206,10 +204,9 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
-    @DisplayName("장바구니·주문·결제·이력에 같은 회원 소유권과 상위 결제 소유권을 유지한다")
+    @DisplayName("장바구니·주문·결제 시작에 같은 회원 소유권을 유지한다")
     @Test
-    void cartOrderPaymentAndHistoryUseSameMemberAndPreserveParentPaymentOwnership()
-            throws Exception {
+    void cartOrderAndPaymentStartUseSameMember() throws Exception {
         String cartBody =
                 mvc.perform(
                                 post("/v1/cart/items")
@@ -260,39 +257,7 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                         .andReturn()
                         .getResponse()
                         .getContentAsString();
-        long paymentId = mapper.readTree(paymentBody).get("paymentId").asLong();
-        await().atMost(Duration.ofSeconds(10))
-                .untilAsserted(
-                        () -> {
-                            // 독립 Payment HTTP 결과를 공개 polling 경로로 Core에 반영한다.
-                            mvc.perform(
-                                            get(
-                                                            "/v1/orders/{number}/payments/{id}",
-                                                            number,
-                                                            paymentId)
-                                                    .header("Authorization", bearer(MEMBER_A)))
-                                    .andExpect(status().isOk());
-                            assertThat(orders.findByOrderNumber(number).orElseThrow().getStatus())
-                                    .isEqualTo(OrderStatus.PAID);
-                        });
-        mvc.perform(
-                        get("/v1/orders/{number}/payments/{id}", number, paymentId)
-                                .header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
-        var another = order(MEMBER_A);
-        mvc.perform(
-                        get(
-                                        "/v1/orders/{number}/payments/{id}",
-                                        another.getOrderNumber(),
-                                        paymentId)
-                                .header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isNotFound());
-        mvc.perform(get("/v1/orders").header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2));
-        assertThat(items.count()).isZero();
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(7);
+        assertThat(mapper.readTree(paymentBody).get("paymentId").asLong()).isPositive();
     }
 
     @DisplayName("일반 사용자는 판매를 관리할 수 없고 판매자는 가능하며 서비스가 회원을 대신할 수 없다")

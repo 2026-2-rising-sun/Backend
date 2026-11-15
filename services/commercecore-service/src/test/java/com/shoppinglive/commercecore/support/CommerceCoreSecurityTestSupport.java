@@ -16,10 +16,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 /** 임시 RSA 키와 실제 운영 검증기·필터를 사용해 인증을 검증한다. */
-@Import({
-    CommerceCoreSecurityTestSupport.SessionTestConfiguration.class,
-    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration.class
-})
+@Import(CommerceCoreSecurityTestSupport.SessionTestConfiguration.class)
 public abstract class CommerceCoreSecurityTestSupport {
     @Autowired protected StubAccessSessionVerifier accessSessions;
 

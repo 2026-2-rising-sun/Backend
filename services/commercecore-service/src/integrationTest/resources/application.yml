@@ -37,6 +37,9 @@ commercecore:
   dev:
     payment-scenario:
       enabled: true
+  # 옛 Payment fixture를 지웠다. 결제 호출이 로컬에서 띄운 Payment(8086)에 닿지 않게 막는다.
+  payment-client:
+    base-url: http://127.0.0.1:1
   shopping-client:
     mode: stub
     base-url: http://127.0.0.1:1
