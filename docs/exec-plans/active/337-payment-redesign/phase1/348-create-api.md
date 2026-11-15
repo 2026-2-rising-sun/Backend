@@ -124,7 +124,7 @@ CREATE INDEX ix_ledger_entry_journal ON ledger_entry(journal_id);
 CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 ```
 
-설계 HTML `#ddl`의 V4와 같다. 다른 점은 `pg_call` 주석 하나다. 호출 전에 행을 먼저 커밋해야 하므로(공통 규칙 "외부 호출") "추가만 한다"를 "응답 뒤 결과만 채운다"로 바꿨다.
+설계 HTML `#ddl`의 V4와 같다. `pg_call`은 호출 전에 행을 먼저 커밋해야 하므로(공통 규칙 "외부 호출") 추가만 하지 않고 응답 뒤 그 행의 결과만 채운다(#348 스키마 PR에서 HTML 주석도 맞춤).
 
 ### `payment` 컬럼
 

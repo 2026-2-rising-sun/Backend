@@ -313,6 +313,107 @@ class PaymentSchemaMigrationTest {
                 .isEqualTo(1L);
     }
 
+    @Test
+    @DisplayName("결제창·결제 키·판매자 주문 번호는 중복되지 않고 자식 행은 없는 부모를 가리키지 않는다")
+    void keysAndForeignKeys() {
+        String orderRef = ref(20);
+        jdbc.update(PAYMENT_INSERT, orderRef, 30000L, 0L, "CREATED");
+        long paymentId =
+                jdbc.queryForObject(
+                        "SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
+        jdbc.update(
+                "UPDATE payment SET pg_order_id = ?, pg_payment_key = ? WHERE id = ?",
+                orderRef + "-1",
+                "key-" + orderRef,
+                paymentId);
+        String other = ref(20);
+        jdbc.update(PAYMENT_INSERT, other, 30000L, 0L, "CREATED");
+        String update = "UPDATE payment SET %s = ? WHERE order_ref = ?";
+        rejected(
+                UNIQUE_VIOLATION,
+                "payment_pg_order_id_key",
+                update.formatted("pg_order_id"),
+                orderRef + "-1",
+                other);
+        rejected(
+                UNIQUE_VIOLATION,
+                "payment_pg_payment_key_key",
+                update.formatted("pg_payment_key"),
+                "key-" + orderRef,
+                other);
+
+        String sellerInsert =
+                "INSERT INTO payment_seller_amount(payment_id, seller_order_number, seller_id, amount,"
+                        + " commission_rate) VALUES (?, ?, '7a1c0000-0000-4000-8000-000000000001', 1000, ?)";
+        jdbc.update(sellerInsert, paymentId, orderRef + "-S1", java.math.BigDecimal.ZERO);
+        rejected(
+                UNIQUE_VIOLATION,
+                "payment_seller_amount_seller_order_number_key",
+                sellerInsert,
+                paymentId,
+                orderRef + "-S1",
+                java.math.BigDecimal.ZERO);
+        rejected(
+                CHECK_VIOLATION,
+                "payment_seller_amount_commission_rate_check",
+                sellerInsert,
+                paymentId,
+                orderRef + "-S2",
+                new java.math.BigDecimal("-0.0001"));
+        rejected(
+                "23503",
+                "payment_seller_amount_payment_id_fkey",
+                sellerInsert,
+                -1L,
+                orderRef + "-S3",
+                java.math.BigDecimal.ZERO);
+        rejected(
+                "23503",
+                "pg_call_payment_id_fkey",
+                "INSERT INTO pg_call(payment_id, kind, outcome, requested_at) VALUES (?, 'CONFIRM', 'UNKNOWN', now())",
+                -1L);
+        rejected(
+                "23503",
+                "ledger_entry_journal_id_fkey",
+                ENTRY_INSERT,
+                -1L,
+                "PG_CUSTODY",
+                100L,
+                0L,
+                null);
+    }
+
+    @Test
+    @DisplayName("PG 호출 종류·결과, 분개 사건 종류·계정은 정한 값만 들어간다")
+    void enumColumnsAreChecked() {
+        String orderRef = ref(20);
+        jdbc.update(PAYMENT_INSERT, orderRef, 30000L, 0L, "CREATED");
+        long paymentId =
+                jdbc.queryForObject(
+                        "SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
+        String callInsert =
+                "INSERT INTO pg_call(payment_id, kind, outcome, requested_at) VALUES (?, ?, ?, now())";
+        jdbc.update(callInsert, paymentId, "CONFIRM", "UNKNOWN");
+        rejected(CHECK_VIOLATION, "pg_call_kind_check", callInsert, paymentId, "REFUND", "UNKNOWN");
+        rejected(
+                CHECK_VIOLATION, "pg_call_outcome_check", callInsert, paymentId, "QUERY", "FAILED");
+        rejected(
+                CHECK_VIOLATION,
+                "ledger_journal_ref_type_check",
+                "INSERT INTO ledger_journal(ref_type, ref_id, created_at) VALUES ('ORDER_PLACED', ?, now())",
+                ref(10));
+        long journalId = journal("PAYMENT_APPROVED", ref(10));
+        rejected(
+                CHECK_VIOLATION,
+                "ledger_entry_account_check",
+                ENTRY_INSERT,
+                journalId,
+                "CASH",
+                100L,
+                0L,
+                null);
+    }
+
     long journal(String refType, String refId) {
         return jdbc.queryForObject(
                 "INSERT INTO ledger_journal(ref_type, ref_id, created_at) VALUES (?, ?, now()) RETURNING id",
