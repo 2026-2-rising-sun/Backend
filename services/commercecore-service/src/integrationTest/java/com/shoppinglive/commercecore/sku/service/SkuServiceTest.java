@@ -226,6 +226,27 @@ class SkuServiceTest {
         assertStock(id, 0, 5);
     }
 
+    @Test
+    @DisplayName("증감과 환불 복구는 예약 해제 공간을 보존하고 경계 초과 시 전체 롤백한다")
+    void preservesReleaseHeadroomIncludingRestock() {
+        Long id = onSale(10);
+        transaction.executeWithoutResult(tx -> service.reserve(id, 2));
+        assertThatThrownBy(
+                        () ->
+                                transaction.executeWithoutResult(
+                                        tx -> service.adjustAvailable(id, Integer.MAX_VALUE - 8)))
+                .isInstanceOf(InsufficientStockException.class);
+        assertStock(id, 8, 2);
+        transaction.executeWithoutResult(tx -> service.adjustAvailable(id, Integer.MAX_VALUE - 11));
+        assertStock(id, Integer.MAX_VALUE - 3, 2);
+        assertThatThrownBy(() -> transaction.executeWithoutResult(tx -> service.restock(id, 2)))
+                .isInstanceOf(IllegalStateException.class);
+        assertStock(id, Integer.MAX_VALUE - 3, 2);
+        transaction.executeWithoutResult(tx -> service.restock(id, 1));
+        transaction.executeWithoutResult(tx -> service.release(id, 2));
+        assertStock(id, Integer.MAX_VALUE, 0);
+    }
+
     private SkuView create(int available) {
         return transaction.execute(tx -> service.create(7L, 19000, available, "상품"));
     }

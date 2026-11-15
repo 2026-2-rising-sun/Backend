@@ -50,6 +50,43 @@ class SkuSalesPostgresTest extends SkuSalesIntegrationTest {
     }
 
     @Test
+    @DisplayName("PG 경합에서도 두 보충 중 하나만 남은 공간을 차지하며 예약은 전량 해제된다")
+    void concurrentReplenishmentPreservesReleaseHeadroom() throws Exception {
+        var sku = register(10);
+        sales.changeStatus(sku.skuId(), SalesStatus.ON_SALE, "seller");
+        tx.executeWithoutResult(t -> skus.reserve(sku.skuId(), 2));
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(3)) {
+            Callable<Boolean> replenish =
+                    () -> {
+                        start.await();
+                        try {
+                            sales.adjustAvailable(sku.skuId(), Integer.MAX_VALUE - 10, "seller");
+                            return true;
+                        } catch (InsufficientStockException rejected) {
+                            return false;
+                        }
+                    };
+            var first = executor.submit(replenish);
+            var second = executor.submit(replenish);
+            var release =
+                    executor.submit(
+                            () -> {
+                                start.await();
+                                tx.executeWithoutResult(t -> skus.release(sku.skuId(), 2));
+                                return true;
+                            });
+            start.countDown();
+            assertThat(List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(release.get(30, TimeUnit.SECONDS)).isTrue();
+        }
+        var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
+        assertThat(current.available()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(current.reserved()).isZero();
+    }
+
+    @Test
     @DisplayName("PostgreSQL의 Product 공유 잠금과 SKU 정렬 잠금은 재고5의 동시10요청 중5개만 선점한다")
     void concurrentOrdersCannotOversell() throws Exception {
         var sku = register(5);
