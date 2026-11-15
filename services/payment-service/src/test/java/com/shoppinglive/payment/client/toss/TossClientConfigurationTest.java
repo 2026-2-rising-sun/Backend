@@ -1,7 +1,6 @@
 package com.shoppinglive.payment.client.toss;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -40,16 +39,26 @@ class TossClientConfigurationTest {
     }
 
     @Test
-    @DisplayName("PAY-PG-04 비밀 키가 비어 있으면 키 값 없이 기동을 막는다")
-    void blankSecretKeyFailsFast() {
-        TossProperties properties =
-                new TossProperties(
-                        "https://toss.test", " ", Duration.ofSeconds(3), Duration.ofSeconds(60));
+    @DisplayName("PAY-PG-01 비밀 키가 비어 있어도 기동하고 토스를 호출하지 않고 NotSent다")
+    void blankSecretKeyStartsAndReturnsNotSentWithoutCalling() throws Exception {
+        // 응답하지 않는 서버를 둔다. 요청을 보냈다면 읽기 타임아웃으로 Unknown이 된다.
+        try (ServerSocket server = serve(null)) {
+            TossProperties properties =
+                    new TossProperties(
+                            "http://127.0.0.1:" + server.getLocalPort(),
+                            " ",
+                            Duration.ofSeconds(1),
+                            Duration.ofMillis(300));
+            TossPaymentsClient client =
+                    new TossClientConfiguration()
+                            .tossPaymentsClient(RestClient.builder(), properties);
 
-        assertThatThrownBy(
-                        () -> TossClientConfiguration.configure(RestClient.builder(), properties))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("PAYMENT_TOSS_SECRET_KEY");
+            assertThat(client.confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
+                    .isInstanceOf(TossResult.NotSent.class);
+            assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.NotSent.class);
+            assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
+                    .isInstanceOf(TossResult.NotSent.class);
+        }
     }
 
     @Test

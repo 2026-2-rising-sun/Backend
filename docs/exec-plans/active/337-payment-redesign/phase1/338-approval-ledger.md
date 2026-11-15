@@ -35,7 +35,7 @@ ledger/service       LedgerService                 record(refType, refId, lines)
 | 키 | 환경 변수 | 기본값 | 의미 |
 |---|---|---|---|
 | `payment.toss.base-url` | `PAYMENT_TOSS_BASE_URL` | `https://api.tosspayments.com` | |
-| `payment.toss.secret-key` | `PAYMENT_TOSS_SECRET_KEY` | 없음(필수) | 테스트 키 `test_sk_…`. **로그·예외 메시지에 남기지 않는다** |
+| `payment.toss.secret-key` | `PAYMENT_TOSS_SECRET_KEY` | 빈 값 | 테스트 키 `test_sk_…`. **로그·예외 메시지에 남기지 않는다**. 비어 있으면 기동하고 WARN 로그 한 줄을 남긴 뒤, 모든 호출을 보내지 않고 `NotSent`로 돌려준다(2026-11-15 사용자 결정) |
 | `payment.toss.connect-timeout` | — | `3s` | PAY-PG-01 |
 | `payment.toss.read-timeout` | — | `60s` | PAY-PG-04 |
 
@@ -70,12 +70,12 @@ HTTP 클라이언트는 Spring `RestClient`(+ JDK `HttpClient` 요청 팩토리)
 
 | 상황 | 결과 | 근거 |
 |---|---|---|
+| 시크릿 키 미설정(호출하지 않음) | `NotSent` | PAY-PG-01 |
 | 연결 타임아웃, 연결 거부(요청을 보내기 전 예외) | `NotSent` | PAY-PG-01 |
 | 읽기 타임아웃, 응답 중 끊김, HTTP 5xx, 분류하지 못한 예외 | `Unknown` | PAY-PG-03. 애매하면 불명 |
+| HTTP 401 (`UNAUTHORIZED_KEY`), HTTP 429 | `NotSent` | 우리 키 문제, 호출 제한. 상태 코드만 본다(본문 code 불필요) |
 | HTTP 4xx인데 본문에서 `code`를 읽지 못함 | `Unknown` | 무엇이 거절됐는지 모른다 |
-| HTTP 401 (`UNAUTHORIZED_KEY`) | `NotSent` | 우리 키 문제 |
-| HTTP 403 + code ∈ {`INCORRECT_BASIC_AUTH_FORMAT`, `API_KEY_ACCESS_DENIED`} | `NotSent` | 우리 설정 문제 |
-| HTTP 429 | `NotSent` | 호출 제한 |
+| HTTP 400 `INVALID_API_KEY`, HTTP 403 + code ∈ {`INCORRECT_BASIC_AUTH_FORMAT`, `API_KEY_ACCESS_DENIED`} | `NotSent` | 우리 키·설정 문제 |
 | HTTP 400 + code ∈ {`ALREADY_PROCESSED_PAYMENT`, `ALREADY_PROCESSING_REQUEST`}, HTTP 403 `FORBIDDEN_CONSECUTIVE_REQUEST` | `Unknown` | PAY-PG-02. 앞선 요청이 처리 중일 수 있다 |
 | 그 밖의 HTTP 4xx (카드 거절 403 `REJECT_CARD_COMPANY` 등 포함) | `Declined(code, message)` | PAY-PG-02 |
 | HTTP 200, 본문 `status`가 호출별 기대 상태 | `Success(payment)` | 값 검증은 ③에서 |
@@ -268,8 +268,8 @@ payload:
 | 외부 | — | 토스 승인·조회·취소 클라이언트, 시크릿 키 설정 | Mock 실행기(#347에서 이미 삭제) |
 | 이벤트 | 토픽, outbox 릴레이 | `PaymentApproved`(키 orderRef) | `PaymentExecutionResolved` |
 | DB | V4 스키마 | — | — |
-| 운영 | — | `PAYMENT_TOSS_SECRET_KEY` 환경 변수 필요 | — |
-| 요구사항 | — | PAY-PG-01 문장(403 분류) | — |
+| 운영 | — | `PAYMENT_TOSS_SECRET_KEY` 환경 변수(없으면 기동은 하고 토스 호출은 `NotSent`) | — |
+| 요구사항 | — | PAY-PG-01 문장(403 분류, 400 `INVALID_API_KEY`, 401·429는 상태 코드만, 키 미설정) | — |
 
 CommerceCore는 아직 `PaymentExecutionResolved`를 기다린다. Phase 2 전까지 통합 환경의 결제는 동작하지 않는다(이미 알려진 영향).
 

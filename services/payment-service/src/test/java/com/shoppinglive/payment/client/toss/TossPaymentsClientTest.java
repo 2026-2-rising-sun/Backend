@@ -135,19 +135,25 @@ class TossPaymentsClientTest {
         assertThat(result.toString()).doesNotContain(SECRET);
     }
 
-    @ParameterizedTest(name = "403 {0}")
-    @CsvSource({"INCORRECT_BASIC_AUTH_FORMAT", "API_KEY_ACCESS_DENIED"})
-    @DisplayName("PAY-PG-01 우리 설정 문제인 403은 NotSent")
-    void forbiddenByOurConfigurationIsNotSent(String code) {
-        respond(HttpStatus.FORBIDDEN, error(code));
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+        "403, INCORRECT_BASIC_AUTH_FORMAT",
+        "403, API_KEY_ACCESS_DENIED",
+        "400, INVALID_API_KEY"
+    })
+    @DisplayName("PAY-PG-01 우리 키·설정 문제인 400·403은 NotSent")
+    void rejectedByOurConfigurationIsNotSent(int status, String code) {
+        respond(HttpStatus.valueOf(status), error(code));
 
         assertThat(confirm()).isInstanceOf(TossResult.NotSent.class);
     }
 
-    @Test
-    @DisplayName("PAY-PG-01 429는 NotSent")
-    void tooManyRequestsIsNotSent() {
-        respond(HttpStatus.TOO_MANY_REQUESTS, error("TOO_MANY_REQUESTS"));
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"401", "429"})
+    @DisplayName("PAY-PG-01 401·429는 본문 code를 읽지 못해도 NotSent")
+    void unauthorizedOrTooManyRequestsWithoutCodeIsNotSent(int status) {
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withStatus(HttpStatus.valueOf(status)));
 
         assertThat(confirm()).isInstanceOf(TossResult.NotSent.class);
     }
