@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.payment.client.toss.TossPayment;
 import com.shoppinglive.payment.client.toss.TossPaymentsClient;
@@ -29,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 /** 승인 API를 HTTP로 부른다(H2). 응답 대기는 테스트에서만 300ms로 줄인다. 토스는 테스트 대역이다. */
 @TestPropertySource(
@@ -50,7 +50,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
 
     String created() throws Exception {
         String orderRef = newOrderRef();
-        create(orderRef).andExpect(status().isCreated());
+        create(orderRef).andExpect(MockMvcResultMatchers.status().isCreated());
         return orderRef;
     }
 
@@ -108,7 +108,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     }
 
     ResultActions expectPending(ResultActions result, String orderRef) throws Exception {
-        return result.andExpect(status().isAccepted())
+        return result.andExpect(MockMvcResultMatchers.status().isAccepted())
                 .andExpect(header().string("Location", "/v1/internal/payments/" + orderRef))
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.paymentId").value(paymentId(orderRef)))
@@ -117,13 +117,14 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     }
 
     void expectError(ResultActions result, int httpStatus, String code) throws Exception {
-        result.andExpect(status().is(httpStatus))
+        result.andExpect(MockMvcResultMatchers.status().is(httpStatus))
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value(code));
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-01] 결제 없음 404, orderRef 불일치 400, 구매자 불일치 403, 금액 불일치 400을 HTTP로 답하고 토스를 부르지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-01] 결제 없음 404, orderRef 불일치 400, 구매자 불일치 403, 금액 불일치 400을 HTTP로 답하고 토스를 부르지 않는다")
     void rejectsMismatches() throws Exception {
         String orderRef = created();
         String key = "tgen_" + orderRef;
@@ -172,7 +173,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     @DisplayName("[PAY-CONFIRM-02] 예전 결제창의 pgOrderId면 409 STALE_CHECKOUT이고 토스를 부르지 않는다")
     void rejectsStaleCheckout() throws Exception {
         String orderRef = created();
-        checkout(orderRef).andExpect(status().isCreated());
+        checkout(orderRef).andExpect(MockMvcResultMatchers.status().isCreated());
 
         expectError(approve(orderRef), 409, "STALE_CHECKOUT");
         verifyNoInteractions(toss);
@@ -190,13 +191,14 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-05] 이미 승인됐으면 200, 처리 중·결과 불명이면 202 PENDING(Location), 닫혔으면 409이고 토스를 부르지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-05] 이미 승인됐으면 200, 처리 중·결과 불명이면 202 PENDING(Location), 닫혔으면 409이고 토스를 부르지 않는다")
     void answersByStatus() throws Exception {
         String approved = created();
         setStatus(approved, "APPROVED");
         expire(approved);
         approve(approved)
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(jsonPath("$.data.paymentId").value(paymentId(approved)))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
@@ -219,7 +221,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
                 .thenReturn(new TossResult.Success(done(orderRef)));
 
         approve(orderRef)
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.paymentId").value(paymentId(orderRef)))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
@@ -228,19 +230,20 @@ class ApprovalApiTest extends PaymentApiTestSupport {
         assertThat(outboxRows(orderRef)).isEqualTo(1);
 
         // 새로고침(같은 요청 반복)도 200이고 토스를 다시 부르지 않는다
-        approve(orderRef).andExpect(status().isOk());
+        approve(orderRef).andExpect(MockMvcResultMatchers.status().isOk());
         verify(toss, times(1)).confirm(anyString(), anyString(), anyLong(), anyString());
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-08] 토스가 거절하면 422 DECLINED이고 data에 {status: DECLINED, code, message}를 담으며 CREATED로 돌아간다")
+    @DisplayName(
+            "[PAY-CONFIRM-08] 토스가 거절하면 422 DECLINED이고 data에 {status: DECLINED, code, message}를 담으며 CREATED로 돌아간다")
     void declined() throws Exception {
         String orderRef = created();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(new TossResult.Declined("REJECT_CARD_PAYMENT", "한도초과 혹은 잔액부족"));
 
         approve(orderRef)
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(MockMvcResultMatchers.status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.data.status").value("DECLINED"))
                 .andExpect(jsonPath("$.data.code").value("REJECT_CARD_PAYMENT"))
@@ -251,7 +254,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
 
         // 같은 결제창으로 다시 승인하면 STALE_CHECKOUT, 새 결제창이면 다시 승인할 수 있다
         expectError(approve(orderRef), 409, "STALE_CHECKOUT");
-        checkout(orderRef).andExpect(status().isCreated());
+        checkout(orderRef).andExpect(MockMvcResultMatchers.status().isCreated());
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(
                         new TossResult.Success(
@@ -263,7 +266,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
                                         OffsetDateTime.parse("2026-11-10T14:02:11+09:00"),
                                         true)));
         approve(orderRef, approval(BUYER, "tgen_" + orderRef, orderRef + "-2", 30000))
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(jsonPath("$.data.status").value("APPROVED"));
     }
 
@@ -279,7 +282,8 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-11][PAY-CONFIRM-06] 토스 응답이 대기 시간 안에 없으면 202 PENDING을 먼저 주고, 뒤에서 승인을 반영해 APPROVED·이벤트가 남는다")
+    @DisplayName(
+            "[PAY-CONFIRM-11][PAY-CONFIRM-06] 토스 응답이 대기 시간 안에 없으면 202 PENDING을 먼저 주고, 뒤에서 승인을 반영해 APPROVED·이벤트가 남는다")
     void lateSuccessAnswersPendingThenApproves() throws Exception {
         String orderRef = created();
         AtomicInteger activeConnections = new AtomicInteger(-1);
@@ -305,7 +309,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
         release.countDown();
         awaitStatus(orderRef, "APPROVED");
         assertThat(outboxRows(orderRef)).isEqualTo(1);
-        approve(orderRef).andExpect(status().isOk());
+        approve(orderRef).andExpect(MockMvcResultMatchers.status().isOk());
         verify(toss, times(1)).confirm(anyString(), anyString(), anyLong(), anyString());
     }
 
@@ -329,7 +333,8 @@ class ApprovalApiTest extends PaymentApiTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-05][PAY-CONFIRM-11] 첫 요청이 토스를 기다리는 동안 온 같은 승인 요청은 바로 202이고 토스는 1번만 불리며, 반영 뒤 재요청은 200이다")
+    @DisplayName(
+            "[PAY-CONFIRM-05][PAY-CONFIRM-11] 첫 요청이 토스를 기다리는 동안 온 같은 승인 요청은 바로 202이고 토스는 1번만 불리며, 반영 뒤 재요청은 200이다")
     void repeatedRequestWhileWaitingCallsTossOnce() throws Exception {
         String orderRef = created();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
@@ -345,7 +350,7 @@ class ApprovalApiTest extends PaymentApiTestSupport {
         release.countDown();
         awaitStatus(orderRef, "APPROVED");
         approve(orderRef)
-                .andExpect(status().isOk())
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(jsonPath("$.data.status").value("APPROVED"));
         verify(toss, times(1)).confirm(anyString(), anyString(), anyLong(), anyString());
     }

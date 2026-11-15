@@ -1,6 +1,6 @@
 package com.shoppinglive.payment.payment.service;
 
-/** 승인 요청의 결과. 승인 API(다음 PR)가 HTTP 응답으로 바꾼다. */
+/** 승인 요청의 결과. 승인 API({@code ApprovalController})가 HTTP 응답으로 바꾼다. */
 public sealed interface ApprovalResult {
     long paymentId();
 

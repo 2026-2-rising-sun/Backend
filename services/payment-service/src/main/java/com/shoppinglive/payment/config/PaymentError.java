@@ -15,7 +15,9 @@ public enum PaymentError {
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
     AMOUNT_CONFLICT(HttpStatus.CONFLICT, "같은 주문 참조에 금액이나 구매자가 다른 결제가 있습니다."),
     STALE_CHECKOUT(HttpStatus.CONFLICT, "예전 결제창의 승인 요청입니다. 결제창을 다시 열어 주세요."),
-    PAYMENT_CLOSED(HttpStatus.CONFLICT, "결제가 닫혔습니다.");
+    PAYMENT_CLOSED(HttpStatus.CONFLICT, "결제가 닫혔습니다."),
+    DECLINED(HttpStatus.UNPROCESSABLE_ENTITY, "카드사에서 결제를 거절했습니다."),
+    PG_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "결제사에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String message;

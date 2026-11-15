@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.payment.client.toss.TossPayment;
 import com.shoppinglive.payment.client.toss.TossResult;
@@ -25,6 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 /** 승인 API의 결과 불명·보상 취소 응답을 실제 PostgreSQL에서 HTTP로 확인한다. 응답 대기는 300ms로 줄인다. */
 @AutoConfigureMockMvc
@@ -58,7 +58,7 @@ class ApprovalApiPostgresTest extends ApprovalPostgresTestSupport {
     }
 
     void expectPending(ResultActions result, ApproveCommand c) throws Exception {
-        result.andExpect(status().isAccepted())
+        result.andExpect(MockMvcResultMatchers.status().isAccepted())
                 .andExpect(header().string("Location", "/v1/internal/payments/" + c.orderRef()))
                 .andExpect(jsonPath("$.data.paymentId").value(paymentId(c.orderRef())))
                 .andExpect(jsonPath("$.data.status").value("PENDING"));
@@ -105,7 +105,7 @@ class ApprovalApiPostgresTest extends ApprovalPostgresTestSupport {
                 .thenReturn(new TossResult.Success(wrongAmount));
 
         approve(c)
-                .andExpect(status().isConflict())
+                .andExpect(MockMvcResultMatchers.status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("PAYMENT_CLOSED"));
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
@@ -147,6 +147,8 @@ class ApprovalApiPostgresTest extends ApprovalPostgresTestSupport {
         awaitStatus(c.orderRef(), "APPROVED");
         assertThat(journals(c.orderRef())).isEqualTo(1);
         assertThat(outboxRows(c.orderRef())).hasSize(1);
-        approve(c).andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("APPROVED"));
+        approve(c)
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
     }
 }
