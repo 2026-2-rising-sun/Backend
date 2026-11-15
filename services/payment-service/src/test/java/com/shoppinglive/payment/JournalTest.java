@@ -55,7 +55,7 @@ class JournalTest {
     @Test
     @DisplayName("[LED-01] 합계가 long 범위를 넘으면 균형이 맞아 보여도 거절한다")
     void overflowIsRejected() {
-        // 넘침을 허용하면 차변 MAX·MAX(합 -2)와 대변 -2가 같아 보인다. 대변 음수는 LED-02에서도 막히므로 차변끼리 넘친다
+        // 차변 MAX + MAX는 long에서 -2로 돈다. 넘침을 막지 않으면 우연히 대변 합과 같아질 수 있다
         assertThatThrownBy(
                         () ->
                                 journal(
