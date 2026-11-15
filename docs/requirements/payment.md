@@ -23,9 +23,9 @@
 
 ## 데이터 불변식
 
-- [ ] **PAY-DATA-01** order_ref는 6–50자이고 결제 1건에 하나다(UNIQUE).
-- [ ] **PAY-DATA-02** refunded_amount는 0 이상 amount 이하다.
-- [ ] **PAY-DATA-03** 상태는 CREATED·APPROVING·APPROVED·UNKNOWN·CANCELED·PARTIALLY_REFUNDED·REFUNDED 중 하나다.
+- [x] **PAY-DATA-01** order_ref는 6–50자이고 결제 1건에 하나다(UNIQUE).
+- [x] **PAY-DATA-02** refunded_amount는 0 이상 amount 이하다.
+- [x] **PAY-DATA-03** 상태는 CREATED·APPROVING·APPROVED·UNKNOWN·CANCELED·PARTIALLY_REFUNDED·REFUNDED 중 하나다.
 
 ## 생성 · 결제창 · 조회
 
