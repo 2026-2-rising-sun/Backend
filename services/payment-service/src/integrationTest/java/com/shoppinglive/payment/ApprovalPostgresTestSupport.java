@@ -30,7 +30,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 abstract class ApprovalPostgresTestSupport {
-    static final String SCHEMA = "payment_approval_" + UUID.randomUUID().toString().replace("-", "");
+    static final String SCHEMA =
+            "payment_approval_" + UUID.randomUUID().toString().replace("-", "");
     static final String BUYER = "5c2e8f1a-0000-4000-8000-6d4c0b9e7a13";
     static final long AMOUNT = 30000;
 

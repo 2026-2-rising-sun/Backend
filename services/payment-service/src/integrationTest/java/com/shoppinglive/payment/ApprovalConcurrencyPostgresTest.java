@@ -61,7 +61,9 @@ class ApprovalConcurrencyPostgresTest extends ApprovalPostgresTestSupport {
                     losers.add(f.get());
                 }
             }
-            assertThat(losers).hasSize(threads - 1).allMatch(ApprovalResult.Pending.class::isInstance);
+            assertThat(losers)
+                    .hasSize(threads - 1)
+                    .allMatch(ApprovalResult.Pending.class::isInstance);
             assertThat(status(c.orderRef())).isEqualTo("APPROVING");
             losersDone.countDown();
 

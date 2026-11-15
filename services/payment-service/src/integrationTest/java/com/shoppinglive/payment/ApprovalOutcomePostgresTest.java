@@ -30,10 +30,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 승인 ②③: 토스 결과별 상태·pg_call·분개·outbox. 토스 호출 중에는 트랜잭션이 없고 APPROVING이 이미 커밋돼 있어야 한다. */
 class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
+    @Autowired TransactionTemplate tx;
 
     static TossResult unknown() {
         return new TossResult.Unknown("읽기 타임아웃");
@@ -48,12 +51,16 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(row.get("status")).isEqualTo("APPROVING");
         assertThat(row.get("pg_payment_key")).isEqualTo(c.paymentKey());
         assertThat(row.get("approving_at")).isNotNull();
-        assertThat(pgCalls(c.orderRef())).hasSize(expectedCalls).last().isEqualTo("CONFIRM:UNKNOWN");
+        assertThat(pgCalls(c.orderRef()))
+                .hasSize(expectedCalls)
+                .last()
+                .isEqualTo("CONFIRM:UNKNOWN");
         return result;
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-04][PAY-CONFIRM-06][PAY-CONFIRM-12][LED-APPROVE-01][PAY-EVENT-01] 토스 성공이면 트랜잭션 밖에서 1번 부르고 APPROVED·승인 분개·PaymentApproved outbox를 함께 남긴다")
+    @DisplayName(
+            "[PAY-CONFIRM-04][PAY-CONFIRM-06][PAY-CONFIRM-12][LED-APPROVE-01][PAY-EVENT-01] 토스 성공이면 트랜잭션 밖에서 1번 부르고 APPROVED·승인 분개·PaymentApproved outbox를 함께 남긴다")
     void success() {
         ApproveCommand c = newPayment();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
@@ -94,12 +101,12 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-07] 토스 성공 응답 값이 다르면 APPROVED로 바꾸지 않고 응답의 paymentKey를 cancel-{pg_order_id}로 전액 취소한 뒤 CANCELED")
+    @DisplayName(
+            "[PAY-CONFIRM-07] 토스 성공 응답 값이 다르면 APPROVED로 바꾸지 않고 응답의 paymentKey를 cancel-{pg_order_id}로 전액 취소한 뒤 CANCELED")
     void mismatchCompensates() {
         ApproveCommand c = newPayment();
         TossPayment other =
-                new TossPayment(
-                        "tgen_other", c.pgOrderId(), "DONE", c.amount() + 1, null, true);
+                new TossPayment("tgen_other", c.pgOrderId(), "DONE", c.amount() + 1, null, true);
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(new TossResult.Success(other));
         when(toss.cancel(anyString(), anyString(), anyString()))
@@ -108,8 +115,11 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         ApprovalResult result = approvals.approve(c);
 
         assertThat(result).isEqualTo(new ApprovalResult.Closed(paymentId(c.orderRef())));
-        verify(toss).cancel(org.mockito.ArgumentMatchers.eq("tgen_other"), anyString(),
-                org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
+        verify(toss)
+                .cancel(
+                        org.mockito.ArgumentMatchers.eq("tgen_other"),
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:SUCCESS");
         assertThat(journals(c.orderRef())).isZero();
@@ -134,7 +144,8 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-08] 첫 호출이 거절이면 CREATED로 돌아가 pg_order_id를 비우고 거절 코드를 남긴다. 같은 결제창으로 다시 승인하면 STALE_CHECKOUT")
+    @DisplayName(
+            "[PAY-CONFIRM-08] 첫 호출이 거절이면 CREATED로 돌아가 pg_order_id를 비우고 거절 코드를 남긴다. 같은 결제창으로 다시 승인하면 STALE_CHECKOUT")
     void declined() {
         ApproveCommand c = newPayment();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
@@ -171,7 +182,12 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(new TossResult.Success(done(retry)));
         assertThat(approvals.approve(retry)).isInstanceOf(ApprovalResult.Approved.class);
-        verify(toss).confirm(c.paymentKey(), retry.pgOrderId(), c.amount(), "confirm-" + retry.pgOrderId());
+        verify(toss)
+                .confirm(
+                        c.paymentKey(),
+                        retry.pgOrderId(),
+                        c.amount(),
+                        "confirm-" + retry.pgOrderId());
         assertThat(journals(c.orderRef())).isEqualTo(1);
     }
 
@@ -193,7 +209,8 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-10][PAY-CONFIRM-12] 불명이면 같은 키로 1번 더 부르고(호출 전 기록 1행 추가), 그래도 불명이면 UNKNOWN(10초 뒤 조회, 30분 마감)")
+    @DisplayName(
+            "[PAY-CONFIRM-10][PAY-CONFIRM-12] 불명이면 같은 키로 1번 더 부르고(호출 전 기록 1행 추가), 그래도 불명이면 UNKNOWN(10초 뒤 조회, 30분 마감)")
     void unknownTwiceBecomesUnknown() {
         ApproveCommand c = newPayment();
         AtomicInteger n = new AtomicInteger();
@@ -244,7 +261,9 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
             when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                     .thenReturn(unknown(), second);
 
-            assertThat(approvals.approve(c)).as(second.toString()).isInstanceOf(ApprovalResult.Pending.class);
+            assertThat(approvals.approve(c))
+                    .as(second.toString())
+                    .isInstanceOf(ApprovalResult.Pending.class);
 
             Map<String, Object> row = payment(c.orderRef());
             assertThat(row.get("status")).as(second.toString()).isEqualTo("UNKNOWN");
@@ -254,7 +273,8 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-06][LED-APPROVE-01][PAY-EVENT-01] 같은 결제에 승인 반영이 동시에 와도(조회기와 경합) APPROVED·분개·outbox는 1번이고 취소하지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-06][LED-APPROVE-01][PAY-EVENT-01] 같은 결제에 승인 반영이 동시에 와도(조회기와 경합) APPROVED·분개·outbox는 1번이고 취소하지 않는다")
     void concurrentApplyDoneOnce() throws Exception {
         ApproveCommand c = newPayment();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString())).thenReturn(unknown());
@@ -294,7 +314,9 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(journals(c.orderRef())).isEqualTo(1);
         assertThat(approvalEntries(c.orderRef())).hasSize(2);
         assertThat(outboxRows(c.orderRef())).hasSize(1);
-        assertThat(pgCalls(c.orderRef())).filteredOn(s -> s.startsWith("QUERY")).allMatch("QUERY:SUCCESS"::equals);
+        assertThat(pgCalls(c.orderRef()))
+                .filteredOn(s -> s.startsWith("QUERY"))
+                .allMatch("QUERY:SUCCESS"::equals);
         verify(toss, never()).cancel(anyString(), anyString(), anyString());
     }
 
@@ -316,8 +338,11 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
 
         when(toss.cancel(anyString(), anyString(), anyString())).thenReturn(unknown());
         outcomes.compensate(id, c.pgOrderId(), c.paymentKey());
-        verify(toss).cancel(org.mockito.ArgumentMatchers.eq(c.paymentKey()), anyString(),
-                org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
+        verify(toss)
+                .cancel(
+                        org.mockito.ArgumentMatchers.eq(c.paymentKey()),
+                        anyString(),
+                        org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
         assertThat(pgCalls(c.orderRef())).contains("CANCEL:UNKNOWN");
     }
 
@@ -327,7 +352,12 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         ApproveCommand c = newPayment();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(new TossResult.Success(done(c)));
-        doThrow(new IllegalStateException("outbox 실패")).when(outbox).append(anyString(), any());
+        // EventOutbox.append는 MANDATORY라 스텁 호출도 트랜잭션 안에서 한다
+        tx.executeWithoutResult(
+                s ->
+                        doThrow(new IllegalStateException("outbox 실패"))
+                                .when(outbox)
+                                .append(anyString(), any()));
 
         assertThatThrownBy(() -> approvals.approve(c)).hasMessageContaining("outbox 실패");
 

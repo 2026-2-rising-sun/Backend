@@ -70,7 +70,10 @@ class ApprovalValidationTest extends PaymentApiTestSupport {
                                 new ApproveCommand(
                                         orderRef, BUYER, ok.paymentKey(), otherRef + "-1", 30000)))
                 .isEqualTo(PaymentError.ORDER_ID_MISMATCH);
-        assertThat(rejected(new ApproveCommand(orderRef, BUYER, ok.paymentKey(), "NOHYPHEN", 30000)))
+        assertThat(
+                        rejected(
+                                new ApproveCommand(
+                                        orderRef, BUYER, ok.paymentKey(), "NOHYPHEN", 30000)))
                 .isEqualTo(PaymentError.ORDER_ID_MISMATCH);
         // 구매자와 금액이 모두 다르면 먼저 검사하는 구매자로 거절한다
         assertThat(
@@ -94,7 +97,8 @@ class ApprovalValidationTest extends PaymentApiTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-02] 예전 결제창의 pgOrderId나 비워진 pg_order_id면 409 STALE_CHECKOUT이고 토스를 부르지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-02] 예전 결제창의 pgOrderId나 비워진 pg_order_id면 409 STALE_CHECKOUT이고 토스를 부르지 않는다")
     void rejectsStaleCheckout() throws Exception {
         String orderRef = created();
         checkout(orderRef); // 결제창 2회차: 현재 pg_order_id = {orderRef}-2
@@ -120,12 +124,14 @@ class ApprovalValidationTest extends PaymentApiTestSupport {
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-05] 이미 승인된 결제는 만료가 지나도 승인됨, 처리 중이면 처리 중, 닫혔으면 PAYMENT_CLOSED로 답하고 토스를 부르지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-05] 이미 승인된 결제는 만료가 지나도 승인됨, 처리 중이면 처리 중, 닫혔으면 PAYMENT_CLOSED로 답하고 토스를 부르지 않는다")
     void answersByStatusWithoutCallingToss() throws Exception {
         String approved = created();
         setStatus(approved, "APPROVED");
         expire(approved);
-        assertThat(approvals.approve(command(approved))).isInstanceOf(ApprovalResult.Approved.class);
+        assertThat(approvals.approve(command(approved)))
+                .isInstanceOf(ApprovalResult.Approved.class);
 
         for (String processing : new String[] {"APPROVING", "UNKNOWN"}) {
             String orderRef = created();
@@ -137,23 +143,23 @@ class ApprovalValidationTest extends PaymentApiTestSupport {
         for (String closed : new String[] {"CANCELED", "PARTIALLY_REFUNDED", "REFUNDED"}) {
             String orderRef = created();
             setStatus(orderRef, closed);
-            assertThat(rejected(command(orderRef))).as(closed).isEqualTo(PaymentError.PAYMENT_CLOSED);
+            assertThat(rejected(command(orderRef)))
+                    .as(closed)
+                    .isEqualTo(PaymentError.PAYMENT_CLOSED);
         }
         verifyNoInteractions(toss);
     }
 
     @Test
-    @DisplayName("[PAY-CONFIRM-04] 다른 결제가 이미 쓴 paymentKey면 400 INVALID_REQUEST이고 상태를 바꾸지 않으며 토스를 부르지 않는다")
+    @DisplayName(
+            "[PAY-CONFIRM-04] 다른 결제가 이미 쓴 paymentKey면 400 INVALID_REQUEST이고 상태를 바꾸지 않으며 토스를 부르지 않는다")
     void rejectsPaymentKeyUsedByAnotherPayment() throws Exception {
         String first = created();
         jdbc.update(
                 "UPDATE payment SET pg_payment_key = ? WHERE order_ref = ?", "tgen_shared", first);
         String second = created();
 
-        assertThat(
-                        rejected(
-                                new ApproveCommand(
-                                        second, BUYER, "tgen_shared", second + "-1", 30000)))
+        assertThat(rejected(new ApproveCommand(second, BUYER, "tgen_shared", second + "-1", 30000)))
                 .isEqualTo(PaymentError.INVALID_REQUEST);
         assertThat(status(second)).isEqualTo("CREATED");
         assertThat(pgCalls(second)).isZero();
