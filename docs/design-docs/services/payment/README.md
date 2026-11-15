@@ -12,6 +12,7 @@
 - [DB ERD 설명](erd.md) · [관계도](erd.html)
 - [결제 실행](states/payment.md) · [시각 자료](states/payment.html)
 - [환불 실행](states/refund.md) · [시각 자료](states/refund.html)
+- [목표 설계](design.html) — 결제 재설계의 구현 전 목표. 현재 코드가 아니다. 원본은 [결제](../../../requirements/payment.md)·[원장](../../../requirements/ledger.md)·[환불](../../../requirements/refund.md) 요구사항이다
 
 ## 원본·갱신
 
