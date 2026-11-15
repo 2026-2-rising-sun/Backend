@@ -274,6 +274,125 @@ class PaymentGroupIntegrationTest
                 .isFalse();
     }
 
+    @DisplayName("전액 할인 묶음은 0원 견적으로 생성하고 쿠폰을 예약한다")
+    @Test
+    void fullyDiscountedGroupIsCreatedWithZeroPayableAndReservedCoupon() {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
+        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
+
+        var quote = service.preview(MEMBER_A, selected(), COUPON_ID);
+        assertThat(quote.totalAmount()).isEqualTo(25000L);
+        assertThat(quote.discountAmount()).isEqualTo(25000L);
+        assertThat(quote.payableAmount()).isZero();
+
+        var created =
+                service.create(
+                        MEMBER_A, selected(), "회원", "01012345678", 25000, COUPON_ID, "zero-order");
+        assertThat(created.group().payableAmount()).isZero();
+        assertThat(created.group().orders())
+                .extracting(order -> order.payableAmount())
+                .containsOnly(0L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+    }
+
+    @DisplayName("취소·만료 시 쿠폰 예약을 해제한다")
+    @Test
+    void couponReservationIsReleasedOnCancellationAndExpiry() {
+        issueCoupon();
+        var cancelled =
+                service.create(
+                                MEMBER_A,
+                                selected(),
+                                "회원",
+                                "01012345678",
+                                25000,
+                                COUPON_ID,
+                                "coupon-cancel")
+                        .group();
+        service.cancel(MEMBER_A, cancelled.groupNumber());
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var expired =
+                service.create(
+                                MEMBER_A,
+                                selected(),
+                                "회원",
+                                "01012345678",
+                                25000,
+                                COUPON_ID,
+                                "coupon-expiry")
+                        .group();
+        Long groupId =
+                groups.findByGroupNumberAndMemberId(expired.groupNumber(), MEMBER_A)
+                        .orElseThrow()
+                        .getId();
+        jdbc.update(
+                "UPDATE payment_group SET expires_at=? WHERE id=?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
+                groupId);
+        assertThat(service.expire(groupId)).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @DisplayName("단건 주문은 쿠폰 할인 스냅샷을 저장하고 쿠폰을 예약한다")
+    @Test
+    void singleOrderCouponIsReservedAndSnapshotted() {
+        issueCoupon();
+        var order = singleCouponOrder("single-coupon-success").order();
+        assertThat(order.getTotalAmount()).isEqualTo(10000L);
+        assertThat(order.getDiscountAmount()).isEqualTo(5000L);
+        assertThat(order.getPayableAmount()).isEqualTo(5000L);
+        assertThat(order.getPaymentGroup().getCouponId()).isEqualTo(COUPON_ID);
+        assertThat(order.getPaymentGroup().getDiscountAmount()).isEqualTo(5000L);
+        assertThat(order.getPaymentGroup().getPayableAmount()).isEqualTo(5000L);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+    }
+
+    @DisplayName("단건 주문 취소·만료 시 쿠폰 예약을 해제한다")
+    @Test
+    void singleOrderCouponReservationIsReleasedByCancellationAndExpiry() {
+        issueCoupon();
+        var cancelled = singleCouponOrder("single-coupon-cancel").order();
+        singleOrders.cancelBeforePayment(cancelled.getOrderNumber(), MEMBER_A);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+
+        var expired = singleCouponOrder("single-coupon-expiry").order();
+        Long groupId = expired.getPaymentGroup().getId();
+        jdbc.update(
+                "UPDATE payment_group SET expires_at=? WHERE id=?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
+                groupId);
+        assertThat(service.expire(groupId)).isTrue();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        stock(salesA, 10, 0);
+    }
+
+    @DisplayName("전액 할인 단건 주문은 0원으로 생성하고 쿠폰을 예약한다")
+    @Test
+    void singleOrderFullyDiscountedCouponIsCreatedWithZeroPayable() {
+        issueCoupon();
+        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 10000L, COUPON_ID);
+        var created = singleCouponOrder("single-coupon-zero").order();
+        assertThat(created.getPayableAmount()).isZero();
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+    }
+
+    @DisplayName("단건 주문의 결제 결과가 미확정이면 쿠폰 예약을 유지한다")
+    @Test
+    void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
+        issueCoupon();
+        var created = singleCouponOrder("single-coupon-pending").order();
+
+        // Payment에 닿지 않아 결과가 없으므로 미확정 상태가 유지된다.
+        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
+
+        assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(service.get(MEMBER_A, created.getPaymentGroup().getGroupNumber()).status())
+                .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+    }
+
     private com.shoppinglive.commercecore.order.dto.OrderCreationResult singleCouponOrder(
             String key) {
         return singleCreation.create(

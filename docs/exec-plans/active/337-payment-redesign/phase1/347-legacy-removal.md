@@ -85,7 +85,7 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 | API | — | `/v1/internal/payments*`, `/refunds*`, `/payment-scenarios/*` 전부 |
 | DB | 테이블 그대로(지우는 것은 #348) | — |
 | 이벤트 | 계약 YAML 그대로 | `PaymentExecutionResolved` 발행 코드 |
-| 운영 | — | **이 PR 병합부터 Phase 2가 끝날 때까지 통합 환경의 결제가 동작하지 않는다.** CommerceCore의 결제 호출은 403을 받는다 |
+| 운영 | — | **이 PR 병합부터 Phase 2가 끝날 때까지 통합 환경의 결제가 동작하지 않는다.** CommerceCore의 결제 호출은 403을 받는다. 로컬 개발용 Core `/v1/dev/payment-scenarios`도 실패한다(`DevPaymentScenarioRegistry`가 `HttpPaymentClient.setScenario/clearScenario`로 Payment `/v1/internal/payment-scenarios`를 부르고 403을 받는다. Core 코드는 고치지 않는다) |
 
 ## 문서 갱신
 

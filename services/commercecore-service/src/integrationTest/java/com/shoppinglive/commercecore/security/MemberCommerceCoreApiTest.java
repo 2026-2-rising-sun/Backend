@@ -204,9 +204,10 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
-    @DisplayName("장바구니·주문·결제 시작에 같은 회원 소유권을 유지한다")
+    @DisplayName("장바구니·주문·결제 시작·이력에 같은 회원 소유권과 상위 결제 소유권을 유지한다")
     @Test
-    void cartOrderAndPaymentStartUseSameMember() throws Exception {
+    void cartOrderPaymentStartAndHistoryUseSameMemberAndPreserveParentPaymentOwnership()
+            throws Exception {
         String cartBody =
                 mvc.perform(
                                 post("/v1/cart/items")
@@ -257,7 +258,21 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                         .andReturn()
                         .getResponse()
                         .getContentAsString();
-        assertThat(mapper.readTree(paymentBody).get("paymentId").asLong()).isPositive();
+        long paymentId = mapper.readTree(paymentBody).get("paymentId").asLong();
+        assertThat(paymentId).isPositive();
+        // 첫 주문이 결제 확정 전이라 같은 회원의 두 번째 주문은 만들 수 없다. 다른 회원의 주문으로 확인한다.
+        var another = order(MEMBER_B);
+        mvc.perform(
+                        get(
+                                        "/v1/orders/{number}/payments/{id}",
+                                        another.getOrderNumber(),
+                                        paymentId)
+                                .header("Authorization", bearer(MEMBER_B)))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/v1/orders").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(7);
     }
 
     @DisplayName("일반 사용자는 판매를 관리할 수 없고 판매자는 가능하며 서비스가 회원을 대신할 수 없다")

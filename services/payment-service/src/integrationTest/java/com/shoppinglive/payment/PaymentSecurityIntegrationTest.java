@@ -40,6 +40,19 @@ class PaymentSecurityIntegrationTest {
     }
 
     @Test
+    @DisplayName("잘못된 서비스 토큰의 내부 API 요청은 401이다")
+    void invalidServiceTokenIsUnauthorized() throws Exception {
+        mvc.perform(
+                        post("/v1/internal/payments")
+                                .header(
+                                        "X-Service-Token",
+                                        "wrong-payment-security-test-credential-32")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("올바른 서비스 토큰이 있어도 열린 내부 경로가 없어 403이다")
     void validServiceTokenIsForbiddenWhileNoRouteIsOpen() throws Exception {
         mvc.perform(
@@ -49,6 +62,12 @@ class PaymentSecurityIntegrationTest {
                                 .content("{}"))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/v1/internal/payments/1").header("X-Service-Token", TOKEN))
+                .andExpect(status().isForbidden());
+        mvc.perform(
+                        post("/v1/internal/refunds")
+                                .header("X-Service-Token", TOKEN)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{}"))
                 .andExpect(status().isForbidden());
     }
 
