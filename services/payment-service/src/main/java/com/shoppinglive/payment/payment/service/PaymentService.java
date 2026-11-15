@@ -10,6 +10,8 @@ import com.shoppinglive.payment.payment.repository.PaymentRepository;
 import com.shoppinglive.payment.payment.repository.PaymentSellerAmountRepository;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,12 +69,23 @@ public class PaymentService {
         int inserted =
                 payments.insertIfAbsent(
                         orderRef, buyerId, request.amount(), expiresAt, orderRef + "-1");
-        Payment payment = payments.findByOrderRef(orderRef).orElseThrow();
+        // ON CONFLICT 대상을 생략해 다른 UNIQUE 충돌도 0행이 된다. 그때는 order_ref 행이 없으니 원인을 남긴다.
+        Payment payment =
+                payments.findByOrderRef(orderRef)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "결제 INSERT가 0행인데 orderRef 행이 없다: " + orderRef));
         if (inserted == 0) {
             requireReusable(payment, request.amount(), buyerId, now);
             return new Created(payment, false);
         }
-        for (SellerAmountRequest seller : request.sellerAmounts()) {
+        // 같은 번호를 잘못 재사용한 두 요청이 반대 순서로 넣어 교착되지 않게 번호 순으로 넣는다.
+        List<SellerAmountRequest> sellers =
+                request.sellerAmounts().stream()
+                        .sorted(Comparator.comparing(SellerAmountRequest::sellerOrderNumber))
+                        .toList();
+        for (SellerAmountRequest seller : sellers) {
             int saved =
                     sellerAmounts.insertIfAbsent(
                             payment.getId(),

@@ -15,13 +15,14 @@ class PaymentCheckoutServiceTest extends PaymentApiTestSupport {
     @DisplayName("[PAY-CHECKOUT-01] CREATED이고 만료 전이면 부를 때마다 checkout_seq를 올리고 새 pgOrderId를 준다(201)")
     void opensNewCheckoutEachCall() throws Exception {
         String orderRef = newOrderRef();
-        create(orderRef).andExpect(status().isCreated());
+        String expiresAt = future();
+        createJson(body(orderRef, BUYER, 30000, expiresAt)).andExpect(status().isCreated());
 
         checkout(orderRef)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.pgOrderId").value(orderRef + "-2"))
                 .andExpect(jsonPath("$.data.amount").value(30000))
-                .andExpect(jsonPath("$.data.expiresAt").isString());
+                .andExpect(jsonPath("$.data.expiresAt").value(expiresAt));
         checkout(orderRef)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.pgOrderId").value(orderRef + "-3"));

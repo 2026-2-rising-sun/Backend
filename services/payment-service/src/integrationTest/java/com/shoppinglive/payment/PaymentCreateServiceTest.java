@@ -187,6 +187,19 @@ class PaymentCreateServiceTest extends PaymentApiTestSupport {
         assertThat(count("payment", orderRef)).isZero();
     }
 
+    @Test
+    @DisplayName("[PAY-CREATE-05] expiresAt 검사는 기존 결제 조회보다 먼저다: 승인된 결제의 재요청도 expiresAt이 지났으면 400")
+    void pastExpiresAtBeforeExistingPayment() throws Exception {
+        // 설계서 처리 순서(검증 → INSERT)를 그대로 따른다. 바꾸려면 설계서·계약을 먼저 고친다.
+        String orderRef = newOrderRef();
+        create(orderRef).andExpect(status().isCreated());
+        setStatus(orderRef, "APPROVED");
+
+        createJson(body(orderRef, BUYER, 30000, Instant.now().minusSeconds(1).toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("INVALID_EXPIRES_AT"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"CANCELED", "PARTIALLY_REFUNDED", "REFUNDED"})
     @DisplayName("[PAY-CREATE-06] 기존 결제가 취소·부분 환불·환불이면 409 PAYMENT_CLOSED")
