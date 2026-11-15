@@ -1,6 +1,6 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — 구현 보류. 이 README의 큰 그림을 확정한 뒤 Phase 1 상세 설계 → Phase 1 구현 순서로 간다(2026-11-15 결정)
+상태: 진행 중 — Phase 1 상세 설계 확정(2026-11-15 사용자 동의). 구현 착수 준비
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: [결제](../../../requirements/payment.md) · [원장](../../../requirements/ledger.md) · [환불](../../../requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../adr/0337-5-pg-timeout-and-unknown.md)
@@ -88,7 +88,7 @@ gh pr edit <내-PR> --base dev && git push --force-with-lease
 
 ```text
 작업: 결제 재설계 Phase 1 PR<n> <제목>
-읽을 것: docs/exec-plans/active/337-payment-redesign/phase1-payment.md 의 "PR<n>" 블록, 블록이 가리키는 요구사항 ID, 필요하면 decision.md
+읽을 것: docs/exec-plans/active/337-payment-redesign/phase1/<이슈>-*.md 의 "PR 나누기"에서 PR<n> 줄, 설계서가 가리키는 요구사항 ID
 저장소·base: Backend, base=<브랜치>, 새 브랜치=<브랜치>
 끝: PR 게이트 결과(검사 출력 요약, ID→테스트 표)를 보고한다. 커밋·푸시·PR 생성은 지시가 있을 때만.
 ```
@@ -115,5 +115,5 @@ Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 
 - 완료: Payment 목표 설계 HTML, 요구사항 초안 3개, ADR 0337-1–5 채택, 이 계획.
 - 남은 일: 큰 그림 확정(이 README) → Phase 1 상세 설계(이슈별) → Phase 1 구현(기존 코드 삭제·토스 클라이언트부터).
-- 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·`payment_order_control`·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 `V4`를 그대로 쓴다. 남은 채 병합되면 `V5`로 옮기고 그 테이블도 함께 지운다.
+- 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·`payment_order_control`·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 `V4`를 그대로 쓴다. 남은 채 병합되면 `V5`로 옮기고 그 테이블도 함께 지운다. 답을 기다리지 않고 기존 코드 삭제를 먼저 진행하며, 충돌은 그 PR이 맞춘다(2026-11-15 결정).
 - 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.
