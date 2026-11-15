@@ -76,7 +76,7 @@ HTTP 클라이언트는 Spring `RestClient`(+ JDK `HttpClient` 요청 팩토리)
 | HTTP 401 (`UNAUTHORIZED_KEY`), HTTP 429 | `NotSent` | 우리 키 문제, 호출 제한. 상태 코드만 본다(본문 code 불필요) |
 | HTTP 4xx인데 본문에서 `code`를 읽지 못함 | `Unknown` | 무엇이 거절됐는지 모른다 |
 | HTTP 400 `INVALID_API_KEY`, HTTP 403 + code ∈ {`INCORRECT_BASIC_AUTH_FORMAT`, `API_KEY_ACCESS_DENIED`} | `NotSent` | 우리 키·설정 문제 |
-| HTTP 400 + code ∈ {`ALREADY_PROCESSED_PAYMENT`, `ALREADY_PROCESSING_REQUEST`}, HTTP 403 `FORBIDDEN_CONSECUTIVE_REQUEST` | `Unknown` | PAY-PG-02. 앞선 요청이 처리 중일 수 있다 |
+| HTTP 400 + code ∈ {`ALREADY_PROCESSED_PAYMENT`, `ALREADY_PROCESSING_REQUEST`}, HTTP 403 `FORBIDDEN_CONSECUTIVE_REQUEST`, HTTP 409 `IDEMPOTENT_REQUEST_PROCESSING` | `Unknown` | PAY-PG-02. 앞선 요청이 처리 중일 수 있다. 409는 같은 멱등 키 요청이 처리 중이다([토스 멱등 키](https://docs.tosspayments.com/reference/using-api/idempotency-key)) |
 | 그 밖의 HTTP 4xx (카드 거절 403 `REJECT_CARD_COMPANY` 등 포함) | `Declined(code, message)` | PAY-PG-02 |
 | HTTP 200, 본문 `status`가 호출별 기대 상태 | `Success(payment)` | 값 검증은 ③에서 |
 | HTTP 200, 본문 파싱 실패 또는 `status`가 기대 상태가 아님(`IN_PROGRESS` 등) | `Unknown` | 조회로 확정한다. 보상 취소로 보내지 않는다 |
@@ -269,7 +269,7 @@ payload:
 | 이벤트 | 토픽, outbox 릴레이 | `PaymentApproved`(키 orderRef) | `PaymentExecutionResolved` |
 | DB | V4 스키마 | — | — |
 | 운영 | — | `PAYMENT_TOSS_SECRET_KEY` 환경 변수(없으면 기동은 하고 토스 호출은 `NotSent`) | — |
-| 요구사항 | — | PAY-PG-01 문장(403 분류, 400 `INVALID_API_KEY`, 401·429는 상태 코드만, 키 미설정) | — |
+| 요구사항 | — | PAY-PG-01 문장(403 분류, 400 `INVALID_API_KEY`, 401·429는 상태 코드만, 키 미설정), PAY-PG-02 문장(409 `IDEMPOTENT_REQUEST_PROCESSING`) | — |
 
 CommerceCore는 아직 `PaymentExecutionResolved`를 기다린다. Phase 2 전까지 통합 환경의 결제는 동작하지 않는다(이미 알려진 영향).
 

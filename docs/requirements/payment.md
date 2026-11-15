@@ -60,7 +60,7 @@
 ## PG 응답 분류
 
 - [ ] **PAY-PG-01** 연결 타임아웃(3초)·연결 거부, 그리고 우리 설정 문제나 호출 제한으로 토스가 처리하지 않은 응답(401, 429, 400 `INVALID_API_KEY`, 403 중 `INCORRECT_BASIC_AUTH_FORMAT`·`API_KEY_ACCESS_DENIED`)은 "보내지 않음"이다. 401·429는 본문 code와 관계없다. 시크릿 키가 설정되지 않았으면 서비스는 기동하되 토스를 호출하지 않고 "보내지 않음"으로 돌려준다. 구매자에게 카드 거절로 보이지 않게 한다. 그 밖의 403(카드 거절 등)은 "거절"이다.
-- [ ] **PAY-PG-02** 그 밖의 4xx는 "거절"이다. 단 `ALREADY_PROCESSED_PAYMENT`·`ALREADY_PROCESSING_REQUEST`·`FORBIDDEN_CONSECUTIVE_REQUEST`(연속 요청 제한)는 "불명"이다.
+- [ ] **PAY-PG-02** 그 밖의 4xx는 "거절"이다. 단 `ALREADY_PROCESSED_PAYMENT`·`ALREADY_PROCESSING_REQUEST`·`FORBIDDEN_CONSECUTIVE_REQUEST`(연속 요청 제한)·409 `IDEMPOTENT_REQUEST_PROCESSING`(같은 멱등 키 요청이 처리 중)은 "불명"이다. 409는 [토스 멱등 키 문서](https://docs.tosspayments.com/reference/using-api/idempotency-key)가 이전 멱등 요청이 처리 중이니 다시 요청해 응답을 확인하라고 안내한다(2026-11-15 확인).
 - [ ] **PAY-PG-03** 읽기 타임아웃·응답 중 끊김·5xx·분류하지 못한 예외는 "불명"이다(애매하면 불명).
 - [ ] **PAY-PG-04** 승인·조회·취소 모두 Basic 인증과 `Idempotency-Key`(승인·취소)를 보내고, 읽기 타임아웃은 60초다.
 

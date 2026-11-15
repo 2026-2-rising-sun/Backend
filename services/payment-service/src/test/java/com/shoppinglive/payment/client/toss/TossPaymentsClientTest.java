@@ -177,7 +177,8 @@ class TossPaymentsClientTest {
     @CsvSource({
         "400, ALREADY_PROCESSED_PAYMENT",
         "400, ALREADY_PROCESSING_REQUEST",
-        "403, FORBIDDEN_CONSECUTIVE_REQUEST"
+        "403, FORBIDDEN_CONSECUTIVE_REQUEST",
+        "409, IDEMPOTENT_REQUEST_PROCESSING"
     })
     @DisplayName("PAY-PG-02 앞선 요청이 처리 중일 수 있는 4xx는 Unknown")
     void possiblyInFlightClientErrorsAreUnknown(int status, String code) {
