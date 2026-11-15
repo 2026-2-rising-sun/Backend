@@ -47,7 +47,7 @@ class TossPaymentsClientTest {
                         new TossProperties(
                                 BASE, SECRET, Duration.ofSeconds(3), Duration.ofSeconds(60)));
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new TossPaymentsClient(builder.build());
+        client = new TossPaymentsClient(builder.build(), Duration.ofSeconds(5));
     }
 
     @Test
@@ -242,6 +242,62 @@ class TossPaymentsClientTest {
 
         assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                 .isInstanceOf(TossResult.Unknown.class);
+    }
+
+    @Test
+    @DisplayName("PAY-PG-02·03 취소의 4xx는 Declined, 5xx는 Unknown")
+    void cancelClientAndServerErrors() {
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andRespond(
+                        withStatus(HttpStatus.BAD_REQUEST)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(error("ALREADY_CANCELED_PAYMENT")));
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andRespond(
+                        withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(error("FAILED_REFUND_PROCESS")));
+
+        assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
+                .isEqualTo(
+                        new TossResult.Declined(
+                                "ALREADY_CANCELED_PAYMENT", "메시지 ALREADY_CANCELED_PAYMENT"));
+        assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
+                .isInstanceOf(TossResult.Unknown.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("PAY-PG-02·03 조회의 4xx는 Declined, 5xx는 Unknown")
+    void getPaymentClientAndServerErrors() {
+        server.expect(requestTo(BASE + "/v1/payments/pk-1"))
+                .andRespond(
+                        withStatus(HttpStatus.NOT_FOUND)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(error("NOT_FOUND_PAYMENT")));
+        server.expect(requestTo(BASE + "/v1/payments/pk-1"))
+                .andRespond(
+                        withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(error("FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING")));
+
+        assertThat(client.getPayment("pk-1"))
+                .isEqualTo(new TossResult.Declined("NOT_FOUND_PAYMENT", "메시지 NOT_FOUND_PAYMENT"));
+        assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.Unknown.class);
+        server.verify();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"201", "302"})
+    @DisplayName("PAY-PG-03 200이 아닌 2xx와 3xx는 Unknown")
+    void unexpectedStatusIsUnknown(int status) {
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(
+                        withStatus(HttpStatus.valueOf(status))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(payment("DONE", "")));
+
+        assertThat(confirm()).isInstanceOf(TossResult.Unknown.class);
     }
 
     private TossResult confirm() {

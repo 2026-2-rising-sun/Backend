@@ -37,9 +37,9 @@ ledger/service       LedgerService                 record(refType, refId, lines)
 | `payment.toss.base-url` | `PAYMENT_TOSS_BASE_URL` | `https://api.tosspayments.com` | |
 | `payment.toss.secret-key` | `PAYMENT_TOSS_SECRET_KEY` | 빈 값 | 테스트 키 `test_sk_…`. **로그·예외 메시지에 남기지 않는다**. 비어 있으면 기동하고 WARN 로그 한 줄을 남긴 뒤, 모든 호출을 보내지 않고 `NotSent`로 돌려준다(2026-11-15 사용자 결정) |
 | `payment.toss.connect-timeout` | — | `3s` | PAY-PG-01 |
-| `payment.toss.read-timeout` | — | `60s` | PAY-PG-04 |
+| `payment.toss.read-timeout` | — | `60s` | PAY-PG-04. 헤더와 본문을 합친 응답 대기다. JDK 요청 타임아웃은 헤더까지만 막으므로 호출 전체에 `connect-timeout + read-timeout` 데드라인을 두고, 넘으면 `Unknown`이다 |
 
-HTTP 클라이언트는 Spring `RestClient`(+ JDK `HttpClient` 요청 팩토리)로 만든다. 공통 `ServiceRestClientFactory`는 내부 서비스용이라 쓰지 않는다.
+HTTP 클라이언트는 Spring `RestClient`(+ JDK `HttpClient` 요청 팩토리)로 만든다. 공통 `ServiceRestClientFactory`는 내부 서비스용이라 쓰지 않는다. Boot가 주입하는 `RestClient.Builder`도 쓰지 않는다. 공통 커스터마이저가 내부 요청 ID(`X-Request-Id`) 같은 헤더를 붙이기 때문이다. 외부 PG에는 토스 헤더만 보낸다.
 
 ### 호출 3개
 

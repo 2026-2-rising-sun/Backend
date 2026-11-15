@@ -2,22 +2,32 @@ package com.shoppinglive.payment.client.toss;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.web.client.RestClientAutoConfiguration;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
-import org.springframework.web.client.RestClient;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.web.client.RestClientCustomizer;
 
-/** 실제 JDK HttpClient 소켓 동작으로 예외 분류를 확인한다. MockRestServiceServer는 타임아웃을 만들지 못한다. */
+/** 운영과 같은 빈 생성 경로와 실제 JDK HttpClient 소켓으로 확인한다. MockRestServiceServer는 타임아웃과 실제 헤더를 만들지 못한다. */
 class TossClientConfigurationTest {
     static final String SECRET = "test_sk_unit_secret";
+    static final String DONE_RESPONSE_HEAD =
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 200\r\n\r\n";
+    static final String PARTIAL_BODY = "{\"paymentKey\":\"pk";
 
     @Test
     @DisplayName("PAY-PG-01·04 기본 연결 타임아웃은 3초, 읽기 타임아웃은 60초다")
@@ -39,25 +49,55 @@ class TossClientConfigurationTest {
     }
 
     @Test
-    @DisplayName("PAY-PG-01 비밀 키가 비어 있어도 기동하고 토스를 호출하지 않고 NotSent다")
+    @DisplayName("PAY-PG-01 비밀 키가 비어 있어도 기동하고, 토스에 요청을 보내지 않고 NotSent다")
     void blankSecretKeyStartsAndReturnsNotSentWithoutCalling() throws Exception {
-        // 응답하지 않는 서버를 둔다. 요청을 보냈다면 읽기 타임아웃으로 Unknown이 된다.
-        try (ServerSocket server = serve(null)) {
-            TossProperties properties =
-                    new TossProperties(
-                            "http://127.0.0.1:" + server.getLocalPort(),
-                            " ",
-                            Duration.ofSeconds(1),
-                            Duration.ofMillis(300));
-            TossPaymentsClient client =
-                    new TossClientConfiguration()
-                            .tossPaymentsClient(RestClient.builder(), properties);
+        try (RawServer server = RawServer.respond("", Duration.ofSeconds(5))) {
+            TossPaymentsClient client = clientFor(server, " ", Duration.ofMillis(300));
 
             assertThat(client.confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
                     .isInstanceOf(TossResult.NotSent.class);
             assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.NotSent.class);
             assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                     .isInstanceOf(TossResult.NotSent.class);
+            assertThat(server.request()).isNotDone();
+        }
+    }
+
+    @Test
+    @DisplayName("PAY-PG-04 공통 RestClient 커스터마이저의 내부 요청 ID 헤더는 토스로 나가지 않는다")
+    void doesNotInheritSharedRestClientCustomizers() throws Exception {
+        String doneBody =
+                "{\"paymentKey\":\"pk-1\",\"orderId\":\"pg-order-1\",\"status\":\"DONE\",\"totalAmount\":15000}";
+        String response =
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                        + doneBody.length()
+                        + "\r\n\r\n"
+                        + doneBody;
+        try (RawServer server = RawServer.respond(response, Duration.ZERO)) {
+            new ApplicationContextRunner()
+                    .withConfiguration(AutoConfigurations.of(RestClientAutoConfiguration.class))
+                    .withUserConfiguration(TossClientConfiguration.class)
+                    // 공통 WebConfiguration의 요청 ID 전달 커스터마이저와 같은 역할이다.
+                    .withBean(
+                            RestClientCustomizer.class,
+                            () -> builder -> builder.defaultHeader("X-Request-Id", "internal-id"))
+                    .withPropertyValues(
+                            "payment.toss.base-url=http://127.0.0.1:" + server.port(),
+                            "payment.toss.secret-key=" + SECRET)
+                    .run(
+                            context ->
+                                    assertThat(
+                                                    context.getBean(TossPaymentsClient.class)
+                                                            .confirm(
+                                                                    "pk-1",
+                                                                    "pg-order-1",
+                                                                    15000,
+                                                                    "confirm-pg-order-1"))
+                                            .isInstanceOf(TossResult.Success.class));
+
+            String request = server.request().get(5, TimeUnit.SECONDS).toLowerCase();
+            assertThat(request).contains("authorization: basic ").contains("idempotency-key: ");
+            assertThat(request).doesNotContain("x-request-id");
         }
     }
 
@@ -70,64 +110,109 @@ class TossClientConfigurationTest {
         }
 
         assertThat(
-                        clientFor(closedPort, Duration.ofSeconds(1))
+                        clientFor("http://127.0.0.1:" + closedPort, SECRET, Duration.ofSeconds(1))
                                 .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
                 .isInstanceOf(TossResult.NotSent.class);
     }
 
     @Test
-    @DisplayName("PAY-PG-03 읽기 타임아웃은 Unknown")
-    void readTimeoutIsUnknown() throws Exception {
-        try (ServerSocket server = serve(null)) {
+    @DisplayName("PAY-PG-03 응답 헤더가 오지 않아 읽기 타임아웃이 나면 Unknown")
+    void readTimeoutBeforeHeadersIsUnknown() throws Exception {
+        try (RawServer server = RawServer.respond("", Duration.ofSeconds(5))) {
             TossResult result =
-                    clientFor(server.getLocalPort(), Duration.ofMillis(300))
+                    clientFor(server, SECRET, Duration.ofMillis(300))
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+        }
+    }
+
+    @Test
+    @DisplayName("PAY-PG-03·04 헤더 뒤 본문이 멈추면 읽기 타임아웃 안에 Unknown으로 끝낸다")
+    void bodyStallAfterHeadersIsUnknownWithinReadTimeout() throws Exception {
+        try (RawServer server =
+                RawServer.respond(DONE_RESPONSE_HEAD + PARTIAL_BODY, Duration.ofSeconds(10))) {
+            long startedAt = System.nanoTime();
+
+            TossResult result =
+                    clientFor(server, SECRET, Duration.ofMillis(300))
+                            .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
+
+            assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(Duration.ofNanos(System.nanoTime() - startedAt))
+                    .isLessThan(Duration.ofSeconds(3));
         }
     }
 
     @Test
     @DisplayName("PAY-PG-03 응답 본문 중간에 연결이 끊기면 Unknown")
     void responseCutMidBodyIsUnknown() throws Exception {
-        String partial =
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 200\r\n\r\n{\"paymentKey\":\"pk";
-        try (ServerSocket server = serve(partial)) {
+        try (RawServer server =
+                RawServer.respond(DONE_RESPONSE_HEAD + PARTIAL_BODY, Duration.ZERO)) {
             TossResult result =
-                    clientFor(server.getLocalPort(), Duration.ofSeconds(5))
+                    clientFor(server, SECRET, Duration.ofSeconds(5))
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
         }
     }
 
-    private static TossPaymentsClient clientFor(int port, Duration readTimeout) {
-        TossProperties properties =
-                new TossProperties(
-                        "http://127.0.0.1:" + port, SECRET, Duration.ofSeconds(1), readTimeout);
-        return new TossPaymentsClient(
-                TossClientConfiguration.configure(RestClient.builder(), properties).build());
+    private static TossPaymentsClient clientFor(
+            RawServer server, String secretKey, Duration readTimeout) {
+        return clientFor("http://127.0.0.1:" + server.port(), secretKey, readTimeout);
     }
 
-    /** 연결 하나를 받아 요청을 읽고 rawResponse를 쓴 뒤 닫는다. null이면 응답 없이 연결만 붙잡는다. */
-    private static ServerSocket serve(String rawResponse) throws IOException {
-        ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
-        Thread.ofVirtual()
-                .start(
-                        () -> {
-                            try (Socket socket = server.accept()) {
-                                socket.getInputStream().read(new byte[8192]);
-                                if (rawResponse == null) {
-                                    Thread.sleep(5_000);
-                                } else {
-                                    socket.getOutputStream()
-                                            .write(rawResponse.getBytes(StandardCharsets.UTF_8));
-                                    socket.getOutputStream().flush();
-                                }
-                            } catch (IOException | InterruptedException ignored) {
-                                // 테스트가 끝나 소켓이 닫히면 멈춘다.
-                            }
-                        });
-        return server;
+    /** 운영 빈과 같은 경로로 만든다. */
+    private static TossPaymentsClient clientFor(
+            String baseUrl, String secretKey, Duration readTimeout) {
+        return new TossClientConfiguration()
+                .tossPaymentsClient(
+                        new TossProperties(baseUrl, secretKey, Duration.ofSeconds(1), readTimeout));
+    }
+
+    /** 연결 하나를 받아 요청 헤더를 기록하고 rawResponse를 쓴 뒤 holdOpen만큼 연결을 붙잡는다. 요청을 받지 않았으면 request는 끝나지 않는다. */
+    private record RawServer(ServerSocket socket, CompletableFuture<String> request)
+            implements AutoCloseable {
+
+        static RawServer respond(String rawResponse, Duration holdOpen) throws IOException {
+            RawServer server =
+                    new RawServer(
+                            new ServerSocket(0, 1, InetAddress.getLoopbackAddress()),
+                            new CompletableFuture<>());
+            Thread.ofVirtual().start(() -> server.handle(rawResponse, holdOpen));
+            return server;
+        }
+
+        int port() {
+            return socket.getLocalPort();
+        }
+
+        private void handle(String rawResponse, Duration holdOpen) {
+            try (Socket connection = socket.accept()) {
+                request.complete(readHeaders(connection.getInputStream()));
+                connection.getOutputStream().write(rawResponse.getBytes(StandardCharsets.UTF_8));
+                connection.getOutputStream().flush();
+                Thread.sleep(holdOpen);
+            } catch (IOException | InterruptedException ignored) {
+                // 테스트가 끝나 소켓이 닫히면 멈춘다.
+            }
+        }
+
+        private static String readHeaders(InputStream input) throws IOException {
+            ByteArrayOutputStream headers = new ByteArrayOutputStream();
+            while (!headers.toString(StandardCharsets.ISO_8859_1).contains("\r\n\r\n")) {
+                int next = input.read();
+                if (next < 0) {
+                    break;
+                }
+                headers.write(next);
+            }
+            return headers.toString(StandardCharsets.ISO_8859_1);
+        }
+
+        @Override
+        public void close() throws IOException {
+            socket.close();
+        }
     }
 }
