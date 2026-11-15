@@ -1,0 +1,4 @@
+# 앱 전체를 띄우는 통합 테스트용 값. 토스는 호출하지 않는다.
+payment:
+  toss:
+    secret-key: test_sk_integration_dummy

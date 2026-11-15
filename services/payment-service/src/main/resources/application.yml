@@ -18,6 +18,10 @@ server:
   port: 8086
 payment:
   core-service-token: ${COMMERCECORE_PAYMENT_SERVICE_TOKEN}
+  toss:
+    base-url: ${PAYMENT_TOSS_BASE_URL:https://api.tosspayments.com}
+    # 비어 있으면 기동을 막는다(TossClientConfiguration).
+    secret-key: ${PAYMENT_TOSS_SECRET_KEY:}
   refunds:
     execution-enabled: true
 shoppinglive:
