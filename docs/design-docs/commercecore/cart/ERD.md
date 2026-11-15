@@ -1,6 +1,6 @@
 # Cart 모듈 ERD
 
-상태: Cart 모델·이행·최종 Order 연결 반영 · 감사 후 소비자 호환 보완 중
+상태: Cart 모델·이행·포트 구현 완료 · 소비자 호환과 최종 독립 API 검증 중
 
 기준: Cart 독립 구현 `6f9dda99`, 최종 통합 감사 `5048413b`. 모델의 최종 거래 연결은 [통합 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)을 함께 본다. [HTML 관계도](ERD.html) · [설계](설계.md) · [구현 계획](../../../exec-plans/active/332-cart-module/README.md) · [현행 Core 전체 ERD](../../services/commercecore/erd.md)
 
@@ -46,7 +46,7 @@ Core V101 Product → V102 SKU → V103 Cart → V104 Order 순서다. 적용된
 
 ## 성공 정리와 실패 복구
 
-최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 최종 OrderSheetService와 OrderSheetLifecycleService가 생성/성공 정리에 사용한다. 독립 Cart 브랜치에 포함된 이전 Order 코드와 최종 통합 코드를 혼동하지 않는다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
+최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 감사 기준 `5048413b`의 OrderSheetService와 OrderSheetLifecycleService가 생성/성공 정리에 사용했다. 최종 독립 PR에 포함되는 공개 API/연계 범위는 최신 Order 계약과 별도로 확인한다. 독립 Cart 브랜치에 포함된 이전 Order 코드와 최종 통합 코드를 혼동하지 않는다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
 
 Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 작성하지 않는다. SKU READY/판매 상태와 Order 결제 상태를 Cart에 복제하지 않는다.
 

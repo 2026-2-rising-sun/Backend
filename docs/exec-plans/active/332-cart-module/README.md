@@ -1,6 +1,6 @@
 # #332 Cart 모듈 구현 계획
 
-상태: Cart 독립 구현·Order 통합 반영 · 최종 감사의 소비자/API 호환 보완 진행 중
+상태: Cart 독립 구현 완료 · 소비자/API 호환 보완과 최종 독립 API 검증 중
 
 자료: [설계](../../../design-docs/commercecore/cart/설계.md) · [ADR](../../../adr/0332-cart-sku-boundary.md) · [ERD MD](../../../design-docs/commercecore/cart/ERD.md) · [ERD HTML](../../../design-docs/commercecore/cart/ERD.html) · [워크로그](../../../worklog/2026-11-13.md) · [이슈 #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 정책 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
