@@ -27,7 +27,7 @@
 | 서비스 | `main/java/com/shoppinglive/payment/service/` 전체(Mock 엔진·게이트웨이, 결과 발행, 재시도 정책, 복구 저장소, 환불 접수·실행·결과, reconciler 등 17개) |
 | 관측 | `main/java/com/shoppinglive/payment/observability/` 전체(`PaymentObservabilityConfiguration`, `PaymentObservation`, `PendingWorkMetrics` — 옛 테이블을 센다) |
 | 지원 | `main/java/com/shoppinglive/payment/support/AfterCommit.java`(옛 서비스 2곳만 사용) |
-| 단위 테스트 | `test/java/com/shoppinglive/payment/service/` 전체 4개 |
+| 단위 테스트 | `test/java/com/shoppinglive/payment/service/`의 `PaymentRetryPolicyTest`, `RefundMockEngineTest`, `RefundRetryPolicyTest`. `ExecutionEventContractTest`는 지우지 않고 다시 쓴다(아래 "남길 것") |
 | 통합 테스트 | `integrationTest/java/com/shoppinglive/payment/service/` 전체 5개 |
 | 설정 | `application.yml`의 `payment.refunds.execution-enabled` |
 
@@ -39,11 +39,14 @@
 | `config/PaymentSecurityConfiguration.java` | 허용 목록을 비운다. `/v1/internal/**`는 모두 `denyAll`(#348에서 새 경로를 연다). 서비스 토큰 필터·probe 체인은 유지 |
 | `config/PaymentExceptionHandler.java` | 없음(#348이 `PaymentError` 처리를 더한다) |
 | `integrationTest/.../PaymentSecurityIntegrationTest.java` | 다시 쓴다: 토큰 없음 401, 토큰 있어도 `/v1/internal/payments` 403, `/actuator/health/liveness`·`/actuator/health/readiness` 200(기존 probe 검사 유지) |
+| `test/.../service/ExecutionEventContractTest.java` | 루트 패키지로 옮기고 옛 DTO 없이 `PaymentExecutionResolved` 봉투 표본 JSON만 만들게 다시 쓴다. 계약 YAML이 남아 있고, Payment만 빌드하는 CI에서 `check_events.py --samples`가 표본 0건으로 실패하지 않게 한다. #338 승인 처리 PR에서 `PaymentApprovedContractTest`로 바꾼다 |
 | `db/payment-migration/V1–V3` | 없음 |
 | `application.yml`의 datasource·kafka·flyway·outbox 설정 | 없음 |
 | `build.gradle.kts` | `resilience4j-spring-boot3`(지금도 쓰는 곳 없음)와 `spring-boot-starter-aop`(지우는 `PaymentObservation`만 씀) 두 줄을 지운다. 새 설계의 재호출은 1번뿐이라 라이브러리가 필요 없다 |
 
 기동 확인을 위해 컨텍스트 로드 테스트 1개(`PaymentServiceContextTest`)를 둔다. `ddl-auto: validate`는 엔티티가 없으므로 통과한다.
+
+PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrationTest`가 0건이 된다(지우는 파일에 `migration` 태그가 있어 `migrationTest`도 선택된다). 두 태스크는 0건이면 실패하므로 위 "테스트" 표의 Postgres 테스트 2개를 새로 둔다.
 
 ## 계약
 
@@ -68,6 +71,9 @@
 |---|---|
 | 컨트롤러 없이 기동 | `PaymentServiceContextTest` |
 | 보안 체인 유지 | `PaymentSecurityIntegrationTest`(다시 씀) |
+| 실제 PostgreSQL·Flyway·`ddl-auto: validate`로 기동 | `PaymentStartupPostgresTest`(`@Tag("postgres")`). H2 create-drop은 validate 통과를 증명하지 못한다 |
+| V1–V3가 빈 스키마에 적용 | `PaymentMigrationPostgresTest`(`@Tag("postgres")`·`@Tag("migration")`) |
+| 이벤트 표본 0건 방지 | `ExecutionEventContractTest`(다시 씀) |
 | 전체 검사 | `scripts/check.sh --base origin/dev`. CommerceCore 테스트가 깨지면 그 부분만 남기고 PR 본문에 적는다 |
 
 ## 바뀌는 점
