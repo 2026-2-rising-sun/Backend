@@ -179,7 +179,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 | `orderRef` | 주문 참조 | 필수(`@NotBlank`만). 형식 `^[A-Za-z0-9_-]{6,50}$`은 **Bean Validation 밖**에서 검사해 400 `INVALID_ORDER_REF`를 낸다. 문자 제한은 토스 orderId 규칙(영문·숫자·`-`·`_`, 6–64자)에서 왔고, 50자는 `-{시도 번호}`가 64자 안에 들어가게 한 값이다 | `OD-20261110-K7Q2M9XA` |
 | `buyerId` | 구매자 | 필수, UUID | |
 | `amount` | 결제 금액 | 필수, ≥ 1 | `30000` |
-| `expiresAt` | 결제 만료 시각 | 필수, ISO-8601 오프셋 포함. DB `now()` 이하면 400 `INVALID_EXPIRES_AT` | `2026-11-10T14:10:00+09:00` |
+| `expiresAt` | 결제 만료 시각 | 필수, ISO-8601 오프셋 포함. **새 결제를 만들 때만** DB `now()` 이하면 400 `INVALID_EXPIRES_AT`(같은 orderRef가 있으면 검사하지 않는다) | `2026-11-10T14:10:00+09:00` |
 | `sellerAmounts[]` | 판매자별 금액 | 필수, 1개 이상 | |
 | `sellerAmounts[].sellerOrderNumber` | | 필수, ≤ 64자, 요청 안에서 중복 없음 | `…-S1` |
 | `sellerAmounts[].sellerId` | | 필수, UUID | |
@@ -204,7 +204,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 | APPROVING · UNKNOWN · APPROVED | 같음 | 200 현재 값(`status` 그대로) |
 | CREATED 만료 · CANCELED · PARTIALLY_REFUNDED · REFUNDED | 같음 | 409 `PAYMENT_CLOSED` |
 
-- 비교는 `amount`·`buyerId`만 한다. `expiresAt`·`sellerAmounts`가 달라도 저장된 값을 유지하고 비교하지 않는다(미결정 1).
+- 비교는 `amount`·`buyerId`만 한다. `expiresAt`·`sellerAmounts`가 달라도 저장된 값을 유지하고 비교하지 않는다(미결정 1). 재시도 본문의 `expiresAt`이 이미 지났어도 기존 결제가 있으면 `INVALID_EXPIRES_AT`이 아니라 위 표로 응답한다(2026-11-16 결정, PAY-CREATE-02).
 - **동시 생성**(PAY-CREATE-02): `INSERT … ON CONFLICT DO NOTHING`(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태)의 영향 행 수로 판단한다. 0행이면 같은 트랜잭션에서 기존 행을 읽어 위 표로 응답한다. 예외를 잡는 방식은 쓰지 않는다(PostgreSQL은 UNIQUE 위반 시 트랜잭션 전체가 중단된다). `payment_seller_amount`는 INSERT가 1행일 때만 같은 트랜잭션에서 넣는다.
 - `sellerOrderNumber`가 다른 결제에 이미 있으면 UNIQUE 위반이다. 정상 Commerce라면 생기지 않는다. 400 `INVALID_REQUEST`로 응답하고 WARN 로그를 남긴다.
 
@@ -260,7 +260,7 @@ UPDATE payment
 
 | API | 트랜잭션 | 외부 호출 |
 |---|---|---|
-| 생성 | 1개: 검증 → INSERT ON CONFLICT → (1행) 판매자 금액 INSERT / (0행) 읽기 | 없음 |
+| 생성 | 1개: 형식 검증 → 기존 행 읽기(있으면 위 표) → `expiresAt` 검증 → INSERT ON CONFLICT → (1행) 판매자 금액 INSERT / (0행) 다시 읽어 위 표 | 없음 |
 | 결제창 | 1개: 조건부 UPDATE → 읽기 | 없음 |
 | 조회 | 읽기 전용 | 없음 |
 

@@ -187,17 +187,29 @@ class PaymentCreateServiceTest extends PaymentApiTestSupport {
         assertThat(count("payment", orderRef)).isZero();
     }
 
-    @Test
-    @DisplayName("[PAY-CREATE-05] expiresAt 검사는 기존 결제 조회보다 먼저다: 승인된 결제의 재요청도 expiresAt이 지났으면 400")
-    void pastExpiresAtBeforeExistingPayment() throws Exception {
-        // 설계서 처리 순서(검증 → INSERT)를 그대로 따른다. 바꾸려면 설계서·계약을 먼저 고친다.
+    @ParameterizedTest
+    @ValueSource(strings = {"CREATED", "APPROVED"})
+    @DisplayName("[PAY-CREATE-02] 같은 orderRef가 있으면 재요청의 expiresAt이 지났어도 검사하지 않고 기존 결제를 200으로 돌려준다")
+    void retryWithPastExpiresAtReturnsExistingPayment(String current) throws Exception {
         String orderRef = newOrderRef();
         create(orderRef).andExpect(status().isCreated());
-        setStatus(orderRef, "APPROVED");
+        setStatus(orderRef, current);
 
         createJson(body(orderRef, BUYER, 30000, Instant.now().minusSeconds(1).toString()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("INVALID_EXPIRES_AT"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(current));
+    }
+
+    @Test
+    @DisplayName("[PAY-CREATE-06] 재요청의 expiresAt이 지났어도 기존 결제가 닫혔으면 400이 아니라 409 PAYMENT_CLOSED")
+    void retryWithPastExpiresAtOnClosedPayment() throws Exception {
+        String orderRef = newOrderRef();
+        create(orderRef).andExpect(status().isCreated());
+        setStatus(orderRef, "CANCELED");
+
+        createJson(body(orderRef, BUYER, 30000, Instant.now().minusSeconds(1).toString()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("PAYMENT_CLOSED"));
     }
 
     @ParameterizedTest

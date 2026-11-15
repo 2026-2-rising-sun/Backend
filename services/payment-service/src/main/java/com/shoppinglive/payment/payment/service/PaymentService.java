@@ -60,12 +60,17 @@ public class PaymentService {
             throw new PaymentException(PaymentError.INVALID_REQUEST, "판매자 주문 번호가 요청 안에서 겹칩니다.");
         }
         Instant now = dbNow();
+        String buyerId = request.buyerId().toString();
+        // 같은 orderRef가 이미 있으면 expiresAt은 보지 않는다(재시도 본문의 expiresAt이 지났어도 기존 결제로 응답).
+        Payment existing = payments.findByOrderRef(orderRef).orElse(null);
+        if (existing != null) {
+            return reuse(existing, request.amount(), buyerId, now);
+        }
         Instant expiresAt = request.expiresAt().toInstant();
         if (!expiresAt.isAfter(now)) {
             throw new PaymentException(PaymentError.INVALID_EXPIRES_AT);
         }
 
-        String buyerId = request.buyerId().toString();
         int inserted =
                 payments.insertIfAbsent(
                         orderRef, buyerId, request.amount(), expiresAt, orderRef + "-1");
@@ -77,8 +82,8 @@ public class PaymentService {
                                         new IllegalStateException(
                                                 "결제 INSERT가 0행인데 orderRef 행이 없다: " + orderRef));
         if (inserted == 0) {
-            requireReusable(payment, request.amount(), buyerId, now);
-            return new Created(payment, false);
+            // 동시 요청이 먼저 넣었다. 위의 기존 결제 경로와 같은 규칙으로 응답한다.
+            return reuse(payment, request.amount(), buyerId, now);
         }
         // 같은 번호를 잘못 재사용한 두 요청이 반대 순서로 넣어 교착되지 않게 번호 순으로 넣는다.
         List<SellerAmountRequest> sellers =
@@ -128,7 +133,7 @@ public class PaymentService {
     }
 
     /** 같은 orderRef 재요청: 금액·구매자만 비교하고 expiresAt·판매자 금액은 처음 값을 유지한다. */
-    private static void requireReusable(Payment payment, long amount, String buyerId, Instant now) {
+    private static Created reuse(Payment payment, long amount, String buyerId, Instant now) {
         if (payment.getAmount() != amount || !payment.getBuyerId().equals(buyerId)) {
             throw new PaymentException(PaymentError.AMOUNT_CONFLICT);
         }
@@ -141,6 +146,7 @@ public class PaymentService {
         if (!reusable) {
             throw new PaymentException(PaymentError.PAYMENT_CLOSED);
         }
+        return new Created(payment, false);
     }
 
     private Instant dbNow() {
