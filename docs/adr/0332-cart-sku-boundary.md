@@ -2,11 +2,11 @@
 
 결정 상태: 업무 방향 채택 · 1차 기술 경계 고정 · 나머지 연결안 미결정
 
-구현 상태: 사용자 착수 지시에 따라 진행 중. [실행 계획](../exec-plans/active/332-cart-module/README.md) · [설계](../design-docs/commercecore/cart/설계.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
+구현 상태: Cart 독립 구현·최종 Order 통합을 마쳤으며 소비자 호환 감사 후속을 진행 중이다. [실행 계획](../exec-plans/active/332-cart-module/README.md) · [설계](../design-docs/commercecore/cart/설계.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
 ## 문제
 
-현재 Cart는 상품 하나당 한 항목이며 Order 패키지 안에 있다. Product–SKU 1:N과 SKU별 가격·재고로 바꾸려면 구매 단위를 구분해야 한다. 결제 성공 정리는 Order에 저장한 Cart ID·버전을 사용하고 선택 환불도 이 ID에 의존한다. 사용자는 Order가 Cart 정보를 많이 갖는 구조와 관리 비용을 지적했다.
+개편 전 Cart는 상품 하나당 한 항목이며 Order 패키지 안에 있었다. Product–SKU 1:N과 SKU별 가격·재고로 바꾸려면 구매 단위를 구분해야 한다. 결제 성공 정리는 Order에 저장한 Cart ID·버전을 사용하고 선택 환불도 이 ID에 의존한다. 사용자는 Order가 Cart 정보를 많이 갖는 구조와 관리 비용을 지적했다.
 
 ## 결정과 이유
 
@@ -35,3 +35,9 @@
 V103은 원본 product_id를 유지하고 sku_id를 nullable로 확장한다. 기존 Sales ID와 일치하는 기본 SKU만 연결하며 매핑 불가 행을 삭제하거나 임의 SKU를 만들지 않는다. 해당 행은 조회·수량 변경·사용자 삭제를 허용하고 주문 선택만 이용 불가로 거절한다. 새 SKU 담기는 실제 SKU ID를 저장하고 기존 productId 요청은 SKU가 정확히 하나일 때만 호환한다.
 
 후속 쿠폰/환불/취소 U1/U2/U3 확정은 Order 범위에 반영한다. Cart에는 별도 쿠폰 계산·환불 상태·취소 상태를 추가하지 않는다. 상세 최신 동작과 실제 검증은 설계·실행 계획·워크로그를 원본으로 삼는다.
+
+## 최종 통합과 감사 후속
+
+Cart `6f9dda99`는 Order 통합 `5048413b`에 포함됐다. [최종 통합 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)과 [2026-11-15 후속 기록](../worklog/2026-11-15.md)을 현재 진행의 연결점으로 사용한다. 과거 Cart 브랜치의 33실패는 그 시점의 기록이며 최종 통합 상태를 뜻하지 않는다.
+
+준비/중지/품절 SKU의 담기 허용은 아직 직접 사용자 확정이 없고 현재 구현을 유지한다. 기존 선점 주문의 결제 허용·새 주문 차단은 후속 사용자 답변에 따라 Order/Product 담당이 반영한다. #340/#345/#346 및 공개 다중 SKU·대표가/옵션 보류는 해제하지 않는다. 소비자 어댑터·계약 한도 보완은 기존 합의를 실현하는 호환 수정이며 새 업무 정책이 아니다.

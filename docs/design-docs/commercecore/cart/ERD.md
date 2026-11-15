@@ -1,8 +1,8 @@
 # Cart 모듈 ERD
 
-상태: Cart 구현·이행 검증 완료 · 전체 거래 연계 검증 대기
+상태: Cart 모델·이행·최종 Order 연결 반영 · 감사 후 소비자 호환 보완 중
 
-기준: `refactor/#332-cart-module`, 기존 dev `cc91c09b` 위의 Cart 변경. [HTML 관계도](ERD.html) · [설계](설계.md) · [구현 계획](../../../exec-plans/active/332-cart-module/README.md) · [현행 Core 전체 ERD](../../services/commercecore/erd.md)
+기준: Cart 독립 구현 `6f9dda99`, 최종 통합 감사 `5048413b`. 모델의 최종 거래 연결은 [통합 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)을 함께 본다. [HTML 관계도](ERD.html) · [설계](설계.md) · [구현 계획](../../../exec-plans/active/332-cart-module/README.md) · [현행 Core 전체 ERD](../../services/commercecore/erd.md)
 
 상품 하나의 옵션이 달라도 장바구니에서는 SKU마다 수량을 따로 관리한다. 기존 판매정보가 없어 SKU로 연결할 수 없는 항목은 지우지 않고 상품 ID와 수량을 보존하며, 주문 선택에서는 이용 불가로 처리한다. 장바구니에 담거나 조회해도 재고를 예약하지 않는다.
 
@@ -46,7 +46,7 @@ Core V101 Product → V102 SKU → V103 Cart → V104 Order 순서다. 적용된
 
 ## 성공 정리와 실패 복구
 
-최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 현재 Cart 브랜치의 Order는 구 Sales 경로가 남아 있다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
+최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 최종 OrderSheetService와 OrderSheetLifecycleService가 생성/성공 정리에 사용한다. 독립 Cart 브랜치에 포함된 이전 Order 코드와 최종 통합 코드를 혼동하지 않는다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
 
 Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 작성하지 않는다. SKU READY/판매 상태와 Order 결제 상태를 Cart에 복제하지 않는다.
 
@@ -57,4 +57,4 @@ Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 �
 - [CartSelectionPort.java](../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartSelectionPort.java)
 - [CartSelectionServiceTest.java](../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/cart/service/CartSelectionServiceTest.java)
 
-2026-11-13 체크포인트의 Cart 단위13/H2통합20/실제 PostgreSQL12/Flyway3 통과는 당시 결과다. `d85332a9`의 CI는299개 중34실패·2스킵이며, 현재 독립 Cart 검증과 선행 SKU 통합 뒤 결과는 [2026-11-14 복구 기록](../../../worklog/2026-11-14.md#332-cart-복구-검증)에서 확인한다. Cart 원본 YAML은 이전 스키마이고 Order `c3d96569`에 Cart 계약 조각이 통합됐다는 인계를 받았다. 전체 거래·계약 검증은 최종 Order 통합 HEAD에서 수행하며 운영 적용 증거와 구분한다.
+과거 검사 건수와 실패는 [2026-11-14 기록](../../../worklog/2026-11-14.md#332-cart-복구-검증)에 남긴다. 최종 Order 통합에서 Cart의 과거 실패는 해소됐고 현재 소비자 호환/계약 한도 보완은 [2026-11-15 기록](../../../worklog/2026-11-15.md)을 따른다. 모델 일치·기존 검사·새 API/브라우저 실행·운영 적용은 서로 다른 증거다.
