@@ -181,6 +181,23 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 
 Core PostgreSQL/계약 대역·Kafka 검사와 실제 Payment 생성·조회·checkout 확인을 구분한다. 실제 환불 생산자·소비자는 아직 발견하지 못해 전체 통합은 미완이다. [현재 원본·남은 기준](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md).
 
+### 새 Payment와 기존 Mock의 계약 구분
+
+2026-11-17 Core `ebea69d6`와 팀원 `feat/#349-payment-recovery`의 `800b41fd`를 대조했다. 새 주문서의 요청은 이미 팀원의 새 DTO와 일치한다. dev에 남아 있는 기존 `PaymentCommand`는 별도 실행 계약이므로 필드 이름만 바꾸거나 새 주문서를 그 DTO로 되돌리지 않는다.
+
+| 단계 | Core 요청 | 팀원 새 Payment 수신 |
+|---|---|---|
+| 생성 POST `/v1/internal/payments` | `Create`: orderRef, buyerId, amount, expiresAt, sellerAmounts | `CreatePaymentRequest`. 구매자·판매자 ID는 UUID, 시각은 오프셋 포함 ISO 문자열, 판매자별 금액과 수수료를 받는다. 준비만 하며 PG 승인을 실행하지 않는다. |
+| 결제창 POST `/{orderRef}/checkouts` | 본문 없음 | 새 pgOrderId, amount, expiresAt 반환 |
+| 조회 GET `/{orderRef}` | 문자열 주문 참조 | ApiResponse data의 상태·금액·환불액·승인 시각 반환 |
+| 승인 POST `/{orderRef}/approval` | `Approval`: buyerId, paymentKey, pgOrderId, amount | `ApprovalRequest`. 200 APPROVED, 202 PENDING과 Location, 422 DECLINED를 구분한다. |
+| 기존 Mock 실행 | `PaymentCommand`: requestId, paymentId, orderId, paymentGroupId, referenceNumber, amount, scenario | 생성 준비가 아니라 기존 결제 실행이다. 조회도 숫자 paymentId이며 응답 봉투가 다르다. |
+
+새 Payment 연결 주소는 `commercecore.payment-relay.base-url`로 명시한다. 기존 Mock을 함께 검증할 때는 `commercecore.payment-client.base-url`과 서로 다른 주소를 사용한다. relay 주소를 생략하면 기존 client 주소(그것도 없으면 localhost:8086)를 사용하므로 구형 Mock 앱을 새 Payment로 오인하지 않는다. 서비스 토큰은 `commercecore.payment-client.service-token` 또는 `COMMERCECORE_PAYMENT_SERVICE_TOKEN`을 사용하며 실제 Payment 설정과 일치해야 한다.
+
+팀원 새 Payment는 PR #352–#359의 별도 작업이다. 이 문서·회귀 테스트의 병합이 해당 구현의 dev 병합이나 배포를 뜻하지 않는다. [계약 회귀 테스트](../../../../../services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/relay/HttpPaymentRelayClientTest.java)와 [이번 검증 범위](../../../../worklog/2026-11-17-payment-contract.md)를 구분해 확인한다. 취소 요청 #360과 신규 주문서 일반 환불은 별도다.
+
+
 ## CommerceCore 환불 접수·결과 반영
 
 <!-- visual: relations -->

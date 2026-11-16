@@ -31,17 +31,17 @@ public class SellerProductQueryService {
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
     private final ProductRepository productRepository;
-    private final SkuSalesService salesRepository;
+    private final SkuSalesService singleSkuSales;
     private final SkuService skus;
     private final ImageUrlResolver imageUrlResolver;
 
     public SellerProductQueryService(
             ProductRepository productRepository,
-            SkuSalesService salesRepository,
+            SkuSalesService singleSkuSales,
             SkuService skus,
             ImageUrlResolver imageUrlResolver) {
         this.productRepository = productRepository;
-        this.salesRepository = salesRepository;
+        this.singleSkuSales = singleSkuSales;
         this.skus = skus;
         this.imageUrlResolver = imageUrlResolver;
     }
@@ -129,7 +129,7 @@ public class SellerProductQueryService {
 
     private Map<Long, SalesLookup> findSales(List<Long> productIds) {
         if (productIds.isEmpty()) return Map.of();
-        return salesRepository.findSingleByProductIds(productIds).stream()
+        return singleSkuSales.findSingleByProductIds(productIds).stream()
                 .collect(Collectors.toMap(SalesLookup::productId, Function.identity()));
     }
 

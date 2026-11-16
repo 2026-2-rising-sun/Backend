@@ -10,7 +10,9 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
+import com.shoppinglive.commercecore.payment.service.LateApprovalRefundStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -27,11 +29,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class OrderPaymentOutcomeService {
     private final OrderTimeSource time;
     private final OrderSheetLifecycleService lifecycle;
-    private final com.shoppinglive.commercecore.payment.service.LateApprovalRefundStore lateRefunds;
+    private final LateApprovalRefundStore lateRefunds;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
-    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
+    private final SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
@@ -43,11 +45,11 @@ public class OrderPaymentOutcomeService {
     public OrderPaymentOutcomeService(
             OrderTimeSource time,
             OrderSheetLifecycleService lifecycle,
-            com.shoppinglive.commercecore.payment.service.LateApprovalRefundStore lateRefunds,
+            LateApprovalRefundStore lateRefunds,
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
             CartItemRepository cart,
-            com.shoppinglive.commercecore.sku.service.SkuService skus,
+            SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             TransactionTemplate tx,
@@ -112,12 +114,6 @@ public class OrderPaymentOutcomeService {
                             cart.lockOwned(child.getSourceCartItemId(), g.getMemberId());
                         }
                     }
-                    for (Order child :
-                            children.stream()
-                                    .sorted(Comparator.comparing(Order::getTradeSkuId))
-                                    .toList()) {
-                        // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
-                    }
                     OrderStatus finalStatus =
                             result.status() == PaymentStatus.SUCCESS
                                     ? OrderStatus.PAID
@@ -127,7 +123,10 @@ public class OrderPaymentOutcomeService {
                     } else {
                         couponReservations.release(g.getMemberId(), g.getCouponId());
                     }
-                    for (Order child : children) {
+                    for (Order child :
+                            children.stream()
+                                    .sorted(Comparator.comparing(Order::getTradeSkuId))
+                                    .toList()) {
                         if (orders.transitionStatus(
                                         child.getId(), "PAYMENT_CONFIRMING", finalStatus.name())
                                 != 1) {
