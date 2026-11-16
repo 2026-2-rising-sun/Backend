@@ -47,7 +47,7 @@ components:
         output, html = api.render(self.root, 'example')
         output.parent.mkdir(parents=True)
         output.write_text(html)
-        (output.parent / 'README.md').write_text('# 모듈')
+        (output.parent / 'api.md').write_text(api.markdown_for(self.root, 'example')[1])
         self.assertEqual(check_docs.check_documents(self.root, [output.relative_to(self.root).as_posix()]), [])
         self.assertIn('X-Service-Token', html)
         self.assertIn('경로 공통 선언', html)
@@ -72,6 +72,51 @@ components:
             shared = self.source.parent / 'common.yaml'
             shared.write_text(shared.read_text().replace('type: object', 'type: object\n      description: 변경'))
             self.assertEqual(api.main(['--check']), 1)
+
+    def test_module_api_views_cover_each_route_once_and_reject_unknown_ownership(self):
+        """모듈별 명세가 경로를 중복·누락하지 않고 새 미분류 API를 알린다."""
+        spec = api.yaml.safe_load(self.source.read_text())
+        paths = ['/v1/seller/products', '/v1/sales', '/v1/cart/items', '/v1/orders', '/v1/coupons']
+        spec['paths'] = {path: {'get': {'responses': {'200': {'description': '성공'}}}} for path in paths}
+        self.source.write_text(api.yaml.safe_dump(spec, allow_unicode=True))
+        covered = []
+        for module in ('product', 'sku', 'cart', 'order', 'coupon'):
+            _, md, _, _, selected = api.markdown_for(self.root, 'example', module)
+            self.assertEqual(len(selected), 1)
+            covered.extend(row[0] for row in selected)
+            self.assertIn('## GET ' + selected[0][0], md)
+        self.assertCountEqual(covered, paths)
+        with self.assertRaises(ValueError):
+            api.module_for('/v1/unclassified')
+
+    def test_shared_authentication_reference_is_in_module_reference_closure(self):
+        """서비스 인증의 공통 참조도 스키마 참조와 함께 보존한다."""
+        spec = api.yaml.safe_load(self.source.read_text())
+        spec['components']['securitySchemes'] = {'BearerAuth': {'$ref': 'common.yaml#/components/securitySchemes/BearerAuth'}}
+        self.source.write_text(api.yaml.safe_dump(spec, allow_unicode=True))
+        common = self.source.parent / 'common.yaml'
+        shared = api.yaml.safe_load(common.read_text())
+        shared['components']['securitySchemes'] = {'BearerAuth': {'type': 'http', 'scheme': 'bearer'}}
+        common.write_text(api.yaml.safe_dump(shared))
+        output, html = api.render(self.root, 'example')
+        output.parent.mkdir(parents=True)
+        output.write_text(html)
+        output.with_suffix('.md').write_text(api.markdown_for(self.root, 'example')[1])
+        self.assertEqual(check_docs.check_documents(self.root, [output.relative_to(self.root).as_posix()]), [])
+
+    def test_authored_html_is_preserved_and_markdown_change_requires_review(self):
+        """수작업 그림은 덮어쓰지 않고 짝 원본 변경을 미완료로 알린다."""
+        from hashlib import sha256
+        source = self.root / 'docs/design-docs/services/payment/design.md'
+        source.parent.mkdir(parents=True)
+        source.write_text('# 목표 설계\n\n<!-- html: authored -->\n기존 그림 설명\n')
+        html = '<p>보존한 그림</p><!-- md-sha256: ' + sha256(source.read_bytes()).hexdigest() + ' -->'
+        source.with_suffix('.html').write_text(html)
+        with patch.object(design, 'ROOT', self.root):
+            self.assertEqual(design.main(['--check']), 0)
+            source.write_text(source.read_text() + '\n조건 변경\n')
+            self.assertEqual(design.main(['--check']), 1)
+            self.assertEqual(source.with_suffix('.html').read_text(), html)
 
     def test_design_generation_tracks_conditions_and_rejects_bad_table(self):
         """전이 조건과 MD 수정이 시각 자료에 반영되며 열이 빠진 표를 거절한다."""

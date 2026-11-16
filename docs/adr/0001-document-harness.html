@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0001: 행동 기준·현재 지식·실행 기록을 연결한다</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="0001-document-harness.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#문제와-대안">문제와 대안</a></li>
+<li><a href="#결정">결정</a></li>
+<li><a href="#영향">영향</a></li>
+<li><a href="#후속-결정">후속 결정</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>ADR 0001: 행동 기준·현재 지식·실행 기록을 연결한다</h1><p>결정 상태: 채택
+구현 상태: <a href="../worklog/archive/330-document-harness/requirements.html">요구사항</a>에서 추적
+관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/issues/330">#330</a></p>
+<h2 id="문제와-대안">문제와 대안</h2>
+<p>문서 수를 줄이는 데 집중하면 결정 이유·실패 경험·검증 범위를 다음 작업에 전달하기 어렵다. 모든 문서를 작업별 폴더에만 두면 현재 설계가 여러 과거 작업에 분산된다. 문서 종류별 폴더만 두면 복잡한 작업의 자료를 함께 찾기 어렵다.</p>
+<h2 id="결정">결정</h2>
+<ul>
+<li>행동 기준은 AGENTS·가이드, 현재 지식은 명세·요구사항·설계, 기록은 ADR·계획·워크로그로 구분하고 서로 연결한다.</li>
+<li>문서 종류별 폴더를 docs 바로 아래에 두고 복잡한 작업은 실행 계획 안에서 작업별로 묶는다. 공통 ADR과 일일 워크로그는 링크한다.</li>
+<li>MD는 사람이 읽을 수 있는 에이전트 참조 자료, HTML은 시각적 이해를 위한 자료로 쓴다. API는 기존 YAML에서 HTML을 생성한다.</li>
+<li>중요한 결정에 ADR, 여러 단계의 작업에 계획, 실제 변경·조사·검증에 워크로그를 작성한다. 모든 작업에 세 파일을 요구하지 않는다.</li>
+<li>훅·가드는 실제 필요와 호출 경로가 검증될 때 추가한다. 지침과 자동 검사를 구분한다.</li>
+</ul>
+<h2 id="영향">영향</h2>
+<p>현재 설명과 과거 사실을 각각 갱신·보존할 수 있다. 코드 변경 시 관련 문서 검토 비용이 생기므로 원본 링크·생성 최신성·로컬 링크 검사를 연결한다. 의미의 일치와 실제 실행 여부는 사람과 에이전트의 문맥 검토가 필요하다.</p>
+<h2 id="후속-결정">후속 결정</h2>
+<p><a href="0002-document-layout.html">ADR 0002</a>에서 서비스·모듈 경로 통합과 주제별 MD/HTML 쌍, 워크로그 하위 계획·과거 기록 보존을 채택했다. 위 내용은 #330 당시 결정이며 현재 문서 배치는 후속 결정을 따른다.</p><p class="muted fingerprint">MD SHA-256: <code>6f38de48e52ec4929dd8a51bff4e34f09c662494b799efe65deb4150c80b3f78</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

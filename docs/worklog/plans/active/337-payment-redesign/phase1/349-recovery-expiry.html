@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#349 결과 불명 복구와 만료</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="349-recovery-expiry.md">MD 원본</a><a href="../../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#개요">개요</a></li>
+<li><a href="#범위">범위</a></li>
+<li><a href="#구성-요소">구성 요소</a></li>
+<li><a href="#설정-제안-이름">설정 (제안 이름)</a></li>
+<li><a href="#1-approving-정체-스위퍼-pay-recover-01">1. APPROVING 정체 스위퍼 (PAY-RECOVER-01)</a></li>
+<li><a href="#2-unknown-조회기-pay-recover-0204">2. UNKNOWN 조회기 (PAY-RECOVER-02–04)</a></li>
+<li><a href="#3-만료-pay-expire-01">3. 만료 (PAY-EXPIRE-01)</a></li>
+<li><a href="#여러-인스턴스-pay-recover-05">여러 인스턴스 (PAY-RECOVER-05)</a></li>
+<li><a href="#테스트">테스트</a></li>
+<li><a href="#바뀌는-점">바뀌는 점</a></li>
+<li><a href="#pr-나누기">PR 나누기</a></li>
+<li><a href="#미결정">미결정</a></li>
+<li><a href="#참고">참고</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#349 결과 불명 복구와 만료</h1><p>상태: 설계 확정(2026-11-15)
+이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/349">#349</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a> · 스키마: <a href="348-create-api.html#db-v4__payment_coresql">#348 설계</a> · 승인 반영: <a href="338-approval-ledger.html#2-승인-처리">#338 설계</a></p>
+<h2 id="개요">개요</h2>
+<p>끝나면 <strong>결과를 모르는 결제(UNKNOWN)와 승인 중에 멈춘 결제(APPROVING)가 스스로 확정</strong>되고, 만료 시각이 지난 결제는 스스로 닫힌다. 사람이 손대는 경우는 조회 마감(30분)이 지난 결제뿐이고, 그때는 ERROR 로그가 남는다. 승인 반영은 #338의 <code>applyDone</code>을 그대로 쓴다.</p>
+<h2 id="범위">범위</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>포함</th>
+<th>요구사항 ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>APPROVING 정체 → UNKNOWN</td>
+<td>PAY-RECOVER-01</td>
+</tr>
+<tr>
+<td>UNKNOWN 조회와 확정</td>
+<td>PAY-RECOVER-02–04</td>
+</tr>
+<tr>
+<td>CREATED 만료 → CANCELED</td>
+<td>PAY-EXPIRE-01</td>
+</tr>
+<tr>
+<td>여러 인스턴스 동시 실행</td>
+<td>PAY-RECOVER-05</td>
+</tr>
+</tbody>
+</table></div>
+<p>하지 않는 것: 웹훅, 거래 대사(후순위), 환불 결과 불명(Phase 3), 분산 락.</p>
+<h2 id="구성-요소">구성 요소</h2>
+<pre><code class="language-text">payment/service   ApprovingSweeper      @Scheduled  APPROVING 3분 초과 → UNKNOWN
+                  UnknownPaymentPoller  @Scheduled  UNKNOWN 조회 → applyDone / CREATED / 다음 조회
+                  PaymentExpiryJob      @Scheduled  CREATED 만료 → CANCELED
+</code></pre>
+<p><code>@EnableScheduling</code>은 <code>payment.recovery.enabled</code>(기본 <code>true</code>)가 켜졌을 때만 등록한다. 통합 테스트는 <code>false</code>로 두고 메서드를 직접 부른다.</p>
+<h2 id="설정-제안-이름">설정 (제안 이름)</h2>
+<p><code>Duration</code> 설정은 SQL에 초 단위 숫자로 넘기고 <code>(:seconds * interval '1 second')</code>로 쓴다. 이 SQL은 PostgreSQL 전용이며 테스트도 <code>@Tag("postgres")</code>다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>키</th>
+<th>기본값</th>
+<th>의미</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>payment.recovery.enabled</code></td>
+<td><code>true</code></td>
+<td>스케줄러 3개 켜기</td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.recovery.sweep-interval</code></td>
+<td><code>30s</code></td>
+<td>스위퍼 주기</td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.recovery.sweep-batch-size</code></td>
+<td><code>100</code></td>
+<td>한 번에 옮길 결제 수</td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.recovery.approving-stuck-after</code></td>
+<td><code>3m</code></td>
+<td>APPROVING 정체 기준</td>
+<td>토스 호출 최대 60초 × 2보다 길게</td>
+</tr>
+<tr>
+<td><code>payment.recovery.poll-interval</code></td>
+<td><code>5s</code></td>
+<td>조회기 주기</td>
+<td>첫 조회 10초를 지키려면 더 짧아야 함</td>
+</tr>
+<tr>
+<td><code>payment.recovery.poll-batch-size</code></td>
+<td><code>50</code></td>
+<td>한 번에 조회할 결제 수</td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.recovery.check-deadline</code></td>
+<td><code>30m</code></td>
+<td>조회 마감</td>
+<td>decision.md 제안값</td>
+</tr>
+<tr>
+<td><code>payment.expiry.interval</code></td>
+<td><code>1m</code></td>
+<td>만료 주기</td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.expiry.batch-size</code></td>
+<td><code>100</code></td>
+<td>한 번에 닫을 결제 수</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="1-approving-정체-스위퍼-pay-recover-01">1. APPROVING 정체 스위퍼 (PAY-RECOVER-01)</h2>
+<pre><code class="language-sql">UPDATE payment
+   SET status = 'UNKNOWN', next_check_at = now(),
+       check_deadline_at = now() + (:checkDeadlineSeconds * interval '1 second'), updated_at = now()
+ WHERE id IN (SELECT id FROM payment
+               WHERE status = 'APPROVING' AND approving_at &lt; now() - (:stuckAfterSeconds * interval '1 second')
+               ORDER BY approving_at LIMIT :sweepBatchSize)
+   AND status = 'APPROVING';
+</code></pre>
+<ul>
+<li>승인 처리 중에 서버가 죽으면 결제가 APPROVING으로 남는다. 저장된 <code>pg_payment_key</code>로 조회할 수 있게 UNKNOWN으로 옮긴다(EC 22, 23).</li>
+<li>바깥 <code>AND status = 'APPROVING'</code>이 동시 실행을 막는다. 두 인스턴스가 같이 돌아도 결과는 같다.</li>
+</ul>
+<h2 id="2-unknown-조회기-pay-recover-0204">2. UNKNOWN 조회기 (PAY-RECOVER-02–04)</h2>
+<p><strong>고르기</strong>(짧은 읽기 트랜잭션):</p>
+<pre><code class="language-sql">SELECT id FROM payment
+ WHERE status = 'UNKNOWN' AND next_check_at &lt;= now()
+ ORDER BY next_check_at LIMIT :batchSize;
+</code></pre>
+<p><strong>결제마다</strong>(트랜잭션 밖에서 토스 호출):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>할 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>결제를 다시 읽는다. UNKNOWN이 아니면 건너뛴다(다른 인스턴스가 먼저 처리함)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>check_deadline_at</code> &lt; now()면 <strong>조회를 멈춘다</strong>: <code>next_check_at = NULL</code>(조회 대상에서 빠짐) + ERROR 로그 1번. 끝 (PAY-RECOVER-04)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>pg_call(kind=QUERY, outcome=UNKNOWN) INSERT, 커밋</td>
+</tr>
+<tr>
+<td>4</td>
+<td>토스 <code>getPayment(pg_payment_key)</code> — 트랜잭션 밖</td>
+</tr>
+<tr>
+<td>5</td>
+<td>결과에 따라 아래 표, 한 트랜잭션</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>조회 결과</th>
+<th>처리</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Success</code>, <code>status = DONE</code>, 응답 검증 통과</td>
+<td><strong>#338 <code>applyDone</code></strong> → APPROVED + 분개 + <code>PaymentApproved</code>. 주문이 이미 닫혔어도 같다(판단은 Commerce)</td>
+<td>PAY-RECOVER-02, EC 37</td>
+</tr>
+<tr>
+<td><code>Success</code>, <code>status = DONE</code>, 응답 검증 실패</td>
+<td>#338 보상 취소와 같은 경로 → CANCELED + ERROR 로그</td>
+<td>PAY-CONFIRM-07</td>
+</tr>
+<tr>
+<td><code>Success</code>, <code>status ∈ {ABORTED, EXPIRED}</code></td>
+<td><code>CREATED</code>, <code>approving_at = NULL</code>, <code>pg_order_id = NULL</code>(#338과 같은 이유), <code>next_check_at = NULL</code>, <code>check_deadline_at = NULL</code> · <code>WHERE status = 'UNKNOWN'</code></td>
+<td>PAY-RECOVER-03(요구사항이 ABORTED·EXPIRED 둘 다 적는다. 인증 뒤 승인되지 않은 결제는 토스에서 EXPIRED가 된다)</td>
+</tr>
+<tr>
+<td><code>Success</code>, 그 밖의 상태(<code>IN_PROGRESS</code>, <code>READY</code>, <code>WAITING_FOR_DEPOSIT</code> 등)</td>
+<td>UNKNOWN 유지, 다음 조회 예약</td>
+<td>PAY-RECOVER-03</td>
+</tr>
+<tr>
+<td><code>Success</code>, <code>status = CANCELED</code>(전액 취소)</td>
+<td><code>CANCELED</code> · <code>WHERE status = 'UNKNOWN'</code> + WARN 로그. 분개는 쓰지 않는다(UNKNOWN은 분개가 없다)</td>
+<td>돈이 모두 돌아갔다. 토스 관리자 화면에서 직접 취소했거나, 우리 보상 취소 응답을 잃은 경우</td>
+</tr>
+<tr>
+<td><code>Success</code>, <code>status = PARTIAL_CANCELED</code></td>
+<td>UNKNOWN 유지 + ERROR 로그. 조회 마감까지 같은 처리(사람이 확인)</td>
+<td>일부 돈이 남아 원장 판단이 필요하다</td>
+</tr>
+<tr>
+<td><code>Declined</code> · <code>NotSent</code> · <code>Unknown</code></td>
+<td>UNKNOWN 유지, 다음 조회 예약. pg_call에 결과 기록</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>응답 검증은 승인과 같다: <code>orderId = pg_order_id</code>, <code>totalAmount = amount</code>, <code>paymentKey = pg_payment_key</code>.</li>
+<li>모든 상태 변경은 <code>WHERE status = 'UNKNOWN'</code> 조건부 UPDATE다. 0행이면 다른 인스턴스가 먼저 반영한 것이므로 아무것도 쓰지 않는다.</li>
+</ul>
+<p><strong>다음 조회 예약</strong>. 결과 불명이 된 시각 <code>t0 = check_deadline_at − 30분</code>에서 지난 시간으로 간격을 고른다. 시도 횟수 컬럼을 따로 두지 않는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>now − t0</code></th>
+<th>다음 조회</th>
+<th>요구사항의 간격</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(UNKNOWN이 될 때)</td>
+<td><code>t0 + 10초</code></td>
+<td>10초</td>
+</tr>
+<tr>
+<td>40초 미만</td>
+<td><code>now + 30초</code></td>
+<td>30초</td>
+</tr>
+<tr>
+<td>100초 미만</td>
+<td><code>now + 1분</code></td>
+<td>1분</td>
+</tr>
+<tr>
+<td>그 이상</td>
+<td><code>now + 5분</code></td>
+<td>5분, 마감까지 반복</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-sql">UPDATE payment SET next_check_at = LEAST(:next, check_deadline_at), updated_at = now()
+ WHERE id = :id AND status = 'UNKNOWN';
+</code></pre>
+<p>다음 조회는 마감을 넘기지 않는다(마감 로그가 늦게 찍히지 않게). 스위퍼가 UNKNOWN으로 옮긴 결제는 <code>next_check_at = now()</code>로 바로 조회한다. 이미 3분 넘게 멈춘 결제라 10초를 더 기다릴 이유가 없다(PAY-CONFIRM-10의 10초는 승인 직후 UNKNOWN에만 적용).</p>
+<p><strong>마감까지 IN_PROGRESS로 남는 경우</strong>: ①을 커밋하고 토스를 부르기 전에 서버가 죽으면 토스 상태는 IN_PROGRESS로 남는다. 인증 유효 시간이 지나면 토스가 EXPIRED로 바꾸므로 보통 조회 중에 CREATED로 돌아간다. 마감(30분)까지 바뀌지 않으면 UNKNOWN에 그대로 두고 ERROR 로그로 사람이 확인한다. 자동으로 CREATED로 돌리지 않는다(돈이 나갔는지 모른다).</p>
+<p><strong>조회 마감 로그 형식</strong>(ERROR, 한 줄):</p>
+<pre><code class="language-text">payment.recovery.deadline paymentId=1001 orderRef=OD-20261110-K7Q2M9XA pgOrderId=OD-20261110-K7Q2M9XA-1 lastPgStatus=IN_PROGRESS
+</code></pre>
+<p><code>paymentKey</code>와 시크릿 키는 로그에 남기지 않는다.</p>
+<h2 id="3-만료-pay-expire-01">3. 만료 (PAY-EXPIRE-01)</h2>
+<pre><code class="language-sql">UPDATE payment SET status = 'CANCELED', updated_at = now()
+ WHERE id IN (SELECT id FROM payment
+               WHERE status = 'CREATED' AND expires_at &lt; now()
+               ORDER BY expires_at LIMIT :batchSize)
+   AND status = 'CREATED' AND expires_at &lt; now();
+</code></pre>
+<ul>
+<li>승인 시작 UPDATE는 <code>status = 'CREATED' AND expires_at &gt; now()</code>를 조건으로 한다. 두 UPDATE가 같은 행을 노리면 하나만 1행이 된다(EC 31, 35).</li>
+<li>돈이 나가지 않은 결제라서 분개·이벤트가 없다. Commerce는 자기 만료 배치로 주문을 닫는다(서로 이벤트 없음).</li>
+</ul>
+<h2 id="여러-인스턴스-pay-recover-05">여러 인스턴스 (PAY-RECOVER-05)</h2>
+<p>분산 락을 두지 않는다. 겹쳐 돌 때 일어나는 일:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>겹침</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>스위퍼 2개</td>
+<td>조건부 UPDATE라 한 번만 바뀜</td>
+</tr>
+<tr>
+<td>조회기 2개가 같은 결제</td>
+<td>토스 조회가 1번 더 갈 수 있다(감수). 반영은 <code>WHERE status = 'UNKNOWN'</code>과 원장 UNIQUE로 1번</td>
+</tr>
+<tr>
+<td>조회기 DONE과 승인 ③ 반영이 동시</td>
+<td>둘 다 <code>applyDone</code>이고 <code>status IN ('APPROVING','UNKNOWN')</code> 조건이라 한쪽만 1행</td>
+</tr>
+<tr>
+<td>만료와 승인 시작</td>
+<td>위 "만료" 참고</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="테스트">테스트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>테스트(제안 이름)</th>
+<th>종류</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PAY-RECOVER-01</td>
+<td><code>ApprovingSweeperPostgresTest</code>(3분 경계 앞뒤)</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-RECOVER-02</td>
+<td><code>UnknownPaymentPollerTest</code>: DONE → APPROVED·분개 1·outbox 1, 주문 닫힘 여부와 무관</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-RECOVER-03</td>
+<td>같은 클래스: ABORTED·EXPIRED → CREATED, IN_PROGRESS → 간격표대로 <code>next_check_at</code></td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-RECOVER-04</td>
+<td>같은 클래스: 마감 지남 → <code>next_check_at NULL</code> + ERROR 로그 1번, 토스 호출 0번</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-RECOVER-05</td>
+<td><code>RecoveryConcurrencyPostgresTest</code>: 조회기 2개 동시 → 상태 변경·분개·이벤트 각 1번</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-EXPIRE-01</td>
+<td><code>PaymentExpiryPostgresTest</code>: 만료 → CANCELED, 승인 시작과 동시에 → 한쪽만</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>토스는 <code>MockRestServiceServer</code> 또는 테스트 대역. 시간은 DB <code>now()</code> 기준이라 테스트는 <code>expires_at</code>·<code>approving_at</code>·<code>check_deadline_at</code>을 과거 값으로 넣어 만든다.</p>
+<h2 id="바뀌는-점">바뀌는 점</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>유지</th>
+<th>바뀜·새로 생김</th>
+<th>없어짐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>동작</td>
+<td>상태 전이 규칙</td>
+<td>스케줄러 3개</td>
+<td>기존 <code>PaymentDelayReconciler</code>·<code>RefundReconciler</code>(#347에서 삭제)</td>
+</tr>
+<tr>
+<td>설정</td>
+<td>—</td>
+<td><code>payment.recovery.*</code>, <code>payment.expiry.*</code></td>
+<td>기존 Mock 재시도 정책</td>
+</tr>
+<tr>
+<td>운영</td>
+<td>—</td>
+<td>조회 마감 ERROR 로그를 사람이 확인</td>
+<td>—</td>
+</tr>
+<tr>
+<td>문서</td>
+<td>—</td>
+<td><code>states/payment.md</code>·<code>.html</code>에 정체·조회·만료 전이</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="pr-나누기">PR 나누기</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>PR</th>
+<th>범위</th>
+<th>base</th>
+<th>브랜치</th>
+<th>갱신할 문서</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR7 복구 · 만료</td>
+<td>스케줄러 3개, 설정, 테스트</td>
+<td>#338 PR6</td>
+<td><code>feat/#349-payment-recovery</code></td>
+<td><code>states/payment.md</code>·<code>.html</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>PR7이 #349를 <code>Closes</code>한다. 이 PR 뒤에 Phase 1 종료 검증을 한다.</p>
+<h2 id="미결정">미결정</h2>
+<p>결정(2026-11-15, 사용자 동의):</p>
+<ol>
+<li>조회 간격은 "불명이 된 뒤 지난 시간"으로 고른다. 시도 횟수 컬럼은 두지 않는다.</li>
+<li>토스 조회가 <code>CANCELED</code>(전액)면 CANCELED로 닫는다. <code>PARTIAL_CANCELED</code>는 사람이 확인한다.</li>
+</ol>
+<h2 id="참고">참고</h2>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f6"><code>#f6</code></a>·<a href="../../../../../design-docs/services/payment/design.html#states"><code>#states</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>d8864166aedceec90e4321a438c085108a5ceab3f2bfa1cce85c6e22e70127e2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

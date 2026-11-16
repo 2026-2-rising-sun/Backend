@@ -30,7 +30,7 @@
 
 조회 사본은 이벤트 도착 순서가 다를 수 있어 product와 product_sales 사이 FK가 없다. 상품 version은 0 이상, 판매 backfill은 version 0, 쿠폰 display version은 1 이상이다.
 
-V2는 기존 사본의 전체 허용을 true로 보존한다. 새 Product 이벤트는 saleEnabled/deletedAt을 명시하며 구형 생략은 true/null이다. 더 큰 version만 반영하되 삭제 사실은 보존한다. 현재 코드는 전체 중지 중에도 기존 공개 노출을 유지하고 구매 가능 조건만 false로 만든다. 이 노출 선택은 직접 사용자 답변을 기다리는 기존 기술 동작이며 사용자 확정 정책이 아니다. 삭제는 공개 조회에서 제외한다. [Product 원본·사본 상세](../../commercecore/product/ERD.md)를 따른다.
+V2는 기존 사본의 전체 허용을 true로 보존한다. 새 Product 이벤트는 saleEnabled/deletedAt을 명시하며 구형 생략은 true/null이다. 더 큰 version만 반영하되 삭제 사실은 보존한다. 현재 코드는 전체 중지 중에도 기존 공개 노출을 유지하고 구매 가능 조건만 false로 만든다. 이 노출 선택은 직접 사용자 답변을 기다리는 기존 기술 동작이며 사용자 확정 정책이 아니다. 삭제는 공개 조회에서 제외한다. [Product 원본·사본 상세](../commercecore/product/erd.md)를 따른다.
 
 ## 원본과 매핑
 

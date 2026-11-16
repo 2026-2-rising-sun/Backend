@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product 조회의 SKU 연결 조각 — #334 적용 대상</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="sku-query-connection.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#실제-제공-포트와-내부-목록-조각">실제 제공 포트와 내부 목록 조각</a></li>
+<li><a href="#기존-판매자-페이지를-전환할-때">기존 판매자 페이지를 전환할 때</a></li>
+<li><a href="#적용-파일과-검증-기준">적용 파일과 검증 기준</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Product 조회의 SKU 연결 조각 — #334 적용 대상</h1><p>코디네이터 배정에 따라 Product #333이 SKU를 역merge하지 않고 조각과 검증 기준을 제공한다. 이 문서는 #334에서 적용·컴파일·통합 테스트할 변경이다. #333 작업 트리에서 SKU 연결이 실행됐다고 보고하지 않는다.</p>
+<h2 id="실제-제공-포트와-내부-목록-조각">실제 제공 포트와 내부 목록 조각</h2>
+<p>검증 커밋 <code>0b36ba4722aea963b092e87a1f6af4145e920af3</code>의 <code>com.shoppinglive.commercecore.sku.service.SkuService.findByProductId(Long)</code>는 <code>List&lt;SkuView&gt;</code>를 반환한다. <code>SkuView</code>는 skuId/productId/price/available/reserved/saleStatus/version이며 <code>status()</code>는 기존 SalesStatus 호환 표시다. 이 타입/SQL을 Product에서 복제하지 않는다.</p>
+<p><code>SellerProductQueryService</code>에 실제 SkuService를 생성자 주입하고 다음 내부 조회를 추가한다. 본인·미삭제 검증은 기존 get의 상품 검증과 같은 private 메서드로 묶을 수 있다. 표시용 조회에 거래 공유 잠금을 사용하지 않는다.</p>
+<pre><code class="language-java">@Transactional(readOnly = true)
+public List&lt;SkuView&gt; listSkus(Long productId, String sellerId) {
+    productRepository.findById(productId)
+            .filter(product -&gt; sellerId.equals(product.getSellerId()))
+            .filter(product -&gt; !product.isDeleted())
+            .orElseThrow(() -&gt; new BusinessException(
+                    ErrorCode.NOT_FOUND, &quot;상품을 찾을 수 없습니다: &quot; + productId));
+    return skus.findByProductId(productId);
+}
+</code></pre>
+<p><code>skus</code>의 실제 타입은 <code>com.shoppinglive.commercecore.sku.service.SkuService</code>, 반환 타입은 <code>com.shoppinglive.commercecore.sku.dto.SkuView</code>다. 준비/전체 중지 상품도 본인에게 목록을 제공하고 SKU 0개면 빈 목록을 반환한다. 새 HTTP 경로나 대표 가격 정책은 이 조각에 포함하지 않는다.</p>
+<h2 id="기존-판매자-페이지를-전환할-때">기존 판매자 페이지를 전환할 때</h2>
+<ul>
+<li>기존 <code>SalesJpaRepository.findLookupsByProductIds</code>와 Sales/Stock 직접 조인은 SKU 쓰기 전환과 함께 바꿔야 한다. 가격·수량을 SKU에 쓰면서 Product 조회만 옛 Sales를 읽는 중간 상태를 최종 완료로 보고하지 않는다.</li>
+<li>페이지는 Product를 먼저 자르고 해당 productIds의 SKU를 한 번에 읽어 <code>Map&lt;Long,List&lt;SkuView&gt;&gt;</code>로 묶는다. product마다 findByProductId를 반복하는 N+1을 도입하지 않는다. 실제 SKU 소유자에게 <code>findByProductIds(Collection&lt;Long&gt;)</code> 일괄 포트 추가를 요청했고 소유자가 구현한 signature/커밋에 맞춘다. 소비자가 임시 포트나 SKU 테이블 매핑을 복제하지 않는다.</li>
+<li>전체 건수/offset은 SKU 수가 아니라 Product 수다. status 조건은 페이지 계산 전에 적용한다. NOT_REGISTERED는 SKU 미존재 조건이며 SOLD_OUT은 실제 SKU 호환 표시 규칙을 따른다. 상품 전체 saleEnabled와 SKU 상태를 서로 덮어쓰지 않는다.</li>
+<li>기존 단일 응답은 SKU 0/1개 경로를 보존한다. 2개 이상에서 임의 첫 SKU/최저가/합산재고/대표 판매 상태를 만들지 않는다. 공개 다중 SKU 응답은 미확정이므로 내부 목록과 구분한다. 기존 단일 응답의 다중 SKU 거절 방식은 SKU의 productId 호환 어댑터와 같은 오류 기준으로 통일하고 실제 오류/응답 조각을 Order 최종 YAML에 전달한다.</li>
+<li>Product API에 saleEnabled가 이미 추가됐으므로 새 SKU 연결에서 이 필드와 삭제 제외를 누락하지 않는다. 등록·수정 응답의 deletedAt도 유지한다.</li>
+</ul>
+<h2 id="적용-파일과-검증-기준">적용 파일과 검증 기준</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>실제 검증할 동작</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SellerProductQueryService</td>
+<td>본인·미삭제 목록, 준비/중지 중에도 실제 SKU 0..N개 조회, 타인/삭제 404</td>
+</tr>
+<tr>
+<td>SellerProductCatalogQueryService</td>
+<td>여러 SKU여도 상품 1행·정확한 total/page, 필터 전후 페이지 일치, SKU 0개/다수 경계</td>
+</tr>
+<tr>
+<td>실제 SKU 쓰기→Product 읽기</td>
+<td>changePrice/adjustAvailable/changeSaleStatus 뒤 기존 단일 응답과 내부 목록이 같은 최신 원본을 반환</td>
+</tr>
+<tr>
+<td>ProductHttpTestApplication·ProductPersistenceTest 준비</td>
+<td>실제 SkuService/필요 설정을 import하고 SKU 테이블을 준비. 옛 Sales fixture만 만들고 최신 SKU를 읽었다고 주장하지 않음</td>
+</tr>
+<tr>
+<td>삭제/기존 주문 수량</td>
+<td>새 거래 가드는 거절하되 같은 DB 트랜잭션의 SKU consume/release/restock은 전체 중지·삭제에 막히지 않음. 멱등성은 Order 전이/환불 적용 기록의 검증과 연결</td>
+</tr>
+<tr>
+<td>회귀</td>
+<td>Product HTTP/권한/이미지/Outbox/일반 snapshot의 기존 검증문 보존, 가격·재고 타입은 실제 SkuView 사용</td>
+</tr>
+<tr>
+<td>문서/계약</td>
+<td>SKU 연결이 반영된 SHA·실행 환경·건수 공유. 단일 응답 호환/공통 API는 Order·SKU 소유 원본에 함께 반영</td>
+</tr>
+</tbody>
+</table></div>
+<p>현재 #333에는 Product 전체 제어 이후 레거시 예약의 소진·해제·복구 가능성을 검증하는 통합 시나리오가 있다. 이는 신규 SKU 경로 실행 증거가 아니며 위 #334 실제 포트 시나리오를 대체하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>bb69e6a72831fa3d1f87af5e0a1c0608369bf5c11ea950306548b2ad9fe98436</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

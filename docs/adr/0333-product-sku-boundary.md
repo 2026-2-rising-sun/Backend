@@ -2,7 +2,7 @@
 
 결정 상태: 아래 업무 정책과 신규 판매 초기값은 사용자 채택, 호출/이행 세부안은 통합 검토 중.
 
-구현 상태: 2026-11-13 사용자 후속 구현 지시로 착수. Product 독립 구현·회귀를 진행하며 공유 계약/SKU·Order 연결과 외부 검증은 별도로 확인한다. [실행 계획](../exec-plans/active/333-product-module/README.md) · [실제 포트/통합 대상](../exec-plans/active/333-product-module/model.md) · [작업 기록](../worklog/2026-11-13.md)
+구현 상태: 2026-11-13 사용자 후속 구현 지시로 착수. Product 독립 구현·회귀를 진행하며 공유 계약/SKU·Order 연결과 외부 검증은 별도로 확인한다. [실행 계획](../worklog/plans/active/333-product-module/README.md) · [실제 포트/통합 대상](../worklog/plans/active/333-product-module/model.md) · [작업 기록](../worklog/2026-11-13.md)
 
 관련 이슈: [Product #333](https://github.com/2026-2-rising-sun/Backend/issues/333). 최종 담당은 Order #331·Cart #332·Product #333·SKU #334의 네 PR이다.
 
@@ -51,4 +51,4 @@ Product에 전체 판매 스위치와 삭제 사실이 생기고, 주문은 상�
 - [SKU 원본 spec](https://www.figma.com/board/1lr73O8XYEhMGHAgWAEeOv/?node-id=424-1279)
 - [현재 구현 ERD](../design-docs/services/commercecore/erd.md) · [현재 구현 HTML](../design-docs/services/commercecore/erd.html)
 
-서비스 ERD/판매 상태 HTML은 레거시 Sales 관계를 보존하면서 Product V101/V2 변경을 반영한다. [Product 모듈 ERD/상태](../design-docs/commercecore/product/README.md)는 MD 원본에서 생성한 HTML과 연결하며 실제 구현·SKU 후속 목표·실행 검증을 구분한다. FigJam 편집은 코디네이터가 인수했으므로 Product 담당은 API·ERD·상태 차이와 근거만 전달한다.
+서비스 ERD/판매 상태 HTML은 레거시 Sales 관계를 보존하면서 Product V101/V2 변경을 반영한다. [Product 모듈 ERD/상태](../design-docs/services/commercecore/product/overview.md)는 MD 원본에서 생성한 HTML과 연결하며 실제 구현·SKU 후속 목표·실행 검증을 구분한다. FigJam 편집은 코디네이터가 인수했으므로 Product 담당은 API·ERD·상태 차이와 근거만 전달한다.

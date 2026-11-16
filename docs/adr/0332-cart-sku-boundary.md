@@ -2,7 +2,7 @@
 
 결정 상태: 업무 방향 채택 · 1차 기술 경계 고정 · 나머지 연결안 미결정
 
-구현 상태: Cart 독립 구현을 마쳤으며 소비자 호환 감사 후속을 진행 중이다. 감사 기준의 Order 통합 기록과 최신 독립 PR 범위는 아래에서 구분한다. [실행 계획](../exec-plans/active/332-cart-module/README.md) · [설계](../design-docs/commercecore/cart/설계.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
+구현 상태: Cart 독립 구현을 마쳤으며 소비자 호환 감사 후속을 진행 중이다. 감사 기준의 Order 통합 기록과 최신 독립 PR 범위는 아래에서 구분한다. [실행 계획](../worklog/plans/active/332-cart-module/README.md) · [설계](../design-docs/services/commercecore/cart/overview.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
 ## 문제
 

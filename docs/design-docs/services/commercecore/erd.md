@@ -2,9 +2,9 @@
 
 <!-- visual: relations -->
 
-기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order 독립 V104를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 독립 결함 보완과 범위 정정 검증 중이며 전체설계는 미충족·머지불가다. 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](../../commercecore/sku/ERD.md) · [Order 상세](../../commercecore/order/ERD.md).
+기준: Product #333 `729d2d5f`·SKU #334 `1a09aacd`·Cart V103·Order 독립 V104를 통합했다. 새 판매와 구/신규 주문 거래는 SKU 원본을 사용하며 sales_info/sales_stock은 이행 입력과 과거 참조로 보존한다. Cart의 선택·조건부 성공 정리 포트도 같은 주문 트랜잭션에 연결한다. 독립 결함 보완과 범위 정정 검증 중이며 전체설계는 미충족·머지불가다. 실제 DB·HTTP·Kafka·PG 제공자 결과는 워크로그와 구분한다. [SKU 상세](sku/erd.md) · [Order 상세](order/erd.md).
 
-[시각 자료](erd.html) · [Cart 모듈 상세 ERD](../../commercecore/cart/ERD.md) · [Order 전체 관계도](../../commercecore/order/ERD.html)
+[시각 자료](erd.html) · [Cart 모듈 상세 ERD](cart/erd.md) · [Order 전체 관계도](order/erd.html)
 
 전체 CREATE/ALTER 순서를 대조한 테이블·핵심 키·관계 요약이다. 전체 열 타입·인덱스·CHECK와 데이터 이관 SQL은 아래 원본을 따른다. 운영 DB에 적용된 실제 스키마를 조회한 결과는 아니다.
 
@@ -53,7 +53,7 @@
 
 ## 제약과 이관
 
-V101은 기존 Product 전체 스위치를 true로 보존하고 신규 기본값만 false로 바꾼다. deleted_at이 있으면 전체 false CHECK를 유지하고 상품·이미지·하위 판매 행을 물리 삭제하지 않는다. [Product 상세 ERD/상태](../../commercecore/product/README.md)에서 통합 목표와 현재 구현을 구분한다.
+V101은 기존 Product 전체 스위치를 true로 보존하고 신규 기본값만 false로 바꾼다. deleted_at이 있으면 전체 false CHECK를 유지하고 상품·이미지·하위 판매 행을 물리 삭제하지 않는다. [Product 상세 ERD/상태](product/overview.md)에서 통합 목표와 현재 구현을 구분한다.
 
 V3에서 비회원 lookup_password_hash를 제거하고 member_id를 필수화했다. V7 금액은 total_amount와 할인·실결제액을 구분한다. V11은 REFUNDED를 허용한다. V10·V12~V14 등 이관용 파일의 이름만 보고 현재 Core가 PG 테이블을 소유한다고 추정하지 않는다. V21 영속 전달과 Payment 원본을 구분한다. 진행 중 묶음의 회원별 부분 유일 인덱스가 있다.
 
@@ -89,7 +89,7 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 
 ## Order V104 상세
 
-논리 Order=payment_group/OrderItem=orders 매핑과 수량 환불·종료 기록 관계는 [모듈 ERD](../../commercecore/order/ERD.md)에 있다. 전체 관계도는 그 모듈 HTML을 사용한다. 이 페이지의 생성 HTML은 테이블/관계 요약이며 통합 ER 그림을 대체하지 않는다. 기존 PK·번호·당시 금액·Cart 출처·활성TTL을 유지한다.
+논리 Order=payment_group/OrderItem=orders 매핑과 수량 환불·종료 기록 관계는 [모듈 ERD](order/erd.md)에 있다. 전체 관계도는 그 모듈 HTML을 사용한다. 이 페이지의 생성 HTML은 테이블/관계 요약이며 통합 ER 그림을 대체하지 않는다. 기존 PK·번호·당시 금액·Cart 출처·활성TTL을 유지한다.
 
 신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는policy0/신규기본600초이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.
 
