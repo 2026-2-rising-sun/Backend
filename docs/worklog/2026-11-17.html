@@ -10,6 +10,7 @@
 <li><a href="#이관-전-서비스-안내의-상태-표현">이관 전 서비스 안내의 상태 표현</a></li>
 </ul>
 </li>
+<li><a href="#문서-구조-정리-pr-게시와-검토">문서 구조 정리 PR 게시와 검토</a></li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>2026-11-17 작업 기록</h1><h2 id="문서-구조와-하네스-통합">문서 구조와 하네스 통합</h2>
@@ -35,6 +36,15 @@
 <p>아래는 이관 전 CommerceCore 개요의 문구이며 최신 실행 결과나 병합 제한을 새로 확정하는 내용이 아니다. 현재 범위는 각 흐름과 진행 계획을 따른다.</p>
 <blockquote>
 <p>현재 기준: Product/SKU/Cart 감사 보완 통합과 CommerceCore 독립 Order 범위다. Payment 추가 변경과 종속 신규 실행은 제외 중이며 기존 legacy는 dev 계약을 유지한다. 내부 주문서 PENDING600초·스냅샷·선점·로컬만료는 별도 도메인이다. PENDING/실행PROCESSING 각각600초 목표의 공개연동은미구현이며 <strong>전체설계미충족·머지불가</strong>다. <a href="../design-docs/services/commercecore/order/overview.html">Order현재범위</a>에서 기존실행·현재범위·후속을 구분한다. 공개 다중SKU/대표가/가격순·옵션은보류다.</p>
-</blockquote><p class="muted fingerprint">MD SHA-256: <code>19b9569312ffced8b6ea4af3d4ffe492d74f63bf3d45e31d390060a0dbf8f4ff</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</blockquote>
+<h2 id="문서-구조-정리-pr-게시와-검토">문서 구조 정리 PR 게시와 검토</h2>
+<ul>
+<li>사용자 요청으로 별도 이슈 없이 <code>docs/document-layout</code> 브랜치를 만들고 문서 구조·하네스 변경을 커밋·푸시한 뒤 <a href="https://github.com/2026-2-rising-sun/Backend/pull/361">PR #361</a>을 생성했다. 초기 검토 head는 <code>860466a125dec24f619d61a9a83332193ba7a44f</code>, base는 <code>dev</code> / <code>2ef0a6c8d2671f0fae95b4897e43d39b0c5a646b</code>다.</li>
+<li>기존 서비스 고도화 초안, PR 작성 지침·템플릿 보강과 관련 과거 워크로그는 커밋에서 제외했다. 경로 이동이 필요한 파일은 내용 변경을 분리하고 로컬 작업트리에 원래 내용을 보존했다.</li>
+<li>커밋 대상만 별도 체크아웃으로 구성해 <code>scripts/check.sh</code>의 9개 검사를 다시 통과했다. 최초 분리 검사에서는 임시 Python 환경 심볼릭 링크가 변경으로 잡혀 불필요한 Java 빌드를 선택했고 JDK 탐색에 실패했다. 해당 임시 경로를 그 체크아웃의 로컬 제외 규칙에 넣어 실제 커밋 범위로 다시 검사했으며 Java 빌드를 검증 성공으로 보고하지 않는다.</li>
+<li>커밋 전 신규 MD의 행 끝 공백을 발견해 API 생성기의 빈 태그 표시와 Payment 보존 MD를 정리했다. 생성 결과를 갱신한 뒤 staged diff 공백 검사를 통과했다.</li>
+<li>게시 전 작성 기준의 지정 절을 읽고, 게시 후 저장된 제목·본문 전체와 base/head를 다시 조회했다. 분산된 문서의 이동 결과, MD/HTML 쌍·생성/검사 변경, Payment 수작업 예외, 로컬 검증과 외부 미실행 범위를 설명하는지 확인했다. 저장된 본문은 검토한 초안과 일치했으며 게시 후 설명 수정 사항은 없었다.</li>
+<li>원격 CI와 PR Labeler는 별도 검사로 구분한다. 최초 게시 검토 시 CI는 실행 중이었으며 이 기록에서 원격 성공을 주장하지 않는다. 병합·배포는 수행하지 않았다.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>db45a2db305eae875182d30d276da8d4b55d5ed804e26199d78eeeaa968c2d6c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
