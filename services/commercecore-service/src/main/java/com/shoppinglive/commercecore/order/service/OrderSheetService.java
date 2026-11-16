@@ -36,6 +36,8 @@ public class OrderSheetService {
     private final ObjectMapper mapper;
     private final OrderSheetLifecycleService lifecycle;
     private final OrderTimeSource time;
+    private final com.shoppinglive.commercecore.coupon.service.CouponPreviewService couponPreview;
+    private final com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons;
     private final com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher events;
 
     public OrderSheetService(
@@ -50,6 +52,8 @@ public class OrderSheetService {
             ObjectMapper mapper,
             OrderSheetLifecycleService lifecycle,
             OrderTimeSource time,
+            com.shoppinglive.commercecore.coupon.service.CouponPreviewService couponPreview,
+            com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons,
             com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher events) {
         this.groups = groups;
         this.orders = orders;
@@ -62,10 +66,25 @@ public class OrderSheetService {
         this.mapper = mapper;
         this.lifecycle = lifecycle;
         this.time = time;
+        this.couponPreview = couponPreview;
+        this.coupons = coupons;
         this.events = events;
     }
 
     public Creation create(String member, String key, CreateOrderSheetRequest request) {
+        return create(member, key, request, null);
+    }
+
+    public record PaymentTerms(String couponId, Long couponSkuId, long expectedAmount) {}
+
+    public Creation createForPayment(
+            String member, String key, CreateOrderSheetRequest request, PaymentTerms terms) {
+        if (terms == null || terms.expectedAmount() <= 0) throw invalid("예상 실결제액은 양수여야 합니다.");
+        return create(member, key, request, terms);
+    }
+
+    private Creation create(
+            String member, String key, CreateOrderSheetRequest request, PaymentTerms terms) {
         if (key == null || key.isBlank() || key.length() > 64) throw invalid("생성 키는 1~64자여야 합니다.");
         if (request == null) throw invalid("주문서 입력이 필요합니다.");
         if (request.items() != null
@@ -112,14 +131,18 @@ public class OrderSheetService {
                                                 Comparator.nullsFirst(Comparator.naturalOrder())))
                                 .toList()
                         : List.<CartSelection>of();
-        String fingerprint =
-                fingerprint(
+        var fingerprintParts =
+                new java.util.ArrayList<Object>(
                         List.of(
                                 directItems,
                                 selections,
                                 request.buyerName(),
                                 request.buyerPhone()));
-        guard.ensure(member);
+        if (terms != null) fingerprintParts.add(terms);
+        String fingerprint = fingerprint(fingerprintParts);
+        // 중계의 외부 TX는 guard를 먼저 준비한다. 여기서 새 연결을 요구하지 않는다.
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager
+                .isActualTransactionActive()) guard.ensure(member);
         return tx.execute(
                 t -> {
                     guard.lock(member);
@@ -189,7 +212,7 @@ public class OrderSheetService {
                     Instant created = time.now();
                     PaymentGroup group =
                             new PaymentGroup(
-                                    UUID.randomUUID().toString(),
+                                    "PG-" + UUID.randomUUID(),
                                     member,
                                     key,
                                     fingerprint,
@@ -233,9 +256,51 @@ public class OrderSheetService {
                         orders.saveAndFlush(item);
                         skus.reserve(sku.skuId(), line.quantity());
                     }
+                    if (terms != null) applyPaymentTerms(group, terms);
                     events.publish("PaymentGroupCreated", group.getId(), Map.of());
                     return new Creation(response(group), true);
                 });
+    }
+
+    private void applyPaymentTerms(PaymentGroup group, PaymentTerms terms) {
+        if (terms.couponId() == null) {
+            if (terms.couponSkuId() != null) throw invalid("쿠폰 없이 적용 SKU를 지정할 수 없습니다.");
+        } else {
+            if (terms.couponSkuId() == null) throw invalid("쿠폰 적용 SKU가 필요합니다.");
+            var item =
+                    orders.findByPaymentGroupIdOrderByIdAsc(group.getId()).stream()
+                            .filter(o -> Objects.equals(o.getSkuId(), terms.couponSkuId()))
+                            .findFirst()
+                            .orElseThrow(() -> invalid("쿠폰 대상 SKU가 주문에 없습니다."));
+            if (jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM coupon_definition WHERE id=? AND seller_id=?",
+                            Integer.class,
+                            terms.couponId(),
+                            item.getSellerIdSnapshot())
+                    != 1) throw conflict("쿠폰과 상품의 판매자가 다릅니다.");
+            var quote =
+                    couponPreview.previewAt(
+                            group.getMemberId(),
+                            terms.couponId(),
+                            List.of(
+                                    new com.shoppinglive.commercecore.coupon.service
+                                            .CouponPreviewService.PricedItem(
+                                            "selected",
+                                            item.getProductIdSnapshot(),
+                                            item.getTotalAmount())),
+                            time.now());
+            coupons.reserveAt(group.getMemberId(), terms.couponId(), time.now());
+            jdbc.update(
+                    "UPDATE orders SET discount_amount=?,payable_amount=total_amount-? WHERE id=?",
+                    quote.discountAmount(),
+                    quote.discountAmount(),
+                    item.getId());
+            group.selectCoupon(terms.couponId(), item.getId(), quote.discountAmount());
+            groups.saveAndFlush(group);
+            entityManager.refresh(item);
+        }
+        if (group.getPayableAmount() <= 0) throw invalid("새 Payment 계약은 실결제액이 양수여야 합니다.");
+        if (group.getPayableAmount() != terms.expectedAmount()) throw conflict("주문 실결제액이 변경되었습니다.");
     }
 
     public OrderSheetResponse get(String member, String number) {

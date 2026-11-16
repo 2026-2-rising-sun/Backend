@@ -1,34 +1,27 @@
 # 주문·결제 서비스 간 흐름
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](services/payment/README.md)에 있다.
-
 <!-- visual: relations -->
 
-현재 공개 legacy는 기존 Payment HTTP 계약을 유지한다. 새 주문은 기본600초이며 첫 실행 접수부터 별도600초 처리 기한을 저장한다. 기한 도달은 주문 EXPIRED와 선점해제, 늦은 승인은 REQUIRED 기록이며 환불 연동 완료는 아니다. 가격·재고 포트는 SKU 원본으로 전환했다. 신규 주문서 공개API·금전·종료/보상 연동은현재PR에서제외했다. [Order현재범위](commercecore/order/설계.md) · [후속인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 전체설계미충족·머지불가이며 MockGateway/실제PG·HTTP와운영제공자검증을구분한다.
+새 주문서 경로는 결제창 준비와 실제 승인을 나눈다. 준비 동안 생성부터600초 PENDING을 유지하고 인증 후 승인 접수에서 PROCESSING 별도600초를 시작한다. 기존 공개 legacy 경로도 유지한다. Payment 실행·원장은 팀원 소유이며 Core는 주문·재고·쿠폰과 전달 기록을 소유한다.
 
-[시각 자료](order-payment.html)
-
-## 책임과 경계
-
-실행 책임은 Payment, 주문·재고·쿠폰 정책은 Core다. 0원도 영속 실행·결과 기록을 남긴다. 운영 PG 연동 검증과 Mock 처리를 구분한다.
-
-## 전이
+## 새 계약 경로
 
 | 출발 | 도착 | 조건·처리 |
 |---|---|---|
-| 사용자 | Core 주문 | 본인·가격·수량·멱등 키 확인 → 재고·쿠폰 예약과 주문/묶음 저장 |
-| Core 확인 중 | Core 영속 전달 | PAYMENT_CONFIRMING과 payment_delivery_request를 같은 트랜잭션에 저장 |
-| Core 커밋 후 | Payment 접수 | 같은 requestId·원문을 HTTP로 전달한다. 응답 유실 시 같은 요청을 재전달한다. |
-| Payment 실행 | Payment 결과·Outbox | Mock 제공자 실행/조회·lease 확인 후 원본과 결과 이벤트를 함께 저장 |
-| Payment 결과 | Core 반영 | 이벤트·HTTP 결과를 같은 검증 경로에서 멱등 반영. 기한 내 SUCCESS는 재고 소비, FAILED는 예약 복원. 기한 후 SUCCESS는 환불 필요 사실만 기록 |
-| Payment UNKNOWN | Core 확인 중 유지 | 기한 전 통신 시간 초과만으로 재고·쿠폰을 풀지 않는다. 처리기한 도달 시 선점해제하고 확정 결과 복구는 계속한다. |
+| 사용자 | Core 주문서 | SKU/Cart·예상 금액 검증, 선점·판매자별 금액/설정 수수료·PREPARE 전달 원문 같은 TX |
+| Core 커밋 후 | Payment 생성/checkout | 준비 데이터만 저장. PENDING/원래 기한 유지 |
+| 사용자 인증 완료 | Core PROCESSING | 첫600초 처리기한·APPROVAL 원문 같은 TX. 반복 요청은 불연장 |
+| Core 커밋 후 | Payment 조회/승인 | 먼저 조회, 유효한 미접수만 승인. 202/UNKNOWN·통신 예외는 실패가 아님 |
+| Payment 확정 승인 | Core PAID | HTTP 조회 또는 PaymentApproved 검증·멱등 반영·재고 소진/쿠폰 사용 |
+| Core 기한 경계 | EXPIRED | 재고/쿠폰 선점 한 번 해제. 이후 새 승인 POST 없이 조회 유지 |
+| 종료 주문의 늦은 승인 | 환불 필요+Outbox | 주문 부활 없이 late-{paymentId}와 RefundRequested(LATE_APPROVAL) 같은 TX |
+| Core 환불 요청 발행 | Payment 환불 소비 | 실제 소비자는 아직 미발견. 발행 성공은 환불 접수/완료가 아님 |
+| Payment 환불 결과 | Core 환불 상태 | Core 소비자는 계약 대역으로 검증. 금액/판매자 원문 검증 뒤 SUCCEEDED/FAILED, 주문은 종료 상태 유지 |
 
-## 상세와 근거
+팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.
 
-- [CommerceCore 주문·결제 묶음](services/commercecore/states/order.md)
-- [CommerceCore 결제 전달·결과 반영](services/commercecore/states/payment.md)
-- [Payment 결제 실행](services/payment/states/payment.md)
+## 기존 경로와 이행
 
-[공통 Outbox](services/common-module/outbox.md) · [이벤트 계약](../../contracts/events)
+legacy PAYMENT/REFUND 전달은 기존 requestId/원문을 유지한다. 기존 0원 경로도 유지하며 새 계약의 양수 제약은 새 order-sheets에만 적용한다. legacy의 late_approval_refund(REQUIRED)와 새 원결제용 payment_relay_refund(REQUESTED)는 별개다. 과거 번호/기한/금액/기존 null 처리기한을 임의 재작성하지 않는다. 호출자 전환·과거 적용 DB 이행·실 PG·실제 환불 통합이 남아 Draft/배포 불가다.
 
-목표설계의 CommerceCore PENDING은생성부터600초, PAYMENT_PROCESSING은실제실행진입부터별도600초다. 두 타이머와 주문 만료는 적용했다. 새 Payment 생성/승인 중계·조회/RefundRequested 연동은 미완이다. 새공개입구·Payment계약변경·503차단은이번PR에추가하지않는다.
+[Core 상세](commercecore/order/설계.md) · [현재 원본·남은 기준](../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 기록](../worklog/2026-11-16.md) · [팀원 설계](services/payment/README.md)

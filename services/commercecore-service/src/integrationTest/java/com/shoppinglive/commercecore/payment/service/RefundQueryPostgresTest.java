@@ -33,6 +33,10 @@ import org.springframework.jdbc.datasource.DelegatingDataSource;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundQueryPostgresTest extends RefundTestSupport {
+    // 전체 EMF 통계와 공유 JDBC를 계측하므로 배경 작업은 이 조회 검사에서 분리한다.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.springframework.scheduling.TaskScheduler scheduler;
+
     @Autowired RefundIntakeService intake;
     @Autowired RefundQueryService queries;
     @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;

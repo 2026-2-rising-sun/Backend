@@ -118,6 +118,33 @@ class OrderSheetMigrationPostgresTest {
         migration("105").validate();
     }
 
+    @Test
+    @DisplayName("V106은 기존 번호·금액·기한·전달 이력을 보존하고 새 연동 표만 추가한다")
+    void relaySchemaDoesNotRewriteExistingOrders() throws Exception {
+        migration("105").migrate();
+        sql(
+                "INSERT INTO payment_delivery_request(request_id,kind,order_id,payment_group_id,reference_number,amount,request_key,payment_id,command,status,requested_at,next_action_at) VALUES('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','PAYMENT',31,11,'old-number',6000,'old-payment',81,'old-command','UNKNOWN',now(),now())");
+        migration("106").migrate();
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM payment_group WHERE id=11 AND group_number='old-number' AND expires_at-created_at=INTERVAL '15 minutes' AND payable_amount=6000 AND processing_expires_at IS NULL"))
+                .isEqualTo(1);
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM payment_delivery_request WHERE payment_id=81 AND kind='PAYMENT' AND status='UNKNOWN' AND command='old-command'"))
+                .isEqualTo(1);
+        assertThat(number("SELECT COUNT(*) FROM seller_order")).isZero();
+        assertThat(number("SELECT COUNT(*) FROM order_payment_relay")).isZero();
+        assertThat(number("SELECT COUNT(*) FROM payment_relay_refund")).isZero();
+        sql(
+                "INSERT INTO payment_delivery_request(request_id,kind,order_id,payment_group_id,reference_number,amount,request_key,command,status,requested_at,next_action_at) VALUES('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','PREPARE',31,11,'old-number',6000,'prepare','request','PROCESSING',now(),now())");
+        assertThatThrownBy(
+                        () ->
+                                sql(
+                                        "INSERT INTO payment_delivery_request(request_id,kind,order_id,payment_group_id,reference_number,amount,request_key,command,status,requested_at,next_action_at) VALUES('cccccccc-cccc-4ccc-8ccc-cccccccccccc','PREPARE',31,11,'old-number',6000,'other','request','PROCESSING',now(),now())"))
+                .isInstanceOf(SQLException.class);
+    }
+
     private Flyway migration(String target) {
         return Flyway.configure()
                 .dataSource(url, user, password)

@@ -86,3 +86,13 @@ Payment 추가 변경과 종속 Core 연동은 사용자 범위 정정에 따라
 - V105는 컬럼과 Core 환불 필요 테이블만 추가한다. 기존 확인중 정책0/1/2의 시작시각을 추측하거나 타이머를 소급 적용하지 않는다. 해당 행의 운영 이행과 이미 다른 V104를 적용한 환경의 체크섬 문제는 미완이다.
 
 [현재 작업·계약 조사](../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 결과](../worklog/2026-11-16.md)
+
+## 2026-11-16 팀원 계약의 Commerce 중계 구현
+
+후속 구현은 새 `/v1/order-sheets`에서 준비 성공 PENDING 유지와 인증 후 PROCESSING 진입을 분리한다. Core seller_order에 팀원 설계의 정렬 번호·할인 후 금액·commerce.commission-rate 설정을 생성 시 보존한다. 설정 숫자 기본값은 정하지 않는다. V106은 기존 V104/V105와 과거 데이터를 덮어쓰지 않는다.
+
+PREPARE/APPROVAL 영속 원문을 기존 HTTP 전달표에 저장하고 legacy 전달기와 대상을 분리한다. 승인 접수 TX에 상태/600초 기한/전달 기록을 함께 저장하며 HTTP는 TX 밖이다. 새 이벤트 소비는 팀원 source/schema/key와 원결제/금액을 검증한다. 늦은 승인에는 새 원결제용 payment_relay_refund와 RefundRequested outbox를 같은 TX에 저장하며 환불 결과를 별도 확정한다. legacy REQUIRED를 임의 새 원결제 환불로 이관하지 않는다.
+
+사용자600/600·확정 실패 FAILED를 적용한다. 팀원 목표의 Commerce T+3분/거절 후 PENDING 복귀 제안은 채택하지 않는다. Payment CREATED expiresAt은 원래 준비 기한이며 APPROVING/UNKNOWN 실패 기한이 아니다. 주문 만료 후에도 미확정 결제는 조회하고 실패를 추정하지 않는다.
+
+앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. [현재 범위](../exec-plans/active/331-order-audit-fixes/processing-deadline.md).

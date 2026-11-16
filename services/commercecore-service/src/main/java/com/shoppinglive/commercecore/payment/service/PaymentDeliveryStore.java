@@ -126,6 +126,76 @@ public class PaymentDeliveryStore {
         return holder.getKey().longValue();
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Delivery relay(
+            String kind,
+            Long orderId,
+            Long groupId,
+            String number,
+            long amount,
+            String key,
+            Long paymentId,
+            Object command) {
+        if (!"PREPARE".equals(kind) && !"APPROVAL".equals(kind))
+            throw new IllegalArgumentException("지원하지 않는 중계 종류입니다.");
+        var existing =
+                jdbc.queryForList(
+                        "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=?",
+                        String.class,
+                        groupId,
+                        kind);
+        if (!existing.isEmpty()) {
+            Delivery prior = get(existing.getFirst());
+            String priorKey =
+                    jdbc.queryForObject(
+                            "SELECT request_key FROM payment_delivery_request WHERE id=?",
+                            String.class,
+                            prior.id());
+            if (!Objects.equals(key, priorKey)
+                    || !Objects.equals(readTree(json(command)), readTree(prior.command())))
+                throw new BusinessException(ErrorCode.CONFLICT, "기존 중계 요청과 입력이 다릅니다.");
+            return prior;
+        }
+        String requestId = UUID.randomUUID().toString();
+        long id =
+                insert(
+                        requestId,
+                        kind,
+                        orderId,
+                        groupId,
+                        number,
+                        amount,
+                        key,
+                        paymentId,
+                        null,
+                        time.now());
+        jdbc.update("UPDATE payment_delivery_request SET command=? WHERE id=?", json(command), id);
+        return get(requestId);
+    }
+
+    public Delivery relay(Long groupId, String kind) {
+        var ids =
+                jdbc.queryForList(
+                        "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=?",
+                        String.class,
+                        groupId,
+                        kind);
+        return ids.isEmpty() ? null : get(ids.getFirst());
+    }
+
+    public java.util.List<Delivery> relayDue() {
+        return jdbc.query(
+                "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE kind IN ('PREPARE','APPROVAL') AND status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP ORDER BY id LIMIT 100",
+                (r, n) ->
+                        new Delivery(
+                                r.getLong(1),
+                                r.getString(2),
+                                r.getString(3),
+                                r.getString(4),
+                                r.getString(5),
+                                r.getString(6)));
+    }
+
     public PaymentExecution payment(long id) {
         var rows =
                 jdbc.queryForList(
@@ -192,7 +262,7 @@ public class PaymentDeliveryStore {
     }
 
     public List<Delivery> due(boolean includeRefunds) {
-        String kind = includeRefunds ? "" : " AND kind='PAYMENT'";
+        String kind = includeRefunds ? " AND kind IN ('PAYMENT','REFUND')" : " AND kind='PAYMENT'";
         return jdbc.query(
                 "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP"
                         + kind

@@ -1739,6 +1739,113 @@ paths:
       - SELLER
       tags:
       - Seller Product
+  /v1/order-sheets:
+    post:
+      tags: [Orders]
+      operationId: createRelayOrderSheet
+      summary: 새 Payment 계약의 주문 생성과 결제 준비
+      description: SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 팀원 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
+      x-required-roles: [USER, SELLER]
+      parameters: [{$ref: '#/components/parameters/RequiredIdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RelayOrderRequest'}
+      responses:
+        '201': {description: 새 주문 저장. paymentId가 null이고 paymentStatus가 PREPARING이면 준비 지연이며 결제 준비 성공이 아니다., content: {application/json: {schema: {$ref: '#/components/schemas/RelayOrderView'}}}}
+        '200': {description: 동일 입력 재요청, content: {application/json: {schema: {$ref: '#/components/schemas/RelayOrderView'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/order-sheets/{number}:
+    get:
+      tags: [Orders]
+      operationId: getRelayOrderSheet
+      summary: 본인 주문과 결제·늦은 승인 환불 상태
+      x-required-roles: [USER, SELLER]
+      parameters: [{name: number, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: 현재 주문·결제 상태. 저장 기한 도달 시 만료를 반영한다., content: {application/json: {schema: {$ref: '#/components/schemas/RelayOrderView'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /v1/order-sheets/{number}/payment:
+    post:
+      tags: [Orders]
+      operationId: prepareRelayPayment
+      summary: 저장된 결제 생성 원문 재전달
+      description: 유효한 PENDING에서만 준비한다. 성공해도 승인 실행이 아니므로 처리 기한을 시작하지 않는다. 이미 준비된 결제창을 새로 열 때는 checkouts를 사용한다.
+      x-required-roles: [USER, SELLER]
+      parameters: [{name: number, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: 현재 준비 상태, content: {application/json: {schema: {$ref: '#/components/schemas/RelayPaymentState'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/order-sheets/{number}/payment/checkouts:
+    post:
+      tags: [Orders]
+      operationId: openRelayCheckout
+      summary: PENDING 주문의 새 결제창 요청
+      description: Payment의 비멱등 checkout 계약을 사용하므로 호출마다 pgOrderId가 바뀔 수 있다. 미준비 상태면 저장된 생성을 재전달한다. 인증 후 승인에는 가장 최근 pgOrderId를 사용한다. PENDING 생성 기한은 연장하지 않는다.
+      x-required-roles: [USER, SELLER]
+      parameters: [{name: number, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: 현재 결제창·준비 상태, content: {application/json: {schema: {$ref: '#/components/schemas/RelayPaymentState'}}}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/order-sheets/{number}/payment/approval:
+    post:
+      tags: [Orders]
+      operationId: approveRelayPayment
+      summary: 인증 완료 후 승인 실행 접수
+      description: JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 첫 전환+600초와 승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 전달 요청이며 기한을 연장하지 않는다. 202와 UNKNOWN은 실패가 아니다. HTTP 응답 유실은 조회·같은 pgOrderId 원문 재전달로 복구한다. 기한 후에는 새 승인을 보내지 않고 조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
+      x-required-roles: [USER, SELLER]
+      parameters:
+      - {name: number, in: path, required: true, schema: {type: string}}
+      - {$ref: '#/components/parameters/RequiredIdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paymentKey, pgOrderId, amount]
+              properties:
+                paymentKey: {type: string, minLength: 1, maxLength: 200}
+                pgOrderId: {type: string, minLength: 1, maxLength: 64}
+                amount: {type: integer, format: int64, minimum: 1}
+      responses:
+        '200': {description: 현재 완료·실패·종료 상태. orderStatus와 refundStatus를 확인하며 HTTP 200 자체는 결제 성공을 뜻하지 않는다., content: {application/json: {schema: {$ref: '#/components/schemas/RelayPaymentState'}}}}
+        '202':
+          description: 승인 결과 미확정
+          headers: {Location: {schema: {type: string}, description: 본인 주문 상태 조회 경로}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/RelayPaymentState'}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/order-sheets/{number}/cancel:
+    post:
+      tags: [Orders]
+      operationId: cancelRelayOrderSheet
+      summary: 결제 준비 전후 PENDING 주문 취소
+      description: 준비된 paymentId가 있어도 아직 PENDING이면 취소·선점해제한다. PROCESSING은 즉시 취소하지 않는다. Payment에 주문 종료 API나 취소 이벤트를 보내지 않는다.
+      x-required-roles: [USER, SELLER]
+      parameters: [{name: number, in: path, required: true, schema: {type: string}}]
+      responses:
+        '204': {description: 취소 또는 이미 취소된 상태}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
 components:
   securitySchemes:
     BearerAuth: {$ref: './common.yaml#/components/securitySchemes/BearerAuth'}
@@ -2630,6 +2737,84 @@ components:
         couponId: {"type":["string","null"],"maxLength":64}
         discountAmount: {"type":"integer","format":"int64","minimum":0}
         payableAmount: {"type":"integer","format":"int64","minimum":0}
+    RelayOrderRequest:
+      type: object
+      required: [buyerName, buyerPhone, expectedAmount]
+      oneOf:
+      - required: [items]
+        properties: {items: {type: array, minItems: 1}}
+      - required: [cartItems]
+        properties: {cartItems: {type: array, minItems: 1}}
+      properties:
+        items:
+          type: [array, 'null']
+          items:
+            type: object
+            required: [skuId, quantity]
+            properties:
+              skuId: {type: integer, format: int64, minimum: 1}
+              quantity: {type: integer, minimum: 1}
+        cartItems: {type: [array, 'null'], maxItems: 100, items: {$ref: '#/components/schemas/CartSelection'}}
+        buyerName: {type: string, minLength: 1, maxLength: 64}
+        buyerPhone: {type: string, minLength: 1, maxLength: 32}
+        expectedAmount: {type: integer, format: int64, minimum: 1, description: 쿠폰 적용 후 예상 실결제액}
+        couponId: {type: [string, 'null'], maxLength: 64}
+        couponSkuId: {type: [integer, 'null'], format: int64, minimum: 1, description: 쿠폰을 선택한 경우 적용할 주문 항목의 SKU}
+    RelayPaymentState:
+      type: object
+      required: [orderNumber, orderStatus, paymentId, paymentStatus, pgOrderId, amount, expiresAt, processingExpiresAt, refundStatus]
+      properties:
+        orderNumber: {type: string}
+        orderStatus: {type: string, enum: [PENDING, PROCESSING, PAID, FAILED, EXPIRED, CANCELLED, REFUNDED, PARTIALLY_REFUNDED]}
+        paymentId: {type: [integer, 'null'], format: int64, minimum: 1}
+        paymentStatus: {type: string, description: PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다.}
+        pgOrderId: {type: [string, 'null']}
+        amount: {type: integer, format: int64, minimum: 1}
+        expiresAt: {type: string, format: date-time, description: 변경하지 않는 PENDING 생성 기한}
+        processingExpiresAt: {type: [string, 'null'], format: date-time, description: 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다.}
+        refundStatus: {type: [string, 'null'], enum: [null, REQUESTED, SUCCEEDED, FAILED], description: 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다.}
+    RelayOrderView:
+      type: object
+      required: [order, payment]
+      properties:
+        order: {$ref: '#/components/schemas/RelayOrderSheet'}
+        payment: {$ref: '#/components/schemas/RelayPaymentState'}
+    RelayOrderSheet:
+      type: object
+      required: [orderNumber, status, failureReason, totalAmount, discountAmount, payableAmount, expiresAt, processingExpiresAt, paymentId, couponId, couponOrderItemId, items]
+      properties:
+        orderNumber: {type: string}
+        status: {type: string, enum: [PENDING, PROCESSING, PAID, FAILED, EXPIRED, CANCELLED, REFUNDED, PARTIALLY_REFUNDED]}
+        failureReason: {type: [string, 'null']}
+        totalAmount: {type: integer, format: int64, minimum: 1}
+        discountAmount: {type: integer, format: int64, minimum: 0}
+        payableAmount: {type: integer, format: int64, minimum: 1}
+        expiresAt: {type: string, format: date-time}
+        processingExpiresAt: {type: [string, 'null'], format: date-time}
+        paymentId: {type: [integer, 'null'], format: int64, minimum: 1}
+        couponId: {type: [string, 'null']}
+        couponOrderItemId: {type: [integer, 'null'], format: int64, minimum: 1}
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [orderItemId, skuId, productId, productName, sellerId, mainImageUrl, selectedOptions, quantity, unitPrice, totalAmount, discountAmount, payableAmount, sourceCartItemId, sourceCartVersion]
+            properties:
+              orderItemId: {type: integer, format: int64, minimum: 1}
+              skuId: {type: integer, format: int64, minimum: 1}
+              productId: {type: integer, format: int64, minimum: 1}
+              productName: {type: string}
+              sellerId: {type: string, format: uuid}
+              mainImageUrl: {type: [string, 'null']}
+              selectedOptions: {type: [string, 'null']}
+              quantity: {type: integer, minimum: 1}
+              unitPrice: {type: integer, format: int64, minimum: 0}
+              totalAmount: {type: integer, format: int64, minimum: 0}
+              discountAmount: {type: integer, format: int64, minimum: 0}
+              payableAmount: {type: integer, format: int64, minimum: 0}
+              sourceCartItemId: {type: [integer, 'null'], format: int64, minimum: 1}
+              sourceCartVersion: {type: [integer, 'null'], format: int64, minimum: 0}
     PaymentGroup:
       type: object
       required:
@@ -2908,7 +3093,7 @@ components:
         status:
           type: string
           enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
-          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이다. Order의 PAYMENT_CONFIRMING은 첫 실행 접수부터600초 기한이다. UNKNOWN은 기한 전 실패로 확정하지 않으며 주문 만료 뒤 승인은 환불 필요 사실로 기록한다. 새 Payment 조회·환불 전달 연동은 미완이다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
+          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이다. Order의 PAYMENT_CONFIRMING은 첫 실행 접수부터600초 기한이다. UNKNOWN은 기한 전 실패로 확정하지 않으며 주문 만료 뒤 승인은 환불 필요 사실로 기록한다. 이 스키마는 기존 legacy 경로다. 새 Payment 조회·환불 전달은 별도 order-sheets 중계를 사용한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
         scheduledResolveAt:

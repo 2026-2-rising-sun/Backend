@@ -89,14 +89,20 @@ class OrderSheetDomainPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("신규 공개 주문서 핸들러는 없고 기존 결제 API로 내부 주문을 우회 실행할 수 없다")
-    void hasNoPublicEntryOrLegacyFinancialBypass() throws Exception {
+    @DisplayName("새 주문서 핸들러가 있어도 미연결 내부 주문을 새 중계나 기존 결제 API로 우회 실행할 수 없다")
+    void relayEntryDoesNotAllowUnboundOrLegacyFinancialBypass() throws Exception {
         assertThat(
                         mappings.getHandlerMethods().keySet().stream()
                                 .flatMap(i -> i.getPatternValues().stream())
                                 .filter(p -> p.startsWith("/v1/order-sheets")))
-                .isEmpty();
+                .contains("/v1/order-sheets", "/v1/order-sheets/{number}/payment/approval");
         var order = create(1);
+        mvc.perform(
+                        post("/v1/order-sheets/" + order.orderNumber() + "/payment")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isNotFound());
         mvc.perform(
                         post("/v1/payment-groups/" + order.orderNumber() + "/payments")
                                 .header("Authorization", bearer(MEMBER_A))

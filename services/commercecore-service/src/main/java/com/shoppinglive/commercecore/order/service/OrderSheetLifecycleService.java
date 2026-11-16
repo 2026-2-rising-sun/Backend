@@ -72,8 +72,7 @@ public class OrderSheetLifecycleService {
                     PaymentGroup group = locked(found.getId());
                     if (group.getStatus() == OrderStatus.CANCELLED) return;
                     // 결제 결과 대기 중 즉시 취소 제한은 사용자 확정 정책이다.
-                    if (group.getStatus() != OrderStatus.PENDING_PAYMENT
-                            || group.getPaymentId() != null)
+                    if (group.getStatus() != OrderStatus.PENDING_PAYMENT)
                         throw conflict("결제 요청 전 주문만 즉시 취소할 수 있습니다.");
                     if (!group.getExpiresAt().isAfter(time.now())) {
                         expireLocked(group);

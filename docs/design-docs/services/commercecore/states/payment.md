@@ -35,4 +35,10 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 
 ## 2026-11-16 현재 PR 경계
 
-새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
+새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. legacy 늦은 승인은 REQUIRED 기록이며 새 계약 경로는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 통합은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
+
+## 팀원 계약 중계의 현재 상태
+
+새 `/v1/order-sheets` 준비는 PENDING 유지, 인증 후 승인 접수만 PROCESSING과 별도600초를 시작한다. PREPARE/APPROVAL 전달 원문과 상태는 같은 TX이며 HTTP는 커밋 후다. 202/UNKNOWN은 미확정, 기한 경계는 EXPIRED와 선점 해제다. 늦은 승인→payment_relay_refund REQUESTED와 RefundRequested outbox→결과 소비 SUCCEEDED/FAILED다. 주문은 종료 상태를 유지한다. legacy REQUIRED 기록과 새 원결제 환불표는 분리한다.
+
+Core PostgreSQL/계약 대역·Kafka 검사와 실제 Payment 생성·조회·checkout 확인을 구분한다. 실제 환불 생산자·소비자는 아직 발견하지 못해 전체 통합은 미완이다. [현재 원본·남은 기준](../../../../exec-plans/active/331-order-audit-fixes/processing-deadline.md).

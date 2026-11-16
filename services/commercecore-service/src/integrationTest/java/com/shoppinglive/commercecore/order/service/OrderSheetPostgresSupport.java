@@ -63,6 +63,9 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
     void seedOrderSheetData() {
         for (String table :
                 List.of(
+                        "payment_relay_refund",
+                        "seller_order",
+                        "order_payment_relay",
                         "refund_target_order",
                         "payment_delivery_request",
                         "refund_request",
