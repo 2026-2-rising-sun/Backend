@@ -1,0 +1,266 @@
+package com.shoppinglive.commercecore.sales.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
+import com.shoppinglive.commercecore.product.service.ProductLookup;
+import com.shoppinglive.commercecore.sales.entity.Sales;
+import com.shoppinglive.commercecore.sales.entity.SalesStatus;
+import com.shoppinglive.commercecore.sales.entity.SalesStock;
+import com.shoppinglive.commercecore.sales.event.SalesInfoEventTracker;
+import com.shoppinglive.commercecore.sales.exception.SalesAlreadyRegisteredException;
+import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
+import com.shoppinglive.common.core.BusinessException;
+import com.shoppinglive.common.core.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * 판매 1 · 판매정보 최초 설정 유스케이스 검증.
+ *
+ * <p>{@link TransactionTemplate} 은 mock 으로 두되 콜백을 그대로 실행하게 해서, 트랜잭션 경계 자체가 아니라 그 안에서 무엇을 저장하는지를 본다.
+ * 실제 커밋·롤백 동작은 JPA 가 보장한다.
+ */
+@ExtendWith(MockitoExtension.class)
+class SalesRegistrationServiceTest {
+
+    private static final Long PRODUCT_ID = 100L;
+
+    @Mock private SalesJpaRepository salesRepository;
+
+    @Mock private SalesStockJpaRepository salesStockRepository;
+
+    @Mock private ProductLookup productLookup;
+
+    @Mock private TransactionTemplate transactionTemplate;
+
+    private SalesRegistrationService salesRegistrationService;
+
+    @Mock private SalesInfoEventTracker events;
+
+    @BeforeEach
+    void setUp() {
+        salesRegistrationService =
+                new SalesRegistrationService(
+                        salesRepository,
+                        salesStockRepository,
+                        productLookup,
+                        transactionTemplate,
+                        events);
+    }
+
+    /**
+     * mock TransactionTemplate 이 콜백을 실제로 실행하도록 스텁한다. 이 스텁이 필요한 테스트 (저장까지 도달하는 경우) 에서만 호출해 불필요한 스텁
+     * 경고를 피한다.
+     */
+    @SuppressWarnings("unchecked")
+    private void executeTransactionInline() {
+        given(transactionTemplate.execute(any()))
+                .willAnswer(
+                        invocation ->
+                                ((TransactionCallback<Object>) invocation.getArgument(0))
+                                        .doInTransaction(new SimpleTransactionStatus()));
+    }
+
+    /** 등록 시 존재 여부와 알림에 쓸 상품 이름을 함께 확인한다. */
+    private void productExists() {
+        given(productLookup.findProduct(PRODUCT_ID))
+                .willReturn(
+                        java.util.Optional.of(
+                                new com.shoppinglive.commercecore.product.dto.ProductSnapshot(
+                                        PRODUCT_ID, "상품 이름", null)));
+    }
+
+    /**
+     * {@code saveAndFlush} 가 식별자를 채워 돌려주도록 스텁한다. 실제로는 JPA 가 flush 시점에 IDENTITY 값을 주입하는데, mock 은 인자를
+     * 그대로 돌려주므로 id 가 {@code null} 로 남는다. 재고({@code sales_stock})는 판매정보의 PK 를 그대로 쓰는 구조라 id 없이는 만들 수
+     * 없다.
+     */
+    private void saveAssignsId(long assignedId) {
+        given(salesRepository.saveAndFlush(any(Sales.class)))
+                .willAnswer(
+                        invocation -> {
+                            Sales sales = invocation.getArgument(0);
+                            ReflectionTestUtils.setField(sales, "id", assignedId);
+                            return sales;
+                        });
+    }
+
+    // ----- 정상 등록 -----
+
+    @DisplayName("판매정보와 초기 재고를 함께 저장한다")
+    @Test
+    void storesSalesInformationAndInitialStockTogether() {
+        productExists();
+        executeTransactionInline();
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        saveAssignsId(1L);
+
+        Sales registered = salesRegistrationService.register(PRODUCT_ID, 15_000L, 10);
+
+        assertThat(registered.getProductId()).isEqualTo(PRODUCT_ID);
+        assertThat(registered.getPrice()).isEqualTo(15_000L);
+
+        ArgumentCaptor<SalesStock> stockCaptor = ArgumentCaptor.forClass(SalesStock.class);
+        verify(salesStockRepository).save(stockCaptor.capture());
+        assertThat(stockCaptor.getValue().getAvailable()).isEqualTo(10);
+        assertThat(stockCaptor.getValue().getReserved()).as("최초 등록 시 배정된 수량은 없다").isZero();
+    }
+
+    /** 등록만으로 판매가 시작되면 안 된다. 판매자가 가격·재고를 준비하는 동안 상품이 공개 목록에 뜨거나 주문을 받아버린다. */
+    @DisplayName("판매 등록 직후 상태는 READY다")
+    @Test
+    void createsSaleInReadyStatus() {
+        productExists();
+        executeTransactionInline();
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        saveAssignsId(1L);
+
+        Sales registered = salesRegistrationService.register(PRODUCT_ID, 15_000L, 10);
+
+        assertThat(registered.getStatus()).isEqualTo(SalesStatus.READY);
+    }
+
+    /** 재고 0 으로 먼저 등록해 두고 판매 3 으로 채우는 운영 흐름을 허용한다. */
+    @DisplayName("초기 재고가 0이어도 판매를 등록한다")
+    @Test
+    void allowsRegistrationWithZeroInitialStock() {
+        productExists();
+        executeTransactionInline();
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        saveAssignsId(1L);
+
+        salesRegistrationService.register(PRODUCT_ID, 15_000L, 0);
+
+        ArgumentCaptor<SalesStock> stockCaptor = ArgumentCaptor.forClass(SalesStock.class);
+        verify(salesStockRepository).save(stockCaptor.capture());
+        assertThat(stockCaptor.getValue().getAvailable()).isZero();
+    }
+
+    // ----- 상품 확인 -----
+
+    @DisplayName("상품이 없으면 판매 등록을 거절하고 저장하지 않는다")
+    @Test
+    void rejectsMissingProductWithoutPersistingSale() {
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        given(productLookup.findProduct(PRODUCT_ID)).willReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
+                .isInstanceOf(ProductNotFoundException.class);
+
+        verify(salesRepository, never()).saveAndFlush(any());
+        verify(salesStockRepository, never()).save(any());
+    }
+
+    /**
+     * 판매 1 완료 기준: "상품이 없거나 <b>존재 여부를 확인하지 못하면</b> 설정을 완료하지 않는다". 로컬 상품 저장소 장애를 "상품 없음" 으로 단정하지 않고
+     * 그대로 전파해, 호출자가 재시도를 안내할 수 있게 한다.
+     */
+    @DisplayName("로컬 상품 저장소 장애를 상품 미존재로 단정하지 않고 전파한다")
+    @Test
+    void propagatesProductLookupFailureWithoutAssumingProductIsMissing() {
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        given(productLookup.findProduct(PRODUCT_ID))
+                .willThrow(new DataAccessResourceFailureException("상품 저장소 연결 실패"));
+
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
+                .isInstanceOf(DataAccessResourceFailureException.class)
+                .isNotInstanceOf(ProductNotFoundException.class);
+
+        verify(salesRepository, never()).saveAndFlush(any());
+    }
+
+    // ----- 중복 등록 -----
+
+    @DisplayName("이미 판매정보가 있으면 409로 거절하고 상품 원본을 조회하지 않는다")
+    @Test
+    void rejectsDuplicateSaleWithoutProductLookup() {
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(true);
+
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
+                .isInstanceOf(SalesAlreadyRegisteredException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.CONFLICT);
+
+        verify(productLookup, never()).findProduct(any());
+        verify(salesRepository, never()).saveAndFlush(any());
+    }
+
+    /**
+     * 중복 검사를 동시에 통과한 두 요청 중 한쪽은 UNIQUE 제약에 걸린다. 그 DB 예외를 그대로 500 으로 흘리지 않고 중복 등록과 같은 409 로 되돌린다.
+     */
+    @DisplayName("UNIQUE 위반도 중복 판매 등록과 같은 409로 처리한다")
+    @Test
+    void mapsUniqueConstraintViolationToDuplicateSaleConflict() {
+        productExists();
+        given(salesRepository.existsByProductId(PRODUCT_ID)).willReturn(false);
+        given(transactionTemplate.execute(any()))
+                .willThrow(new DataIntegrityViolationException("uk_sales_info_product_id"));
+
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, 10))
+                .isInstanceOf(SalesAlreadyRegisteredException.class)
+                .hasCauseInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    // ----- 입력 검증 -----
+
+    @DisplayName("판매 등록 가격이 0 이하면 400으로 거절한다")
+    @Test
+    void rejectsNonPositiveRegistrationPrice() {
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 0L, 10))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.INVALID_REQUEST);
+
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, -1L, 10))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @DisplayName("판매 등록 재고가 음수면 400으로 거절한다")
+    @Test
+    void rejectsNegativeRegistrationStock() {
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, -1))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).errorCode())
+                .isEqualTo(ErrorCode.INVALID_REQUEST);
+    }
+
+    @DisplayName("판매 등록 필수값이 null이면 400으로 거절한다")
+    @Test
+    void rejectsNullRegistrationFields() {
+        assertThatThrownBy(() -> salesRegistrationService.register(null, 15_000L, 10))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, null, 10))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, 15_000L, null))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    /** 검증 실패는 DB·상품 저장소 어디에도 닿기 전에 끝나야 한다. */
+    @DisplayName("판매 등록 검증에 실패하면 DB·상품 저장소에 접근하지 않는다")
+    @Test
+    void rejectsInvalidRegistrationBeforeDatabaseAndProductLookup() {
+        assertThatThrownBy(() -> salesRegistrationService.register(PRODUCT_ID, -1L, 10))
+                .isInstanceOf(BusinessException.class);
+
+        verify(salesRepository, never()).existsByProductId(any());
+        verify(productLookup, never()).findProduct(any());
+    }
+}

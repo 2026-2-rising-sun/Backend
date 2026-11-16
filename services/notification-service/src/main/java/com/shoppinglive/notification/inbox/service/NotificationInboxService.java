@@ -46,6 +46,13 @@ public class NotificationInboxService {
         return notifications.countByMemberIdAndReadAtIsNull(memberId);
     }
 
+    /** 조회 여부와 관계없이 본인의 미읽음 알림만 갱신하며 기존 읽음 시각은 유지한다. */
+    @Transactional
+    public void markAllRead(String memberId) {
+        notifications.markAllReadIfUnread(
+                memberId, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+    }
+
     /**
      * 알림 1건을 읽음으로 표시한다.
      *

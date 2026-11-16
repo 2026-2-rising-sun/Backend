@@ -1,0 +1,5352 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Notification API</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="api.md">MD 명세</a><a href="../../../../contracts/api/notification-service.yaml">계약 YAML</a><a href="../../../README.html">문서 지도</a><a href="overview.html">서비스·모듈 개요</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#공통-인증과-서버">공통 인증과 서버</a></li>
+<li><a href="#get-v1notifications">GET /v1/notifications</a></li>
+<li><a href="#get-v1notificationsunread-count">GET /v1/notifications/unread-count</a></li>
+<li><a href="#post-v1notificationsread-all">POST /v1/notifications/read-all</a></li>
+<li><a href="#post-v1notificationsnotificationidread">POST /v1/notifications/{notificationId}/read</a></li>
+<li><a href="#post-v1broadcast-alerts">POST /v1/broadcast-alerts</a></li>
+<li><a href="#get-v1broadcast-alerts">GET /v1/broadcast-alerts</a></li>
+<li><a href="#delete-v1broadcast-alertsbroadcastid">DELETE /v1/broadcast-alerts/{broadcastId}</a></li>
+<li><a href="#get-v1broadcast-alertsbroadcastid">GET /v1/broadcast-alerts/{broadcastId}</a></li>
+<li><a href="#post-v1restock-alerts">POST /v1/restock-alerts</a></li>
+<li><a href="#get-v1restock-alerts">GET /v1/restock-alerts</a></li>
+<li><a href="#delete-v1restock-alertsproductid">DELETE /v1/restock-alerts/{productId}</a></li>
+<li><a href="#get-v1restock-alertsproductid">GET /v1/restock-alerts/{productId}</a></li>
+<li><a href="#전체-스키마-원본">전체 스키마 원본</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Notification API</h1><label for="search">API 찾기</label> <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="예: /orders 또는 상품…"><p id="count" role="status"></p><div class="controls"><button id="expand" type="button">모두 펼치기</button><button id="collapse" type="button">모두 접기</button></div><!-- generated: OpenAPI -->
+
+<p><a href="../../../../contracts/api/notification-service.yaml">계약 YAML</a> · OpenAPI 3.1.0 · 계약 1.0.0</p>
+<p>계약에 선언된 API입니다. 실제 응답·인증·외부 서비스 실행 결과는 워크로그에서 확인합니다.</p>
+<p>회원 본인의 인앱 알림함 조회와 읽음 처리.</p>
+<details><summary id="공통-인증과-서버">공통 인증과 서버</summary>
+<pre><code class="language-yaml">security:
+- BearerAuth: []
+securitySchemes:
+  BearerAuth:
+    $ref: ./common.yaml#/components/securitySchemes/BearerAuth
+servers:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1notifications"><summary><span class="badge method-get">GET</span> /v1/notifications</summary>
+<p>내 알림 목록</p>
+<p>USER·SELLER 본인의 알림만 occurredAt 내림차순, 같은 시각은 id 내림차순으로 반환한다. 조회는 읽음 상태를 바꾸지 않는다. cursor가 없거나 공백이면 첫 구간이다. nextCursor는 해석하지 않고 다음 요청에 전달한다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cursor</td>
+<td>query</td>
+<td>선택</td>
+<td>string</td>
+<td></td>
+</tr>
+<tr>
+<td>size</td>
+<td>query</td>
+<td>선택</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>입력 형식·size·cursor 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.id</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.eventType</td>
+<td>string</td>
+<td>필수</td>
+<td>알림을 만들게 한 이벤트 이름. 화면이 아이콘을 고르는 근거다. 새 알림이 생기면 값이 늘어나므로 모르는 값을 받아도 동작해야 한다.</td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.title</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 100}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.body</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 500}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.linkType</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>눌렀을 때 보낼 곳의 종류. 보낼 곳이 없는 알림은 linkValue 와 함께 null 이다.</td>
+<td>{&quot;enum&quot;: &#91;&quot;BROADCAST&quot;, &quot;PRODUCT&quot;, &quot;PAYMENT_GROUP&quot;, &quot;REFUND&quot;, &quot;COUPON&quot;, null&#93;}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.linkValue</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID, PAYMENT_GROUP 은 PG-UUID 또는 기존 PG-LEGACY-주문ID, REFUND 는 해당 묶음번호/환불요청ID, COUPON 은 쿠폰 ID(쿠폰함 이동).</td>
+<td>{&quot;maxLength&quot;: 100}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.occurredAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.readAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>data.nextCursor</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.hasNext</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 알림 목록
+operationId: listNotifications
+description: USER·SELLER 본인의 알림만 occurredAt 내림차순, 같은 시각은 id 내림차순으로 반환한다. 조회는 읽음 상태를
+  바꾸지 않는다. cursor가 없거나 공백이면 첫 구간이다. nextCursor는 해석하지 않고 다음 요청에 전달한다.
+parameters:
+- name: cursor
+  in: query
+  required: false
+  schema:
+    type: string
+- name: size
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 20
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/NotificationListEnvelope'
+  '400':
+    description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1notificationsunread-count"><summary><span class="badge method-get">GET</span> /v1/notifications/unread-count</summary>
+<p>내 안 읽은 알림 개수</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="응답_1">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_1">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.unreadCount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_1">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_1">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_1">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_1">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_1">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 안 읽은 알림 개수
+operationId: getUnreadNotificationCount
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/UnreadCountEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="post-v1notificationsread-all"><summary><span class="badge method-post">POST</span> /v1/notifications/read-all</summary>
+<p>내 미읽음 알림 전체 읽음 처리</p>
+<p>토큰의 USER·SELLER 본인의 미읽음 알림 전체를 서버 시각으로 한 번에 갱신한다. 조회 여부·페이지·커서와 무관하며 요청 본문이나 알림 ID 목록은 필요하지 않다. 다른 회원의 알림과 기존 읽음 시각·수정 시각은 변경하지 않는다. 빈 목록과 반복·동시 요청도 성공한다. 갱신 이후 도착한 알림은 다음 요청의 대상이다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="응답_2">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>204</td>
+<td>전체 읽음 처리 완료. 대상이 없거나 반복 호출이어도 성공. 본문 없음.</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_2">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_2">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_2">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_2">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_2">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 미읽음 알림 전체 읽음 처리
+operationId: markAllNotificationsRead
+description: 토큰의 USER·SELLER 본인의 미읽음 알림 전체를 서버 시각으로 한 번에 갱신한다. 조회 여부·페이지·커서와 무관하며
+  요청 본문이나 알림 ID 목록은 필요하지 않다. 다른 회원의 알림과 기존 읽음 시각·수정 시각은 변경하지 않는다. 빈 목록과 반복·동시 요청도
+  성공한다. 갱신 이후 도착한 알림은 다음 요청의 대상이다.
+responses:
+  '204':
+    description: 전체 읽음 처리 완료. 대상이 없거나 반복 호출이어도 성공. 본문 없음.
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="post-v1notificationsnotificationidread"><summary><span class="badge method-post">POST</span> /v1/notifications/{notificationId}/read</summary>
+<p>내 알림 읽음 처리</p>
+<p>서버 시각으로 최초 읽음만 기록한다. 반복·동시 요청도 최초 성공한 쓰기의 시각을 유지한다. 다른 회원의 알림과 없는 ID는 모두 404. notificationId 숫자 형식 오류는 400이며 존재하지 않는 0·음수 ID는 404이다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_1">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>notificationId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_3">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>204</td>
+<td>읽음 처리 완료. 반복 호출도 최초 읽음 시각을 유지한다. 본문 없음.</td>
+</tr>
+<tr>
+<td>404</td>
+<td>없는 알림과 다른 회원의 알림은 모두 NOT_FOUND</td>
+</tr>
+<tr>
+<td>400</td>
+<td>notificationId 숫자 형식 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_1">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_3">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_3">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_3">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_3">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_3">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 알림 읽음 처리
+operationId: markNotificationRead
+description: 서버 시각으로 최초 읽음만 기록한다. 반복·동시 요청도 최초 성공한 쓰기의 시각을 유지한다. 다른 회원의 알림과 없는 ID는
+  모두 404. notificationId 숫자 형식 오류는 400이며 존재하지 않는 0·음수 ID는 404이다.
+parameters:
+- name: notificationId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+responses:
+  '204':
+    description: 읽음 처리 완료. 반복 호출도 최초 읽음 시각을 유지한다. 본문 없음.
+  '404':
+    description: 없는 알림과 다른 회원의 알림은 모두 NOT_FOUND
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '400':
+    description: 'notificationId 숫자 형식 오류: INVALID_REQUEST'
+    content: *id001
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="post-v1broadcast-alerts"><summary><span class="badge method-post">POST</span> /v1/broadcast-alerts</summary>
+<p>방송 시작 알림 신청</p>
+<p>신청자는 토큰의 회원이다. 이미 신청한 방송을 다시 신청해도 201이며 신청은 하나만 남는다. 방송 존재 여부는 알림이 Live 이벤트로 받아 둔 일정 사본으로 확인하므로, 아직 일정을 받지 못한 방송은 404이다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-본문">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>broadcastId</td>
+<td>integer</td>
+<td>필수</td>
+<td>알림을 받을 방송. Live 가 발행한 일정 이벤트로 알림이 받아 둔 방송이어야 한다.</td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_4">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>201</td>
+<td>신청 완료. 이미 신청했던 경우도 같다. 본문 없음.</td>
+</tr>
+<tr>
+<td>400</td>
+<td>broadcastId 누락·형식 오류 또는 0 이하: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>404</td>
+<td>일정 사본에 없는 방송: NOT_FOUND</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_2">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_1">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_4">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_4">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_4">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_4">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_4">계약 원문</h3>
+<pre><code class="language-yaml">summary: 방송 시작 알림 신청
+operationId: registerBroadcastAlert
+description: 신청자는 토큰의 회원이다. 이미 신청한 방송을 다시 신청해도 201이며 신청은 하나만 남는다. 방송 존재 여부는 알림이 Live
+  이벤트로 받아 둔 일정 사본으로 확인하므로, 아직 일정을 받지 못한 방송은 404이다.
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/BroadcastAlertRequest'
+responses:
+  '201':
+    description: 신청 완료. 이미 신청했던 경우도 같다. 본문 없음.
+  '400':
+    description: 'broadcastId 누락·형식 오류 또는 0 이하: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '404':
+    description: '일정 사본에 없는 방송: NOT_FOUND'
+    content: *id001
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1broadcast-alerts"><summary><span class="badge method-get">GET</span> /v1/broadcast-alerts</summary>
+<p>내 방송 시작 알림 신청 목록</p>
+<p>USER·SELLER 토큰 본인 신청만 대상 ID 내림차순으로 반환한다. cursor는 이전 응답 nextCursor를 그대로 전달한다. 회원 ID 파라미터는 사용하지 않는다. 방송 신청은 발송 후에도 보존되며 현재 방송 진행 상태나 발송 대기 여부를 뜻하지 않는다. 삭제된 방송의 신청도 직접 해제할 때까지 남을 수 있다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_2">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cursor</td>
+<td>query</td>
+<td>선택</td>
+<td>string</td>
+<td></td>
+</tr>
+<tr>
+<td>size</td>
+<td>query</td>
+<td>선택</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_5">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>입력 형식·size·cursor 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_2">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.targetId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>data.nextCursor</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.hasNext</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_3">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_5">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_5">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_5">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_5">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_5">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 방송 시작 알림 신청 목록
+operationId: listBroadcastAlerts
+description: USER·SELLER 토큰 본인 신청만 대상 ID 내림차순으로 반환한다. cursor는 이전 응답 nextCursor를 그대로
+  전달한다. 회원 ID 파라미터는 사용하지 않는다. 방송 신청은 발송 후에도 보존되며 현재 방송 진행 상태나 발송 대기 여부를 뜻하지 않는다. 삭제된
+  방송의 신청도 직접 해제할 때까지 남을 수 있다.
+parameters:
+- name: cursor
+  in: query
+  required: false
+  schema:
+    type: string
+- name: size
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 20
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/AlertSubscriptionListEnvelope'
+  '400':
+    description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="delete-v1broadcast-alertsbroadcastid"><summary><span class="badge method-delete">DELETE</span> /v1/broadcast-alerts/{broadcastId}</summary>
+<p>방송 시작 알림 해제</p>
+<p>신청한 적이 없어도 204이다. 원한 상태가 이미 달성돼 있으므로 오류로 보지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_3">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>broadcastId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_6">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>204</td>
+<td>해제 완료. 신청이 없었던 경우도 같다. 본문 없음.</td>
+</tr>
+<tr>
+<td>400</td>
+<td>broadcastId 숫자 형식 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_4">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_6">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_6">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_6">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_6">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_6">계약 원문</h3>
+<pre><code class="language-yaml">summary: 방송 시작 알림 해제
+operationId: unregisterBroadcastAlert
+description: 신청한 적이 없어도 204이다. 원한 상태가 이미 달성돼 있으므로 오류로 보지 않는다.
+parameters:
+- name: broadcastId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+responses:
+  '204':
+    description: 해제 완료. 신청이 없었던 경우도 같다. 본문 없음.
+  '400':
+    description: 'broadcastId 숫자 형식 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1broadcast-alertsbroadcastid"><summary><span class="badge method-get">GET</span> /v1/broadcast-alerts/{broadcastId}</summary>
+<p>내 대상별 알림 신청 상태</p>
+<p>토큰 본인의 신청 기록 유무만 반환한다. 다른 회원의 신청은 보이지 않으며 기록이 없거나 대상이 없는 경우 subscribed=false이다. 발송 완료나 대상의 현재 상태는 나타내지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_4">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>broadcastId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_7">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>broadcastId 숫자 형식 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_3">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.subscribed</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_5">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_7">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_7">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_7">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_7">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_7">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 대상별 알림 신청 상태
+operationId: getBroadcastAlertState
+description: 토큰 본인의 신청 기록 유무만 반환한다. 다른 회원의 신청은 보이지 않으며 기록이 없거나 대상이 없는 경우 subscribed=false이다.
+  발송 완료나 대상의 현재 상태는 나타내지 않는다.
+parameters:
+- name: broadcastId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/AlertSubscriptionStateEnvelope'
+  '400':
+    description: 'broadcastId 숫자 형식 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="post-v1restock-alerts"><summary><span class="badge method-post">POST</span> /v1/restock-alerts</summary>
+<p>재입고 알림 신청</p>
+<p>신청자는 토큰의 회원이다. 이미 신청한 상품을 다시 신청해도 201이며 신청은 하나만 남는다. 판매 상태는 알림이 Commerce 이벤트로 받아 둔 사본으로 확인하므로, 아직 판매정보를 받지 못한 상품은 404이고 판매 중인 상품은 409이다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-본문_1">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>productId</td>
+<td>integer</td>
+<td>필수</td>
+<td>재입고 알림을 받을 상품. 알림이 판매정보 이벤트로 받아 둔 상품이어야 하고 품절 상태여야 한다.</td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_8">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>201</td>
+<td>신청 완료. 이미 신청했던 경우도 같다. 본문 없음.</td>
+</tr>
+<tr>
+<td>400</td>
+<td>productId 누락, 형식 오류 또는 0 이하: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>404</td>
+<td>판매정보 사본에 없는 상품: NOT_FOUND</td>
+</tr>
+<tr>
+<td>409</td>
+<td>판매 중인 상품: CONFLICT. 재입고 알림은 품절을 전제한다</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락, 무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER, SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_6">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_2">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="409--applicationjson">409 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_8">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_8">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_8">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_8">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_8">계약 원문</h3>
+<pre><code class="language-yaml">summary: 재입고 알림 신청
+operationId: registerRestockAlert
+description: 신청자는 토큰의 회원이다. 이미 신청한 상품을 다시 신청해도 201이며 신청은 하나만 남는다. 판매 상태는 알림이 Commerce
+  이벤트로 받아 둔 사본으로 확인하므로, 아직 판매정보를 받지 못한 상품은 404이고 판매 중인 상품은 409이다.
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/RestockAlertRequest'
+responses:
+  '201':
+    description: 신청 완료. 이미 신청했던 경우도 같다. 본문 없음.
+  '400':
+    description: 'productId 누락, 형식 오류 또는 0 이하: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '404':
+    description: '판매정보 사본에 없는 상품: NOT_FOUND'
+    content: *id001
+  '409':
+    description: '판매 중인 상품: CONFLICT. 재입고 알림은 품절을 전제한다'
+    content: *id001
+  '401':
+    description: 토큰 누락, 무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER, SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1restock-alerts"><summary><span class="badge method-get">GET</span> /v1/restock-alerts</summary>
+<p>내 재입고 알림 신청 목록</p>
+<p>USER·SELLER 토큰 본인 신청만 대상 ID 내림차순으로 반환한다. cursor는 이전 응답 nextCursor를 그대로 전달한다. 회원 ID 파라미터는 사용하지 않는다. 재입고 알림을 보낸 상품의 신청은 기존 1회 발송 정책에 따라 삭제되어 목록에서 빠진다. 대상 상품 삭제는 별도 이벤트가 없어 즉시 반영되지 않을 수 있다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_5">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cursor</td>
+<td>query</td>
+<td>선택</td>
+<td>string</td>
+<td></td>
+</tr>
+<tr>
+<td>size</td>
+<td>query</td>
+<td>선택</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_9">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>입력 형식·size·cursor 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_4">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.targetId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>data.items&#91;&#93;.createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>data.nextCursor</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.hasNext</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_7">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_9">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_9">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_9">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_9">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_9">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 재입고 알림 신청 목록
+operationId: listRestockAlerts
+description: USER·SELLER 토큰 본인 신청만 대상 ID 내림차순으로 반환한다. cursor는 이전 응답 nextCursor를 그대로
+  전달한다. 회원 ID 파라미터는 사용하지 않는다. 재입고 알림을 보낸 상품의 신청은 기존 1회 발송 정책에 따라 삭제되어 목록에서 빠진다. 대상
+  상품 삭제는 별도 이벤트가 없어 즉시 반영되지 않을 수 있다.
+parameters:
+- name: cursor
+  in: query
+  required: false
+  schema:
+    type: string
+- name: size
+  in: query
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 50
+    default: 20
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/AlertSubscriptionListEnvelope'
+  '400':
+    description: '입력 형식·size·cursor 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="delete-v1restock-alertsproductid"><summary><span class="badge method-delete">DELETE</span> /v1/restock-alerts/{productId}</summary>
+<p>재입고 알림 해제</p>
+<p>신청한 적이 없어도 204이다. 원한 상태가 이미 달성돼 있으므로 오류로 보지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_6">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>productId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_10">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>204</td>
+<td>해제 완료. 신청이 없었던 경우도 같다. 본문 없음.</td>
+</tr>
+<tr>
+<td>400</td>
+<td>productId 숫자 형식 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락, 무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER, SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_8">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_10">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_10">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_10">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_10">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_10">계약 원문</h3>
+<pre><code class="language-yaml">summary: 재입고 알림 해제
+operationId: unregisterRestockAlert
+description: 신청한 적이 없어도 204이다. 원한 상태가 이미 달성돼 있으므로 오류로 보지 않는다.
+parameters:
+- name: productId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+responses:
+  '204':
+    description: 해제 완료. 신청이 없었던 경우도 같다. 본문 없음.
+  '400':
+    description: 'productId 숫자 형식 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락, 무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER, SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="operation endpoint" id="get-v1restock-alertsproductid"><summary><span class="badge method-get">GET</span> /v1/restock-alerts/{productId}</summary>
+<p>내 대상별 알림 신청 상태</p>
+<p>토큰 본인의 신청 기록 유무만 반환한다. 다른 회원의 신청은 보이지 않으며 기록이 없거나 대상이 없는 경우 subscribed=false이다. 발송 완료나 대상의 현재 상태는 나타내지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> 없음</p>
+<h3 id="요청-파라미터_7">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>productId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_11">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>조회 성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>productId 숫자 형식 오류: INVALID_REQUEST</td>
+</tr>
+<tr>
+<td>401</td>
+<td>토큰 누락·무효 또는 보안 폐기된 세션</td>
+</tr>
+<tr>
+<td>403</td>
+<td>USER·SELLER 권한이 없는 호출</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Member 세션 확인 불가: SERVICE_UNAVAILABLE</td>
+</tr>
+<tr>
+<td>500</td>
+<td>서버 내부 오류</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_5">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data.subscribed</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_9">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_11">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_11">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_11">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="500--applicationjson_11">500 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_11">계약 원문</h3>
+<pre><code class="language-yaml">summary: 내 대상별 알림 신청 상태
+operationId: getRestockAlertState
+description: 토큰 본인의 신청 기록 유무만 반환한다. 다른 회원의 신청은 보이지 않으며 기록이 없거나 대상이 없는 경우 subscribed=false이다.
+  발송 완료나 대상의 현재 상태는 나타내지 않는다.
+parameters:
+- name: productId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int64
+responses:
+  '200':
+    description: 조회 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/AlertSubscriptionStateEnvelope'
+  '400':
+    description: 'productId 숫자 형식 오류: INVALID_REQUEST'
+    content: &amp;id001
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    description: 토큰 누락·무효 또는 보안 폐기된 세션
+    content: *id001
+  '403':
+    description: USER·SELLER 권한이 없는 호출
+    content: *id001
+  '503':
+    description: 'Member 세션 확인 불가: SERVICE_UNAVAILABLE'
+    content: *id001
+  '500':
+    description: 서버 내부 오류
+    content: *id001
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8085
+- url: http://dev-notification-service:8080
+</code></pre>
+</details><details class="schema-source"><summary id="전체-스키마-원본">참조 스키마 원문 펼치기</summary>
+<p>공통·순환 참조는 계약의 components 정의를 따릅니다.</p>
+<h3 id="commonyaml">common.yaml</h3>
+<pre><code class="language-yaml">components:
+  schemas:
+    ApiError:
+      type: object
+      required:
+      - code
+      - message
+      - requestId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type:
+          - string
+          - 'null'
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member,
+        aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의
+        세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
+</code></pre>
+<h3 id="notification-serviceyaml">notification-service.yaml</h3>
+<pre><code class="language-yaml">components:
+  schemas:
+    NotificationListEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/NotificationPage'
+        error:
+          type: 'null'
+    NotificationPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      - hasNext
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        hasNext:
+          type: boolean
+    Notification:
+      type: object
+      required:
+      - id
+      - eventType
+      - title
+      - body
+      - linkType
+      - linkValue
+      - occurredAt
+      - readAt
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        eventType:
+          type: string
+          maxLength: 64
+          description: 알림을 만들게 한 이벤트 이름. 화면이 아이콘을 고르는 근거다. 새 알림이 생기면 값이 늘어나므로 모르는
+            값을 받아도 동작해야 한다.
+          example: LiveBroadcastStarted
+        title:
+          type: string
+          maxLength: 100
+        body:
+          type: string
+          maxLength: 500
+        linkType:
+          type:
+          - string
+          - 'null'
+          enum:
+          - BROADCAST
+          - PRODUCT
+          - PAYMENT_GROUP
+          - REFUND
+          - COUPON
+          - null
+          description: 눌렀을 때 보낼 곳의 종류. 보낼 곳이 없는 알림은 linkValue 와 함께 null 이다.
+        linkValue:
+          type:
+          - string
+          - 'null'
+          maxLength: 100
+          description: linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID,
+            PAYMENT_GROUP 은 PG-UUID 또는 기존 PG-LEGACY-주문ID, REFUND 는 해당 묶음번호/환불요청ID,
+            COUPON 은 쿠폰 ID(쿠폰함 이동).
+          example: '42'
+        occurredAt:
+          type: string
+          format: date-time
+        readAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    ErrorEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: 'null'
+        error:
+          $ref: ./common.yaml#/components/schemas/ApiError
+    UnreadCountEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+          - unreadCount
+          properties:
+            unreadCount:
+              type: integer
+              format: int64
+              minimum: 0
+        error:
+          type: 'null'
+    BroadcastAlertRequest:
+      type: object
+      required:
+      - broadcastId
+      properties:
+        broadcastId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 알림을 받을 방송. Live 가 발행한 일정 이벤트로 알림이 받아 둔 방송이어야 한다.
+    AlertSubscriptionListEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/AlertSubscriptionPage'
+        error:
+          type: 'null'
+    AlertSubscriptionPage:
+      type: object
+      required:
+      - items
+      - nextCursor
+      - hasNext
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertSubscription'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+        hasNext:
+          type: boolean
+    AlertSubscription:
+      type: object
+      required:
+      - targetId
+      - createdAt
+      properties:
+        targetId:
+          type: integer
+          format: int64
+          minimum: 1
+        createdAt:
+          type: string
+          format: date-time
+    AlertSubscriptionStateEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required:
+          - subscribed
+          properties:
+            subscribed:
+              type: boolean
+        error:
+          type: 'null'
+    RestockAlertRequest:
+      type: object
+      required:
+      - productId
+      properties:
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 재입고 알림을 받을 상품. 알림이 판매정보 이벤트로 받아 둔 상품이어야 하고 품절 상태여야 한다.
+  securitySchemes:
+    BearerAuth:
+      $ref: ./common.yaml#/components/securitySchemes/BearerAuth
+</code></pre>
+<p>입력 SHA-256: <code>303004242d7a59006dd5d293f3a11c776a301446e32ddfabd385d4bbaf1cd500</code></p></details><h2>참조 탐색</h2><details><summary>common.yaml</summary><dl id="ref-33388d16e5b1c46f9ce2"><dt>components</dt><dd><dl id="ref-076d1657772e80178394"><dt>schemas</dt><dd><dl id="ref-7816620e5c23a958fad4"><dt>ApiError</dt><dd><dl id="ref-2845906e170daf47b047"><dt>type</dt><dd><span id="ref-dd5749f58f7847735c54">object</span></dd><dt>required</dt><dd><ol id="ref-9d9718416681e4dbd73c"><li><span id="ref-b300c1e2abca548f8ffa">code</span></li><li><span id="ref-7ef509204a3bc03c869c">message</span></li><li><span id="ref-d047563a6adacb5888bd">requestId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-adad3b792d60d486e2a6"><dt>code</dt><dd><dl id="ref-632820c7c178af53a1ba"><dt>type</dt><dd><span id="ref-099d9a201c7fa17f072a">string</span></dd></dl></dd><dt>message</dt><dd><dl id="ref-43021fa7b2aab2f488f9"><dt>type</dt><dd><span id="ref-b0668d5e157b523d539b">string</span></dd></dl></dd><dt>requestId</dt><dd><dl id="ref-6b932cdbe7673137ed44"><dt>type</dt><dd><ol id="ref-142afa636f72850fe0cf"><li><span id="ref-941dd7edf4daf444a97b">string</span></li><li><span id="ref-f8a870dcfd57fd9ab125">null</span></li></ol></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>securitySchemes</dt><dd><dl id="ref-06fc765b45bbd6d41209"><dt>BearerAuth</dt><dd><dl id="ref-795437853176cab69da1"><dt>type</dt><dd><span id="ref-2839761e8f648a7cb70f">http</span></dd><dt>scheme</dt><dd><span id="ref-b68e0a3011182ec9094b">bearer</span></dd><dt>bearerFormat</dt><dd><span id="ref-f1269c521b1d3e664df5">JWT</span></dd><dt>description</dt><dd><span id="ref-8d301cdf8ae491df1baa">Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.</span></dd></dl></dd></dl></dd></dl></dd></dl></details><details><summary>notification-service.yaml</summary><dl id="ref-d737ab77463addefb8a3"><dt>components</dt><dd><dl id="ref-039dc84452156dc2c536"><dt>schemas</dt><dd><dl id="ref-493e85244d3d7a14431f"><dt>NotificationListEnvelope</dt><dd><dl id="ref-dbcaf0573c78b124193f"><dt>type</dt><dd><span id="ref-0bcd0f35d579085acc88">object</span></dd><dt>required</dt><dd><ol id="ref-1fb013696421c7a72ac5"><li><span id="ref-8cb952fea9ad57fa9df1">success</span></li><li><span id="ref-7e5fc5ffdda7bb14a3a8">data</span></li><li><span id="ref-1dd4a09897d23e750a2b">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-f404ad3f5854613da0e5"><dt>success</dt><dd><dl id="ref-0fff1ea3824be9a86bcb"><dt>type</dt><dd><span id="ref-fb1f130c0af64d196de9">boolean</span></dd><dt>const</dt><dd><span id="ref-2acd006c45cee40b9b14">true</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-bf97ab3a91ae54f14bb3"><dt>$ref</dt><dd><span id="ref-e2d869adafe221a5f531"><a href="#ref-a03f2c35c78998c60653">#/components/schemas/NotificationPage</a></span></dd></dl></dd><dt>error</dt><dd><dl id="ref-5b616abea4a3e39ed75f"><dt>type</dt><dd><span id="ref-5b6f5da2b7db2f9ae91c">null</span></dd></dl></dd></dl></dd></dl></dd><dt>NotificationPage</dt><dd><dl id="ref-a03f2c35c78998c60653"><dt>type</dt><dd><span id="ref-024eb259bb835ff0d7fe">object</span></dd><dt>required</dt><dd><ol id="ref-b07c6d06b7307d8c54a6"><li><span id="ref-84da33d096806b557611">items</span></li><li><span id="ref-23a9dabc36bc089ccc28">nextCursor</span></li><li><span id="ref-63ab65a0ad946af46336">hasNext</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-50707f195da7e22797d2"><dt>items</dt><dd><dl id="ref-09cc456b268ac2d6cc4e"><dt>type</dt><dd><span id="ref-625c266894477b8cef6f">array</span></dd><dt>items</dt><dd><dl id="ref-144d639f2a156f2f67dc"><dt>$ref</dt><dd><span id="ref-0f80c7d7f0305a7e624e"><a href="#ref-76bdfff100ad9e7251b3">#/components/schemas/Notification</a></span></dd></dl></dd></dl></dd><dt>nextCursor</dt><dd><dl id="ref-a49ba98b1e6d87fd70e7"><dt>type</dt><dd><ol id="ref-7f3383e075c8abdd825e"><li><span id="ref-db8c69bc84b5587794b0">string</span></li><li><span id="ref-94b3d0c9eafd0370b5bc">null</span></li></ol></dd></dl></dd><dt>hasNext</dt><dd><dl id="ref-f9d601fa7d30a13f4db3"><dt>type</dt><dd><span id="ref-65cafe5b506b56dae5b6">boolean</span></dd></dl></dd></dl></dd></dl></dd><dt>Notification</dt><dd><dl id="ref-76bdfff100ad9e7251b3"><dt>type</dt><dd><span id="ref-04be8ad55c8277fc2ac8">object</span></dd><dt>required</dt><dd><ol id="ref-e85df153c5249d10fc02"><li><span id="ref-6a5cfa170700a9a0a9d3">id</span></li><li><span id="ref-3601f7c948ae77849482">eventType</span></li><li><span id="ref-9fdbab27dfdfc3838895">title</span></li><li><span id="ref-a5cdaa5a382ad652d76b">body</span></li><li><span id="ref-6865e1708e1408fc86ef">linkType</span></li><li><span id="ref-2a0bf62adaf6433bd6a6">linkValue</span></li><li><span id="ref-14df020dfa62a5a48d8a">occurredAt</span></li><li><span id="ref-9027a60f375ce3f36f0c">readAt</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-fb7d3ed6cd199c44115d"><dt>id</dt><dd><dl id="ref-055dc1c54781c3d427c3"><dt>type</dt><dd><span id="ref-3a474fada5558c1242dc">integer</span></dd><dt>format</dt><dd><span id="ref-6aed41cf569383acfb43">int64</span></dd><dt>minimum</dt><dd><span id="ref-39ad34a826ad7c9adc5e">1</span></dd></dl></dd><dt>eventType</dt><dd><dl id="ref-efc7a6774e4b9f7691a0"><dt>type</dt><dd><span id="ref-8606cc98aa2e8b1e8d2e">string</span></dd><dt>maxLength</dt><dd><span id="ref-c5a4c62dbb4ee50ceb52">64</span></dd><dt>description</dt><dd><span id="ref-2334cf1f50591414aa7a">알림을 만들게 한 이벤트 이름. 화면이 아이콘을 고르는 근거다. 새 알림이 생기면 값이 늘어나므로 모르는 값을 받아도 동작해야 한다.</span></dd><dt>example</dt><dd><span id="ref-a200e023ff97786f4047">LiveBroadcastStarted</span></dd></dl></dd><dt>title</dt><dd><dl id="ref-2617da3099b62b69dc5f"><dt>type</dt><dd><span id="ref-e0a4c5798d306f4ce6b6">string</span></dd><dt>maxLength</dt><dd><span id="ref-cbc9933fa25bd018fc0d">100</span></dd></dl></dd><dt>body</dt><dd><dl id="ref-aa57341b82487f60e2ff"><dt>type</dt><dd><span id="ref-a93cf72f5acbfdac9b7e">string</span></dd><dt>maxLength</dt><dd><span id="ref-cc1d30df8ab05f28077d">500</span></dd></dl></dd><dt>linkType</dt><dd><dl id="ref-a59bd8a8ca1590152b11"><dt>type</dt><dd><ol id="ref-3cd696bf1046bb663e60"><li><span id="ref-e9fc15c8c3286f0e9209">string</span></li><li><span id="ref-f00ea580f8a21437eae4">null</span></li></ol></dd><dt>enum</dt><dd><ol id="ref-794822ec0275167c7764"><li><span id="ref-eb2e72583de1356a0b46">BROADCAST</span></li><li><span id="ref-51b0cb898650b227109f">PRODUCT</span></li><li><span id="ref-bf80122aa4d56765a0c7">PAYMENT_GROUP</span></li><li><span id="ref-a1e37c28df1fa1da1b8c">REFUND</span></li><li><span id="ref-e89b4b81b44c10e6c6a9">COUPON</span></li><li><span id="ref-e554c205fac6cdd962ad">null</span></li></ol></dd><dt>description</dt><dd><span id="ref-99cfd29fc79ed9b51801">눌렀을 때 보낼 곳의 종류. 보낼 곳이 없는 알림은 linkValue 와 함께 null 이다.</span></dd></dl></dd><dt>linkValue</dt><dd><dl id="ref-a549368f6d5a39ccbc6c"><dt>type</dt><dd><ol id="ref-99282c440d30fa5b1af5"><li><span id="ref-25181999e7e0323bef90">string</span></li><li><span id="ref-5df2fb4ada0c9fc4f2e5">null</span></li></ol></dd><dt>maxLength</dt><dd><span id="ref-182f12523661d52cf8cd">100</span></dd><dt>description</dt><dd><span id="ref-da39e096fc8b0fd10590">linkType 이 가리키는 대상 식별자. BROADCAST 는 방송 ID, PRODUCT 는 상품 ID, PAYMENT_GROUP 은 PG-UUID 또는 기존 PG-LEGACY-주문ID, REFUND 는 해당 묶음번호/환불요청ID, COUPON 은 쿠폰 ID(쿠폰함 이동).</span></dd><dt>example</dt><dd><span id="ref-d331664324b3320c3d61">42</span></dd></dl></dd><dt>occurredAt</dt><dd><dl id="ref-7e984ae1e911167cf59c"><dt>type</dt><dd><span id="ref-46c3edb897c6780ef0b7">string</span></dd><dt>format</dt><dd><span id="ref-4f1f063e58e112a99196">date-time</span></dd></dl></dd><dt>readAt</dt><dd><dl id="ref-f259b61c48ce4bbb8b78"><dt>type</dt><dd><ol id="ref-eb2db945798035077423"><li><span id="ref-430f91e123ffccd84346">string</span></li><li><span id="ref-11657c4b4ca0a09b477c">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-c2e24c838add2509a4b1">date-time</span></dd></dl></dd></dl></dd></dl></dd><dt>ErrorEnvelope</dt><dd><dl id="ref-f7103f48ffce905b4619"><dt>type</dt><dd><span id="ref-e942d5639aa796e75d51">object</span></dd><dt>required</dt><dd><ol id="ref-a97e18dbbcedd3cc7be4"><li><span id="ref-d0fd68e908a97450d0f2">success</span></li><li><span id="ref-cfb13d988ac8fcb9c122">data</span></li><li><span id="ref-f3a2825b1e58c87ecbc4">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-29d02b1fed89c71c1a49"><dt>success</dt><dd><dl id="ref-2709315cbe15c5844309"><dt>type</dt><dd><span id="ref-d30bbab8bfb55f190dd5">boolean</span></dd><dt>const</dt><dd><span id="ref-2399fd54b1711f68f0a5">false</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-4f74e1f2cdfd4bc2dbb1"><dt>type</dt><dd><span id="ref-ba443a7cafbdff3b7bce">null</span></dd></dl></dd><dt>error</dt><dd><dl id="ref-395aee20fc880b870fb1"><dt>$ref</dt><dd><span id="ref-c0640b766df57e9bcf8d"><a href="#ref-2845906e170daf47b047">./common.yaml#/components/schemas/ApiError</a></span></dd></dl></dd></dl></dd></dl></dd><dt>UnreadCountEnvelope</dt><dd><dl id="ref-43902b88a3a4b7892132"><dt>type</dt><dd><span id="ref-8635f814ba55292b1d09">object</span></dd><dt>required</dt><dd><ol id="ref-cdb1f232cf0952a5cd46"><li><span id="ref-a09c9cf27ed151849762">success</span></li><li><span id="ref-f7b9325a4ad39c027b6e">data</span></li><li><span id="ref-e749a826f0df28ae41bc">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-be6cdd584c39c630a2c4"><dt>success</dt><dd><dl id="ref-02c9331e195874cc8140"><dt>type</dt><dd><span id="ref-b0eea896ad4a75517e38">boolean</span></dd><dt>const</dt><dd><span id="ref-13aaf56857030d7a6845">true</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-ab9dd54f57496661b638"><dt>type</dt><dd><span id="ref-aecf7b3668be95de6cfb">object</span></dd><dt>required</dt><dd><ol id="ref-3e258740a039ca18508e"><li><span id="ref-a0ecddff0dd01d2c4a12">unreadCount</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-54fdfaa3d401e7d6ac37"><dt>unreadCount</dt><dd><dl id="ref-cf52993bea3954ebe56b"><dt>type</dt><dd><span id="ref-044a7621d2d3ad9a571c">integer</span></dd><dt>format</dt><dd><span id="ref-d3249bfb61d4164f17a4">int64</span></dd><dt>minimum</dt><dd><span id="ref-ec62dcc4a29bba0bd188">0</span></dd></dl></dd></dl></dd></dl></dd><dt>error</dt><dd><dl id="ref-0a1e852fa0fff91a7264"><dt>type</dt><dd><span id="ref-651dd9169f1c1b62f72f">null</span></dd></dl></dd></dl></dd></dl></dd><dt>BroadcastAlertRequest</dt><dd><dl id="ref-262d891d87cd7367414b"><dt>type</dt><dd><span id="ref-5d2eff45c5c356f8ef87">object</span></dd><dt>required</dt><dd><ol id="ref-c408b11da491649997f8"><li><span id="ref-922b462d2b3e1123adbd">broadcastId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-b24ca557af675abc7f34"><dt>broadcastId</dt><dd><dl id="ref-3ae5af62b102e6f5d731"><dt>type</dt><dd><span id="ref-4f11fddd0d037fb7db3a">integer</span></dd><dt>format</dt><dd><span id="ref-4c2c11ff7371cfb821fd">int64</span></dd><dt>minimum</dt><dd><span id="ref-3b3d3dc9081b87ee0fc5">1</span></dd><dt>description</dt><dd><span id="ref-846ff393c1e6c3ca1b25">알림을 받을 방송. Live 가 발행한 일정 이벤트로 알림이 받아 둔 방송이어야 한다.</span></dd></dl></dd></dl></dd></dl></dd><dt>AlertSubscriptionListEnvelope</dt><dd><dl id="ref-27733190e5e42d2a78ce"><dt>type</dt><dd><span id="ref-eac6336d92c01a163a59">object</span></dd><dt>required</dt><dd><ol id="ref-d36e0b4042cfececef0a"><li><span id="ref-29bc67b9f06e1b6f3f88">success</span></li><li><span id="ref-f82703d3cc168f398d49">data</span></li><li><span id="ref-4a4e7058234711cdc7b1">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-1f18a9d62163ce44f612"><dt>success</dt><dd><dl id="ref-668ff91ae12587ea3e8a"><dt>type</dt><dd><span id="ref-6a01bfd00c7137a13aae">boolean</span></dd><dt>const</dt><dd><span id="ref-28f93891853a409e65b4">true</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-3eee1b23af5e5e696b6b"><dt>$ref</dt><dd><span id="ref-9280d48b0b3ebe0420ad"><a href="#ref-7d33bc6892a7f5005dc6">#/components/schemas/AlertSubscriptionPage</a></span></dd></dl></dd><dt>error</dt><dd><dl id="ref-1ea273276aa44d3afaf1"><dt>type</dt><dd><span id="ref-47dbf19148ed695c4902">null</span></dd></dl></dd></dl></dd></dl></dd><dt>AlertSubscriptionPage</dt><dd><dl id="ref-7d33bc6892a7f5005dc6"><dt>type</dt><dd><span id="ref-f6d414b72df2cf33561e">object</span></dd><dt>required</dt><dd><ol id="ref-414556fd4f6ff957baef"><li><span id="ref-eb300e976fdc72b4d032">items</span></li><li><span id="ref-38ac843354fd29ac892f">nextCursor</span></li><li><span id="ref-013afd3cb5b1f6fe57e7">hasNext</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-7ad2bf4c816945c74452"><dt>items</dt><dd><dl id="ref-77f3fd667780b4263946"><dt>type</dt><dd><span id="ref-21ac2d8cee14ff430d90">array</span></dd><dt>items</dt><dd><dl id="ref-575dded78b195eceae93"><dt>$ref</dt><dd><span id="ref-9c886b4ed096c10b4d13"><a href="#ref-6890aff9f9d08b75398a">#/components/schemas/AlertSubscription</a></span></dd></dl></dd></dl></dd><dt>nextCursor</dt><dd><dl id="ref-44b45fa72af50602a553"><dt>type</dt><dd><ol id="ref-bb339ec557ec990504b0"><li><span id="ref-9b2ea237ce8f76ad70ee">string</span></li><li><span id="ref-efbb6a8f4da8978f23b9">null</span></li></ol></dd></dl></dd><dt>hasNext</dt><dd><dl id="ref-d2b3c4bbbb6adf5afcce"><dt>type</dt><dd><span id="ref-bafb9f22833d12d08b7f">boolean</span></dd></dl></dd></dl></dd></dl></dd><dt>AlertSubscription</dt><dd><dl id="ref-6890aff9f9d08b75398a"><dt>type</dt><dd><span id="ref-90f1701ab6d2a6f4d79e">object</span></dd><dt>required</dt><dd><ol id="ref-e0fd4861d69044baadf6"><li><span id="ref-0429475ef77232cbb8ce">targetId</span></li><li><span id="ref-d5c4913be8f2a5191492">createdAt</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-e00666d22ecac3128b3b"><dt>targetId</dt><dd><dl id="ref-64e048d9c5d525d31c1b"><dt>type</dt><dd><span id="ref-d1dd98a458ae0dc547b4">integer</span></dd><dt>format</dt><dd><span id="ref-a97427e8c500156e6e82">int64</span></dd><dt>minimum</dt><dd><span id="ref-1d3a3530819eb39f67cb">1</span></dd></dl></dd><dt>createdAt</dt><dd><dl id="ref-6ad31e5d2de812faecbc"><dt>type</dt><dd><span id="ref-d88c0342ac78724a2883">string</span></dd><dt>format</dt><dd><span id="ref-b4495700f70735f54bb9">date-time</span></dd></dl></dd></dl></dd></dl></dd><dt>AlertSubscriptionStateEnvelope</dt><dd><dl id="ref-e249de4b7d96bf5d5a14"><dt>type</dt><dd><span id="ref-af61b03c0557a19624bb">object</span></dd><dt>required</dt><dd><ol id="ref-f58f36ac072835d6a153"><li><span id="ref-985fdd738979175e2ea8">success</span></li><li><span id="ref-637ef95137534522cd92">data</span></li><li><span id="ref-64d1d8828631c2349423">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-cae216bb1df6d3a8086e"><dt>success</dt><dd><dl id="ref-60248e200f949efee97b"><dt>type</dt><dd><span id="ref-ccaad2244f6cd5b404c3">boolean</span></dd><dt>const</dt><dd><span id="ref-00442b03d4a11f0bcd47">true</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-eb1a53757221d0fae645"><dt>type</dt><dd><span id="ref-6c209c40a0df450a61c1">object</span></dd><dt>required</dt><dd><ol id="ref-5b35143fee979efabe72"><li><span id="ref-2e069b025204e4dc4274">subscribed</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-0b2bf742ba6ab60beb3f"><dt>subscribed</dt><dd><dl id="ref-1498d1b8faad670dc42d"><dt>type</dt><dd><span id="ref-304d2a9abb3b7b2dbe16">boolean</span></dd></dl></dd></dl></dd></dl></dd><dt>error</dt><dd><dl id="ref-35031b32f9a973e90900"><dt>type</dt><dd><span id="ref-85d1de01a0e57f91410f">null</span></dd></dl></dd></dl></dd></dl></dd><dt>RestockAlertRequest</dt><dd><dl id="ref-0789d6ad92b7547a6c7a"><dt>type</dt><dd><span id="ref-267851c31d87305d24b1">object</span></dd><dt>required</dt><dd><ol id="ref-9a00b3ca9d810fa97d13"><li><span id="ref-705241d4b21dce861b52">productId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-14bc45209ff27ed69e4c"><dt>productId</dt><dd><dl id="ref-170a3b6ca908ba3bcf67"><dt>type</dt><dd><span id="ref-de07134a1c96eed88a0c">integer</span></dd><dt>format</dt><dd><span id="ref-3c07737b8ce0968f0699">int64</span></dd><dt>minimum</dt><dd><span id="ref-c4e83174c340a91b0ea0">1</span></dd><dt>description</dt><dd><span id="ref-f652307e0c0aa6c16fee">재입고 알림을 받을 상품. 알림이 판매정보 이벤트로 받아 둔 상품이어야 하고 품절 상태여야 한다.</span></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>securitySchemes</dt><dd><dl id="ref-9c38db77a8473eeae539"><dt>BearerAuth</dt><dd><dl id="ref-13283b48d7dedb44a2d8"><dt>$ref</dt><dd><span id="ref-a2a61869023c3b920ea2"><a href="#ref-795437853176cab69da1">./common.yaml#/components/securitySchemes/BearerAuth</a></span></dd></dl></dd></dl></dd></dl></dd></dl></details><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+const operations=[...document.querySelectorAll('.operation')];
+const search=document.querySelector('#search');
+function filter(){const q=search.value.toLowerCase();operations.forEach(n=>n.hidden=!n.textContent.toLowerCase().includes(q));document.querySelector('#count').textContent=`${operations.filter(n=>!n.hidden).length} / ${operations.length}개 API`;}
+search.addEventListener('input',filter);filter();
+document.querySelector('#expand').onclick=()=>operations.filter(n=>!n.hidden).forEach(n=>n.open=true);
+document.querySelector('#collapse').onclick=()=>operations.forEach(n=>n.open=false);
+function reveal(){const id=decodeURIComponent(location.hash.slice(1));if(!id)return;const target=document.getElementById(id);if(!target)return;let n=target;while(n){if(n.tagName==='DETAILS')n.open=true;n=n.parentElement;}if(target.classList.contains('operation')){search.value='';filter();}target.scrollIntoView();}
+window.addEventListener('hashchange',reveal);reveal();
+</script></body></html>

@@ -65,6 +65,12 @@ public class NotificationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/read-all")
+    public ResponseEntity<Void> readAll(@AuthenticationPrincipal AuthenticatedUser member) {
+        inbox.markAllRead(member.memberId());
+        return ResponseEntity.noContent().build();
+    }
+
     private int pageSize(Integer requested) {
         if (requested == null) {
             return DEFAULT_SIZE;

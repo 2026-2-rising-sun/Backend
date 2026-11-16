@@ -1,0 +1,87 @@
+# Cart 모듈 설계
+
+상태: Cart 독립 구현 완료 · 최종 통합 감사 후 소비자 호환 보완 중
+
+관련 자료: [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 정책 #340](https://github.com/2026-2-rising-sun/Backend/issues/340) · [ADR 0332](../../../../adr/0332-cart-sku-boundary.md) · [구현 계획](../../../../worklog/plans/active/332-cart-module/README.md) · [ERD 원본](erd.md) · [ERD HTML](erd.html)
+
+Cart 독립 구현은 `6f9dda99`에서 전달했고 최종 Order 통합 감사 기준은 `5048413b26337cbdc84e258347750d1870f763a8`이다. 이 문서의 Cart 모델·포트와 최종 Order 거래 흐름은 구분한다. [최종 통합 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)과 [통합 검증 기록](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/worklog/2026-11-14.md#order-최종-전체-검증과-확인-대기-경계)을 함께 본다. 과거 Cart 브랜치의 실패를 최종 Order의 현재 실패로 재사용하지 않는다.
+
+## 책임과 확정 동작
+
+- Product별로 묶어 표시하고 담긴 SKU별로 체크·수량 변경·삭제한다. 상품 전체 체크는 하위 SKU 선택이다.
+- 담기·조회는 재고를 예약하지 않는다. 현재 가격과 available/reserved의 원본은 SKU 모듈이다.
+- 주문서 생성 시 서버 가격·상품 스냅샷과 예약은 Order·SKU가 같은 DB 트랜잭션으로 처리한다. Cart 조회값으로 기존 주문 금액을 바꾸지 않는다.
+- 자동 정리는 결제 성공 후만 한다. #340 보류 중 기존 Cart ID·회원·version 조건과 Order/환불 출처 참조를 보존한다. 새로운 편집 제한·연결 테이블·장바구니 예약 상태는 추가하지 않는다.
+- Product·SKU·Cart ID는 BIGINT/Long이며 DB FK 없이 앱 참조를 검증한다. Member ID는 기존 회원 UUID 문자열이다.
+- 신규 Product는 sale_enabled=false, SKU는 READY로 시작하고 판매자가 판매 시작을 선택한다. 기존 상태와 SKU 수동 전이 범위는 보존한다.
+
+## 작성한 구조
+
+| 경로·타입 | 책임 |
+|---|---|
+| `cart/entity/CartItem` | 항목 ID·회원·상품·nullable SKU·수량·version·감사 시각 |
+| `cart/repository/CartItemRepository` | 회원 소유 조회·잠금, 회원+SKU 중복 검사, ID/회원/version 조건부 삭제 |
+| `cart/service/CartService` | SKU 담기·기존 상품 ID 호환·상품별 표시 조회·절대 수량 변경·삭제 |
+| `cart/service/CartSelectionPort`·`CartSelectionService` | Order용 선택 검증·정렬 잠금·완료 잠금·조건부 정리 |
+| `cart/controller/CartController` | Cart CRUD. 기존 한 항목 주문 경로는 Order 서비스 호출을 호환 유지 |
+| `cart/dto/SelectedCartItem` | itemId/skuId/productId/quantity/version의 불변 선택 결과 |
+
+기존 order 패키지의 Cart 타입을 cart로 이동했고 공유 소비자의 import 호환을 반영했다. 감사 기준 Order `5048413b`의 신규 주문서 생성·성공 정리는 CartSelectionPort를 호출했다. 2026-11-15 최종 PR은 CommerceCore 독립 범위로 조정 중이며, 신규 공개 API·금전 연동의 포함 여부는 Order 최종 계약에서 확인한다. 각 브랜치의 구현·검증 기준 SHA는 위 통합 계획과 실행 기록에서 구분한다. 임시 Cart/SKU 도메인 복제나 다른 워크트리 미커밋 파일 복사는 하지 않는다.
+
+## 저장 모델과 V103
+
+물리 필드·관계의 원본은 [ERD.md](erd.md)다. `sku_id`는 기존 미매핑 항목 보존을 위해 nullable이며 신규 SKU 담기는 반드시 실제 SKU ID로 생성한다. `product_id`도 상품별 표시와 기존 참조를 위해 보존한다.
+
+V103은 sales_info.product_id → sales_info.id → V102가 보존한 sku.id로만 연결한다. sku.product_id의 임의 첫 행을 선택하지 않는다. 매핑 불가 행은 원래 상품·수량·version·감사 시각 그대로 남긴다. 회원+SKU 유일성과 sku_id IS NULL인 회원+상품 부분 유일성을 적용한다.
+
+미매핑 행은 조회·수량 변경·사용자 삭제가 가능하지만 새로운 주문 선택은 409로 거절한다. 이전 주문의 ID/version 참조는 바꾸지 않는다. 기존 적용 SQL은 수정하지 않고 V101→V102→V103→V104 순서를 따른다.
+
+## API와 조회
+
+| Method·Path | 작성한 요청·응답 |
+|---|---|
+| GET `/v1/cart/items` | Product별 productId/productName/mainImageUrl/saleEnabled/items 목록. 각 항목은 id/skuId/quantity/version/unitPrice/available/skuStatus/purchasable |
+| POST `/v1/cart/items` | skuId 또는 기존 productId 중 하나의 비null 값과 quantity. 201 항목 응답에 상품/SKU 참조 포함 |
+| PATCH `/v1/cart/items/{itemId}` | quantity는 최종 절대 수량. 200 항목 응답. 요청 version은 추가하지 않음 |
+| DELETE `/v1/cart/items/{itemId}` | 본인 행 삭제 후 204, 본문 없음 |
+
+기존 productId 담기는 SKU가 정확히 하나일 때만 호환하고 0개/여러 개이면 명시적 SKU 지정을 요구하는 409다. 같은 회원의 같은 SKU 중복은 409로 유지하며 수량을 누적하지 않는다. 현재 구현은 상품이 존재하면 READY/중지/품절 SKU도 담을 수 있지만 예약하거나 거래 가능성을 확정하지 않는다. 이 담기 판매조건은 직접 사용자 답변이 없는 구현 선택이며, 이번 수정에서 정책을 바꾸거나 승인된 업무 규칙으로 표시하지 않는다.
+
+ProductLookup.findProducts와 SkuService.findBySkuIds로 묶음 조회한다. Product의 saleEnabled, SKU 판매 상태, available≥quantity를 함께 만족할 때만 표시용 purchasable=true다. 상품 삭제·미매핑·SKU 누락은 이용 불가로 표시하고 항목·수량을 자동 수정/삭제하지 않는다. reserved는 외부 Cart DTO에 노출하지 않는다. 옵션 JSON/옵션 표시 상세를 임의로 만들지 않는다.
+
+GET은 상품별 묶음 응답이고 POST는 SKU ID와 단일 SKU productId 호환을 제공한다. [API 변경 조각](../../../../worklog/plans/active/332-cart-module/cart-api-fragment.yaml)은 최종 통합 기준의 Core 계약에 반영됐다. Cart 독립 브랜치에는 구 계약이 남아 있으므로 계약 원본의 최종 통합 상태는 위 Order SHA에서 확인한다. Frontend의 기존 평면 어댑터가 이 응답을 잘못 읽는 결함은 별도 격리 브랜치에서 보완하며 [후속 기록](../../../../worklog/2026-11-15.md)에 실제 검증과 PR을 남긴다. 구 Cart 견적/주문은 기존 단일 SKU 범위이고 복수 SKU 409를 숨기거나 임의 기본 SKU로 우회하지 않는다.
+
+## 선택·잠금·정리 포트
+
+| 메서드 | 결과·규칙 |
+|---|---|
+| `readOwned(memberId, List<CartSelection>)` | 회원 소유·버전·SKU 매핑 검증 후 ID순 결과 반환 |
+| `lockOwned(memberId, List<CartSelection>)` | 같은 검증과 ID순 쓰기 잠금. 호출자 트랜잭션 필수 |
+| `lockForCompletion(memberId, List<Long>)` | 남아 있는 본인 행을 ID순 잠금. 이미 삭제·변경된 행 허용 |
+| `deletePurchased(memberId, List<CartSelection>)` | ID·회원·원본 version이 같은 행만 삭제하고 영향 행 수 반환. 호출자 트랜잭션 필수 |
+
+선택은 기존 API와 같은 1~100개이며 중복 ID·잘못된 ID/version을 거절한다. snapshot은 itemId/skuId/productId/quantity/version을 제공하며 productId를 skuId로 해석하지 않는다. Order의 호출 순서는 Cart 선택 잠금 → 모든 Product 정렬 공유 잠금/신규 거래 검증 → SKU 정렬 잠금/예약이다. 회원·주문·쿠폰까지 포함한 전체 보호 순서는 Order 조정 경계다.
+
+완료 잠금과 삭제는 strict 선택 검증을 재사용하지 않는다. 구매 중 수량 변경이나 삭제 후 재추가는 성공 정리 실패의 이유가 아니기 때문이다. 삭제 영향 행 0은 그대로 허용하고 SQL 오류는 Order 상태·재고와 함께 롤백한다. 실패·취소·만료에는 성공 정리를 실행하지 않는다.
+
+## 쿠폰·환불·취소와 상태
+
+후속 사용자 U2는 주문당 쿠폰 한 장/선택 항목 하나 적용, 주문 누적 전량 환불 성공 시 원래 유효기간으로 복원을 확정했다. U3는 결제 결과 대기 중 즉시 취소 제한과 기존 10분 만료 유지다. 환불 U1도 4,000원×3/쿠폰2,000/실결제10,000의 순차 4,000→4,000→2,000 환불로 확정됐고 비례배분 제안은 폐기됐다. 금액·환불·쿠폰·취소 상태는 Order 소유이며 Cart는 항목 식별·version 참조를 보존하고 별도 계산/상태를 만들지 않는다.
+
+Cart에는 독립 업무 상태 enum/만료 상태/상태관리도 없이 행 생성·수량 변경·삭제만 있다. SKU READY/ON_SALE/PRIVATE와 Order 결제 상태를 Cart에 복제하지 않는다. FigJam API·ERD·상태 표현은 코디네이터 단독 편집이며 이 모듈은 코드/계약 근거만 전달한다.
+
+## 구현과 검증 상태
+
+과거 독립 검증은 [2026-11-14 Cart 기록](../../../../worklog/2026-11-14.md#332-cart-복구-검증)에 보존한다. 당시 `8397dca2`의 Core 통합 33실패는 후행 Order 통합에서 해소됐으며 최신 실패로 세지 않는다. 최종 통합 `5048413b`의 더 넓은 감사에서는 별도 환불 비활성 PostgreSQL 검사 실패가 발견됐으므로 과거 CI 성공만으로 전체 완료를 주장하지 않는다. 이번 수정의 소비자/API/브라우저 결과는 [2026-11-15 기록](../../../../worklog/2026-11-15.md)에서 확인한다.
+
+## 직접 합의와 구현 선택
+
+상품별 묶음·SKU별 조작, 담기/조회 미예약, 결제 성공 후 정리와 신규 판매 준비 상태는 직접 합의다. BIGINT·물리 FK 없음·미매핑 보존·정렬 잠금·기존 100개 선택 제한은 기술 조정/기존 계약 보존이다. 담기 판매조건·재고0 판매시작·판매중지 상품 공개노출은 미답변이며 임의로 확정하지 않는다. 기존 선점 주문은 결제를 허용하고 새 주문만 판매 조건으로 차단한다는 후속 사용자 합의는 Order/Product의 거래 경계에서 적용한다.
+
+#340의 연결/편집 정책과 #345/#346 구현은 보류다. 공개 다중 SKU·대표가·옵션 JSON 정책도 추가하지 않는다. Cart에는 독립 상태 enum이나 상태도를 만들지 않는다.
+
+소스: [CartItem](../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/entity/CartItem.java) · [CartService](../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartService.java) · [CartController](../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/controller/CartController.java) · [CartSelectionPort](../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartSelectionPort.java) · [V103](../../../../../services/commercecore-service/src/main/resources/db/migration/V103__cart_sku_reference.sql)
+
+## 2026-11-15 범위 조정
+
+위 `5048413b` 링크는 감사 기준의 역사적 연결점이다. 사용자 지시로 최종 Order PR은 Payment 변경 없는 CommerceCore 독립 범위로 조정하며 기존 dev의 legacy 결제 동작은 보존한다. 신규 Payment 연동이나 임의 503 차단을 이 Cart 수정에 추가하지 않는다. 신규 Order API와 모든 새 주문10분 요구의 최종 충족 여부는 Order 최종 SHA/계약에서 따로 보고한다. Frontend 호환 수정은 기존 Cart CRUD·견적·주문 경로만 호출한다. `3b44a879`의 실제 브라우저 증거는 그 시점의 API에 대한 것이며 최종 범위 조정 HEAD 검증을 대신하지 않는다.

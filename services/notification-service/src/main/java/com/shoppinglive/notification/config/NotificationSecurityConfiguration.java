@@ -52,7 +52,9 @@ public class NotificationSecurityConfiguration {
                                                 "/v1/notifications/unread-count")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
-                                                HttpMethod.POST, "/v1/notifications/{id}/read")
+                                                HttpMethod.POST,
+                                                "/v1/notifications/{id}/read",
+                                                "/v1/notifications/read-all")
                                         .hasAnyRole("USER", "SELLER")
                                         .requestMatchers(
                                                 HttpMethod.GET,

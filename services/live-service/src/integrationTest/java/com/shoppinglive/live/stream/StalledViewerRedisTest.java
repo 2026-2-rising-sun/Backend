@@ -118,13 +118,13 @@ class StalledViewerRedisTest extends LiveSecuritySupport {
                     final long started = System.nanoTime();
                     awaitChat(viewer, write(id, "측정-" + sent));
                     worst = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
-                    System.out.printf("[StalledViewer] sent=%d probe(ms)=%d%n", sent, worst);
+                    System.out.printf("[StalledViewer] 전송 건수=%d 수신 지연(ms)=%d%n", sent, worst);
                 }
                 // 막힌 뒤 이어지는 채팅도 늦는지 본다.
                 final List<Long> after = probe(id, viewer);
 
                 System.out.printf(
-                        "[StalledViewer] before(ms)=%s blockedAt=%d after(ms)=%s%n",
+                        "[StalledViewer] 연결 정체 전 지연(ms)=%s 정체 시점 전송 건수=%d 연결 정체 후 지연(ms)=%s%n",
                         before, sent, after);
                 assertThat(worst)
                         .as("멈춘 시청자 %d명이 있을 때 정상 시청자 수신 지연(ms)", STALLED_VIEWERS)

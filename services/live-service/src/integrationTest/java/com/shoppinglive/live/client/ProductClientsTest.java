@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
-import com.shoppinglive.live.client.commerce.HttpSalesClient;
-import com.shoppinglive.live.client.commerce.SalesStatus;
-import com.shoppinglive.live.client.shopping.HttpProductClient;
+import com.shoppinglive.live.client.commercecore.HttpProductClient;
+import com.shoppinglive.live.client.commercecore.HttpSalesClient;
+import com.shoppinglive.live.client.commercecore.SalesStatus;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,7 +156,7 @@ class ProductClientsTest {
     void stubRequiresLocalOrTestProfile() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties stub =
-                new ProductClientsConfiguration.Properties("stub", null, null, null, null);
+                new ProductClientsConfiguration.Properties("stub", null, null);
         assertThatThrownBy(
                         () ->
                                 configuration.productClient(
@@ -170,7 +170,7 @@ class ProductClientsTest {
     void httpModeRequiresUpstreamUrl() {
         final ProductClientsConfiguration configuration = new ProductClientsConfiguration();
         final ProductClientsConfiguration.Properties http =
-                new ProductClientsConfiguration.Properties("http", null, null, null, null);
+                new ProductClientsConfiguration.Properties("http", null, null);
         assertThatThrownBy(
                         () ->
                                 configuration.productClient(
@@ -185,10 +185,8 @@ class ProductClientsTest {
         final ProductClientsConfiguration.Properties http =
                 new ProductClientsConfiguration.Properties(
                         "http",
-                        "http://shopping",
-                        "http://commerce",
-                        "test-live-shopping-credential-000000000001",
-                        "test-live-commerce-credential-000000000001");
+                        "http://commercecore",
+                        "test-live-shopping-credential-000000000001");
         final MockEnvironment dev = new MockEnvironment();
         dev.setActiveProfiles("dev");
 
@@ -210,21 +208,17 @@ class ProductClientsTest {
         var config = new ProductClientsConfiguration();
         var properties =
                 new ProductClientsConfiguration.Properties(
-                        "http",
-                        baseUrl,
-                        baseUrl,
-                        "test-live-shopping-credential-000000000001",
-                        "test-live-commerce-credential-000000000001");
+                        "http", baseUrl, "test-live-shopping-credential-000000000001");
         var builder = RestClient.builder();
         config.productClient(properties, builder, new MockEnvironment()).get(List.of(1L));
         config.salesClient(properties, builder, new MockEnvironment()).get(List.of(1L));
         server.verify(
                 getRequestedFor(urlPathEqualTo("/v1/internal/products"))
-                        .withHeader("X-Service-Token", equalTo(properties.shoppingToken()))
+                        .withHeader("X-Service-Token", equalTo(properties.commercecoreToken()))
                         .withQueryParam("ids", equalTo("1")));
         server.verify(
                 getRequestedFor(urlPathEqualTo("/v1/sales"))
-                        .withHeader("X-Service-Token", equalTo(properties.commerceToken()))
+                        .withHeader("X-Service-Token", equalTo(properties.commercecoreToken()))
                         .withQueryParam("productIds", equalTo("1")));
     }
 

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cart 모듈 설계</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="overview.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#책임과-확정-동작">책임과 확정 동작</a></li>
+<li><a href="#작성한-구조">작성한 구조</a></li>
+<li><a href="#저장-모델과-v103">저장 모델과 V103</a></li>
+<li><a href="#api와-조회">API와 조회</a></li>
+<li><a href="#선택잠금정리-포트">선택·잠금·정리 포트</a></li>
+<li><a href="#쿠폰환불취소와-상태">쿠폰·환불·취소와 상태</a></li>
+<li><a href="#구현과-검증-상태">구현과 검증 상태</a></li>
+<li><a href="#직접-합의와-구현-선택">직접 합의와 구현 선택</a></li>
+<li><a href="#340의-연결편집-정책과-345346-구현은-보류다-공개-다중-sku대표가옵션-json-정책도-추가하지-않는다-cart에는-독립-상태-enum이나-상태도를-만들지-않는다">340의 연결/편집 정책과 #345/#346 구현은 보류다. 공개 다중 SKU·대표가·옵션 JSON 정책도 추가하지 않는다. Cart에는 독립 상태 enum이나 상태도를 만들지 않는다.</a><ul>
+<li><a href="#2026-11-15-범위-조정">2026-11-15 범위 조정</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Cart 모듈 설계</h1><p>상태: Cart 독립 구현 완료 · 최종 통합 감사 후 소비자 호환 보완 중</p>
+<p>관련 자료: <a href="https://github.com/2026-2-rising-sun/Backend/issues/332">Cart #332</a> · <a href="https://github.com/2026-2-rising-sun/Backend/issues/340">정리 정책 #340</a> · <a href="../../../../adr/0332-cart-sku-boundary.html">ADR 0332</a> · <a href="../../../../worklog/plans/active/332-cart-module/README.html">구현 계획</a> · <a href="erd.html">ERD 원본</a> · <a href="erd.html">ERD HTML</a></p>
+<p>Cart 독립 구현은 <code>6f9dda99</code>에서 전달했고 최종 Order 통합 감사 기준은 <code>5048413b26337cbdc84e258347750d1870f763a8</code>이다. 이 문서의 Cart 모델·포트와 최종 Order 거래 흐름은 구분한다. <a href="https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md">최종 통합 계획</a>과 <a href="https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/worklog/2026-11-14.md#order-최종-전체-검증과-확인-대기-경계">통합 검증 기록</a>을 함께 본다. 과거 Cart 브랜치의 실패를 최종 Order의 현재 실패로 재사용하지 않는다.</p>
+<h2 id="책임과-확정-동작">책임과 확정 동작</h2>
+<ul>
+<li>Product별로 묶어 표시하고 담긴 SKU별로 체크·수량 변경·삭제한다. 상품 전체 체크는 하위 SKU 선택이다.</li>
+<li>담기·조회는 재고를 예약하지 않는다. 현재 가격과 available/reserved의 원본은 SKU 모듈이다.</li>
+<li>주문서 생성 시 서버 가격·상품 스냅샷과 예약은 Order·SKU가 같은 DB 트랜잭션으로 처리한다. Cart 조회값으로 기존 주문 금액을 바꾸지 않는다.</li>
+<li>자동 정리는 결제 성공 후만 한다. #340 보류 중 기존 Cart ID·회원·version 조건과 Order/환불 출처 참조를 보존한다. 새로운 편집 제한·연결 테이블·장바구니 예약 상태는 추가하지 않는다.</li>
+<li>Product·SKU·Cart ID는 BIGINT/Long이며 DB FK 없이 앱 참조를 검증한다. Member ID는 기존 회원 UUID 문자열이다.</li>
+<li>신규 Product는 sale_enabled=false, SKU는 READY로 시작하고 판매자가 판매 시작을 선택한다. 기존 상태와 SKU 수동 전이 범위는 보존한다.</li>
+</ul>
+<h2 id="작성한-구조">작성한 구조</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>경로·타입</th>
+<th>책임</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cart/entity/CartItem</code></td>
+<td>항목 ID·회원·상품·nullable SKU·수량·version·감사 시각</td>
+</tr>
+<tr>
+<td><code>cart/repository/CartItemRepository</code></td>
+<td>회원 소유 조회·잠금, 회원+SKU 중복 검사, ID/회원/version 조건부 삭제</td>
+</tr>
+<tr>
+<td><code>cart/service/CartService</code></td>
+<td>SKU 담기·기존 상품 ID 호환·상품별 표시 조회·절대 수량 변경·삭제</td>
+</tr>
+<tr>
+<td><code>cart/service/CartSelectionPort</code>·<code>CartSelectionService</code></td>
+<td>Order용 선택 검증·정렬 잠금·완료 잠금·조건부 정리</td>
+</tr>
+<tr>
+<td><code>cart/controller/CartController</code></td>
+<td>Cart CRUD. 기존 한 항목 주문 경로는 Order 서비스 호출을 호환 유지</td>
+</tr>
+<tr>
+<td><code>cart/dto/SelectedCartItem</code></td>
+<td>itemId/skuId/productId/quantity/version의 불변 선택 결과</td>
+</tr>
+</tbody>
+</table></div>
+<p>기존 order 패키지의 Cart 타입을 cart로 이동했고 공유 소비자의 import 호환을 반영했다. 감사 기준 Order <code>5048413b</code>의 신규 주문서 생성·성공 정리는 CartSelectionPort를 호출했다. 2026-11-15 최종 PR은 CommerceCore 독립 범위로 조정 중이며, 신규 공개 API·금전 연동의 포함 여부는 Order 최종 계약에서 확인한다. 각 브랜치의 구현·검증 기준 SHA는 위 통합 계획과 실행 기록에서 구분한다. 임시 Cart/SKU 도메인 복제나 다른 워크트리 미커밋 파일 복사는 하지 않는다.</p>
+<h2 id="저장-모델과-v103">저장 모델과 V103</h2>
+<p>물리 필드·관계의 원본은 <a href="erd.html">ERD.md</a>다. <code>sku_id</code>는 기존 미매핑 항목 보존을 위해 nullable이며 신규 SKU 담기는 반드시 실제 SKU ID로 생성한다. <code>product_id</code>도 상품별 표시와 기존 참조를 위해 보존한다.</p>
+<p>V103은 sales_info.product_id → sales_info.id → V102가 보존한 sku.id로만 연결한다. sku.product_id의 임의 첫 행을 선택하지 않는다. 매핑 불가 행은 원래 상품·수량·version·감사 시각 그대로 남긴다. 회원+SKU 유일성과 sku_id IS NULL인 회원+상품 부분 유일성을 적용한다.</p>
+<p>미매핑 행은 조회·수량 변경·사용자 삭제가 가능하지만 새로운 주문 선택은 409로 거절한다. 이전 주문의 ID/version 참조는 바꾸지 않는다. 기존 적용 SQL은 수정하지 않고 V101→V102→V103→V104 순서를 따른다.</p>
+<h2 id="api와-조회">API와 조회</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Method·Path</th>
+<th>작성한 요청·응답</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET <code>/v1/cart/items</code></td>
+<td>Product별 productId/productName/mainImageUrl/saleEnabled/items 목록. 각 항목은 id/skuId/quantity/version/unitPrice/available/skuStatus/purchasable</td>
+</tr>
+<tr>
+<td>POST <code>/v1/cart/items</code></td>
+<td>skuId 또는 기존 productId 중 하나의 비null 값과 quantity. 201 항목 응답에 상품/SKU 참조 포함</td>
+</tr>
+<tr>
+<td>PATCH <code>/v1/cart/items/{itemId}</code></td>
+<td>quantity는 최종 절대 수량. 200 항목 응답. 요청 version은 추가하지 않음</td>
+</tr>
+<tr>
+<td>DELETE <code>/v1/cart/items/{itemId}</code></td>
+<td>본인 행 삭제 후 204, 본문 없음</td>
+</tr>
+</tbody>
+</table></div>
+<p>기존 productId 담기는 SKU가 정확히 하나일 때만 호환하고 0개/여러 개이면 명시적 SKU 지정을 요구하는 409다. 같은 회원의 같은 SKU 중복은 409로 유지하며 수량을 누적하지 않는다. 현재 구현은 상품이 존재하면 READY/중지/품절 SKU도 담을 수 있지만 예약하거나 거래 가능성을 확정하지 않는다. 이 담기 판매조건은 직접 사용자 답변이 없는 구현 선택이며, 이번 수정에서 정책을 바꾸거나 승인된 업무 규칙으로 표시하지 않는다.</p>
+<p>ProductLookup.findProducts와 SkuService.findBySkuIds로 묶음 조회한다. Product의 saleEnabled, SKU 판매 상태, available≥quantity를 함께 만족할 때만 표시용 purchasable=true다. 상품 삭제·미매핑·SKU 누락은 이용 불가로 표시하고 항목·수량을 자동 수정/삭제하지 않는다. reserved는 외부 Cart DTO에 노출하지 않는다. 옵션 JSON/옵션 표시 상세를 임의로 만들지 않는다.</p>
+<p>GET은 상품별 묶음 응답이고 POST는 SKU ID와 단일 SKU productId 호환을 제공한다. <a href="../../../../worklog/plans/active/332-cart-module/cart-api-fragment.yaml">API 변경 조각</a>은 최종 통합 기준의 Core 계약에 반영됐다. Cart 독립 브랜치에는 구 계약이 남아 있으므로 계약 원본의 최종 통합 상태는 위 Order SHA에서 확인한다. Frontend의 기존 평면 어댑터가 이 응답을 잘못 읽는 결함은 별도 격리 브랜치에서 보완하며 <a href="../../../../worklog/2026-11-15.html">후속 기록</a>에 실제 검증과 PR을 남긴다. 구 Cart 견적/주문은 기존 단일 SKU 범위이고 복수 SKU 409를 숨기거나 임의 기본 SKU로 우회하지 않는다.</p>
+<h2 id="선택잠금정리-포트">선택·잠금·정리 포트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드</th>
+<th>결과·규칙</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>readOwned(memberId, List&lt;CartSelection&gt;)</code></td>
+<td>회원 소유·버전·SKU 매핑 검증 후 ID순 결과 반환</td>
+</tr>
+<tr>
+<td><code>lockOwned(memberId, List&lt;CartSelection&gt;)</code></td>
+<td>같은 검증과 ID순 쓰기 잠금. 호출자 트랜잭션 필수</td>
+</tr>
+<tr>
+<td><code>lockForCompletion(memberId, List&lt;Long&gt;)</code></td>
+<td>남아 있는 본인 행을 ID순 잠금. 이미 삭제·변경된 행 허용</td>
+</tr>
+<tr>
+<td><code>deletePurchased(memberId, List&lt;CartSelection&gt;)</code></td>
+<td>ID·회원·원본 version이 같은 행만 삭제하고 영향 행 수 반환. 호출자 트랜잭션 필수</td>
+</tr>
+</tbody>
+</table></div>
+<p>선택은 기존 API와 같은 1~100개이며 중복 ID·잘못된 ID/version을 거절한다. snapshot은 itemId/skuId/productId/quantity/version을 제공하며 productId를 skuId로 해석하지 않는다. Order의 호출 순서는 Cart 선택 잠금 → 모든 Product 정렬 공유 잠금/신규 거래 검증 → SKU 정렬 잠금/예약이다. 회원·주문·쿠폰까지 포함한 전체 보호 순서는 Order 조정 경계다.</p>
+<p>완료 잠금과 삭제는 strict 선택 검증을 재사용하지 않는다. 구매 중 수량 변경이나 삭제 후 재추가는 성공 정리 실패의 이유가 아니기 때문이다. 삭제 영향 행 0은 그대로 허용하고 SQL 오류는 Order 상태·재고와 함께 롤백한다. 실패·취소·만료에는 성공 정리를 실행하지 않는다.</p>
+<h2 id="쿠폰환불취소와-상태">쿠폰·환불·취소와 상태</h2>
+<p>후속 사용자 U2는 주문당 쿠폰 한 장/선택 항목 하나 적용, 주문 누적 전량 환불 성공 시 원래 유효기간으로 복원을 확정했다. U3는 결제 결과 대기 중 즉시 취소 제한과 기존 10분 만료 유지다. 환불 U1도 4,000원×3/쿠폰2,000/실결제10,000의 순차 4,000→4,000→2,000 환불로 확정됐고 비례배분 제안은 폐기됐다. 금액·환불·쿠폰·취소 상태는 Order 소유이며 Cart는 항목 식별·version 참조를 보존하고 별도 계산/상태를 만들지 않는다.</p>
+<p>Cart에는 독립 업무 상태 enum/만료 상태/상태관리도 없이 행 생성·수량 변경·삭제만 있다. SKU READY/ON_SALE/PRIVATE와 Order 결제 상태를 Cart에 복제하지 않는다. FigJam API·ERD·상태 표현은 코디네이터 단독 편집이며 이 모듈은 코드/계약 근거만 전달한다.</p>
+<h2 id="구현과-검증-상태">구현과 검증 상태</h2>
+<p>과거 독립 검증은 <a href="../../../../worklog/2026-11-14.html#332-cart-복구-검증">2026-11-14 Cart 기록</a>에 보존한다. 당시 <code>8397dca2</code>의 Core 통합 33실패는 후행 Order 통합에서 해소됐으며 최신 실패로 세지 않는다. 최종 통합 <code>5048413b</code>의 더 넓은 감사에서는 별도 환불 비활성 PostgreSQL 검사 실패가 발견됐으므로 과거 CI 성공만으로 전체 완료를 주장하지 않는다. 이번 수정의 소비자/API/브라우저 결과는 <a href="../../../../worklog/2026-11-15.html">2026-11-15 기록</a>에서 확인한다.</p>
+<h2 id="직접-합의와-구현-선택">직접 합의와 구현 선택</h2>
+<p>상품별 묶음·SKU별 조작, 담기/조회 미예약, 결제 성공 후 정리와 신규 판매 준비 상태는 직접 합의다. BIGINT·물리 FK 없음·미매핑 보존·정렬 잠금·기존 100개 선택 제한은 기술 조정/기존 계약 보존이다. 담기 판매조건·재고0 판매시작·판매중지 상품 공개노출은 미답변이며 임의로 확정하지 않는다. 기존 선점 주문은 결제를 허용하고 새 주문만 판매 조건으로 차단한다는 후속 사용자 합의는 Order/Product의 거래 경계에서 적용한다.</p>
+<h1 id="340의-연결편집-정책과-345346-구현은-보류다-공개-다중-sku대표가옵션-json-정책도-추가하지-않는다-cart에는-독립-상태-enum이나-상태도를-만들지-않는다">340의 연결/편집 정책과 #345/#346 구현은 보류다. 공개 다중 SKU·대표가·옵션 JSON 정책도 추가하지 않는다. Cart에는 독립 상태 enum이나 상태도를 만들지 않는다.</h1>
+<p>소스: <a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/entity/CartItem.java">CartItem</a> · <a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartService.java">CartService</a> · <a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/controller/CartController.java">CartController</a> · <a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/cart/service/CartSelectionPort.java">CartSelectionPort</a> · <a href="../../../../../services/commercecore-service/src/main/resources/db/migration/V103__cart_sku_reference.sql">V103</a></p>
+<h2 id="2026-11-15-범위-조정">2026-11-15 범위 조정</h2>
+<p>위 <code>5048413b</code> 링크는 감사 기준의 역사적 연결점이다. 사용자 지시로 최종 Order PR은 Payment 변경 없는 CommerceCore 독립 범위로 조정하며 기존 dev의 legacy 결제 동작은 보존한다. 신규 Payment 연동이나 임의 503 차단을 이 Cart 수정에 추가하지 않는다. 신규 Order API와 모든 새 주문10분 요구의 최종 충족 여부는 Order 최종 SHA/계약에서 따로 보고한다. Frontend 호환 수정은 기존 Cart CRUD·견적·주문 경로만 호출한다. <code>3b44a879</code>의 실제 브라우저 증거는 그 시점의 API에 대한 것이며 최종 범위 조정 HEAD 검증을 대신하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>abee0cbb4fa314f947cbcd2378883aacbbcb619033b55ad569335eb1f2114f10</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

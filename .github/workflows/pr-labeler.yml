@@ -8,7 +8,7 @@ permissions:
   contents: read
   pull-requests: write
 
-# Finish each update before another run changes this PR's labels.
+# 다른 실행이 이 PR의 라벨을 바꾸기 전에 현재 갱신을 끝낸다.
 concurrency:
   group: pr-labeler-${{ github.event.pull_request.number }}
   cancel-in-progress: false
@@ -23,7 +23,7 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            // No PR checkout: all inputs are data from the GitHub API.
+            // PR 코드를 체크아웃하지 않고 GitHub API의 데이터만 입력으로 사용한다.
             const ignored = [
               /\.(?:md|mdx|rst|adoc)$/i,
               /(?:^|\/)README[^/]*\.txt$/i,
@@ -50,7 +50,7 @@ jobs:
             const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
               owner, repo, issue_number, per_page: 100,
             });
-            // Change only size/*; retain service, review and manually added labels.
+            // size/*만 변경하고 서비스·리뷰·수동 추가 라벨은 유지한다.
             for (const label of labels) {
               if (label.name.startsWith('size/') && label.name !== target) {
                 await github.rest.issues.removeLabel({
@@ -63,4 +63,4 @@ jobs:
                 owner, repo, issue_number, labels: [target],
               });
             }
-            core.info(`Implementation changes: ${lines} additions + deletions -> ${target}`);
+            core.info(`구현 변경량: 추가·삭제 ${lines}줄 -> ${target}`);

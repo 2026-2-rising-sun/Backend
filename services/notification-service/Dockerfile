@@ -13,8 +13,8 @@ COPY settings.gradle.kts build.gradle.kts ./
 COPY common-module common-module
 # settings.gradle.kts가 include하는 프로젝트는 디렉터리가 실재해야 하므로 5개 서비스의 빌드 스크립트를 모두 가져온다.
 COPY services/member-service/build.gradle.kts services/member-service/
-COPY services/shopping-service/build.gradle.kts services/shopping-service/
-COPY services/commerce-service/build.gradle.kts services/commerce-service/
+COPY services/catalog-service/build.gradle.kts services/catalog-service/
+COPY services/commercecore-service/build.gradle.kts services/commercecore-service/
 COPY services/live-service/build.gradle.kts services/live-service/
 COPY services/notification-service/build.gradle.kts services/notification-service/
 RUN --mount=type=cache,target=/root/.gradle \

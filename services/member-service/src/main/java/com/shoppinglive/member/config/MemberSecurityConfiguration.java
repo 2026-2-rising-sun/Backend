@@ -40,8 +40,8 @@ public class MemberSecurityConfiguration {
                                 auth.requestMatchers(
                                                 HttpMethod.POST, "/v1/internal/auth/sessions/check")
                                         .hasAnyAuthority(
-                                                "SERVICE_shopping",
-                                                "SERVICE_commerce",
+                                                "SERVICE_catalog",
+                                                "SERVICE_commercecore",
                                                 "SERVICE_live",
                                                 "SERVICE_notification")
                                         .anyRequest()

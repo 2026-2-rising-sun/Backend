@@ -64,6 +64,16 @@ class SalesInfoEventListenerTest {
     }
 
     @Test
+    @DisplayName("서비스 분리 전 발행된 판매 이벤트도 재처리한다")
+    void acceptsPreviousProducerSource() {
+        listener.consume(
+                record(
+                        snapshot(1, "SOLD_OUT")
+                                .replace("commercecore-service", "commerce-service")));
+        assertThat(statuses.findByProductId(PRODUCT).orElseThrow().status()).isEqualTo("SOLD_OUT");
+    }
+
+    @Test
     @DisplayName("같은 이벤트가 두 번 와도, 늦게 온 옛 스냅샷이 새 상태를 덮지 않는다")
     void ignoresDuplicateAndStaleEvents() {
         listener.consume(record(snapshot(2, "ON_SALE")));
@@ -97,7 +107,7 @@ class SalesInfoEventListenerTest {
                                 listener.consume(
                                         record(
                                                 snapshot(1, "SOLD_OUT")
-                                                        .replace("commerce-service", "x"))))
+                                                        .replace("commercecore-service", "x"))))
                 .isInstanceOf(InvalidEventMessageException.class);
         // 메시지 key 가 payload 의 판매 ID 와 다르면 파티션이 흩어져 순서가 깨진 것이다.
         assertThatThrownBy(
@@ -142,7 +152,7 @@ class SalesInfoEventListenerTest {
         return "{\"eventId\":\""
                 + EVENT_ID
                 + "\",\"eventType\":\"SalesStatusChanged\",\"schemaVersion\":1,"
-                + "\"source\":\"commerce-service\",\"aggregateId\":\""
+                + "\"source\":\"commercecore-service\",\"aggregateId\":\""
                 + SALES
                 + "\",\"occurredAt\":\"2026-10-15T00:00:00Z\",\"payload\":{\"salesId\":"
                 + SALES

@@ -261,7 +261,7 @@ class RestockNotificationTest {
         return "{\"eventId\":\"74b623b8-90ee-4f65-919c-d9ad2ea46fb"
                 + version
                 + "\",\"eventType\":\"SalesStatusChanged\",\"schemaVersion\":1,"
-                + "\"source\":\"commerce-service\",\"aggregateId\":\""
+                + "\"source\":\"commercecore-service\",\"aggregateId\":\""
                 + SALES
                 + "\",\"occurredAt\":\"2026-10-15T00:00:00Z\",\"payload\":{\"salesId\":"
                 + SALES

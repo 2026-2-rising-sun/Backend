@@ -35,6 +35,12 @@ jobs:
       - name: Select work from changed files
         id: changes
         run: python .github/scripts/ci/classify_changes.py
+      - name: 문서 링크·MD/HTML 쌍·요구사항 상태 점검
+        run: python scripts/check_docs.py
+      - name: API MD·HTML 최신성 점검
+        run: python scripts/render_api_docs.py --check
+      - name: 설계·ADR·워크로그 HTML 최신성 점검
+        run: python scripts/render_design_docs.py --check
       - uses: actions/setup-java@v5
         if: steps.changes.outputs.gradle_tasks != '[]'
         with:
@@ -54,7 +60,7 @@ jobs:
         run: python -m unittest discover -s .github/scripts/ci -p 'test_*.py'
       - name: Check local verification runner
         if: steps.changes.outputs.harness == 'true'
-        run: python -m unittest discover -s harness -p 'test_*.py'
+        run: python -m unittest discover -s scripts -p 'test_*.py'
       - name: Check local authentication configuration tool
         if: steps.changes.outputs.local_auth == 'true'
         run: node --test scripts/local/auth-env.test.cjs
@@ -81,40 +87,43 @@ jobs:
       - name: Check serialized event samples
         if: steps.changes.outputs.event_samples == 'true'
         run: python .github/scripts/api/check_events.py --samples
-      - name: Start PostgreSQL only for migration checks
-        if: steps.changes.outputs.migration_tasks != '[]'
+      - name: Start PostgreSQL only for selected database checks
+        if: steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]'
         env:
-          MIGRATION_SERVICES: ${{ steps.changes.outputs.migration_services }}
+          DATABASE_SERVICES: ${{ steps.changes.outputs.database_services }}
         run: |
           docker run --detach --name ci-migration-postgres \
             --env POSTGRES_PASSWORD=test --publish 127.0.0.1:55432:5432 postgres:16
           for attempt in {1..30}; do
             if docker exec ci-migration-postgres pg_isready --username postgres; then break; fi
-            echo "Waiting for PostgreSQL ($attempt/30)"
+            echo "PostgreSQL 준비 대기 중 ($attempt/30)"
             sleep 1
           done
           docker exec ci-migration-postgres pg_isready --username postgres
           python - <<'PY'
           import json, os, subprocess
-          for service in json.loads(os.environ['MIGRATION_SERVICES']):
+          for service in json.loads(os.environ['DATABASE_SERVICES']):
               database = service.removesuffix('-service') + '_test'
               subprocess.run(['docker', 'exec', 'ci-migration-postgres', 'createdb',
                               '--username', 'postgres', database], check=True)
           PY
       - name: Run migration-tagged PostgreSQL tests
-        if: steps.changes.outputs.migration_tasks != '[]'
+        if: steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]'
         env:
           MIGRATION_TASKS: ${{ steps.changes.outputs.migration_tasks }}
           MEMBER_TEST_DB_URL: jdbc:postgresql://localhost:55432/member_test
           MEMBER_TEST_DB_DRIVER: org.postgresql.Driver
           MEMBER_TEST_DB_USER: postgres
           MEMBER_TEST_DB_PASSWORD: test
-          COMMERCE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commerce_test
-          COMMERCE_TEST_POSTGRES_USER: postgres
-          COMMERCE_TEST_POSTGRES_PASSWORD: test
-          SHOPPING_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/shopping_test
-          SHOPPING_TEST_POSTGRES_USER: postgres
-          SHOPPING_TEST_POSTGRES_PASSWORD: test
+          PAYMENT_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/payment_test
+          PAYMENT_TEST_POSTGRES_USER: postgres
+          PAYMENT_TEST_POSTGRES_PASSWORD: test
+          COMMERCECORE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commercecore_test
+          COMMERCECORE_TEST_POSTGRES_USER: postgres
+          COMMERCECORE_TEST_POSTGRES_PASSWORD: test
+          CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
+          CATALOG_TEST_POSTGRES_USER: postgres
+          CATALOG_TEST_POSTGRES_PASSWORD: test
           NOTIFICATION_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/notification_test
           NOTIFICATION_TEST_DB_DRIVER: org.postgresql.Driver
           NOTIFICATION_TEST_DB_USER: postgres
@@ -127,6 +136,27 @@ jobs:
           subprocess.run(['./gradlew', *json.loads(os.environ['MIGRATION_TASKS']),
                           '--no-daemon', '--max-workers=2'], check=True)
           PY
+      - name: Run PostgreSQL business regression tests
+        if: steps.changes.outputs.postgres_tasks != '[]'
+        env:
+          POSTGRES_TASKS: ${{ steps.changes.outputs.postgres_tasks }}
+          LIVE_PG_TEST: '1'
+          LIVE_PG_PORT: '55432'
+          CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
+          CATALOG_TEST_POSTGRES_USER: postgres
+          CATALOG_TEST_POSTGRES_PASSWORD: test
+          COMMERCECORE_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/commercecore_test
+          COMMERCECORE_TEST_POSTGRES_USER: postgres
+          COMMERCECORE_TEST_POSTGRES_PASSWORD: test
+          PAYMENT_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/payment_test
+          PAYMENT_TEST_POSTGRES_USER: postgres
+          PAYMENT_TEST_POSTGRES_PASSWORD: test
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          subprocess.run(['./gradlew', *json.loads(os.environ['POSTGRES_TASKS']),
+                          '--no-daemon', '--max-workers=2'], check=True)
+          PY
       - name: Start Redis only for Redis checks
         if: steps.changes.outputs.redis_tasks != '[]'
         run: |
@@ -134,7 +164,7 @@ jobs:
             --publish 127.0.0.1:56379:6379 redis:7-alpine
           for attempt in {1..30}; do
             if docker exec ci-redis redis-cli ping; then break; fi
-            echo "Waiting for Redis ($attempt/30)"
+            echo "Redis 준비 대기 중 ($attempt/30)"
             sleep 1
           done
           docker exec ci-redis redis-cli ping
@@ -146,10 +176,10 @@ jobs:
           LIVE_REDIS_PORT: '56379'
           MEMBER_REDIS_TEST: '1'
           MEMBER_REDIS_PORT: '56379'
-          SHOPPING_REDIS_TEST: '1'
-          SHOPPING_REDIS_PORT: '56379'
-          COMMERCE_REDIS_TEST: '1'
-          COMMERCE_REDIS_PORT: '56379'
+          CATALOG_REDIS_TEST: '1'
+          CATALOG_REDIS_PORT: '56379'
+          COMMERCECORE_REDIS_TEST: '1'
+          COMMERCECORE_REDIS_PORT: '56379'
           NOTIFICATION_REDIS_TEST: '1'
           NOTIFICATION_REDIS_PORT: '56379'
         run: |
@@ -159,7 +189,7 @@ jobs:
                           '--no-daemon', '--max-workers=2'], check=True)
           PY
       - name: Stop temporary external services
-        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
+        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
         run: |
           for container in ci-migration-postgres ci-redis; do
             if docker container inspect "$container" >/dev/null 2>&1; then

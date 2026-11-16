@@ -1,4 +1,4 @@
-"""Select CI work from the diff of the commit actually checked out for testing."""
+"""검사에 실제로 사용하는 커밋의 변경 내역으로 CI 작업을 선택한다."""
 import argparse
 from dataclasses import dataclass
 import importlib.util
@@ -9,13 +9,14 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-SERVICES = ("member-service", "shopping-service", "commerce-service", "live-service",
+SERVICES = ("member-service", "catalog-service", "commercecore-service", "payment-service", "live-service",
             "notification-service")
 SPEC = importlib.util.spec_from_file_location(
     "api_structure", Path(__file__).resolve().parents[1] / "api/check_structure.py")
 API = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(API)
 MIGRATION_SERVICES = SERVICES
+POSTGRES_SERVICES = {"catalog-service", "commercecore-service", "payment-service", "live-service"}
 LIVE_PREFIX = "services/live-service/"
 PUBSUB_CALLERS = {"ChatWriteService.java", "BroadcastEndNotifier.java", "BroadcastService.java"}
 
@@ -29,7 +30,7 @@ class Change:
 
 
 def java_tokens(source):
-    # Java processes Unicode escapes before recognizing comments. Tree-sitter does not.
+    # Java는 주석을 인식하기 전에 유니코드 이스케이프를 처리하지만 Tree-sitter는 그렇지 않다.
     if re.search(rb"\\u+[0-9a-fA-F]{4}", source):
         raise ValueError("Unicode escapes require a build")
     tree = API.Parser(API.JAVA).parse(source)
@@ -62,7 +63,7 @@ def comments_only(change):
 def routes_changed(change):
     try:
         def routes(source):
-            # Line numbers move when comments change; operation multiplicity matters.
+            # 주석 변경으로 줄 번호가 이동할 수 있으므로 같은 API 동작의 선언 개수를 비교한다.
             found = API.controller_routes((source or b"").decode("utf-8"), change.path)
             return {operation: len(locations) for operation, locations in found.items()}
         return routes(change.before) != routes(change.after)
@@ -71,17 +72,37 @@ def routes_changed(change):
 
 
 def document(path):
-    # Runtime resources are never documentation just because of their extension/name.
+    # 실행 시 사용하는 리소스는 확장자나 이름만으로 문서로 분류하지 않는다.
     if "/src/" in path or path.startswith("contracts/api/"):
         return False
+    # 실행하지 않는 계획·인계 조각의 이동은 업무 코드·계약 변경이 아니다.
+    if path.startswith(('docs/worklog/plans/', 'docs/exec-plans/')) and Path(path).suffix.lower() in {'.yaml', '.yml', '.patch'}:
+        return True
     name = Path(path).name
     return (name == "AGENTS.md" or re.fullmatch(r"readme(?:\.(md|mdx|rst|adoc|txt))?", name, re.I)
             or Path(path).suffix.lower() in {".md", ".mdx", ".rst", ".adoc"}
-            or (path.startswith("docs/") and Path(path).suffix.lower() == ".txt"))
+            or (path.startswith("docs/") and Path(path).suffix.lower() in {".txt", ".html", ".css", ".svg", ".png", ".jpg", ".webp"}))
+
+
+def documentation_ignore_only(change):
+    """문서 제외 규칙·주석만 달라진 경우에 한해 전체 빌드를 생략한다."""
+    if change.before is None or change.after is None or not change.same_mode:
+        return False
+    allowed = {"docs/**/*.md", "services/*/docs/**/*.md", "contracts/api/README.md",
+               "contracts/docs/*.md"}
+
+    def other_rules(source):
+        return [line for line in source.decode("utf-8").splitlines()
+                if line.strip() and not line.startswith("#") and line not in allowed]
+
+    try:
+        return other_rules(change.before) == other_rules(change.after)
+    except UnicodeError:
+        return False
 
 
 def tags(source):
-    """Read actual @Tag annotations; comments and string mentions are not tags."""
+    """실제 @Tag 애너테이션을 읽는다. 주석이나 문자열에 나온 태그는 제외한다."""
     if source is None:
         return set()
     tree = API.Parser(API.JAVA).parse(source)
@@ -130,7 +151,7 @@ def redis_changed(change):
             "/stream/" in path or Path(path).name in PUBSUB_CALLERS
         ):
             return True
-        # A cache annotation alone cannot establish which CacheManager backs it.
+        # 캐시 애너테이션만으로 실제 사용하는 CacheManager를 판별할 수 없다.
         identifiers = set()
         for source in (change.before, change.after):
             if source:
@@ -174,6 +195,9 @@ def classify(changes, full_reason=None):
              if path.startswith("services/" + service + "/")), None)
         if document(path):
             action = "documentation"
+        elif path == ".gitignore" and documentation_ignore_only(change):
+            tools["harness"] = tools["classifier"] = True
+            action = "documentation-ignore"
         elif path.startswith(".github/workflows/"):
             tools["workflow"] = tools["classifier"] = True
             action = "workflow"
@@ -186,8 +210,8 @@ def classify(changes, full_reason=None):
         elif path.startswith(".github/scripts/"):
             tools["classifier"] = True
             action = "ci-tool"
-        elif path.startswith("harness/"):
-            tools["harness"] = True
+        elif path.startswith("harness/") or (path.startswith("scripts/") and "/" not in path.removeprefix("scripts/")):
+            tools["harness"] = tools["classifier"] = True
             action = "harness-tool"
         elif path.startswith("scripts/local/auth-env."):
             tools["local_auth"] = True
@@ -212,7 +236,8 @@ def classify(changes, full_reason=None):
                 action = "full" if module == "common-module" else "service-build"
                 service = module.removeprefix("services:")
                 source_tags = (tags(change.before) | tags(change.after)) if path.endswith(".java") else set()
-                if "/src/main/resources/db/migration/" in path or "migration" in source_tags:
+                if any(folder in path for folder in ("/src/main/resources/db/migration/",
+                                                       "/src/main/resources/db/payment-migration/")) or "migration" in source_tags:
                     migrations.update(MIGRATION_SERVICES if module == "common-module" else [service])
                 if redis_changed(change):
                     redis.update(["live-service"] if module == "common-module" else [service])
@@ -228,13 +253,19 @@ def classify(changes, full_reason=None):
     tasks = ["build"] if full else (
         [":" + module + ":build" for module in sorted(builds)]
         + [":" + module + ":spotlessCheck" for module in sorted(formats - builds)])
+    postgres = POSTGRES_SERVICES if full else {m.removeprefix("services:") for m in builds} & POSTGRES_SERVICES
+    database_services = set(migrations) | postgres
+    # Core 통합 fixture는 Payment를 독립 DataSource/HTTP 서버로 기동한다.
+    if "commercecore-service" in database_services:
+        database_services.add("payment-service")
+    postgres_tasks = [":services:" + service + ":postgresTest" for service in sorted(postgres)]
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
-    event_samples = full or bool(builds & {"services:commerce-service", "services:live-service"})
+    event_samples = full or bool(builds & {"services:catalog-service", "services:commercecore-service", "services:payment-service", "services:live-service"})
     return {"gradle_tasks": tasks, "run_tests": full or bool(builds), "api": api,
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
             "migration_tasks": [":services:" + service + ":migrationTest" for service in sorted(migrations)],
-            "redis_tasks": redis_tasks,
+            "redis_tasks": redis_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres), "database_services": sorted(database_services),
             **tools, "reasons": reasons}
 
 
@@ -253,7 +284,7 @@ def diff_changes(root, base, head):
         return result
     old, new = entries(base), entries(head)
     changes = []
-    # Disabling rename detection treats moves as delete + add, covering both services.
+    # 이름 변경 감지를 끄면 이동을 삭제와 추가로 처리하므로 양쪽 서비스를 모두 검사한다.
     paths = git(root, "diff", "--no-renames", "--name-only", "-z", base, head, "--")
     for name in filter(None, paths.split(b"\0")):
         def content(tree):
@@ -305,7 +336,7 @@ def main():
             for key, value in plan.items():
                 if key != "reasons":
                     stream.write(key + "=" + json.dumps(value) + "\n")
-    summary = "### Selected CI work\n\n```json\n" + json.dumps(
+    summary = "### 선택한 CI 작업\n\n```json\n" + json.dumps(
         plan, ensure_ascii=False, indent=2) + "\n```\n"
     if os.getenv("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as stream:

@@ -24,7 +24,7 @@ import org.springframework.util.backoff.FixedBackOff;
  * 알림이 받는 이벤트(방송, 판매정보)의 실패 처리. error handler bean 하나가 기본 listener factory 에 붙어 모든 listener 에 같이
  * 적용된다.
  *
- * <p>Shopping 의 {@code EventConsumerConfiguration} 과 같은 방식으로 맞췄다. 같은 레포에서 같은 문제를 다르게 풀면 사고가 났을 때 어느
+ * <p>Catalog 의 {@code EventConsumerConfiguration} 과 같은 방식으로 맞췄다. 같은 레포에서 같은 문제를 다르게 풀면 사고가 났을 때 어느
  * 쪽 규칙인지 매번 확인해야 한다. 두 작업이 다 들어가면 공용 모듈로 옮기는 게 맞다.
  *
  * <p>실패를 셋으로 나눈다.
@@ -46,7 +46,7 @@ import org.springframework.util.backoff.FixedBackOff;
 class NotificationConsumerConfiguration {
 
     /**
-     * 원본 토픽 이름 뒤에 붙는다. <b>서비스 이름이 들어가는 게 중요하다</b> — {@code commerce.sales-info.v1} 은 Shopping 도
+     * 원본 토픽 이름 뒤에 붙는다. <b>서비스 이름이 들어가는 게 중요하다</b> — {@code commerce.sales-info.v1} 은 Catalog 도
      * 구독하므로, 서비스 이름이 없으면 두 서비스의 실패 메시지가 한 토픽에 섞여 누가 되돌려야 하는지 알 수 없다.
      */
     static final String DLT_SUFFIX = ".notification.dlt";

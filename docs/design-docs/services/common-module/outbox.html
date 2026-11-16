@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>공통 Outbox 발행 흐름</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="outbox.md">MD 원본</a><a href="../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#책임과-조건">책임과 조건</a></li>
+<li><a href="#전이">전이</a></li>
+<li><a href="#구현과-검증-근거">구현과 검증 근거</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>공통 Outbox 발행 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 560" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="업무 트랜잭션" data-target="미발행 행"><title>업무 트랜잭션 → 미발행 행: EventOutbox로 메시지 원문과 eventId를 같은 트랜잭션에 저장한다. 롤백되면 함께 취소된다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="미발행 행" data-target="전송 시도"><title>미발행 행 → 전송 시도: 커밋 후 빠른 경로 또는 주기 relay가 선택한다. claim 모드는 token·lease를 확인한다.</title><path class="connector" d="M725,77 L780,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="72.0">2</text></g><g class="edge-row" data-source="전송 시도" data-target="발행 표시"><title>전송 시도 → 발행 표시: Kafka ACK 이후 published_at을 기록한다. claim 모드는 아직 유효한 권한의 결과만 쓴다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">3</text></g><g class="edge-row" data-source="전송 시도" data-target="재시도 대기"><title>전송 시도 → 재시도 대기: 실패 횟수·오류를 저장한다. claim 모드는 다음 시각·lease 해제를 반영한다.</title><path class="connector" d="M940,120 L565,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="157.5">4</text></g><g class="edge-row" data-source="재시도 대기" data-target="전송 시도"><title>재시도 대기 → 전송 시도: 예약 실행과 조건을 만족한 행을 다시 선택한다.</title><path class="connector" d="M565,205 L940,120" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="157.5">5</text></g><g class="edge-row" data-source="ACK 이후 중단" data-target="중복 전달 가능"><title>ACK 이후 중단 → 중복 전달 가능: 브로커 성공 뒤 DB 표시 전에 중단되면 재전송될 수 있다. 소비자는 eventId·버전 조건으로 중복을 처리해야 한다.</title><path class="connector" d="M940,290 L190,375" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="327.5">6</text></g><g><title>업무 트랜잭션</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">업무 트랜잭션</tspan></text></g><g><title>미발행 행</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">미발행 행</tspan></text></g><g><title>전송 시도</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">전송 시도</tspan></text></g><g><title>발행 표시</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">발행 표시</tspan></text></g><g><title>재시도 대기</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">재시도 대기</tspan></text></g><g><title>ACK 이후 중단</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">ACK 이후 중단</tspan></text></g><g><title>중복 전달 가능</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">중복 전달 가능</tspan></text></g></svg></div></section><p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
+<p><a href="outbox.html">시각 자료</a></p>
+<h2 id="책임과-조건">책임과 조건</h2>
+<p>업무 변경과 Outbox 삽입은 소유 서비스의 같은 DB 트랜잭션에 참여한다. 공통 모듈은 독립 DB를 소유하지 않는다. 기본 relay와 선택적인 DB claim 모드를 구분하며 스키마·설정이 준비된 서비스에서만 claim을 사용한다.</p>
+<h2 id="전이">전이</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·부수 효과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>업무 트랜잭션</td>
+<td>미발행 행</td>
+<td>EventOutbox로 메시지 원문과 eventId를 같은 트랜잭션에 저장한다. 롤백되면 함께 취소된다.</td>
+</tr>
+<tr>
+<td>미발행 행</td>
+<td>전송 시도</td>
+<td>커밋 후 빠른 경로 또는 주기 relay가 선택한다. claim 모드는 token·lease를 확인한다.</td>
+</tr>
+<tr>
+<td>전송 시도</td>
+<td>발행 표시</td>
+<td>Kafka ACK 이후 published_at을 기록한다. claim 모드는 아직 유효한 권한의 결과만 쓴다.</td>
+</tr>
+<tr>
+<td>전송 시도</td>
+<td>재시도 대기</td>
+<td>실패 횟수·오류를 저장한다. claim 모드는 다음 시각·lease 해제를 반영한다.</td>
+</tr>
+<tr>
+<td>재시도 대기</td>
+<td>전송 시도</td>
+<td>예약 실행과 조건을 만족한 행을 다시 선택한다.</td>
+</tr>
+<tr>
+<td>ACK 이후 중단</td>
+<td>중복 전달 가능</td>
+<td>브로커 성공 뒤 DB 표시 전에 중단되면 재전송될 수 있다. 소비자는 eventId·버전 조건으로 중복을 처리해야 한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="구현과-검증-근거">구현과 검증 근거</h2>
+<ul>
+<li><a href="../../../../common-module/src/main/java/com/shoppinglive/common/outbox/EventOutbox.java">EventOutbox.java</a></li>
+<li><a href="../../../../common-module/src/main/java/com/shoppinglive/common/outbox/OutboxRelay.java">OutboxRelay.java</a></li>
+<li><a href="../../../../common-module/src/main/java/com/shoppinglive/common/outbox/OutboxLeaseStore.java">OutboxLeaseStore.java</a></li>
+<li><a href="../../../../common-module/src/main/java/com/shoppinglive/common/outbox/OutboxMessage.java">OutboxMessage.java</a></li>
+</ul>
+<p><a href="../../../../common-module/src/test/java/com/shoppinglive/common/outbox/OutboxRelayTest.java">OutboxRelayTest.java</a> · <a href="../../../../common-module/src/integrationTest/java/com/shoppinglive/common/outbox/OutboxTransactionIntegrationTest.java">OutboxTransactionIntegrationTest.java</a></p>
+<p>이번 작업은 코드 대조다. ACK·소비 반영·운영 장애 복구를 새로 실행한 증거는 없다.</p><p class="muted fingerprint">MD SHA-256: <code>5b10e4c74d19fa6c4025a2f21ebec55f8df1d93c4e5da6d5cff6b40479f951ae</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

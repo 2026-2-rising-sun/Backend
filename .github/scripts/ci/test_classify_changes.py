@@ -5,17 +5,41 @@ import unittest
 
 from classify_changes import Change, classify, comments_only, diff_changes, event_plan
 
-JAVA = "services/commerce-service/src/main/java/example/Example.java"
+JAVA = "services/commercecore-service/src/main/java/example/Example.java"
 CONTROLLER = b'@RestController class Example { @GetMapping("/orders") void get() {} }'
 
 
 class ClassificationTests(unittest.TestCase):
+    def test_only_document_ignore_rules_can_avoid_full_build(self):
+        """기존 문서 제외 규칙 해제는 도구 검사, 그 밖의 규칙 변경은 전체 검사다."""
+        before = b'build/\n# old\ndocs/**/*.md\nservices/*/docs/**/*.md\n'
+        after = b'build/\n# new\n'
+        plan = classify([Change('.gitignore', before, after)])
+        self.assertEqual(plan['gradle_tasks'], [])
+        self.assertTrue(plan['harness'])
+        self.assertTrue(plan['classifier'])
+        for change in [Change('.gitignore', before, after + b'*.java\n'),
+                       Change('.gitignore', before, after + b'!docs/**/*.md\n'),
+                       Change('.gitignore', before, after, False),
+                       Change('.gitignore', None, after)]:
+            self.assertEqual(classify([change])['gradle_tasks'], ['build'])
+
     def test_documents_do_not_build_or_test(self):
         plan = classify([Change(path, b"old", b"new") for path in
                          ("README.md", "AGENTS.md", "docs/notes.txt", "docs/ci.md")])
         self.assertEqual(plan["gradle_tasks"], [])
         self.assertFalse(plan["api"])
         self.assertFalse(plan["run_tests"])
+
+    def test_plan_fragments_move_without_selecting_application_build(self):
+        """계획의 YAML·패치 이동은 문서이며 실제 계약·실행 설정은 기존 검사를 유지한다."""
+        for path in ('docs/exec-plans/active/333/api-changes.yaml',
+                     'docs/worklog/plans/active/333/api-changes.yaml',
+                     'docs/worklog/plans/active/332/compat.patch'):
+            for change in (Change(path, b'old', None), Change(path, None, b'new')):
+                self.assertEqual(classify([change])['gradle_tasks'], [])
+        self.assertTrue(classify([Change('contracts/api/commercecore-service.yaml', b'old', b'new')])['api'])
+        self.assertTrue(classify([Change('services/member-service/src/main/resources/application.yml', b'old', b'new')])['run_tests'])
 
     def test_runtime_resources_are_not_skipped_as_documentation(self):
         for path in ("services/member-service/src/main/resources/README.md",
@@ -30,7 +54,7 @@ class ClassificationTests(unittest.TestCase):
                       b'class Example {\n int a = 1;\n} '):
             with self.subTest(after=after):
                 plan = classify([Change(JAVA, before, after)])
-                self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:spotlessCheck"])
+                self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:spotlessCheck"])
                 self.assertFalse(plan["run_tests"])
                 self.assertFalse(plan["api"])
 
@@ -49,7 +73,7 @@ class ClassificationTests(unittest.TestCase):
         for before, after in pairs:
             with self.subTest(after=after):
                 plan = classify([Change(JAVA, before, after)])
-                self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+                self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_added_deleted_and_mode_changed_java_are_not_comment_only(self):
         for change in (Change(JAVA, None, b"//new"), Change(JAVA, b"//old", None),
@@ -64,13 +88,13 @@ class ClassificationTests(unittest.TestCase):
             Change("services/live-service/src/test/java/Example.java", b'class Example {}',
                    b'// comment\nclass Example {}'),
         ])
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build",
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build",
                          ":services:member-service:build", ":services:live-service:spotlessCheck"])
 
     def test_same_module_format_is_covered_by_build(self):
         plan = classify([Change(JAVA, b'class Example {}', b'// comment\nclass Example {}'),
-                         Change("services/commerce-service/build.gradle.kts", b"a", b"b")])
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+                         Change("services/commercecore-service/build.gradle.kts", b"a", b"b")])
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_common_comments_only_format_but_code_changes_build_everything(self):
         path = "common-module/src/main/java/Example.java"
@@ -128,12 +152,12 @@ class ClassificationTests(unittest.TestCase):
         self.assertTrue(event_plan(Path("."), "unknown", {})["run_tests"])
 
     def test_migration_add_modify_delete_only_selects_changed_service(self):
-        path = "services/commerce-service/src/main/resources/db/migration/V99__example.sql"
+        path = "services/commercecore-service/src/main/resources/db/migration/V99__example.sql"
         for before, after in ((None, b"CREATE TABLE example(id bigint)"),
                               (b"old", b"new"), (b"old", None)):
             with self.subTest(before=before, after=after):
                 plan = classify([Change(path, before, after)])
-                self.assertEqual(plan["migration_tasks"], [":services:commerce-service:migrationTest"])
+                self.assertEqual(plan["migration_tasks"], [":services:commercecore-service:migrationTest"])
                 self.assertEqual(plan["redis_tasks"], [])
 
     def test_unrelated_service_code_does_not_start_external_services(self):
@@ -156,7 +180,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertFalse(plan["run_tests"])
 
     def test_event_checks_follow_producer_builds_and_shared_changes(self):
-        for service in ("commerce-service", "live-service"):
+        for service in ("commercecore-service", "live-service"):
             plan = classify([Change("services/" + service + "/src/main/java/Example.java",
                                     b'class Example {}', b'class Example { int value; }')])
             self.assertTrue(plan["events"])
@@ -190,7 +214,7 @@ class ClassificationTests(unittest.TestCase):
                       b'class Cache {StringRedisTemplate redis;}'):
             for old, new in ((before, after), (after, before)):
                 self.assertEqual(classify([Change(path, old, new)])["redis_tasks"], [":services:member-service:redisTest"])
-        # Spring caching may use a non-Redis backend.
+        # Spring 캐시는 Redis 이외의 저장소를 사용할 수 있다.
         self.assertEqual(classify([Change(path, before, b'@Cacheable("x") class Cache {}')])["redis_tasks"], [])
 
     def test_non_redis_cache_configuration_does_not_select_redis(self):
@@ -239,7 +263,7 @@ class GitDiffTests(unittest.TestCase):
         (self.root / old_path).unlink()
         head = self.commit(JAVA, "class Example {}")
         plan = classify(diff_changes(self.root, base, head))
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build",
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build",
                                               ":services:member-service:build"])
 
     def test_push_uses_before_after_and_new_branch_falls_back(self):
@@ -253,7 +277,7 @@ class GitDiffTests(unittest.TestCase):
         base = self.commit("README.md", "old")
         self.commit(JAVA, "class Example {}")
         plan = event_plan(self.root, "pull_request", {"pull_request": {"base": {"sha": base}}})
-        self.assertEqual(plan["gradle_tasks"], [":services:commerce-service:build"])
+        self.assertEqual(plan["gradle_tasks"], [":services:commercecore-service:build"])
 
     def test_file_permission_change_is_not_skipped(self):
         base = self.commit(JAVA, "class Example {}")
@@ -273,7 +297,8 @@ class GitDiffTests(unittest.TestCase):
 class HarnessSelectionTests(unittest.TestCase):
     def test_runner_changes_select_harness_tests_without_build(self):
         """실행기 변경은 자체 검사만 선택하고 업무 빌드를 요구하지 않는다."""
-        for path in ("harness/verify.py", "harness/test_verify.py"):
+        for path in ("scripts/verify.py", "scripts/test_verify.py", "scripts/check_docs.py",
+                     "scripts/test_check_docs.py", "scripts/check.sh", "scripts/check-docs.sh"):
             with self.subTest(path=path):
                 plan = classify([Change(path, None, b"code")])
                 self.assertTrue(plan["harness"])
@@ -282,7 +307,7 @@ class HarnessSelectionTests(unittest.TestCase):
 
     def test_harness_documents_do_not_select_runner_tests(self):
         """같은 폴더의 지침 변경은 문서로 분류하고 실행기 검사를 추가하지 않는다."""
-        plan = classify([Change("harness/README.md", b"old", b"new")])
+        plan = classify([Change("docs/README.md", b"old", b"new")])
         self.assertFalse(plan["harness"])
         self.assertEqual(plan["gradle_tasks"], [])
 
@@ -294,7 +319,65 @@ class HarnessSelectionTests(unittest.TestCase):
         step = next(s for s in ci["jobs"]["build"]["steps"]
                     if s.get("name") == "Check local verification runner")
         self.assertIn("outputs.harness == 'true'", step["if"])
-        self.assertIn("unittest discover -s harness", step["run"])
+        self.assertIn("unittest discover -s scripts", step["run"])
+
+    def test_html_assets_are_documents_but_runtime_html_is_built(self):
+        """설명용 HTML·그림은 문서이며 실행 리소스는 빌드한다."""
+        for path in ("docs/design-docs/harness-map.html", "docs/assets/map.svg"):
+            with self.subTest(path=path):
+                plan = classify([Change(path, None, b"content")])
+                self.assertEqual(plan["gradle_tasks"], [])
+        plan = classify([Change("services/member-service/src/main/resources/page.html", None, b"content")])
+        self.assertTrue(plan["run_tests"])
+
+    def test_ci_always_checks_document_links_even_for_code_deletions(self):
+        """코드 삭제로 문서 참조가 깨져도 CI 문서 점검을 생략하지 않는다."""
+        import yaml
+        root = Path(__file__).resolve().parents[3]
+        ci = yaml.safe_load((root / ".github/workflows/ci.yml").read_text())
+        for command in ("python scripts/check_docs.py", "python scripts/render_api_docs.py --check",
+                        "python scripts/render_design_docs.py --check"):
+            step = next(s for s in ci["jobs"]["build"]["steps"] if s.get("run") == command)
+            self.assertNotIn("if", step)
+
+
+class ServiceBoundaryTests(unittest.TestCase):
+    def test_split_services_select_postgres_business_tests(self):
+        """분리된 서비스의 업무 변경은 PostgreSQL 전용 회귀도 선택한다."""
+        for service in ("catalog-service", "commercecore-service", "payment-service", "live-service"):
+            with self.subTest(service=service):
+                plan = classify([Change(f"services/{service}/src/main/java/Example.java", None, b"class Example {}")])
+                self.assertEqual(plan["gradle_tasks"], [f":services:{service}:build"])
+                self.assertEqual(plan["postgres_tasks"], [f":services:{service}:postgresTest"])
+                self.assertTrue(plan["event_samples"])
+
+    def test_core_only_database_checks_provision_payment_fixture_database(self):
+        """Core만 검사해도 독립 Payment fixture DB를 준비하고 Payment 업무 검사는 추가하지 않는다."""
+        for path in (JAVA, "services/commercecore-service/src/main/resources/db/migration/V99__example.sql"):
+            plan = classify([Change(path, None, b"new")])
+            self.assertEqual(plan["database_services"], ["commercecore-service", "payment-service"])
+            self.assertEqual(plan["postgres_tasks"], [":services:commercecore-service:postgresTest"])
+            self.assertNotIn(":services:payment-service:build", plan["gradle_tasks"])
+
+    def test_other_service_does_not_provision_core_fixture_database(self):
+        """다른 서비스 단독 검사는 Core용 독립 DB를 준비하지 않는다."""
+        plan = classify([Change("services/catalog-service/src/main/java/Example.java", None, b"class Example {}")])
+        self.assertEqual(plan["database_services"], ["catalog-service"])
+
+    def test_payment_isolated_migration_directory_selects_migration_tests(self):
+        """Payment 전용 Flyway 경로의 추가·수정·삭제도 마이그레이션 검사를 선택한다."""
+        path = "services/payment-service/src/main/resources/db/payment-migration/V3__outbox_worker_claim.sql"
+        for before, after in ((None, b"CREATE TABLE example(id bigint)"),
+                              (b"old", b"new"), (b"old", None)):
+            with self.subTest(before=before, after=after):
+                plan = classify([Change(path, before, after)])
+                self.assertEqual(plan["migration_tasks"], [":services:payment-service:migrationTest"])
+                self.assertEqual(plan["postgres_tasks"], [":services:payment-service:postgresTest"])
+
+    def test_comment_only_change_does_not_select_postgres(self):
+        """주석만 바뀌면 외부 DB를 시작하지 않는다."""
+        plan = classify([Change(JAVA, b"class A {}", "// 설명\nclass A {}".encode())])
+        self.assertEqual(plan["postgres_tasks"], [])
 
 
 class WorkflowTests(unittest.TestCase):
@@ -322,9 +405,9 @@ class WorkflowTests(unittest.TestCase):
         steps = ci["jobs"]["build"]["steps"]
         for step in steps:
             if "docker run" in step.get("run", ""):
-                self.assertTrue("migration_tasks != '[]'" in step["if"] or "redis_tasks != '[]'" in step["if"])
+                self.assertTrue("migration_tasks != '[]'" in step["if"] or "postgres_tasks != '[]'" in step["if"] or "redis_tasks != '[]'" in step["if"])
         ordinary = next(i for i, s in enumerate(steps) if s.get("name") == "Run selected Gradle work")
-        postgres = next(i for i, s in enumerate(steps) if s.get("name") == "Start PostgreSQL only for migration checks")
+        postgres = next(i for i, s in enumerate(steps) if s.get("name") == "Start PostgreSQL only for selected database checks")
         self.assertLess(ordinary, postgres)
 
 

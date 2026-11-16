@@ -55,10 +55,10 @@ public abstract class MemberAuthTestSupport {
         properties.add("member.auth.private-key-location", () -> PRIVATE_KEY.toUri().toString());
         properties.add("member.auth.key-id", TOKENS::keyId);
         properties.add(
-                "shoppinglive.security.service-tokens.shopping",
+                "shoppinglive.security.service-tokens.catalog",
                 () -> "test-shopping-member-credential-0123456789");
         properties.add(
-                "shoppinglive.security.service-tokens.commerce",
+                "shoppinglive.security.service-tokens.commercecore",
                 () -> "test-commerce-member-credential-0123456789");
         properties.add(
                 "shoppinglive.security.service-tokens.live",

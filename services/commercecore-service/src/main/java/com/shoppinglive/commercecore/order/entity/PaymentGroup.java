@@ -1,0 +1,222 @@
+package com.shoppinglive.commercecore.order.entity;
+
+import com.shoppinglive.common.persistence.BaseEntity;
+import jakarta.persistence.*;
+import java.time.Instant;
+
+@Entity
+@Table(
+        name = "payment_group",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"member_id", "request_key"}))
+public class PaymentGroup extends BaseEntity {
+    @Column(name = "group_number", nullable = false, unique = true, length = 64)
+    private String groupNumber;
+
+    @Column(name = "member_id", nullable = false, length = 36)
+    private String memberId;
+
+    @Column(name = "request_key", nullable = false, length = 64)
+    private String requestKey;
+
+    @Column(name = "fingerprint", nullable = false, length = 64)
+    private String fingerprint;
+
+    @Column(name = "total_amount", nullable = false)
+    private Long totalAmount;
+
+    @Column(name = "discount_amount", nullable = false)
+    private Long discountAmount;
+
+    @Column(name = "payable_amount", nullable = false)
+    private Long payableAmount;
+
+    @Column(name = "coupon_id", length = 36)
+    private String couponId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private OrderStatus status;
+
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
+
+    @Column(name = "processing_expires_at")
+    private Instant processingExpiresAt;
+
+    @Column(name = "payment_id")
+    private Long paymentId;
+
+    @Column(name = "policy_version", nullable = false, columnDefinition = "SMALLINT DEFAULT 0")
+    private short policyVersion;
+
+    @Column(name = "failure_reason", length = 32)
+    private String failureReason;
+
+    @Version private Long version;
+
+    @Column(name = "coupon_order_item_id")
+    private Long couponOrderItemId;
+
+    public Long getCouponOrderItemId() {
+        return couponOrderItemId;
+    }
+
+    public void selectCoupon(String couponId, Long itemId, long discount) {
+        if (!isOrderSheet()
+                || status != OrderStatus.PENDING_PAYMENT
+                || paymentId != null
+                || discount < 0
+                || discount > totalAmount)
+            throw new IllegalStateException("결제 요청 전 주문서에서만 쿠폰을 선택할 수 있습니다.");
+        this.couponId = couponId;
+        this.couponOrderItemId = itemId;
+        this.discountAmount = discount;
+        this.payableAmount = totalAmount - discount;
+    }
+
+    public boolean usesLegacyExecution() {
+        return policyVersion == 0;
+    }
+
+    public boolean isOrderSheet() {
+        return policyVersion == 1;
+    }
+
+    public void useOrderSheetPolicy() {
+        policyVersion = 1;
+    }
+
+    public void failOrderSheet() {
+        status = OrderStatus.FAILED;
+        failureReason = "PAYMENT_FAILED";
+    }
+
+    public void expireOrderSheet() {
+        status = OrderStatus.EXPIRED;
+        failureReason = "EXPIRED";
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    protected PaymentGroup() {}
+
+    public PaymentGroup(
+            String number,
+            String member,
+            String key,
+            String fingerprint,
+            long total,
+            Instant expires) {
+        this(number, member, key, fingerprint, total, expires, 0L, null);
+    }
+
+    public PaymentGroup(
+            String number,
+            String member,
+            String key,
+            String fingerprint,
+            long total,
+            Instant expires,
+            long discount) {
+        this(number, member, key, fingerprint, total, expires, discount, null);
+    }
+
+    public PaymentGroup(
+            String number,
+            String member,
+            String key,
+            String fingerprint,
+            long total,
+            Instant expires,
+            long discount,
+            String couponId) {
+        if (total <= 0 || discount < 0 || discount > total) {
+            throw new IllegalArgumentException("결제 묶음 금액이 올바르지 않습니다.");
+        }
+        this.groupNumber = number;
+        this.memberId = member;
+        this.requestKey = key;
+        this.fingerprint = fingerprint;
+        this.totalAmount = total;
+        this.discountAmount = discount;
+        this.payableAmount = total - discount;
+        this.couponId = couponId;
+        this.expiresAt = expires;
+        this.status = OrderStatus.PENDING_PAYMENT;
+    }
+
+    public String getGroupNumber() {
+        return groupNumber;
+    }
+
+    public String getMemberId() {
+        return memberId;
+    }
+
+    public String getRequestKey() {
+        return requestKey;
+    }
+
+    public String getFingerprint() {
+        return fingerprint;
+    }
+
+    public Long getTotalAmount() {
+        return totalAmount;
+    }
+
+    public Long getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public Long getPayableAmount() {
+        return payableAmount;
+    }
+
+    public String getCouponId() {
+        return couponId;
+    }
+
+    public OrderStatus getStatus() {
+        return status;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public Instant getProcessingExpiresAt() {
+        return processingExpiresAt;
+    }
+
+    public Instant paymentDeadline() {
+        return status == OrderStatus.PAYMENT_CONFIRMING ? processingExpiresAt : expiresAt;
+    }
+
+    public boolean paymentDeadlineReached(Instant now) {
+        Instant deadline = paymentDeadline();
+        return deadline != null && !deadline.isAfter(now);
+    }
+
+    /** 승인 실행을 처음 접수할 때만 처리 기한을 정한다. 생성 기한은 바꾸지 않는다. */
+    public void beginProcessing(Instant now) {
+        if (status != OrderStatus.PENDING_PAYMENT || !expiresAt.isAfter(now))
+            throw new IllegalStateException("결제를 시작할 수 없는 주문입니다.");
+        processingExpiresAt = now.plusSeconds(600);
+        status = OrderStatus.PAYMENT_CONFIRMING;
+    }
+
+    public Long getPaymentId() {
+        return paymentId;
+    }
+
+    public void transition(OrderStatus next) {
+        status = next;
+    }
+
+    public void setPaymentId(Long id) {
+        paymentId = id;
+    }
+}

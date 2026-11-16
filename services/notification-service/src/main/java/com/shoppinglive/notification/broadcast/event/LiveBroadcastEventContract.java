@@ -3,7 +3,7 @@ package com.shoppinglive.notification.broadcast.event;
 /**
  * Live 방송 이벤트 계약 중 알림이 쓰는 부분의 사본.
  *
- * <p>서비스끼리는 코드를 의존하지 않으므로(모듈 경계) 소비자도 계약을 따로 들고 있는다. Shopping 이 판매정보 계약 사본을 들고 있는 것과 같은 방식이다. 발행 측이
+ * <p>서비스끼리는 코드를 의존하지 않으므로(모듈 경계) 소비자도 계약을 따로 들고 있는다. Catalog 이 판매정보 계약 사본을 들고 있는 것과 같은 방식이다. 발행 측이
  * 바뀌면 이 사본과 {@link LiveBroadcastEventMessage} 의 검증이 깨지면서 드러난다.
  *
  * <p>방송 단위 이벤트는 모두 한 토픽에 들어오고 {@code eventType} 으로 구분한다. 그래서 <b>모르는 eventType 은 무시</b>해야 한다 — 이벤트

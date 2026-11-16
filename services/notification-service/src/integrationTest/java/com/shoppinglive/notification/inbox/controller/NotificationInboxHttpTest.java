@@ -24,6 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.datasource.url=${NOTIFICATION_TEST_POSTGRES_URL:jdbc:h2:mem:notification_inbox;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}",
         })
@@ -33,6 +34,7 @@ class NotificationInboxHttpTest extends NotificationSecuritySupport {
 
     private static final Instant BASE = Instant.parse("2026-10-12T00:00:00Z");
 
+    @Autowired org.springframework.boot.test.web.client.TestRestTemplate http;
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired NotificationRepository notifications;
@@ -146,6 +148,118 @@ class NotificationInboxHttpTest extends NotificationSecuritySupport {
     @DisplayName("로그인하지 않으면 알림함에 접근할 수 없다")
     void inboxRequiresLogin() throws Exception {
         mvc.perform(get("/v1/notifications")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("전체 읽음은 미조회·후속 페이지까지 처리하고 다른 회원과 기존 읽음 시각을 보존한다")
+    void readAllCoversUnloadedPagesAndPreservesExistingReads() throws Exception {
+        markRead(myOldest);
+        var existing = notifications.findById(myOldest).orElseThrow();
+        Instant readAt = existing.getReadAt();
+        Instant updatedAt = existing.getUpdatedAt();
+        for (int index = 0; index < 25; index++) {
+            save(JwtTestTokens.MEMBER_A, BASE.plusSeconds(200 + index));
+        }
+        JsonNode first = list("?size=20");
+        assertThat(first.path("hasNext").asBoolean()).isTrue();
+        assertThat(unreadCount()).isEqualTo(27);
+
+        readAll(userBearer());
+        assertThat(unreadCount()).isZero();
+        JsonNode next = list("?size=20&cursor=" + first.path("nextCursor").asText());
+        assertThat(next.path("items")).hasSize(8);
+        next.path("items").forEach(item -> assertThat(item.path("readAt").isNull()).isFalse());
+        var afterFirst = notifications.findAll();
+        readAll(userBearer());
+        for (var before : afterFirst) {
+            var after = notifications.findById(before.getId()).orElseThrow();
+            assertThat(after.getReadAt()).isEqualTo(before.getReadAt());
+            assertThat(after.getUpdatedAt()).isEqualTo(before.getUpdatedAt());
+        }
+        var preserved = notifications.findById(myOldest).orElseThrow();
+        assertThat(preserved.getReadAt()).isEqualTo(readAt);
+        assertThat(preserved.getUpdatedAt()).isEqualTo(updatedAt);
+        assertThat(notifications.findById(othersNotification).orElseThrow().getReadAt()).isNull();
+
+        save(JwtTestTokens.MEMBER_A, BASE.plusSeconds(500));
+        assertThat(unreadCount()).isEqualTo(1);
+        readAll(userBearer());
+        assertThat(unreadCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("알림이 없는 판매자도 전체 읽음을 반복할 수 있다")
+    void emptySellerInboxIsIdempotent() throws Exception {
+        String seller = "Bearer " + TOKENS.token(JwtTestTokens.SELLER, java.util.Set.of("SELLER"));
+        readAll(seller);
+        readAll(seller);
+        assertThat(unreadCount()).isEqualTo(3);
+        assertThat(notifications.findById(othersNotification).orElseThrow().getReadAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("전체 읽음은 무토큰·잘못된 토큰과 허용되지 않은 역할을 거부한다")
+    void readAllRequiresValidUserOrSeller() throws Exception {
+        mvc.perform(post("/v1/notifications/read-all")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/v1/notifications/read-all").header("Authorization", "Bearer invalid"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(
+                        post("/v1/notifications/read-all")
+                                .header(
+                                        "Authorization",
+                                        "Bearer "
+                                                + TOKENS.token(
+                                                        JwtTestTokens.MEMBER_A,
+                                                        java.util.Set.of("ADMIN"))))
+                .andExpect(status().isUnauthorized());
+        assertThat(unreadCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("동시 전체 읽음은 각 행을 한 번만 갱신하고 최초 쓰기 시각을 보존한다")
+    void concurrentReadAllUpdatesOnlyOnce() throws Exception {
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var writes = new java.util.ArrayList<java.util.concurrent.Future<Integer>>();
+            for (int index = 0; index < 2; index++) {
+                var at = BASE.plusSeconds(300 + index);
+                writes.add(
+                        pool.submit(
+                                () -> {
+                                    start.await();
+                                    return new org.springframework.transaction.support
+                                                    .TransactionTemplate(transactions)
+                                            .execute(
+                                                    ignored ->
+                                                            notifications.markAllReadIfUnread(
+                                                                    JwtTestTokens.MEMBER_A, at));
+                                }));
+            }
+            start.countDown();
+            int first = writes.get(0).get(10, java.util.concurrent.TimeUnit.SECONDS);
+            int second = writes.get(1).get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(java.util.List.of(first, second)).containsExactlyInAnyOrder(3, 0);
+            assertThat(notifications.findById(myOldest).orElseThrow().getReadAt())
+                    .isEqualTo(BASE.plusSeconds(first == 3 ? 300 : 301));
+            assertThat(notifications.findById(othersNotification).orElseThrow().getReadAt())
+                    .isNull();
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private void readAll(String bearer) {
+        var headers = new org.springframework.http.HttpHeaders();
+        headers.set("Authorization", bearer);
+        var response =
+                http.exchange(
+                        "/v1/notifications/read-all",
+                        org.springframework.http.HttpMethod.POST,
+                        new org.springframework.http.HttpEntity<Void>(headers),
+                        String.class);
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(response.getBody()).isNull();
     }
 
     /** 이벤트 ID 는 알림마다 다르다 — 같은 시각 2건을 만들려면 유일 제약을 피해야 한다. */

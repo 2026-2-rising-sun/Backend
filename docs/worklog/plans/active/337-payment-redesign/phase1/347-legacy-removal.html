@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#347 기존 Mock 결제 코드 제거</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="347-legacy-removal.md">MD 원본</a><a href="../../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#개요">개요</a></li>
+<li><a href="#범위">범위</a></li>
+<li><a href="#삭제-목록-2026-11-15-dev-기준">삭제 목록 (2026-11-15 dev 기준)</a></li>
+<li><a href="#남길-것">남길 것</a></li>
+<li><a href="#계약">계약</a></li>
+<li><a href="#343에-따라-바뀌는-것">#343에 따라 바뀌는 것</a></li>
+<li><a href="#테스트">테스트</a></li>
+<li><a href="#바뀌는-점">바뀌는 점</a></li>
+<li><a href="#문서-갱신">문서 갱신</a></li>
+<li><a href="#pr-나누기">PR 나누기</a></li>
+<li><a href="#미결정">미결정</a></li>
+<li><a href="#참고">참고</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#347 기존 Mock 결제 코드 제거</h1><p>상태: 설계 확정(2026-11-15) · #343을 기다리지 않는다. #343이 먼저 병합되면 아래 표대로 바꾼다
+이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a></p>
+<h2 id="개요">개요</h2>
+<p>끝나면 payment-service에 <strong>기존 Mock 결제·환불 코드와 그 API가 없고</strong>, 서비스는 컨트롤러 없이 기동한다. 새 코드(#348 이후)가 이름·경로·테이블에서 옛 코드와 섞이지 않게 하는 것이 목적이다. 기존 테이블은 이 PR에서 지우지 않는다. 테이블은 #348의 V4가 지운다(마이그레이션 번호를 하나로 모으기 위해).</p>
+<h2 id="범위">범위</h2>
+<p>요구사항 ID 없음(삭제 작업). 근거: <a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> "기존 구현과 호환을 맞추지 않고 교체한다".</p>
+<p>하지 않는 것: CommerceCore 결제 모듈(Phase 2), DB 테이블 삭제(#348 V4), 이벤트 계약 YAML 교체(#338).</p>
+<h2 id="삭제-목록-2026-11-15-dev-기준">삭제 목록 (2026-11-15 <code>dev</code> 기준)</h2>
+<p>경로 접두: <code>services/payment-service/src/</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>파일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>컨트롤러</td>
+<td><code>main/java/com/shoppinglive/payment/controller/InternalPaymentController.java</code>, <code>PaymentScenarioController.java</code></td>
+</tr>
+<tr>
+<td>DTO</td>
+<td><code>main/java/com/shoppinglive/payment/dto/</code> 전체(<code>DevPaymentScenarioRegistry</code>, <code>MockRefundResult</code>, <code>PaymentCommand</code>, <code>PaymentExecution</code>, <code>RefundCommand</code>, <code>RefundExecution</code>)</td>
+</tr>
+<tr>
+<td>엔티티</td>
+<td><code>main/java/com/shoppinglive/payment/entity/</code> 전체(<code>MockPaymentResultUnknownException</code>, <code>MockRefundOutcome</code>, <code>PaymentAttempt</code>, <code>PaymentScenario</code>, <code>PaymentStatus</code>, <code>RefundStatus</code>)</td>
+</tr>
+<tr>
+<td>예외</td>
+<td><code>main/java/com/shoppinglive/payment/exception/MockRefundResultUnknownException.java</code></td>
+</tr>
+<tr>
+<td>리포지토리</td>
+<td><code>main/java/com/shoppinglive/payment/repository/PaymentAttemptJpaRepository.java</code></td>
+</tr>
+<tr>
+<td>서비스</td>
+<td><code>main/java/com/shoppinglive/payment/service/</code> 전체(Mock 엔진·게이트웨이, 결과 발행, 재시도 정책, 복구 저장소, 환불 접수·실행·결과, reconciler 등 17개)</td>
+</tr>
+<tr>
+<td>관측</td>
+<td><code>main/java/com/shoppinglive/payment/observability/</code> 전체(<code>PaymentObservabilityConfiguration</code>, <code>PaymentObservation</code>, <code>PendingWorkMetrics</code> — 옛 테이블을 센다)</td>
+</tr>
+<tr>
+<td>지원</td>
+<td><code>main/java/com/shoppinglive/payment/support/AfterCommit.java</code>(옛 서비스 2곳만 사용)</td>
+</tr>
+<tr>
+<td>단위 테스트</td>
+<td><code>test/java/com/shoppinglive/payment/service/</code> 전체 4개</td>
+</tr>
+<tr>
+<td>통합 테스트</td>
+<td><code>integrationTest/java/com/shoppinglive/payment/service/</code> 전체 5개</td>
+</tr>
+<tr>
+<td>설정</td>
+<td><code>application.yml</code>의 <code>payment.refunds.execution-enabled</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="남길-것">남길 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>이 PR에서 바꾸는 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PaymentServiceApplication.java</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>config/PaymentSecurityConfiguration.java</code></td>
+<td>허용 목록을 비운다. <code>/v1/internal/**</code>는 모두 <code>denyAll</code>(#348에서 새 경로를 연다). 서비스 토큰 필터·probe 체인은 유지</td>
+</tr>
+<tr>
+<td><code>config/PaymentExceptionHandler.java</code></td>
+<td>없음(#348이 <code>PaymentError</code> 처리를 더한다)</td>
+</tr>
+<tr>
+<td><code>integrationTest/.../PaymentSecurityIntegrationTest.java</code></td>
+<td>다시 쓴다: 토큰 없음 401, 토큰 있어도 <code>/v1/internal/payments</code> 403, <code>/actuator/health/liveness</code>·<code>/actuator/health/readiness</code> 200(기존 probe 검사 유지)</td>
+</tr>
+<tr>
+<td><code>db/payment-migration/V1–V3</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>application.yml</code>의 datasource·kafka·flyway·outbox 설정</td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>build.gradle.kts</code></td>
+<td><code>resilience4j-spring-boot3</code>(지금도 쓰는 곳 없음)와 <code>spring-boot-starter-aop</code>(지우는 <code>PaymentObservation</code>만 씀) 두 줄을 지운다. 새 설계의 재호출은 1번뿐이라 라이브러리가 필요 없다</td>
+</tr>
+</tbody>
+</table></div>
+<p>기동 확인을 위해 컨텍스트 로드 테스트 1개(<code>PaymentServiceContextTest</code>)를 둔다. <code>ddl-auto: validate</code>는 엔티티가 없으므로 통과한다.</p>
+<h2 id="계약">계약</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>이 PR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>contracts/api/payment-service.yaml</code></td>
+<td><code>paths: {}</code>로 비운다(검사기는 <code>paths</code> 키만 요구한다). <code>components</code>는 #348이 다시 쓴다</td>
+</tr>
+<tr>
+<td><code>docs/design-docs/services/payment/api.html</code></td>
+<td><code>scripts/render-api-docs.sh</code>로 재생성</td>
+</tr>
+<tr>
+<td><code>contracts/events/payment-execution-results.yaml</code></td>
+<td><strong>그대로 둔다.</strong> 발행 코드는 지우지만 CommerceCore 소비자가 아직 쓴다. 교체는 #338 PR5</td>
+</tr>
+<tr>
+<td><code>contracts/events/payment-refund-results.yaml</code></td>
+<td>그대로 둔다. 교체는 Phase 3</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="343에-따라-바뀌는-것">#343에 따라 바뀌는 것</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#343 결과</th>
+<th>이 설계</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Payment 부분을 빼고 병합(요청한 안)</td>
+<td>위 목록 그대로</td>
+</tr>
+<tr>
+<td>Payment 부분을 넣은 채 먼저 병합</td>
+<td>삭제 목록에 <code>dto/OrderClosureCommand</code>, <code>order-closure</code> 엔드포인트, 관련 테스트를 더한다. 그 PR의 <code>V4__order_closure_compensation.sql</code>이 먼저 들어가므로 <strong>#348의 마이그레이션을 <code>V5__payment_core.sql</code>로 바꾸고</strong>, 맨 앞 DROP에 <code>payment_order_control</code>을 더한다</td>
+</tr>
+<tr>
+<td>아직 열려 있음</td>
+<td><strong>기다리지 않고 진행한다</strong>(2026-11-15 사용자 결정). 충돌은 #343이 맞춘다</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="테스트">테스트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>확인</th>
+<th>방법</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>컨트롤러 없이 기동</td>
+<td><code>PaymentServiceContextTest</code></td>
+</tr>
+<tr>
+<td>보안 체인 유지</td>
+<td><code>PaymentSecurityIntegrationTest</code>(다시 씀)</td>
+</tr>
+<tr>
+<td>전체 검사</td>
+<td><code>scripts/check.sh --base origin/dev</code>. CommerceCore 테스트가 깨지면 그 부분만 남기고 PR 본문에 적는다</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="바뀌는-점">바뀌는 점</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>유지</th>
+<th>없어짐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>코드</td>
+<td>애플리케이션, 보안·예외 설정</td>
+<td>Mock 결제·환불 전체, 관측 지표</td>
+</tr>
+<tr>
+<td>API</td>
+<td>—</td>
+<td><code>/v1/internal/payments*</code>, <code>/refunds*</code>, <code>/payment-scenarios/*</code> 전부</td>
+</tr>
+<tr>
+<td>DB</td>
+<td>테이블 그대로(지우는 것은 #348)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>이벤트</td>
+<td>계약 YAML 그대로</td>
+<td><code>PaymentExecutionResolved</code> 발행 코드</td>
+</tr>
+<tr>
+<td>운영</td>
+<td>—</td>
+<td><strong>이 PR 병합부터 Phase 2가 끝날 때까지 통합 환경의 결제가 동작하지 않는다.</strong> CommerceCore의 결제 호출은 403을 받는다</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="문서-갱신">문서 갱신</h2>
+<ul>
+<li><code>docs/design-docs/services/payment/README.md</code> "현재 코드" 절: Mock 코드 삭제 사실과 이 PR 링크</li>
+<li><code>erd.md</code>·<code>states/payment.md</code>·<code>states/refund.md</code>: "교체 예정" 표시를 "코드 삭제됨, 테이블은 #348 V4에서 삭제" 로 바꾸고 HTML 재생성</li>
+<li><code>design-docs/order-payment.md</code>·<code>refund.md</code>, <code>requirements/order-payment.md</code>: Payment 쪽 설명에 같은 표시</li>
+</ul>
+<h2 id="pr-나누기">PR 나누기</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>PR</th>
+<th>base</th>
+<th>브랜치</th>
+<th>크기</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR0 기존 코드 삭제</td>
+<td><code>dev</code></td>
+<td><code>refactor/#347-payment-legacy-removal</code></td>
+<td>XL 가능(삭제 줄). PR 본문에 이유 한 줄</td>
+</tr>
+</tbody>
+</table></div>
+<p>PR0이 #347을 <code>Closes</code>한다.</p>
+<h2 id="미결정">미결정</h2>
+<p>결정(2026-11-15, 사용자 동의): 쓰지 않는 의존성 두 줄은 이 PR에서 지운다.</p>
+<h2 id="참고">참고</h2>
+<p><a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/343#issuecomment-6892067416">#343 조율 댓글</a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>0cdb3b2652aeb3eec056f04ddd7cb0e6610d2ce179cfc9988383c27b6e62b184</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

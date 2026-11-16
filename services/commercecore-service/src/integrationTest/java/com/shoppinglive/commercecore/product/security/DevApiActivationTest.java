@@ -1,0 +1,50 @@
+package com.shoppinglive.commercecore.product.security;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+
+import com.shoppinglive.commercecore.product.controller.DevProductImageController;
+import com.shoppinglive.commercecore.product.repository.ProductImageRepository;
+import com.shoppinglive.commercecore.product.service.DevImageResetService;
+import com.shoppinglive.commercecore.storage.ImageStorage;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+
+class DevApiActivationTest {
+    private ApplicationContextRunner context(String... profiles) {
+        return new ApplicationContextRunner()
+                .withInitializer(context -> context.getEnvironment().setActiveProfiles(profiles))
+                .withUserConfiguration(DevProductImageController.class, DevImageResetService.class)
+                .withBean(ProductImageRepository.class, () -> mock(ProductImageRepository.class))
+                .withBean(ImageStorage.class, () -> mock(ImageStorage.class));
+    }
+
+    @DisplayName("local·test에서도 명시적 플래그가 필요하고 dev 설정으로 우회할 수 없다")
+    @Test
+    void localOrTestAlsoRequiresExplicitFlagAndDevCannotOverrideIt() {
+        for (String profile : new String[] {"local", "test"}) {
+            context(profile)
+                    .run(
+                            context ->
+                                    assertThat(context)
+                                            .doesNotHaveBean(DevProductImageController.class));
+            context(profile)
+                    .withPropertyValues("commercecore.dev-api.enabled=true")
+                    .run(
+                            context ->
+                                    assertThat(context)
+                                            .hasSingleBean(DevProductImageController.class));
+        }
+        for (String[] profiles :
+                new String[][] {{"dev"}, {"prod"}, {"local", "dev"}, {"test", "prod"}}) {
+            context(profiles)
+                    .withPropertyValues("commercecore.dev-api.enabled=true")
+                    .run(
+                            context ->
+                                    assertThat(context)
+                                            .doesNotHaveBean(DevProductImageController.class)
+                                            .doesNotHaveBean(DevImageResetService.class));
+        }
+    }
+}

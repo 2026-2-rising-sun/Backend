@@ -71,10 +71,7 @@ public class StreamRelay implements MessageListener {
                                     mapper.valueToTree(event.data()))));
         } catch (Exception e) {
             log.warn(
-                    "stream event not published: type={} broadcastId={} cause={}",
-                    event.name(),
-                    broadcastId,
-                    e.toString());
+                    "스트림 이벤트 발행 실패: 유형={} 방송 ID={} 원인={}", event.name(), broadcastId, e.toString());
         }
     }
 
@@ -90,7 +87,7 @@ public class StreamRelay implements MessageListener {
                 registry.publish(envelope.broadcastId(), event);
             }
         } catch (Exception e) {
-            log.warn("stream event ignored: cause={}", e.toString());
+            log.warn("스트림 이벤트 무시: 원인={}", e.toString());
         }
     }
 
@@ -106,11 +103,11 @@ public class StreamRelay implements MessageListener {
         try {
             container.start();
             subscribed = true;
-            log.info("stream relay subscribed");
+            log.info("스트림 중계 구독 완료");
         } catch (RuntimeException e) {
             // 실패한 start 가 container 를 "실행 중"으로 남기면 다음 start 가 아무것도 하지 않는다.
             container.stop();
-            log.warn("stream relay not subscribed, will retry: cause={}", e.toString());
+            log.warn("스트림 중계 구독 실패, 재시도 예정: 원인={}", e.toString());
         }
     }
 

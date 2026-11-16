@@ -30,11 +30,11 @@ public class PaymentExpiringSoonScheduler {
         try {
             int created = service.notifyExpiringSoon(Instant.now());
             if (created > 0) {
-                log.info("payment expiry alerts created count={}", created);
+                log.info("결제 만료 임박 알림 생성 완료: 생성 건수={}", created);
             }
         } catch (RuntimeException e) {
             // 던지면 다음 주기가 돌지 않는다. 한 주기가 실패해도 1분 뒤 다시 시도해야 한다.
-            log.error("payment expiry alert sweep failed", e);
+            log.error("결제 만료 임박 알림 일괄 처리 실패", e);
         }
     }
 }

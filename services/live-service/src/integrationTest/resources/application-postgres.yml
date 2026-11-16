@@ -9,8 +9,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:${LIVE_PG_PORT:55432}/live_test
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: test
+    username: ${LIVE_PG_USER:postgres}
+    password: ${LIVE_PG_PASSWORD:test}
   flyway:
     enabled: true
     clean-disabled: false

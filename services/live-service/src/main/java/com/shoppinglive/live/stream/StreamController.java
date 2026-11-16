@@ -61,7 +61,7 @@ public class StreamController {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiResponse<Void>> unexpected(final Exception e) {
-        log.error("stream could not start", e);
+        log.error("스트림 시작 실패", e);
         final ErrorCode code = ErrorCode.INTERNAL_ERROR;
         return ResponseEntity.status(code.status())
                 .contentType(MediaType.APPLICATION_JSON)

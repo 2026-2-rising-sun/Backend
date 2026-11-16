@@ -169,7 +169,7 @@ final class BroadcastConnection {
                 emitter.complete();
             } catch (RuntimeException e) {
                 // 재사용이 끝난 servlet 응답의 완료 실패가 다른 연결 정리를 막지 않게 한다.
-                log.debug("stream completion failed", e);
+                log.debug("스트림 종료 실패", e);
             }
         }
     }
