@@ -1,12 +1,27 @@
-# 설계 지도
+# 흐름과 서비스 설계
 
-- [하네스 동작](document-harness.md)
-- [모듈별 API·ERD·상태 문서](services/README.md)
-- [Product 모듈 상세·목표 관계](commercecore/product/README.md)
-- [주문·결제](order-payment.md) · [시각 자료](order-payment.html)
-- [환불](refund.md) · [시각 자료](refund.html)
-- [Catalog 사본 동기화](catalog-sync.md) · [시각 자료](catalog-sync.html)
-- [인증·세션 확인](authentication.md) · [시각 자료](authentication.html)
-- [방송·알림](live-notification.md) · [시각 자료](live-notification.html)
+## 서비스 간 흐름
 
-현재 설계는 구현 변경과 함께 갱신한다. 과거 결정은 [ADR](../adr/0001-document-harness.md), 실패는 [이관 사례](failures/330-stale-links.md)처럼 근거를 연결한다.
+| 주제 | 문서 |
+|---|---|
+| 주문 준비·결제 승인·만료·늦은 승인 | [주문·결제](flows/order-payment.md) |
+| 환불 접수·실행·결과 반영 | [환불](flows/refund.md) |
+| 상품·판매·쿠폰 조회 사본 | [Catalog 동기화](flows/catalog-sync.md) |
+| JWT·서버 세션 확인 | [인증](flows/authentication.md) |
+| 방송·채팅·알림 전달 | [방송·알림](flows/live-notification.md) |
+
+## 서비스별 설계
+
+| 서비스 | 책임과 문서 |
+|---|---|
+| [CommerceCore](services/commercecore/overview.md) | Product·SKU·Cart·Order·Coupon 원본과 모듈별 ERD·API |
+| [Payment](services/payment/overview.md) | 결제·환불 실행. 현재 Mock 구현과 재설계 목표 구분 |
+| [Catalog](services/catalog/overview.md) | 공개 조회 사본 |
+| [Member](services/member/overview.md) | 회원·인증·세션 |
+| [Live](services/live/overview.md) | 방송·채팅·실시간 전달 |
+| [Notification](services/notification/overview.md) | 알림·구독·조회 사본 |
+| [common-module](services/common-module/overview.md) | 인증·응답·감사·Outbox 공통 구현 |
+
+[제품 개요](overview.md) · [공통 용어](glossary.md) · [전체 서비스 경계](../../ARCHITECTURE.md) · [문서 관리 기준](../README.md)
+
+흐름은 서비스 간 연결, 모듈 문서는 해당 모듈의 데이터·업무 규칙을 설명한다. MD·HTML은 한 쌍으로 관리하며 결정 이유는 ADR, 실제 검증은 워크로그로 연결한다.

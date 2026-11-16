@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#331 Order 구현과 통합 검증</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="README.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#범위와-완료-조건">범위와 완료 조건</a></li>
+<li><a href="#사용자-확정과-기술-연결안">사용자 확정과 기술 연결안</a></li>
+<li><a href="#실제-소유-파일과-의존">실제 소유 파일과 의존</a></li>
+<li><a href="#계약실패-복구">계약·실패 복구</a></li>
+<li><a href="#의존-pr과-저장-상태">의존 PR과 저장 상태</a></li>
+<li><a href="#완료조건-검토와-결과">완료조건 검토와 결과</a></li>
+<li><a href="#별도-후속과-범위-한계">별도 후속과 범위 한계</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#331 Order 구현과 통합 검증</h1><p><strong>역사 기록:</strong> e08b8aea 보존 구현의 당시 범위/실행이다. 2026-11-15 Payment 담당경계 정정으로 현재 PR의 신규 금전·종료/보상·legacy600초 확대는 제외했다. <a href="../../active/331-order-audit-fixes/README.html">현재 보완 계획</a>의 미충족 원래 수용 기준을 따르며 전체설계완료·머지가능으로 읽지 않는다.
+상태: <strong>기존 범위 구현·검증 완료</strong>. 코드 기준 <code>840825635f370960679621a7aa9a8237fe27bffb</code>, Draft PR #343(base Cart). 사용자는 지금 기존 작업을 마무리하고 <a href="https://github.com/2026-2-rising-sun/Backend/issues/345">#345 동시 환불</a>·<a href="https://github.com/2026-2-rising-sun/Backend/issues/346">#346 결제 준비/실행 기한 분리</a>는 나중에 전용 작업 공간에서 진행하도록 요청했다. 두 후속은 사용자 요청으로 보류하며 이 계획의 완료를 정책 전체 승인·운영 검증·후속 구현 완료로 확대하지 않는다.</p>
+<p><a href="https://github.com/2026-2-rising-sun/Backend/issues/331">이슈 #331</a> · <a href="../../../../adr/0331-order-snapshot-lifecycle.html">ADR 0331</a> · <a href="../../../../design-docs/services/commercecore/order/overview.html">상세설계</a> · <a href="../../../../design-docs/services/commercecore/order/erd.html">ERD</a> · <a href="../../../../design-docs/services/commercecore/order/overview.html">상태</a> · <a href="../../../2026-11-13.html">워크로그</a> · <a href="verification.html">실제 검증 보고</a></p>
+<h2 id="범위와-완료-조건">범위와 완료 조건</h2>
+<ul>
+<li>주문서 생성 시 UUID 주문번호·SKU 항목·서버 가격 스냅샷·선점을 같은 DB 트랜잭션으로 저장한다.</li>
+<li>신규 주문의 원래 10분 기한, 결제/만료 경합, 늦은 성공 보상, 수량별 부분 환불·쿠폰 복원을 멱등 처리한다.</li>
+<li>기존 PK·물리명·주문번호·금액·Cart 출처·15분 기한과 policy_version=0 활성 구매를 보존한다. 가격·재고 원본은 SKU로 통일한다.</li>
+<li>코드·실제 DTO/API 계약·MD/HTML·마이그레이션·회귀가 일치하고 실행 결과를 기록한 뒤 독립 Order PR 한 개를 작성한다. dev 병합·배포는 범위 밖이다.</li>
+</ul>
+<h2 id="사용자-확정과-기술-연결안">사용자 확정과 기술 연결안</h2>
+<p>U1/U2/U3는 사용자 직접 합의다. 다만 미확정 환불1건·일반 환불off의 보상 예외는 직접 합의로 확인하지 못한 구현 선택이다. <a href="../../../../design-docs/services/commercecore/order/overview.html#9-직접-합의와-구분하는-구현-선택">현재 동작·영향·대안</a>을 숨기지 않으며 정책 전체 승인으로 표시하지 않는다. 변경 검토는 별도 후속 #345/#346에 연결해 사용자 요청으로 보류하며, 현재1건 환불 제한과 일반 환불off 보상 예외는 유지한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>결정</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사용자</td>
+<td>주문서 생성 요청에서 Pending와 선점, 서버 당시 가격 유지, 10분 만료 실패/해제, 늦은 성공으로 부활하지 않음</td>
+</tr>
+<tr>
+<td>사용자</td>
+<td>별도 예약 테이블 없이 Order 전이와 SKU available/reserved 변경을 같은 DB 트랜잭션에 적용</td>
+</tr>
+<tr>
+<td>사용자 U1</td>
+<td>환불액 <code>min(단가×이번 수량, 항목 실결제액−이전 성공 환불액)</code>. 4000×3/쿠폰2000은 순차4000/4000/2000, 두 개 일괄8000</td>
+</tr>
+<tr>
+<td>사용자 U2</td>
+<td>주문당 쿠폰 한 장·구매 항목 하나 적용. 누적 주문 전체 수량 환불 성공 시 한 번 복원, 원래 유효기간 유지</td>
+</tr>
+<tr>
+<td>사용자 U3</td>
+<td>결제 결과 대기 중 즉시 취소 제한 유지. 원래10분 기한은 유지</td>
+</tr>
+<tr>
+<td>기술 구현</td>
+<td>기존 payment_group/orders PK·테이블명 확장, 새 /v1/order-sheets와 policy_version=1 병행. 기존 저장 행은 버전0 호환, 신규 구 API는 버전2/10분</td>
+</tr>
+<tr>
+<td>기술 구현</td>
+<td>회원 구매 가드·주문 잠금으로 주문별 미확정 사용자 환불 한 건만 허용. 성공 수량/금액만 사용하며 실패 새 키 재시도 가능</td>
+</tr>
+<tr>
+<td>보류 범위</td>
+<td>옵션 JSON 제공·버전 계약, 공개 다중 SKU 대표가/합산재고 정책. 임의 옵션이나 Catalog 저장소를 만들지 않음</td>
+</tr>
+</tbody>
+</table></div>
+<p>외부 서비스가 같은 환불 알고리즘을 사용한다는 근거는 없다. <a href="refund-policy-research.html">공식 정책 조사 기록</a>은 대안 검토로 보존하며 사용자 결정을 바꾸지 않는다.</p>
+<h2 id="실제-소유-파일과-의존">실제 소유 파일과 의존</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>범위</th>
+<th>실제 파일/원본</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>새 주문·수량 환불</td>
+<td><code>services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/</code>의 OrderSheetController/RefundController·DTO·Service/Lifecycle/RefundService·OrderTimeSource</td>
+</tr>
+<tr>
+<td>기존 소비자 전환</td>
+<td>OrderCreation/Checkout/PaymentGroupCheckout/Lifecycle/Outcome·OrderService/ExpirationScheduler와 LegacyOrderSkuService. Sales 저장소 직접 의존 제거, 신규 구 API 주문도 SKU 참조·상품 스냅샷 저장</td>
+</tr>
+<tr>
+<td>Order 물리 이행</td>
+<td>Core <code>db/migration/V104__order_sheets_and_closure.sql</code>, payment_group/orders/refund_request/refund_target_order/order_payment_closure 및 member_coupon 사용 출처</td>
+</tr>
+<tr>
+<td>최소 Payment 연계</td>
+<td>Core OrderClosureDeliveryService/PaymentDeliveryStore/Dispatcher/ResultHandler·RefundOutcome, 독립 Payment OrderClosureService·제어키/호출 시작/환불 실행 필터</td>
+</tr>
+<tr>
+<td>독립 Payment 이행</td>
+<td><code>services/payment-service/src/main/resources/db/payment-migration/V4__order_closure_compensation.sql</code></td>
+</tr>
+<tr>
+<td>계약 최종 통합</td>
+<td><code>contracts/api/commercecore-service.yaml</code>, 최소 <code>payment-service.yaml</code>. Product 승인 API는 Product 원본 커밋을 merge해 보존, Cart CRUD 조각 통합</td>
+</tr>
+<tr>
+<td>문서</td>
+<td>이 폴더·ADR0331·Order 상세 MD/HTML·현재 서비스 문서/생성 HTML·워크로그</td>
+</tr>
+</tbody>
+</table></div>
+<p>실제 포트는 ProductTradingService.lockForNewOrder(Collection<Long>) → ProductTradeSnapshot, SkuService.lockForOrder/findBySkuIds/findByProductId 및 reserve/consume/release/restock, CartSelectionPort.lockOwned/lockForCompletion/deletePurchased를 사용한다. DTO를 복제하지 않는다. 최종 Cart 선택 DTO는 itemId/skuId/productId/quantity/version이다.</p>
+<p>잠금은 신규 생성에서 회원 가드 → Cart 출처 → Product 전체 ID순 공유 잠금 → SKU 전체 ID순 쓰기 잠금이다. 완료/해제는 주문 상태를 직렬화하고 SKU ID순으로 수량을 처리한다. 환불은 주문/환불 기록 잠금 → 성공 수량·금액 → SKU 복구 → 마지막 전량 쿠폰 복원을 같은 트랜잭션에 적용한다. 외부 HTTP는 잠금 트랜잭션 커밋 뒤 호출한다.</p>
+<p>구 productId API는 상품의 SKU가 하나일 때 지원한다. 0개는404, 여러 개는409로 새 주문서 경로를 안내한다. Sales 이력이 없는 신규 SKU도 지원하며 새 구 API 주문은 SKU 참조와 상품 스냅샷을 기록한다. 과거 Sales 참조/FK는 그대로 유지한다. 가격·재고는 SKU에서만 읽는다. Cart 옵션 SKU가 기본 SKU와 다르면 409로 새 주문서 경로를 안내하며 임의 기본 SKU로 주문하지 않는다. 이미 생성된 버전0 주문의 완료/해제/환불에는 현재 판매허용을 요구하지 않는다.</p>
+<h2 id="계약실패-복구">계약·실패 복구</h2>
+<p><a href="payment-closure-contract.html">Payment 종료/보상 계약</a>을 구현했다. 종료 의도는 만료/선점 해제와 같은 Core 트랜잭션에 저장한다. Payment는 paymentId+원 paymentRequestId의 영속 제어키로 생성·종료·호출 시작을 직렬화한다. 이미 호출된 UNKNOWN은 실패로 단정하거나 새 승인 호출로 바꾸지 않는다. 늦은 SUCCESS 보상은 일반 환불 flag가 off여도 검증된 종료 보상만 실행·복구한다. 보상 결과는 SKU·Cart·쿠폰 효과를 재적용하지 않는다.</p>
+<p>실제 HTTP 검사에서 서비스 인증 경로 누락403과 기본 RestClient의 숫자 Instant 직렬화400을 발견했다. 정확한 SERVICE_commercecore matcher를 추가하고 Core DTO의 Instant에 STRING 직렬화를 지정했다. 수신 Instant/ISO 검증은 유지한다. 일반 사용자 Bearer만으로 이 API를 허용하지 않는다.</p>
+<h2 id="의존-pr과-저장-상태">의존 PR과 저장 상태</h2>
+<p>순서는 Product #333 → SKU #334 → Cart #332 → Order #331이다. PR base도 dev → Product 브랜치 → SKU 브랜치 → Cart 브랜치 순서다. 검증된 정확 SHA를 일반 merge하여 ancestry를 보존하고 cherry-pick/rebase/force push는 하지 않는다. 공통 문서 각 모듈 기록을 보존한다.</p>
+<p>최종 통합은 <code>ddf4d083</code>(Order <code>0f59e17c</code> + Cart <code>6f9dda99</code>)이며 Product/SKU/Cart ancestry를 보존했다. 전체 통합 검증은 <code>a68c31da</code>, 모든 신규 주문10분 후속을 포함한 코드 HEAD는 <code>84082563</code>이다. 기존 구현 완료와 별도 후속 보류를 구분한다.</p>
+<h2 id="완료조건-검토와-결과">완료조건 검토와 결과</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>기존 완료조건</th>
+<th>실제 충족 근거</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>주문서 스냅샷·SKU 선점의 원자적 저장</td>
+<td>주문서 PostgreSQL16건과 전체Core 회귀 성공. 실패·롤백·멱등/경합 검증 유지</td>
+</tr>
+<tr>
+<td>10분·만료/결제 경합·늦은 성공·부분수량 환불·쿠폰 복원</td>
+<td>전체통합 보상8건/주문서16건과 후속 신규기한14건. 생성5경로·기존15분 보존·599/600초·UNKNOWN/실제HTTP 늦은 성공 포함</td>
+</tr>
+<tr>
+<td>기존 PK/물리명/번호/금액/Cart 출처/저장기한 보존·SKU 원본 통합</td>
+<td>Core 이행23건의 V1042건, 구API PostgreSQL7건 및 신규기한의 기존행 보존 검사</td>
+</tr>
+<tr>
+<td>구현·계약·MD/HTML·이행/회귀 일치 및 Order PR</td>
+<td>공통 Core/Payment 최소 계약·생성 HTML 검사, PR343 Draft와 정확 코드HEAD CI43591454215 SUCCESS</td>
+</tr>
+</tbody>
+</table></div>
+<p>기존 범위에서 미충족으로 남은 완료조건은 없다. <a href="verification.html">검증 보고</a>의 실행 시점·스킵·한계를 유지하며 이 계획을 completed로 이동한다. <code>a68c31da</code> 전체 하네스1362건 실패/오류/스킵0(외부Kafka2 실제 실행), <code>84082563</code> Core/Payment 후속740건 실패0·오류0·외부Kafka2스킵(실제PG 업무/이행246건·신규기한14건 스킵0)은 서로 다른 기존 실행이다. 이번 마무리는 문서만 변경하며 서비스 검사를 새로 실행한 수치로 쓰지 않는다.</p>
+<h2 id="별도-후속과-범위-한계">별도 후속과 범위 한계</h2>
+<p><a href="https://github.com/2026-2-rising-sun/Backend/issues/345">#345 동시 환불</a>·<a href="https://github.com/2026-2-rising-sun/Backend/issues/346">#346 결제 준비/실행 기한 분리</a>는 사용자 요청으로 나중에 전용 작업 공간에서 진행한다. 현재 주문별 미확정 환불1건 제한·일반 환불off의 검증된 보상 예외는 그대로이며, off 중 PROCESSING 접수가 추가 환불을 막을 수 있고 기전달 요청은 flag로 취소되지 않는 경계도 유지한다. 후속의 새 환불/상태 모델이나 기한 기본값을 현재 구현 또는 확정 정책으로 채택하지 않는다.</p>
+<p>옵션 JSON 공급·공개 다중SKU/대표가·가격순은 보류 범위다. 실제 PG 제공자·Redis·AWS·운영 배포·별도 배포된 Catalog 소비자/DB 종단은 미검증이며 dev 병합·배포는 하지 않았다. PR은 Draft를 유지하고 기존 범위 완료와 정책 전체 승인·운영 검증을 구분한다.</p><p class="muted fingerprint">MD SHA-256: <code>53c839f714e4aad32215ad15411facad353df0ec1b2bbb18ebfa133fd5137d0f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

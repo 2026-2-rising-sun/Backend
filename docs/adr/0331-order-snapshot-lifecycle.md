@@ -2,7 +2,7 @@
 
 결정 상태: 핵심 정책 및 후속 U2/U3 채택. U1도 단가 우선/남은 실결제액 상한으로 채택됐다. 물리 PK/테이블명 보존 확장안은 구현 착수 지시에서 채택됐다.
 
-구현 상태: Payment 담당범위 정정·독립 결함 보완 검증 중. 원래 설계 미충족·머지 불가. [실행 계획](../exec-plans/completed/331-order-module/README.md) · [상세설계](../design-docs/commercecore/order/설계.md) · [기록](../worklog/2026-11-13.md#331-order-설계-통합-검토-준비)
+구현 상태: Payment 담당범위 정정·독립 결함 보완 검증 중. 원래 설계 미충족·머지 불가. [실행 계획](../worklog/plans/completed/331-order-module/README.md) · [상세설계](../design-docs/services/commercecore/order/overview.md) · [기록](../worklog/2026-11-13.md#331-order-설계-통합-검토-준비)
 
 아래 2026-11-14까지의 정책·구현 설명은 당시 기록이며 현재 PR의 제공 범위는 마지막 후속 정정과 현재 계획을 따른다.
 
@@ -47,7 +47,7 @@ Order #331은 사용자 환불 범위·업무 적용과 주문 경계를 맡고 
 
 사용자는 이전 비례배분 제안을 거절하고 4,000원×3개/쿠폰2,000원/실결제10,000원에서 순차 4,000·4,000·2,000원과 마지막 전량 성공 시 쿠폰 복원을 확정했다. 일반식은 `min(주문 단가×이번 수량, 항목 실결제액−이전 성공 환불액)`이다. 잔여 환불액이 0이어도 성공 수량·재고·전량 여부를 처리한다. 다른 주문항목이 남아 있으면 쿠폰을 복원하지 않으며 원래 유효기간을 유지한다.
 
-[코디네이터의 공식 정책 조사 기록](../exec-plans/completed/331-order-module/refund-policy-research.md)을 보존했다. 확인한 외부 정책의 범위·한계는 사용자 결정과 다르며 같은 알고리즘을 사용한다고 주장하지 않는다.
+[코디네이터의 공식 정책 조사 기록](../worklog/plans/completed/331-order-module/refund-policy-research.md)을 보존했다. 확인한 외부 정책의 범위·한계는 사용자 결정과 다르며 같은 알고리즘을 사용한다고 주장하지 않는다.
 
 ## 2026-11-14 후속 사용자 확정: 모든 신규 주문10분
 
@@ -70,7 +70,7 @@ Payment 추가 변경과 종속 Core 연동은 사용자 범위 정정에 따라
 
 ## 2026-11-15 최신 기한 요구와 미구현
 
-사용자 직접 확정은 PENDING 생성부터600초, 실제 실행 진입부터 PAYMENT_PROCESSING 별도600초다. 준비데이터 생성/재전송으로 실행기한을 시작·연장하지 않는다. PROCESSING 만료가 PG실패확정·즉시해제 승인은 아니며 UNKNOWN의 종료/조회/보상계약은 별도 정의가 필요하다. 내부PENDING600초 외 새상태/실행타이머·공개금전연동·legacy기한확대는 현재 미충족이다. [현재계획](../exec-plans/active/331-order-audit-fixes/README.md) · [CommerceCore측인계](../exec-plans/active/331-order-audit-fixes/payment-handoff.md). 기존시스템을넘어Payment를수정하지않고전체설계완료/머지가능으로표시하지않는다.
+사용자 직접 확정은 PENDING 생성부터600초, 실제 실행 진입부터 PAYMENT_PROCESSING 별도600초다. 준비데이터 생성/재전송으로 실행기한을 시작·연장하지 않는다. PROCESSING 만료가 PG실패확정·즉시해제 승인은 아니며 UNKNOWN의 종료/조회/보상계약은 별도 정의가 필요하다. 내부PENDING600초 외 새상태/실행타이머·공개금전연동·legacy기한확대는 현재 미충족이다. [현재계획](../worklog/plans/active/331-order-audit-fixes/README.md) · [CommerceCore측인계](../worklog/plans/active/331-order-audit-fixes/payment-handoff.md). 기존시스템을넘어Payment를수정하지않고전체설계완료/머지가능으로표시하지않는다.
 
 ## 2026-11-16 별도 처리 기한과 Commerce 소유 경계
 
@@ -85,7 +85,7 @@ Payment 추가 변경과 종속 Core 연동은 사용자 범위 정정에 따라
 - Core HTTP 전달 기록의 생성/재시도도 due 조회와 같은 DB시각을 쓴다. JVM시각을 섞지 않는다.
 - V105는 컬럼과 Core 환불 필요 테이블만 추가한다. 기존 확인중 정책0/1/2의 시작시각을 추측하거나 타이머를 소급 적용하지 않는다. 해당 행의 운영 이행과 이미 다른 V104를 적용한 환경의 체크섬 문제는 미완이다.
 
-[현재 작업·계약 조사](../exec-plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 결과](../worklog/2026-11-16.md)
+[현재 작업·계약 조사](../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 결과](../worklog/2026-11-16.md)
 
 ## 2026-11-16 팀원 계약의 Commerce 중계 구현
 
@@ -95,4 +95,4 @@ PREPARE/APPROVAL 영속 원문을 기존 HTTP 전달표에 저장하고 legacy �
 
 사용자600/600·확정 실패 FAILED를 적용한다. 팀원 목표의 Commerce T+3분/거절 후 PENDING 복귀 제안은 채택하지 않는다. Payment CREATED expiresAt은 원래 준비 기한이며 APPROVING/UNKNOWN 실패 기한이 아니다. 주문 만료 후에도 미확정 결제는 조회하고 실패를 추정하지 않는다.
 
-앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. [현재 범위](../exec-plans/active/331-order-audit-fixes/processing-deadline.md).
+앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. [현재 범위](../worklog/plans/active/331-order-audit-fixes/processing-deadline.md).

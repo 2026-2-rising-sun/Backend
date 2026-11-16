@@ -141,10 +141,26 @@ def check_documents(root, paths, tracked=None):
                         anchor_cache[path] = anchors(path)
                     if fragment not in anchor_cache[path]:
                         errors.append(f"{relative}: 앵커 없음: {url}")
-            if relative.startswith("docs/requirements/") and source.name != "README.md":
+            if source.suffix == ".md" and source.name != "README.md" and (relative.startswith("docs/requirements/") or "/requirements/" in relative or relative == "docs/worklog/archive/330-document-harness/requirements.md"):
                 errors.extend(f"{relative}: {error}" for error in check_requirement(root, source, prose(text)))
         except (OSError, UnicodeError, ValueError) as error:
             errors.append(f"{relative}: {error}")
+    return errors
+
+
+def check_pairs(root, paths):
+    """문서의 MD·HTML 짝과 허용한 소유 경로를 확인한다."""
+    errors = []
+    for relative in sorted(paths):
+        path = Path(relative)
+        managed = relative == 'docs/README.md' or relative == 'docs/README.html' or any(relative.startswith('docs/' + folder + '/') for folder in ('design-docs', 'adr', 'worklog'))
+        if relative.startswith(('docs/design-docs/commercecore/', 'docs/exec-plans/')):
+            errors.append(f'{relative}: 이전 문서 경로입니다. 서비스·워크로그 경로를 사용하세요.')
+        if not managed or path.suffix not in ('.md', '.html'):
+            continue
+        partner = root / path.with_suffix('.html' if path.suffix == '.md' else '.md')
+        if not partner.is_file():
+            errors.append(f'{relative}: MD/HTML 짝 없음: {partner.relative_to(root)}')
     return errors
 
 
@@ -159,7 +175,7 @@ def main(argv=None):
         tracked = {path for path in output.decode().split("\0") if path and (root / path).is_file()}
         paths = {path for path in tracked if Path(path).suffix.lower() in {".md", ".html"}
                  and "/src/" not in path}
-        errors = check_documents(root, paths, tracked)
+        errors = check_documents(root, paths, tracked) + check_pairs(root, paths)
     except (OSError, subprocess.CalledProcessError, UnicodeError) as error:
         print(f"문서 점검 준비 실패: {error}")
         return 1

@@ -10,7 +10,7 @@
 
 HttpPaymentRelayClientTest에서 생성 원문 전체와 판매자 2건을 엄격히 비교한다. checkout 재발급·주문 참조 조회·승인200을 추가하고 202·422·트랜잭션 중 HTTP 금지 검증은 유지했다. 조회의 64비트 ID·금액, UNKNOWN·APPROVING·APPROVED·CANCELED와 승인 시각을 확인한다. 구형 Mock의 raw 실행 응답은 새 준비 성공으로 읽지 않는 경계를 보호한다.
 
-[결제 전달 문서](../design-docs/services/commercecore/states/payment.md)에 두 계약의 구분, 필드·경로 대응, 별도 연결 주소와 토큰 설정, 팀원 PR #352–#359 의존성을 추가했다. HTML은 저장소의 scripts/render_design_docs.py로 생성한다. 운영 Java·DB·API/이벤트 원본과 팀원 Payment 구현은 변경하지 않는다. 취소 전달 #360과 일반 환불은 별도다.
+[결제 전달 문서](../design-docs/services/commercecore/order/overview.md#새-payment와-기존-mock의-계약-구분)에 두 계약의 구분, 필드·경로 대응, 별도 연결 주소와 토큰 설정, 팀원 PR #352–#359 의존성을 추가했다. HTML은 저장소의 scripts/render_design_docs.py로 생성한다. 운영 Java·DB·API/이벤트 원본과 팀원 Payment 구현은 변경하지 않는다. 취소 전달 #360과 일반 환불은 별도다.
 
 ## 실제 검증
 
