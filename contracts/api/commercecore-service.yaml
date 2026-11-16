@@ -794,7 +794,7 @@ paths:
       tags: ["Orders"]
       summary: "주문 가능 여부와 최신 금액 확인"
       operationId: "previewOrder"
-      description: "구 productId 호환 API이며 SKU가 하나인 상품만 지원한다. Sales 이력 없는 SKU도 허용하고 SKU 없음404·복수SKU409이며 신규 SKU 주문서 공개 경로는 후속이다. 재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
+      description: "구 productId 호환 API이며 SKU가 하나인 상품만 지원한다. Sales 이력 없는 SKU도 허용하고 SKU 없음404·복수SKU409이며 응답 skuId는 LegacyOrderSkuService가 단일 SKU를 실제 조회한 식별자다. 기존 salesId 호환 필드는 유지하며 상품/판매정보 ID와의 동일성을 추정하지 않는다. 이 skuId와 할인후 payableAmount를 새 order-sheets 입력에 사용한다. 재고·쿠폰 예약 없음. couponId가 있으면 회원 보유·사용 가능 기간 및 상품 대상 여부를 서버에서 검증한다. 쿠폰 적용 대상 상품을 주문할 수 없는 경우도 409. 주문 생성 때 가격·판매·재고를 다시 검사한다. 곱셈 overflow는 400."
       parameters: [{"name": "productId", "in": "query", "required": true, "schema": {"type": "integer", "format": "int64", "minimum": 1}}, {"name": "quantity", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[1-9][0-9]{0,8}$"}}, {"name": "couponId", "in": "query", "required": false, "schema": {"type": "string", "maxLength": 64}}]
       x-required-roles: ["USER", "SELLER"]
       responses:
@@ -804,9 +804,9 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/OrderCheckout"}
               examples:
-                normal: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
-                couponApplied: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": "33333333-3333-4333-8333-333333333334", "discountAmount": 5000, "payableAmount": 25000}}
-                soldOut: {"value": {"productId": 1, "salesId": 1, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 0, "salesStatus": "SOLD_OUT", "orderable": false, "reason": "SOLD_OUT", "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
+                normal: {"value": {"productId": 1, "salesId": 501, "skuId": 501, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
+                couponApplied: {"value": {"productId": 1, "salesId": 501, "skuId": 501, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 10, "salesStatus": "ON_SALE", "orderable": true, "reason": null, "couponId": "33333333-3333-4333-8333-333333333334", "discountAmount": 5000, "payableAmount": 25000}}
+                soldOut: {"value": {"productId": 1, "salesId": 501, "skuId": 501, "productName": "가을 니트", "unitPrice": 15000, "quantity": 2, "totalAmount": 30000, "available": 0, "salesStatus": "SOLD_OUT", "orderable": false, "reason": "SOLD_OUT", "couponId": null, "discountAmount": 0, "payableAmount": 30000}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -1759,6 +1759,19 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /v1/order-sheets/active:
+    get:
+      tags: [Orders]
+      operationId: getActiveRelayOrderSheet
+      summary: 본인의 유효한 새 활성 주문서 복구
+      description: 새 Payment 연결이 있는 PENDING/PROCESSING 주문을 반환한다. 기한 도달은 같은 잠금 경로에서 만료·해제한 뒤 없으면204다. legacy 활성 조회는 별도다. 이전 policy1/2 미연결 진행중 주문은 없음으로 숨기지 않고409로 보고하며 새 주문 자동 생성·재승인하지 않는다. 조회는 Payment HTTP를 실행하지 않고 기한을 연장하지 않는다.
+      x-required-roles: [USER, SELLER]
+      responses:
+        '200': {description: 본인 새 활성 주문서, content: {application/json: {schema: {$ref: '#/components/schemas/RelayOrderView'}}}}
+        '204': {description: 새 활성 주문서 없음. legacy active도 별도로 확인해야 한다.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
   /v1/order-sheets/{number}:
     get:
@@ -3068,10 +3081,11 @@ components:
         totalPages: {"type": "integer", "format": "int64", "minimum": 0}
     OrderCheckout:
       type: "object"
-      required: ["productId", "salesId", "productName", "unitPrice", "quantity", "totalAmount", "available", "salesStatus", "orderable", "reason", "discountAmount", "payableAmount"]
+      required: ["productId", "salesId", "skuId", "productName", "unitPrice", "quantity", "totalAmount", "available", "salesStatus", "orderable", "reason", "discountAmount", "payableAmount"]
       properties:
         productId: {"type": "integer", "format": "int64", "minimum": 1}
-        salesId: {"type": "integer", "format": "int64", "minimum": 1}
+        salesId: {"type": "integer", "format": "int64", "minimum": 1, "description": "기존 호환 이름. 신규 호출자는 명시적 skuId 사용"}
+        skuId: {"type": "integer", "format": "int64", "minimum": 1, "description": "단일 SKU 실제 조회 결과. productId/과거 Sales ID에서 추정하지 않음"}
         productName: {"type": "string"}
         unitPrice: {"type": "integer", "format": "int64", "minimum": 1}
         quantity: {"type": "integer", "format": "int32", "minimum": 1, "maximum": 2147483647}

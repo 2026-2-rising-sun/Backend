@@ -36,6 +36,14 @@ public class OrderPaymentRelayController {
                 .body(service.view(user.memberId(), created.number()));
     }
 
+    @GetMapping("/active")
+    public ResponseEntity<PaymentRelayService.View> active(
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return service.active(user.memberId())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @GetMapping("/{number}")
     public PaymentRelayService.View get(
             @AuthenticationPrincipal AuthenticatedUser user, @PathVariable String number) {

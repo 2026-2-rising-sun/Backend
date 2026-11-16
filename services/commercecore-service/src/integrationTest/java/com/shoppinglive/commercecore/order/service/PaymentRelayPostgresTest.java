@@ -24,6 +24,7 @@ import org.springframework.web.client.ResourceAccessException;
 @SpringBootTest(
         properties = {
             "commerce.commission-rate=0.1250",
+            "commercecore.product.lookup.mode=local",
             "commercecore.payment-relay.recovery-enabled=false"
         })
 @AutoConfigureMockMvc
@@ -783,5 +784,136 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("APPROVED");
         assertThat(relay.state(MEMBER_A, number).refundStatus()).isEqualTo("REQUESTED");
         assertThat(available(501)).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("새 활성 주문은 JWT 본인만 복구하고 재조회해도 기한·전달 원문을 바꾸지 않는다")
+    void recoversOwnedActiveOrderWithoutRestartingPayment() throws Exception {
+        mvc.perform(get("/v1/order-sheets/active")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isNoContent());
+        String number = createRelay("active", false).number();
+        prepare(number);
+        var before = relay.state(MEMBER_A, number);
+        var delivery = accept(number);
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("order.orderNumber").value(number))
+                .andExpect(jsonPath("payment.orderStatus").value("PROCESSING"));
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_B)))
+                .andExpect(status().isNoContent());
+        assertThat(relay.state(MEMBER_A, number).expiresAt()).isEqualTo(before.expiresAt());
+        assertThat(deliveries.relay(id(number), "APPROVAL").requestId())
+                .isEqualTo(delivery.requestId());
+        verify(remote, never()).get(anyString());
+        verify(remote, never()).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("활성 조회의 정확 만료 경계는 선점·쿠폰을 한 번 해제하고 새 주문 없음으로 반환한다")
+    void activeReadExpiresAtBoundaryOnce() throws Exception {
+        String number = createRelay("active-expiry", true).number();
+        prepare(number);
+        accept(number);
+        expiry(number);
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isNoContent());
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("이전 미연결 진행중 내부 주문은 활성 없음으로 숨기지 않고 재정합 필요409를 반환한다")
+    void activeReadReportsUnlinkedHistoricalOrder() throws Exception {
+        var old = create(1);
+        mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isConflict());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM payment_delivery_request", Integer.class))
+                .isZero();
+        assertThat(groups.findById(groupId(old)).orElseThrow().getStatus().name())
+                .isEqualTo("PENDING_PAYMENT");
+        assertThat(reserved(501)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("구매자 단일 상품 견적은 실제 SKU를 명시하며 새 주문서가 가격·판매를 재검증한다")
+    void resolvesActualSingleSkuWithoutIdentityGuess() throws Exception {
+        mvc.perform(
+                        get("/v1/orders/checkout")
+                                .param("productId", "102")
+                                .param("quantity", "2")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("productId").value(102))
+                .andExpect(jsonPath("skuId").value(502))
+                .andExpect(jsonPath("salesId").value(502))
+                .andExpect(jsonPath("payableAmount").value(6000));
+        jdbc.update("UPDATE sku SET price=3500 WHERE id=502");
+        assertThatThrownBy(
+                        () ->
+                                relay.create(
+                                        MEMBER_A,
+                                        "stale-quote",
+                                        new RelayOrderRequest(
+                                                List.of(new CreateOrderSheetRequest.Item(502L, 2)),
+                                                null,
+                                                "구매자",
+                                                "01012345678",
+                                                6000L,
+                                                null,
+                                                null)))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+        assertThat(reserved(502)).isZero();
+        jdbc.update("UPDATE product SET sale_enabled=FALSE WHERE id=102");
+        mvc.perform(
+                        get("/v1/orders/checkout")
+                                .param("productId", "102")
+                                .param("quantity", "2")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("skuId").value(502))
+                .andExpect(jsonPath("orderable").value(false));
+        assertThatThrownBy(
+                        () ->
+                                relay.create(
+                                        MEMBER_A,
+                                        "stopped-quote",
+                                        new RelayOrderRequest(
+                                                List.of(new CreateOrderSheetRequest.Item(502L, 2)),
+                                                null,
+                                                "구매자",
+                                                "01012345678",
+                                                7000L,
+                                                null,
+                                                null)))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+        assertThat(reserved(502)).isZero();
+    }
+
+    @Test
+    @DisplayName("구매자 SKU 식별은 복수 SKU와 삭제 상품을 기존 정책대로 거절하고 선점하지 않는다")
+    void singleSkuLookupKeepsMultipleAndDeletedProductRules() throws Exception {
+        mvc.perform(
+                        get("/v1/orders/checkout")
+                                .param("productId", "101")
+                                .param("quantity", "1")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isConflict());
+        jdbc.update(
+                "UPDATE product SET sale_enabled=FALSE, deleted_at=CURRENT_TIMESTAMP WHERE id=102");
+        mvc.perform(
+                        get("/v1/orders/checkout")
+                                .param("productId", "102")
+                                .param("quantity", "1")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(status().isNotFound());
+        assertThat(reserved(501)).isZero();
+        assertThat(reserved(502)).isZero();
     }
 }

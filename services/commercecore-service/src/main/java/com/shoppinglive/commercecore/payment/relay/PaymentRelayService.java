@@ -399,32 +399,63 @@ public class PaymentRelayService {
                     var group = locked(found.getId());
                     lifecycle.expire(group.getId());
                     group = locked(group.getId());
-                    var binding = store.binding(group.getId());
-                    var prepare = deliveries.relay(group.getId(), "PREPARE");
-                    String status =
-                            binding.paymentId() == null && prepare != null && prepare.terminal()
-                                    ? "PREPARATION_FAILED"
-                                    : binding.status();
-                    var payment =
-                            new PaymentState(
-                                    number,
-                                    group.getStatus() == OrderStatus.PENDING_PAYMENT
-                                            ? "PENDING"
-                                            : group.getStatus() == OrderStatus.PAYMENT_CONFIRMING
-                                                    ? "PROCESSING"
-                                                    : group.getStatus().name(),
-                                    binding.paymentId(),
-                                    status,
-                                    binding.pgOrderId(),
-                                    group.getPayableAmount(),
-                                    group.getExpiresAt(),
-                                    group.getProcessingExpiresAt(),
-                                    store.refundStatus(group.getId()));
-                    return new View(
-                            OrderSheetResponse.from(
-                                    group, orders.findByPaymentGroupIdOrderByIdAsc(group.getId())),
-                            payment);
+                    return viewLocked(group);
                 });
+    }
+
+    public Optional<View> active(String member) {
+        guard.ensure(member);
+        return tx.execute(
+                t -> {
+                    guard.lock(member);
+                    View active = null;
+                    for (var found :
+                            groups.findByMemberIdAndStatusIn(
+                                    member,
+                                    List.of(
+                                            OrderStatus.PENDING_PAYMENT,
+                                            OrderStatus.PAYMENT_CONFIRMING))) {
+                        if (!found.isOrderSheet()) continue;
+                        var group = locked(found.getId());
+                        if (store.binding(group.getId()) == null)
+                            throw conflict("이전 주문의 결제 연동 상태를 먼저 확인해야 합니다.");
+                        lifecycle.expire(group.getId());
+                        group = locked(group.getId());
+                        if (group.getStatus() != OrderStatus.PENDING_PAYMENT
+                                && group.getStatus() != OrderStatus.PAYMENT_CONFIRMING) continue;
+                        if (active != null) throw conflict("진행 중인 주문이 여러 건입니다. 기존 주문을 확인해 주세요.");
+                        active = viewLocked(group);
+                    }
+                    return Optional.ofNullable(active);
+                });
+    }
+
+    private View viewLocked(PaymentGroup group) {
+        var binding = store.binding(group.getId());
+        var prepare = deliveries.relay(group.getId(), "PREPARE");
+        String status =
+                binding.paymentId() == null && prepare != null && prepare.terminal()
+                        ? "PREPARATION_FAILED"
+                        : binding.status();
+        var payment =
+                new PaymentState(
+                        group.getGroupNumber(),
+                        group.getStatus() == OrderStatus.PENDING_PAYMENT
+                                ? "PENDING"
+                                : group.getStatus() == OrderStatus.PAYMENT_CONFIRMING
+                                        ? "PROCESSING"
+                                        : group.getStatus().name(),
+                        binding.paymentId(),
+                        status,
+                        binding.pgOrderId(),
+                        group.getPayableAmount(),
+                        group.getExpiresAt(),
+                        group.getProcessingExpiresAt(),
+                        store.refundStatus(group.getId()));
+        return new View(
+                OrderSheetResponse.from(
+                        group, orders.findByPaymentGroupIdOrderByIdAsc(group.getId())),
+                payment);
     }
 
     public PaymentGroup deliveryGroup(PaymentDeliveryStore.Delivery delivery) {
