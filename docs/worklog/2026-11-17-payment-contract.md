@@ -25,4 +25,6 @@ DTO 검증은 실제 Payment 컨트롤러·DB·PG를 기동한 증거가 아니�
 
 ## 저장·후속
 
-이슈 [#364](https://github.com/2026-2-rising-sun/Backend/issues/364). PR 생성·최신 CI·게시 본문 검토·병합 결과는 완료 후 기록한다. 기존 작업 폴더의 checkout과 변경을 보존하며 이 worktree의 파일만 커밋한다.
+이슈 [#364](https://github.com/2026-2-rising-sun/Backend/issues/364), PR [#365](https://github.com/2026-2-rising-sun/Backend/pull/365), base dev / head test/#364-payment-contract다. 게시 직전 최신 사용자 지침의 writing.md 「처음 읽는 사람도 이해할 수 있게 설명하기」「PR 설명 작성과 확인」을 읽었다. 게시 후 제목·본문 전체와 base/head를 조회하고, 기존 계약 호환 확인·회귀 보강이라는 최종 범위, 외부 Kafka2스킵, 팀원 구현 미병합·실PG 미실행 제약을 검토했다. 미해결 리뷰 스레드는 없었다. 최종 CI·병합 여부와 커밋은 GitHub PR의 해당 기록을 기준으로 확인한다.
+
+기존 작업 폴더의 checkout과 미커밋 변경은 보존하며 이 worktree의 파일만 커밋한다. 작업 전용 PostgreSQL 컨테이너는 검증 후 제거한다. 새 Chat 에이전트의 모델·추론 확인 요청에는 아직 답을 받지 않아 추가 에이전트를 실행하지 않았으며, 현재 에이전트가 독립 worktree에서 검증·게시를 진행했다.
