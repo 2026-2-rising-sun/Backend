@@ -38,17 +38,25 @@ public class PaymentEventConsumerConfiguration {
     }
 
     @Bean
-    PaymentResultConsumer paymentResultConsumer(ObjectMapper mapper, PaymentResultHandler handler) {
-        return new PaymentResultConsumer(mapper, handler);
+    PaymentResultConsumer paymentResultConsumer(
+            ObjectMapper mapper,
+            PaymentResultHandler handler,
+            com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
+        return new PaymentResultConsumer(mapper, handler, relay);
     }
 
     public static class PaymentResultConsumer {
         private final ObjectMapper mapper;
         private final PaymentResultHandler handler;
+        private final com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay;
 
-        PaymentResultConsumer(ObjectMapper mapper, PaymentResultHandler handler) {
+        PaymentResultConsumer(
+                ObjectMapper mapper,
+                PaymentResultHandler handler,
+                com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
             this.mapper = mapper;
             this.handler = handler;
+            this.relay = relay;
         }
 
         @KafkaListener(
@@ -56,7 +64,20 @@ public class PaymentEventConsumerConfiguration {
                 groupId = "commercecore-payment-results-v1",
                 containerFactory = "paymentResultListenerContainerFactory",
                 autoStartup = "${commercecore.payment.results-enabled:true}")
-        public void payment(String json) throws Exception {
+        public void payment(org.apache.kafka.clients.consumer.ConsumerRecord<String, String> record)
+                throws Exception {
+            String json = record.value();
+            if ("PaymentApproved".equals(mapper.readTree(json).path("eventType").asText())) {
+                EventEnvelope<
+                                com.shoppinglive.commercecore.payment.relay.PaymentRelayContract
+                                        .Approved>
+                        event = mapper.readValue(json, new TypeReference<>() {});
+                validate(event, "PaymentApproved", event.payload().orderRef());
+                if (!event.aggregateId().equals(record.key()))
+                    throw new IllegalArgumentException("승인 이벤트 키가 주문 참조와 다릅니다.");
+                relay.approved(event.payload());
+                return;
+            }
             EventEnvelope<PaymentExecution> event =
                     mapper.readValue(json, new TypeReference<>() {});
             validate(event, "PaymentExecutionResolved", event.payload().requestId());
@@ -70,7 +91,28 @@ public class PaymentEventConsumerConfiguration {
                 groupId = "commercecore-refund-results-v1",
                 containerFactory = "paymentResultListenerContainerFactory",
                 autoStartup = "${commercecore.payment.results-enabled:true}")
-        public void refund(String json) throws Exception {
+        public void refund(org.apache.kafka.clients.consumer.ConsumerRecord<String, String> record)
+                throws Exception {
+            String json = record.value();
+            String type = mapper.readTree(json).path("eventType").asText();
+            if ("RefundSucceeded".equals(type)) {
+                EventEnvelope<
+                                com.shoppinglive.commercecore.payment.relay.PaymentRelayContract
+                                        .RefundSucceeded>
+                        event = mapper.readValue(json, new TypeReference<>() {});
+                validate(event, type, record.key());
+                relay.refundSucceeded(event.aggregateId(), event.payload());
+                return;
+            }
+            if ("RefundFailed".equals(type)) {
+                EventEnvelope<
+                                com.shoppinglive.commercecore.payment.relay.PaymentRelayContract
+                                        .RefundFailed>
+                        event = mapper.readValue(json, new TypeReference<>() {});
+                validate(event, type, record.key());
+                relay.refundFailed(event.aggregateId(), event.payload());
+                return;
+            }
             EventEnvelope<RefundExecution> event = mapper.readValue(json, new TypeReference<>() {});
             validate(event, "RefundExecutionResolved", event.payload().requestId());
             var status = event.payload().status();

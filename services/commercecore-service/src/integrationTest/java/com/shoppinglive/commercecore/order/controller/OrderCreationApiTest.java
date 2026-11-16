@@ -59,6 +59,7 @@ class OrderCreationApiTest
 
     @Autowired private TransactionTemplate transactionTemplate;
 
+    @Autowired private com.shoppinglive.commercecore.sku.service.SkuService skuCommands;
     private Long salesId;
 
     @BeforeEach
@@ -72,6 +73,7 @@ class OrderCreationApiTest
         Sales sales = salesRepository.save(new Sales(PRODUCT_ID, PRICE, SalesStatus.ON_SALE));
         salesId = sales.getId();
         salesStockRepository.save(new SalesStock(salesId, INITIAL_STOCK, 0));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -137,7 +139,7 @@ class OrderCreationApiTest
     void reservesStockWhenCreatingOrder() throws Exception {
         order(body(Map.of("quantity", 2)), null).andExpect(status().isCreated());
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getAvailable()).isEqualTo(3);
         assertThat(stock.getReserved()).isEqualTo(2);
     }
@@ -159,7 +161,7 @@ class OrderCreationApiTest
                 .andExpect(jsonPath("$.orderNumber").value(firstOrderNumber));
 
         assertThat(orderRepository.findAll()).hasSize(1);
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getReserved()).as("재고도 한 번만 잡힌다").isEqualTo(2);
     }
 
@@ -186,7 +188,7 @@ class OrderCreationApiTest
                 .andExpect(jsonPath("$.buyerName").doesNotExist())
                 .andExpect(jsonPath("$.data").isEmpty());
         assertThat(orderRepository.count()).isEqualTo(1);
-        assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        assertThat(legacyStock(salesId).getReserved()).isEqualTo(2);
     }
 
     @DisplayName("활성 주문이 있으면 다른 멱등 키의 새 주문도 거절한다")
@@ -196,7 +198,7 @@ class OrderCreationApiTest
         order(body(Map.of("quantity", 1)), "key-2").andExpect(status().isConflict());
 
         assertThat(orderRepository.findAll()).hasSize(1);
-        assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
+        assertThat(legacyStock(salesId).getReserved()).isEqualTo(1);
     }
 
     @DisplayName("재고보다 많이 주문하면 409로 응답하고 재고를 유지한다")
@@ -206,7 +208,7 @@ class OrderCreationApiTest
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("CONFLICT"));
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getAvailable()).isEqualTo(INITIAL_STOCK);
         assertThat(stock.getReserved()).isZero();
         assertThat(orderRepository.findAll()).isEmpty();
@@ -217,7 +219,11 @@ class OrderCreationApiTest
     void returns409WhenSaleIsNotActive() throws Exception {
         // @Modifying 쿼리는 트랜잭션 안에서만 실행된다.
         transactionTemplate.executeWithoutResult(
-                status -> salesRepository.transitionStatus(salesId, "ON_SALE", "PRIVATE"));
+                status -> {
+                    skuCommands.changeSaleStatus(
+                            salesId,
+                            com.shoppinglive.commercecore.sku.entity.SkuSaleStatus.PRIVATE);
+                });
 
         order(body(Map.of()), null).andExpect(status().isConflict());
         assertThat(orderRepository.findAll()).isEmpty();
@@ -236,7 +242,7 @@ class OrderCreationApiTest
         order(body(Map.of("expectedTotalAmount", 25_000L)), null).andExpect(status().isConflict());
 
         assertThat(orderRepository.findAll()).isEmpty();
-        assertThat(salesStockRepository.findById(salesId).orElseThrow().getReserved()).isZero();
+        assertThat(legacyStock(salesId).getReserved()).isZero();
     }
 
     @DisplayName("확인 금액이 현재 금액과 같으면 주문을 생성한다")
@@ -264,7 +270,6 @@ class OrderCreationApiTest
     void marksSaleSoldOutWhenStockIsExhausted() throws Exception {
         order(body(Map.of("quantity", 5)), null).andExpect(status().isCreated());
 
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.SOLD_OUT);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
     }
 }

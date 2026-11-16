@@ -40,6 +40,7 @@ scripts/render-api-docs.sh --check      # 생성 결과 최신성 확인
 | 이슈·브랜치·커밋·PR | [작성 기준](docs/guides/writing.md), [템플릿](docs/templates/README.md) 중 작성할 종류 |
 | 요구사항·결정·계획·기록 | [문서 지도](docs/README.md)의 작성·갱신·완료 기준 |
 | 리뷰 | 변경 대상 규칙과 [리뷰 절차](docs/guides/workflow.md#리뷰와-전달) |
+| Payment 서비스 | [Payment 작업 주의점](services/payment-service/AGENTS.md) |
 
 링크를 모두 따라 읽지 않는다. 현재 작업의 관련 부분부터 읽고 이미 확인한 내용은 재사용한다. `rg --files`, `rg`로 관련 파일·심볼을 찾고 의존·호출·실패 근거에 따라 조사 범위를 넓힌다.
 

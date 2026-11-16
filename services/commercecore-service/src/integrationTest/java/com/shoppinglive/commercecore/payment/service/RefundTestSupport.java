@@ -76,6 +76,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         Long salesB = sales.saveAndFlush(new Sales(81002L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 5, 0));
         stocks.saveAndFlush(new SalesStock(salesB, 5, 0));
+        prepareLegacyTradeFixtures();
         a = cart.add(MEMBER_A, 81001L, 2);
         b = cart.add(MEMBER_A, 81002L, 1);
     }
@@ -85,6 +86,7 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         if (jdbc == null) {
             return;
         }
+        jdbc.update("DELETE FROM late_approval_refund");
         jdbc.update("DELETE FROM event_outbox");
         paymentServer.jdbc.update("DELETE FROM mock_refund_result");
         paymentServer.jdbc.update("DELETE FROM refund_execution");

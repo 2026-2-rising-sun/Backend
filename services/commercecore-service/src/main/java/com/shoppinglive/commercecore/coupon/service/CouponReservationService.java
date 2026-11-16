@@ -27,10 +27,14 @@ public class CouponReservationService {
     }
 
     public void reserve(String memberId, String couponId) {
+        reserveAt(memberId, couponId, Instant.now(clock));
+    }
+
+    public void reserveAt(String memberId, String couponId, Instant at) {
         if (couponId == null) {
             return;
         }
-        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        Instant now = at.truncatedTo(ChronoUnit.MICROS);
         int changed =
                 jdbc.update(
                         """
@@ -50,6 +54,26 @@ public class CouponReservationService {
 
     public void confirm(String memberId, String couponId) {
         transition(memberId, couponId, "USED");
+    }
+
+    public void confirmForOrder(String memberId, String couponId, long groupId) {
+        if (couponId == null) return;
+        if (jdbc.update(
+                        "UPDATE member_coupon SET status='USED',used_payment_group_id=? WHERE member_id=? AND coupon_id=? AND status='RESERVED'",
+                        groupId,
+                        memberId,
+                        couponId)
+                != 1) throw new IllegalStateException("예약된 쿠폰의 상태가 일치하지 않습니다.");
+    }
+
+    public void restoreForOrder(String memberId, String couponId, long groupId) {
+        if (couponId == null) return;
+        // 과거 환불 결과가 이미 다른 주문에서 재사용한 쿠폰을 다시 풀지 못하게 한다.
+        jdbc.update(
+                "UPDATE member_coupon SET status='AVAILABLE',used_payment_group_id=NULL WHERE member_id=? AND coupon_id=? AND status='USED' AND used_payment_group_id=?",
+                memberId,
+                couponId,
+                groupId);
     }
 
     public void release(String memberId, String couponId) {

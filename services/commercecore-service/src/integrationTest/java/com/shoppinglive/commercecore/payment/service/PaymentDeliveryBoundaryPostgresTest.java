@@ -68,11 +68,7 @@ class PaymentDeliveryBoundaryPostgresTest extends RefundTestSupport {
                 .isEqualTo("PAID");
         assertThat(paymentGroups.start(MEMBER_A, group.groupNumber(), "early").paymentId())
                 .isEqualTo(result.paymentId());
-        assertThat(
-                        stocks.findById(orders.findAll().getFirst().getSalesInfoId())
-                                .orElseThrow()
-                                .getReserved())
-                .isZero();
+        assertThat(legacyStock(orders.findAll().getFirst().getTradeSkuId()).getReserved()).isZero();
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentSucceeded'",
