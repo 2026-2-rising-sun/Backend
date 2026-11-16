@@ -77,6 +77,7 @@ class PaymentFlowIntegrationTest
                         null,
                         Instant.now().plusSeconds(900));
         orderRepository.save(order);
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -105,7 +106,7 @@ class PaymentFlowIntegrationTest
                             boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
-                            SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
+                            SalesStock s = legacyStock(salesInfoId);
                             // consumeReserved: reserved 1 → 0, available 4 그대로 (소진)
                             assertThat(s.getReserved()).isZero();
                             assertThat(s.getAvailable()).isEqualTo(4);
@@ -125,7 +126,7 @@ class PaymentFlowIntegrationTest
                             boundary.reconcileOverdue();
                             Order o = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
                             assertThat(o.getStatus()).isEqualTo(OrderStatus.FAILED);
-                            SalesStock s = salesStockRepository.findById(salesInfoId).orElseThrow();
+                            SalesStock s = legacyStock(salesInfoId);
                             // restoreReserved: 예약 재고 1 → 0, 가용 재고 4 → 5
                             assertThat(s.getReserved()).isZero();
                             assertThat(s.getAvailable()).isEqualTo(5);

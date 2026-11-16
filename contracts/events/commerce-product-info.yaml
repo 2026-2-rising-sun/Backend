@@ -1,14 +1,14 @@
 asyncapi: 3.1.0
 info:
   title: CommerceCore 상품 snapshot 이벤트 계약
-  version: 1.0.0
+  version: 1.1.0
   description: 상품 원본과 common Outbox를 같은 트랜잭션으로 저장하고 Catalog 공개 조회 사본에 비동기 반영한다.
 defaultContentType: application/json
 channels:
   productInfo:
     address: commerce.product-info.v1
     description: Kafka key는 payload.productId의 10진수 문자열이며 aggregateId와 같다. 최초 등록 version은
-      0이다. 실제 기본정보 변경으로 JPA version이 증가할 때 전체 snapshot을 발행한다. Catalog는 행이 없으면 version
+      0이다. 실제 기본정보·전체 판매 제어·소프트 삭제로 JPA version이 증가할 때 전체 snapshot을 발행한다. Catalog는 행이 없으면 version
       0을 포함해 저장하고, 기존 행보다 큰 version만 반영해 중복·역순·동시 최초 전달을 처리한다. occurredAt은 이벤트 생성
       시각, createdAt/updatedAt은 상품 원본 시각이며 순서 비교에 사용하지 않는다. 대표 이미지 1개의 ID/URL을 전달하며
       파일은 Core가 제공한다. 기존 commerce.sales-info.v1과 commerce.coupon-info.v1 토픽은 유지한다.
@@ -55,6 +55,8 @@ components:
             version: 0
             createdAt: '2026-11-08T00:00:00Z'
             updatedAt: '2026-11-08T00:00:00Z'
+            saleEnabled: false
+            deletedAt: null
   schemas:
     ProductInfoEnvelope:
       type: object
@@ -86,6 +88,17 @@ components:
           $ref: '#/components/schemas/ProductInfoSnapshot'
     ProductInfoSnapshot:
       type: object
+      allOf:
+      - if:
+          required: [deletedAt]
+          properties:
+            deletedAt:
+              type: string
+        then:
+          required: [saleEnabled]
+          properties:
+            saleEnabled:
+              const: false
       required:
       - productId
       - name
@@ -145,3 +158,12 @@ components:
         updatedAt:
           type: string
           format: date-time
+        saleEnabled:
+          type: boolean
+          default: true
+          description: Product 전체 판매허용. 신규 생산자는 false로 등록하며 구형 이벤트에서 생략 시 기존 개별 상태를 보존하도록 true로 해석한다. SKU 상태·수량과 독립이다.
+        deletedAt:
+          type: [string, 'null']
+          format: date-time
+          default: null
+          description: 소프트 삭제 시각. 삭제이면 saleEnabled는 false다. 소비자는 삭제 사실과 버전을 보존해 이전 snapshot으로 되살리지 않는다. 구형 생략은 null이다.

@@ -29,6 +29,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "COMMERCECORE_TEST_POSTGRES_URL", matches = ".+")
 class RefundDispatchDisabledPostgresTest extends RefundTestSupport {
+    // 수동 recover의 배치 선택 검증에 자동 스케줄러가 끼어들지 않게 한다.
+    // 실행 중 lease와 겹치는 전달은 아래 동시성 시나리오에서 별도로 검증한다.
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.springframework.scheduling.TaskScheduler taskScheduler;
+
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired ApplicationContext context;
@@ -69,6 +74,9 @@ class RefundDispatchDisabledPostgresTest extends RefundTestSupport {
                 .isEqualTo("PROCESSING");
         // 재활성된 relay는 새 UUID를 만들지 않고 이미 저장한 요청을 그대로 전송한다.
         var enabled = new PaymentDispatcher(deliveries, client, handler, true, true);
+        assertThat(deliveries.due(true))
+                .extracting(PaymentDeliveryStore.Delivery::requestId)
+                .contains(accepted.requestId());
         enabled.recover();
         assertThat(deliveries.byRefund(id).requestId()).isEqualTo(accepted.requestId());
         assertThat(
@@ -176,5 +184,68 @@ class RefundDispatchDisabledPostgresTest extends RefundTestSupport {
                 .isZero();
         assertThat(deliveries.due(true)).hasSize(100);
         assertThat(deliveries.due(false)).isEmpty();
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("다른 전달이 Payment lease를 보유하면 미확정을 유지하고 확정 뒤 같은 원문으로 복구한다")
+    void concurrentDeliveryPreservesPendingUntilPaymentLeaseCompletes() throws Exception {
+        var item = cart.add(MEMBER_B, 81001L, 1);
+        var group =
+                paymentGroups
+                        .create(
+                                MEMBER_B,
+                                java.util.List.of(
+                                        new com.shoppinglive.commercecore.order.service
+                                                .PaymentGroupService.Selection(
+                                                item.getId(), item.getVersion())),
+                                "후속구매자",
+                                "01012345678",
+                                10000,
+                                "concurrent-relay-order")
+                        .group();
+        var pending = paymentGroups.start(MEMBER_B, group.groupNumber(), "concurrent-relay-pay");
+        var gateway =
+                paymentServer.context.getBean(
+                        com.shoppinglive.payment.service.DurableMockGateway.class);
+        var claimed = new java.util.concurrent.CountDownLatch(1);
+        var finish = new java.util.concurrent.CountDownLatch(1);
+        doAnswer(
+                        invocation -> {
+                            claimed.countDown();
+                            if (!finish.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                                throw new IllegalStateException("경합 검증 해제를 기다리지 못했습니다.");
+                            return invocation.callRealMethod();
+                        })
+                .when(gateway)
+                .authorize(anyLong(), any());
+        try (var pool = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            var first = pool.submit(() -> dispatcher.payment(pending.paymentId()));
+            try {
+                assertThat(claimed.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                assertThat(
+                                paymentServer.jdbc.queryForObject(
+                                        "SELECT COUNT(*) FROM payment_attempt WHERE payment_id=? AND lease_until>clock_timestamp() AND status='PROCESSING'",
+                                        Long.class,
+                                        pending.paymentId()))
+                        .isEqualTo(1);
+                assertThat(dispatcher.payment(pending.paymentId()).status().name())
+                        .isEqualTo("PROCESSING");
+                assertThat(paymentGroups.get(MEMBER_B, group.groupNumber()).status().name())
+                        .isEqualTo("PAYMENT_CONFIRMING");
+            } finally {
+                finish.countDown();
+            }
+            assertThat(first.get(10, java.util.concurrent.TimeUnit.SECONDS).status().name())
+                    .isEqualTo("SUCCESS");
+        }
+        assertThat(dispatcher.payment(pending.paymentId()).requestId())
+                .isEqualTo(pending.requestId());
+        assertThat(paymentGroups.get(MEMBER_B, group.groupNumber()).status().name())
+                .isEqualTo("PAID");
+        assertThat(
+                        paymentServer.jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM mock_gateway_result", Long.class))
+                .isEqualTo(1);
+        verify(gateway, times(1)).authorize(anyLong(), any());
     }
 }
