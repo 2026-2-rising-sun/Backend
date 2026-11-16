@@ -10,6 +10,7 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -18,19 +19,17 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 class PaymentGroupLifecycleService {
-    private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
     private final OrderTimeSource time;
     private final OrderSheetLifecycleService localOrders;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final com.shoppinglive.commercecore.sku.service.SkuService skus;
+    private final SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final PaymentDispatcher dispatcher;
@@ -45,16 +44,14 @@ class PaymentGroupLifecycleService {
             OrderTimeSource time,
             OrderSheetLifecycleService localOrders,
             OrderJpaRepository orders,
-            com.shoppinglive.commercecore.sku.service.SkuService skus,
+            SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             PaymentDispatcher dispatcher,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             CouponReservationService couponReservations,
-            PaymentGroupEventPublisher notificationEvents,
-            ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
-        this.telemetry = telemetry;
+            PaymentGroupEventPublisher notificationEvents) {
         this.groups = groups;
         this.time = time;
         this.localOrders = localOrders;
@@ -156,9 +153,6 @@ class PaymentGroupLifecycleService {
                 orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream()
                         .sorted(Comparator.comparing(Order::getTradeSkuId))
                         .toList();
-        for (Order child : children) {
-            // 항목이 SKU ID순으로 정렬되어 수량 명령도 같은 순서로 잠근다.
-        }
         for (Order child : children) {
             int changed =
                     terminal == OrderStatus.CANCELLED
