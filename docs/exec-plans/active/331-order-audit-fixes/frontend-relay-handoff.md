@@ -1,6 +1,6 @@
 # Frontend 새 주문서 계약 인계
 
-기준 Backend: `cf79be0a` 이후 이 파일과 함께 커밋한 단일 SKU·active 보완. 실제 실행용 고정 SHA는 환경 manifest와 전달 메시지에 기록한다. 계약 원본은 [CommerceCore OpenAPI](../../../../contracts/api/commercecore-service.yaml), 동작 기준은 [현재 계획](processing-deadline.md)이다. Backend 작성/환경 책임자는 Order 담당, UI 작성/브라우저 조작 책임자는 Frontend `ctx_ff5b03f8532d`다. Payment 소유 원본은 변경하지 않는다.
+공개 API·브라우저 실행 고정 Backend SHA: `7a64bbbd11cc37f2960854886de18f4750241cf0`. 이후 이행 회귀·문서 변경은 별도로 기록하며 실제 실행 jar와 설정은 환경 manifest에 보존한다. 계약 원본은 [CommerceCore OpenAPI](../../../../contracts/api/commercecore-service.yaml), 동작 기준은 [현재 계획](processing-deadline.md)이다. Backend 작성/환경 책임자는 Order 담당, UI 작성/브라우저 조작 책임자는 Frontend `ctx_ff5b03f8532d`다. Payment 소유 원본은 변경하지 않는다.
 
 ## 호출과 응답
 
@@ -39,7 +39,11 @@ Cart는 `items` 대신 `cartItems:[{itemId,version}]`를 보낸다. Cart GET의 
 
 Core가 SDK 준비 값으로 주는 것은 `pgOrderId,amount,expiresAt`이다. SDK의 `orderId`에는 **받은 pgOrderId**를 쓴다. callback의 `paymentKey,orderId,amount`에서 `orderId`를 Core 승인 본문의 `pgOrderId`에 매핑한다. 결제창을 재발급했다면 이전 ID를 재사용하지 않는다. `buyerId`는 본문으로 보내지 않고 Core가 JWT에서 공급한다.
 
-SDK clientKey/customerKey·성공/실패 URL·결제 UI 설정은 Core 응답에 없다. 임의 실 PG 키/인증 성공을 만들지 않는다. 실제 SDK 설정 여부는 Frontend 설정과 팀원 SDK 계약에서 확인해야 한다. 이번 공유 환경은 명시적인 PG/인증 대역을 사용하며 실계좌·실결제는 실행하지 않는다. 대역 callback 검증을 실 Toss SDK 인증 검증이라고 보고하지 않는다.
+SDK clientKey/customerKey·성공/실패 URL·결제 UI 설정은 Core 응답에 없다. 다만 **SDK 흐름 자체는 팀원 설계에 있다.** 팀원 dev Payment design.html의 인증 흐름과 위젯 절은 SDK 초기화·금액/UI 렌더링·requestPayment·successUrl의 paymentKey/orderId/amount·failUrl을 설명한다. [공식 v2 위젯 가이드](https://docs.tosspayments.com/guides/v2/payment-widget/integration)도 인증 결과를 서버에서 검증한 뒤 승인하는 순서다. 정확한 패키지 버전·공개키·customerKey 공급과 앱의 callback 경로가 아직 공급/확인되지 않은 점을 “전체 SDK 설계 없음”으로 확대하지 않는다.
+
+[공식 코어 API](https://docs.tosspayments.com/reference)는 orderId PG조회가 위젯 `gsk` 키를 지원하지 않는다고 명시한다. [API 키 기준](https://docs.tosspayments.com/reference/using-api/api-keys)은 client/secret을 같은 세트로 쓰며 위젯 키는 승인·paymentKey 조회를 지원한다고 설명한다. 현재 최신800b41fd(실행2c6aa250과 생산동일) `TossPaymentsClient`는 confirm·paymentKey 조회·cancel만 호출한다. `PaymentExpiryJob`은 DB CREATED만 닫고 orderId로 PG를 조회하지 않는다. 따라서 이 제한과 현재 실행 코드의 직접 충돌은 미발견이다. 공급 설정은 단일 `PAYMENT_TOSS_SECRET_KEY`이며 실제 키 종류/세트는 확인하지 않았다. 임의 API 개별 키 혼용이나 별도 Payment 키 정책을 만들지 않는다.
+
+이번 공유 환경은 명시적인 PG/인증 대역을 사용하며 실계좌·실결제는 실행하지 않는다. 대역 callback 검증을 실 Toss SDK 인증 검증이라고 보고하지 않는다. 실제 provider 코드·주입 설정·SDK 대역 검사·실 SDK 실행을 따로 기록한다.
 
 ## 식별자와 복구 제약
 

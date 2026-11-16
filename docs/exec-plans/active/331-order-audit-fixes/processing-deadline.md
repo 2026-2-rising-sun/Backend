@@ -18,8 +18,8 @@
 |---|---|---|
 | origin/dev | d8b195b01871bb84bcae098eff8f3d8f0896a84f | ADR0337과 생성·승인·환불 목표 계약 |
 | feat/#348-payment-create-api | a4cd70be | 생성·조회·checkout 실제 구현. 변경하지 않은 소스로 띄운 Payment/PostgreSQL에 Core HTTP 클라이언트로 생성201·재요청200·조회·checkout201·새 결제창 조회 5건 확인 |
-| feat/#338-payment-approval-api / feat/#349-payment-recovery | 47d4850a / 2c6aa250 | 후속 fetch에서 승인 API·PaymentApproved 생산·복구 실제 구현 발견. 변경 없는 복구 브랜치 앱으로 정상/늦은 승인과 실제8초202 뒤 Kafka 승인을 확인 |
-| feat/#338-toss-client | 0814c680 | 클라이언트 작업. Commerce 승인·환불 E2E 증거 아님 |
+| feat/#338-payment-approval-api / feat/#349-payment-recovery | 최신3f6bbfaa / 800b41fd, 실행2c6aa250 | 승인 API·PaymentApproved 생산·복구 실제 구현. 2c6→800b 차이는 TossClientConfigurationTest 한 파일뿐이며 생산/리소스/API/이벤트 차이0. 불변2c6 앱으로 정상/늦은 승인과 실제8초202 뒤 Kafka 승인을 검증 |
+| feat/#338-toss-client | 최신887efe34 | 클라이언트 작업. Commerce 승인·환불 E2E 증거 아님 |
 
 수수료 원본은 팀원 `docs/design-docs/services/payment/design.html`의 `commerce.commission-rate` 설정이다. 생성 시 seller_order에 복사하며 숫자 기본값을 임의로 넣지 않는다. seller_id 정렬 순서로 `{orderRef}-S1`부터 번호를 만들고, 각 판매자의 항목 총액에서 해당 선택 SKU 쿠폰 할인을 뺀 실결제액을 전달한다. 테스트의 0.1250은 fixture다. 설정 누락은 신규 생성 TX를 rollback하며 기존 legacy 경로를 변경하지 않는다. 이전 조사에서 이 원본과 생성 API 브랜치를 누락했던 설명은 정정한다.
 
@@ -33,9 +33,11 @@
 - [x] 늦은 승인 환불 기록+Kafka outbox 원자 저장, 승인/환불 결과 멱등 소비. 실제 PostgreSQL+EmbeddedKafka에서 계약 대역 이벤트 중복·발행·결과 반영 검증.
 - [x] 팀원 실제 승인 endpoint·PaymentApproved 생산을 Core HTTP/Kafka와 연결. PG는 대역이며 실 PG 증거는 아님.
 - [ ] 팀원 실제 RefundRequested 소비/환불 결과 생산을 통한 끝까지 검증. 현재 구현을 발견하지 못해 완료 시각을 정할 수 없음.
-- [ ] UNKNOWN 복구중단의 Commerce 통지/조회 필드. 팀원2c6aa250은30분 뒤 next_check_at=NULL과 오류로그로 조회를 중단하지만 GET 응답에는 중단 사실이 없다. Core는 실패를 추정하지 않고 조회를 유지함.
+- [ ] UNKNOWN 복구중단의 Commerce 통지/조회 필드. 최신 팀원800b41fd도30분 뒤 next_check_at=NULL과 오류로그로 조회를 중단하지만 GET 응답에는 중단 사실이 없다. Core는 실패를 추정하지 않고 조회를 유지함.
 - [ ] V105 이전 확인중 null 기한과 과거 다른 V104/Payment V4 적용 환경의 운영 이행.
-- [ ] 기존 호출자/Frontend의 새 주문서 전환과 실 PG 검증. 기존 legacy가 새 계약으로 전환됐다고 주장하지 않음.
+- [x] 구매자 checkout.skuId 명시·새 active 조회/미연결 내부 주문409. PostgreSQL에서 소유 격리·정확 만료·가격 재검증·복수SKU/삭제/판매중지 회귀 검증.
+- [x] Frontend 실제 브라우저의 새 주문서 Cart·단건·인증 취소/실패·사용자 주문취소·legacy 재진입·늦은 승인 환불 요청 표시. 고정 Core7a64bbbd의 실제 HTTP/DB/Kafka와 PG·세션 대역을 사용했다. 늦은 승인은 복구조회 비활성 환경에서 Kafka 전이를 분리했다.
+- [ ] 실제 SDK/실 PG 검증. 위젯 흐름은 팀원/공식 문서에 있으며 주입형 provider/callback 코드 지원은 Frontend 담당이 이어간다. 실제 키 세트·customerKey 공급·운영callback은 미확인이다.
 - [ ] 신규 사용자 수량 환불은 #345, 공개 다중 SKU/옵션 정책은 #340 보류 유지.
 
 V106은 Core seller_order/order_payment_relay/payment_relay_refund와 기존 전달 종류 확장이다. 기존 번호·금액·저장기한·전달 원문을 덮어쓰지 않는다. 새 내부 주문번호는 기존 이벤트 계약과 같은 PG-UUID(39자), seller 번호42자이며 기존 UUID 주문번호도 변경하지 않는다. legacy의 late_approval_refund(REQUIRED)는 새 원결제 ID 환불표와 분리하고 자동 이관하지 않는다.
@@ -46,4 +48,8 @@ V106은 Core seller_order/order_payment_relay/payment_relay_refund와 기존 전
 
 ## 늦은 HTTP 응답의 역행 방지
 
-준비 결과는 원결제 ID를 최초로 연결할 때만 저장한다. 중복 준비 응답이 새 checkout의 pgOrderId나 확정 결과를 덮지 않는다. 거절 확정 뒤 도착한202/미확정 조회도 DECLINED를 되돌리지 않는다. 이후 실제 승인이 확인되면 별도 승인 경로가 종료 주문을 유지하며 늦은 환불 요청을 기록한다. 이 두 순서를 실제 PostgreSQL에서 실패 재현 후 보완했고 최종 Core701건은 실패·스킵 없이 통과했다. 실제 환불 통합과 운영 이행 미완은 유지한다.
+준비 결과는 원결제 ID를 최초로 연결할 때만 저장한다. 중복 준비 응답이 새 checkout의 pgOrderId나 확정 결과를 덮지 않는다. 거절 확정 뒤 도착한202/미확정 조회도 DECLINED를 되돌리지 않는다. 이후 실제 승인이 확인되면 별도 승인 경로가 종료 주문을 유지하며 늦은 환불 요청을 기록한다. 이 두 순서를 실제 PostgreSQL에서 실패 재현 후 보완했고 이전 cf79be0a의 Core701건은 실패·스킵 없이 통과했다. 실제 환불 통합과 운영 이행 미완은 유지한다.
+
+## Frontend와 이전 DB 후속
+
+[고정 API/SDK 인계](frontend-relay-handoff.md) · [이전 DB의 기술적 이행과 금전 재개 경계](archived-database-cutover.md). 체크섬 정리를 전용 복제 DB에서 검증해도 기존 확인중 NULL 기한이나 Payment 종료·보상 명령의 실제 결과를 결정한 것은 아니다. 원문과 번호·금액·기한을 보존하며 운영 이행은 계속 미완으로 둔다.

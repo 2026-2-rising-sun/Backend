@@ -24,4 +24,4 @@ Payment 소유 코드·DB·계약은 변경하지 않는다. #340 공개 다중 
 
 ## 후속 통합 작업
 
-[Frontend 단일 SKU·active·SDK 인계](frontend-relay-handoff.md)를 먼저 고정하고, 전용 환경에서 기존 Frontend 담당의 실제 브라우저 검증을 지원한다. 실제 환불 소비와 UNKNOWN 중단 통지의 최신 원본 확인, 보존 V104/Payment V4·null 기한 전용 PostgreSQL 재현은 진행 중이다. 운영/공유 DB 변경과 미확정 기한 보정은 하지 않는다. 결과와 고정 SHA는 [워크로그](../../../worklog/2026-11-16.md)에 이어 기록한다.
+[Frontend 단일 SKU·active·SDK 인계](frontend-relay-handoff.md)를 먼저 고정하고, 전용 환경에서 기존 Frontend 담당의 실제 브라우저 검증을 지원한다. 실제 환불 소비와 UNKNOWN 중단 통지의 최신 원본 확인, [보존 V104/Payment V4·null 기한 전용 PostgreSQL 재현](archived-database-cutover.md)을 수행하며 운영 금전 재개는 보류한다. 운영/공유 DB 변경과 미확정 기한 보정은 하지 않는다. 결과와 고정 SHA는 [워크로그](../../../worklog/2026-11-16.md)에 이어 기록한다.

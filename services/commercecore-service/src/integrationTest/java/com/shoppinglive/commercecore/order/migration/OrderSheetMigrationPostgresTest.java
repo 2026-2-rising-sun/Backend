@@ -2,11 +2,15 @@ package com.shoppinglive.commercecore.order.migration;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.nio.file.*;
 import java.sql.*;
+import java.util.Arrays;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 @Tag("postgres")
 @Tag("migration")
@@ -17,6 +21,7 @@ class OrderSheetMigrationPostgresTest {
             System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_USER", "postgres");
     private final String password =
             System.getenv().getOrDefault("COMMERCECORE_TEST_POSTGRES_PASSWORD", "postgres");
+    @TempDir Path archivedDirectory;
     private String schema;
     private Connection connection;
 
@@ -143,6 +148,127 @@ class OrderSheetMigrationPostgresTest {
                                 sql(
                                         "INSERT INTO payment_delivery_request(request_id,kind,order_id,payment_group_id,reference_number,amount,request_key,command,status,requested_at,next_action_at) VALUES('cccccccc-cccc-4ccc-8ccc-cccccccccccc','PREPARE',31,11,'old-number',6000,'other','request','PROCESSING',now(),now())"))
                 .isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    @DisplayName("보존 V104 체크섬은 자동 이행을 차단하고 전용 스냅샷의 제한적 repair 뒤 원문과 null 기한을 보존한다")
+    void archivedSchemaRequiresExplicitMetadataReconciliation() throws Exception {
+        var resolver = new PathMatchingResourcePatternResolver();
+        for (var resource : resolver.getResources("classpath:db/migration/*.sql")) {
+            try (var input = resource.getInputStream()) {
+                Files.copy(input, archivedDirectory.resolve(resource.getFilename()));
+            }
+        }
+        try (var input =
+                getClass()
+                        .getResourceAsStream(
+                                "/order-migration/V104__order_sheets_and_closure.sql")) {
+            Files.copy(
+                    input,
+                    archivedDirectory.resolve("V104__order_sheets_and_closure.sql"),
+                    StandardCopyOption.REPLACE_EXISTING);
+        }
+        var archived =
+                Flyway.configure()
+                        .dataSource(url, user, password)
+                        .schemas(schema)
+                        .defaultSchema(schema)
+                        .locations("filesystem:" + archivedDirectory)
+                        .target("104")
+                        .cleanDisabled(true)
+                        .load();
+        archived.migrate();
+        assertThat(number("SELECT checksum FROM flyway_schema_history WHERE version='104'"))
+                .isEqualTo(1274506072L);
+        sql(
+                "UPDATE payment_group SET status='PAYMENT_CONFIRMING', policy_version=1,payment_id=81 WHERE id=11");
+        sql("UPDATE orders SET status='PAYMENT_CONFIRMING' WHERE id=31");
+        sql(
+                "UPDATE refund_request SET purpose='COMPENSATION',order_closure_request_id='dddddddd-dddd-4ddd-8ddd-dddddddddddd' WHERE id=71");
+        sql(
+                "INSERT INTO order_payment_closure(closure_request_id,payment_request_id,payment_id,order_id,payment_group_id,reference_number,amount,reason,closed_at,acknowledged,next_action_at) VALUES('dddddddd-dddd-4ddd-8ddd-dddddddddddd','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',81,31,11,'old-number',6000,'EXPIRED',now(),FALSE,now())");
+        sql(
+                "INSERT INTO payment_delivery_request(request_id,kind,order_id,payment_group_id,reference_number,amount,request_key,payment_id,command,status,requested_at,next_action_at) VALUES('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','PAYMENT',31,11,'old-number',6000,'old-payment',81,'{\"orderClosureRequestId\":\"dddddddd-dddd-4ddd-8ddd-dddddddddddd\",\"paymentId\":81}','UNKNOWN',now(),now())");
+        String before = financialSnapshot();
+        assertThatThrownBy(() -> migration("106").migrate())
+                .hasMessageContaining("checksum mismatch")
+                .hasMessageContaining("104");
+        assertThat(financialSnapshot()).isEqualTo(before);
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='"
+                                        + schema
+                                        + "' AND column_name='processing_expires_at'"))
+                .isZero();
+
+        // 운영 자동 복구가 아니다. 알려진 보존본의 104만 다른 전용 스냅샷에서 기술적 호환성을 검증한다.
+        var validation = migration("104").validateWithResult();
+        assertThat(validation.invalidMigrations).hasSize(1);
+        assertThat(validation.invalidMigrations.getFirst().version).isEqualTo("104");
+        assertThat(
+                        Arrays.stream(archived.info().applied())
+                                .filter(m -> !m.getVersion().toString().equals("104"))
+                                .allMatch(
+                                        m ->
+                                                Arrays.stream(migration("106").info().all())
+                                                        .anyMatch(
+                                                                current ->
+                                                                        current.getVersion()
+                                                                                        .equals(
+                                                                                                m
+                                                                                                        .getVersion())
+                                                                                && java.util.Objects
+                                                                                        .equals(
+                                                                                                current
+                                                                                                        .getChecksum(),
+                                                                                                m
+                                                                                                        .getChecksum()))))
+                .isTrue();
+        migration("104").repair();
+        migration("106").migrate();
+        migration("106").validate();
+        assertThat(number("SELECT checksum FROM flyway_schema_history WHERE version='104'"))
+                .isNotEqualTo(1274506072L);
+        assertThat(financialSnapshot()).isEqualTo(before);
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM payment_group WHERE id=11 AND processing_expires_at IS NULL AND status='PAYMENT_CONFIRMING' AND policy_version=1 AND expires_at-created_at=INTERVAL '15 minutes'"))
+                .isEqualTo(1);
+        assertThat(number("SELECT COUNT(*) FROM order_payment_relay")).isZero();
+        assertThat(number("SELECT COUNT(*) FROM payment_relay_refund")).isZero();
+        assertThat(number("SELECT COUNT(*) FROM order_payment_closure WHERE acknowledged=FALSE"))
+                .isEqualTo(1);
+        // DDL 호환 통과와 금전 처리 재개는 다르다. 미확정 원문·종료 기록은 이행 승인 대상에 남는다.
+        assertThat(
+                        number(
+                                "SELECT COUNT(*) FROM payment_delivery_request WHERE status='UNKNOWN' AND kind='PAYMENT'"))
+                .isEqualTo(1);
+    }
+
+    private String financialSnapshot() throws SQLException {
+        var result = new StringBuilder();
+        for (String table :
+                new String[] {
+                    "payment_group",
+                    "orders",
+                    "refund_request",
+                    "refund_target_order",
+                    "payment_delivery_request",
+                    "order_payment_closure",
+                    "sku",
+                    "cart_item"
+                }) {
+            try (var statement = connection.createStatement();
+                    var rows =
+                            statement.executeQuery(
+                                    "SELECT COALESCE(jsonb_agg(jsonb_strip_nulls(to_jsonb(r)) ORDER BY to_jsonb(r)::text),'[]'::jsonb)::text FROM "
+                                            + table
+                                            + " r")) {
+                rows.next();
+                result.append(table).append(':').append(rows.getString(1)).append('\n');
+            }
+        }
+        return result.toString();
     }
 
     private Flyway migration(String target) {
