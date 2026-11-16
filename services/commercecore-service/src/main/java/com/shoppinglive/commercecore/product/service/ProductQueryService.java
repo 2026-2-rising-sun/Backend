@@ -66,6 +66,16 @@ public class ProductQueryService implements ProductLookup {
     }
 
     @Override
+    public Map<Long, String> findHistoricalSellerIds(Collection<Long> productIds) {
+        // seller_id는 생성 후 불변이고 소프트 삭제에도 보존된다. 공개 상품 조회와 분리한다.
+        Map<Long, String> sellers = new java.util.HashMap<>();
+        for (Product product : productRepository.findAllById(productIds)) {
+            if (product.getSellerId() != null) sellers.put(product.getId(), product.getSellerId());
+        }
+        return sellers;
+    }
+
+    @Override
     public boolean exists(Long productId) {
         return productRepository.existsByIdAndDeletedAtIsNull(productId);
     }

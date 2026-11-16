@@ -1,0 +1,29 @@
+# CommerceCore 결제 연동 후속 요구 인계
+
+상태: 요구·미구현. Payment 담당의 코드/DTO/DB/API/이벤트를 이 문서로 변경하거나 새 설계를 대신 채택하지 않는다. 팀원 dev ADR0337-1~5는 채택됐지만 결제 교체·주문연동·환불은 별도 실행 계획이다.
+
+| 소유 | 상태/기한 | 시작 기준 | 현재 구현/미확정 |
+|---|---|---|---|
+| CommerceCore 목표 | 주문 PENDING600초 | 주문 생성·선점 | 내부 도메인만 구현, 공개 legacy 기본15분 적용은 기존동작으로 남음 |
+| CommerceCore 목표 | PAYMENT_PROCESSING 별도600초 | 실제 결제 실행 진입 | 2026-11-15 직접 확정시간. 준비데이터 생성만으로 전환하지 않고 재전송으로 연장하지 않음. 새상태/타이머 미구현 |
+| Payment 팀원 목표 | CREATED | 새결제 생성/준비 | 주문PENDING과 다른소유/상태이며 새API는 이번PR에서 구현하지 않음 |
+| Payment 팀원 목표 | APPROVING/UNKNOWN | PG실행/조회 | CommerceCore PROCESSING과 동일상태가 아님. 통신대기8초/PGtimeout10초 같은 기술시간은 주문600초와 다름 |
+| 서비스 경계 후속 | UNKNOWN·기한종료·늦은승인 | 원문/금전사실 조회 | PROCESSING600초 경과가 PG실패확정·즉시재고해제승인은 아님. 조회·종료·보상계약 별도정의 필요 |
+
+필요 인계: orderRef/구매자/판매자별금액·멱등키 소유, Commerce 승인중계·주문잠금, 결과시간/환불기간 기준, PaymentApproved의 중복·순서와 상태확정, M3 RefundRequested/LATE_APPROVAL·영속재시도·늦은성공부활금지, 금전성공후Core반영실패의 재조회/중복금전금지. U1단가우선/U2누적전량·원기한, Product중지후기선점결제허용도 유지해야 한다.
+
+현재 PR은 신규 주문서 공개API/금전연동과 legacy600초 확대분을 후속으로 분리한다. 503 또는 다른 코드로 새 차단 정책을 설치하지 않는다. 진행중policy1/2를0으로 바꾸거나 저장기한을 소급 변경하지 않는다. 보존ref e08b8aea의 기존Mock전용 구현/검증과 현재 축소범위를 구분하며 기존V104/PaymentV4 적용환경의 무중단이행을 보장하지 않는다.
+
+#345 동시환불·#346 실행기한분리의 별도 작업공간은 재개하지 않았다. 이번600초 값 확정은 새Payment 구현권한이나 UNKNOWN 종료정책 승인으로 확대하지 않는다.
+
+
+## 기존 코드와 팀원 목표의 차이
+
+| 구분 | 현재 legacy 소비 계약 | 팀원 목표/CommerceCore 미연결 |
+|---|---|---|
+| 결제 식별/입력 | requestId/paymentId/orderId/paymentGroupId·amount·scenario | 불투명orderRef·buyerId·expiresAt·판매자별금액/수수료율. 공급원·스냅샷 계약 미연결 |
+| 상태 소유 | Core PAYMENT_CONFIRMING, 기존Payment PROCESSING/SUCCESS/FAILED/UNKNOWN | Core 목표PAYMENT_PROCESSING은별도주문상태. Payment CREATED/APPROVING/APPROVED/UNKNOWN과동일상태가아님 |
+| 기한 | 공개legacy기본15분/확인중유지, 내부PENDING600초 | 목표PENDING600초+실제실행진입PROCESSING600초. PG대기/통신timeout과다른시계 |
+| 결과/환불 | 기존실행결과HTTP·이벤트와항목전체환불 | 새PaymentApproved·RefundRequested/LATE_APPROVAL과원장/금전정합성은팀원로드맵후속. 이번PR에서구현/채택대행하지않음 |
+
+팀원 최신dev df36802e의로드맵은구현보류/Phase단위이며원문을보존했다. 이표는CommerceCore측필요사항의인계이고Payment계약/DB/코드를수정하라는지시가아니다.

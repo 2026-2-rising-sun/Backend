@@ -4,10 +4,11 @@
 
 Payment 실행 원본과 분리한다. 회원 ID는 Member 식별자이며 서비스 간 FK는 없다.
 
-기준: `cc91c09b`의 공통 코드 위 Product #333의 V101·제어/삭제 구현을 반영한다. SKU·Cart·Order의 후속 이행은 각 담당 통합 후 갱신하며 운영 환경 검증 자료와 구분한다.
+현재 기준: Product/SKU/Cart 감사 보완 통합과 CommerceCore 독립 Order 범위다. Payment 추가 변경과 종속 신규 실행은 제외 중이며 기존 legacy는 dev 계약을 유지한다. 내부 주문서 PENDING600초·스냅샷·선점·로컬만료는 별도 도메인이다. PENDING/실행PROCESSING 각각600초 목표의 공개연동은미구현이며 **전체설계미충족·머지불가**다. [Order현재범위](../../commercecore/order/설계.md)에서 기존실행·현재범위·후속을 구분한다. 공개 다중SKU/대표가/가격순·옵션은보류다.
 
 ## 문서
 
+- [SKU 모듈 목표·구현 진행 상태](../../commercecore/sku/README.md): V102/V3·내부 거래 포트의 별도 상세. 아래 기존 Sales 설명과 전환 상태를 구분한다.
 - [API HTML](api.html) · [계약 YAML](../../../../contracts/api/commercecore-service.yaml)
 - [DB ERD 설명](erd.md) · [관계도](erd.html)
 - [Product 상세 ERD·전체 상태](../../commercecore/product/README.md)

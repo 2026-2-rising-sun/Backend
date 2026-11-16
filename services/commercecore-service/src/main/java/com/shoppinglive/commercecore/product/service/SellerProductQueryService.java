@@ -7,7 +7,9 @@ import com.shoppinglive.commercecore.product.dto.SellerProductSummary;
 import com.shoppinglive.commercecore.product.entity.Product;
 import com.shoppinglive.commercecore.product.repository.ProductRepository;
 import com.shoppinglive.commercecore.sales.dto.SalesLookup;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commercecore.sku.dto.SkuView;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.commercecore.storage.ImageUrlResolver;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -29,15 +31,18 @@ public class SellerProductQueryService {
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
     private final ProductRepository productRepository;
-    private final SalesJpaRepository salesRepository;
+    private final SkuSalesService salesRepository;
+    private final SkuService skus;
     private final ImageUrlResolver imageUrlResolver;
 
     public SellerProductQueryService(
             ProductRepository productRepository,
-            SalesJpaRepository salesRepository,
+            SkuSalesService salesRepository,
+            SkuService skus,
             ImageUrlResolver imageUrlResolver) {
         this.productRepository = productRepository;
         this.salesRepository = salesRepository;
+        this.skus = skus;
         this.imageUrlResolver = imageUrlResolver;
     }
 
@@ -110,9 +115,21 @@ public class SellerProductQueryService {
                 product.isSaleEnabled());
     }
 
+    @Transactional(readOnly = true)
+    public List<SkuView> listSkus(Long productId, String sellerId) {
+        productRepository
+                .findById(productId)
+                .filter(p -> !p.isDeleted() && sellerId.equals(p.getSellerId()))
+                .orElseThrow(
+                        () ->
+                                new BusinessException(
+                                        ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다: " + productId));
+        return skus.findByProductId(productId);
+    }
+
     private Map<Long, SalesLookup> findSales(List<Long> productIds) {
         if (productIds.isEmpty()) return Map.of();
-        return salesRepository.findLookupsByProductIds(productIds).stream()
+        return salesRepository.findSingleByProductIds(productIds).stream()
                 .collect(Collectors.toMap(SalesLookup::productId, Function.identity()));
     }
 

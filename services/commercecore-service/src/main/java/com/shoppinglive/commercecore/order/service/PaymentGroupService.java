@@ -43,6 +43,7 @@ public class PaymentGroupService {
             Long payableAmount,
             String couponId,
             Instant expiresAt,
+            Instant processingExpiresAt,
             List<OrderResponse> orders,
             Long paymentId) {}
 

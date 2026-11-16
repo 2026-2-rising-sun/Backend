@@ -1,0 +1,27 @@
+# Order 최종 감사 보완과 담당 범위 정정
+
+상태: 진행 중. 사용자는 CommerceCore 구현 범위의 dev 병합을 승인했다. 실제 SDK/PG·환불 전체 연동·UNKNOWN 중단 통지·과거 미확정 거래 대사는 외부 후속으로 보존한다. 아래 이전 전체 범위의 머지 불가 판정과 현재 Core 한정 승인을 구분하며, 전체 계획은 완료로 옮기지 않는다.
+
+## 현재 범위
+
+[현재 구현·팀원 원본·남은 수용 기준](processing-deadline.md)이 최신 기준이다. Core 새 주문서 API·준비/승인 전달·600/600 기한·늦은 승인 환불 요청과 결과 소비를 구현했다. 실제 팀원 앱으로 생성·조회·checkout·승인·Kafka 결과 반영을 확인했으며 환불 통합은 팀원 구현을 기다린다. 기존 공개 legacy 경로는 유지한다.
+
+Payment 소유 코드·DB·계약은 변경하지 않는다. #340 공개 다중 SKU/옵션 정책, #345 사용자 동시 수량환불과 보류 worktree는 재개하거나 병합하지 않는다. 과거 V104/Payment V4 복제본의 기술적 보존 검증은 완료했으며 기존 확인중 NULL 기한·미확정 금전 행의 운영 재개는 별도 미완이다. Frontend 새 호출자 전환과 전용 PG대역 브라우저 검증은 완료했고 실제 SDK/실 PG 검증은 남았다. PR Draft/ready와 실제 모듈 누적 병합은 코디네이터가 수행하며, 이번 담당은 dev 문서 동기화·검증·push까지만 맡는다. 별도 배포는 하지 않는다.
+
+## 이전 축소 범위의 실행 결과
+
+코드 검증 SHA `c81f5c2b0be35bbdc417438c1f9094925c23724c`, dev 기준 `df36802e`. `scripts/check.sh --base origin/dev --external` 최종고유JUnit task1339건 실패0·오류0·스킵0(실행820/동일입력UP-TO-DATE519, Member/Notification단위NO-SOURCE는0건). 단위·H2·실제PostgreSQL·외부Kafka를같은종류로합산해실제PG라고부르지않는다.
+
+전용Postgres업무197건(Catalog11/Core154/Live5/Payment기존27)·이행26건(Catalog3/Core23)이통과했다. Notification통합106에는별도조건부PG경합3건이포함되며중복합산하지않는다. 기본외부Kafka2건은H2생산DB+독립hostKafka다. 원본테스트/단언변경없이전용PG스키마+같은독립Kafka로추가2건도통과했고V104실제이행/판매Outbox7건published_at/실제소비를확인했다. 원격코드CI43703280065는658건 실패0/오류0/외부Kafka2스킵이며로컬외부증거와구분한다.
+
+첫전체9700f04c는고유937건중H2구기대1실패였고이벤트표본미실행이다. 실패/fixture준비오류와미커밋진단은보존했으며 dev원본legacy계약복원후최종1339와구분한다. 문서156/API6/설계30최신성 및390/1280브라우저를별도로검사했다. Cart실제앱은d588f70a에서CRUD/쿠폰견적/주문/취소·정리를확인했고결제0,묶음GET응답미캡처/샘플이미지404는성공으로세지않는다. d588이후생산소스·계약차이0(테스트메서드·문서만변경)으로재사용한다.
+
+이부분검증의통과는위의원래설계미충족체크박스를완료하지않는다. 계획은active로유지하며PR343 Draft·머지불가다. 이후문서기록커밋의정확HEAD CI/remote일치/clean은PR과최종인계보고에서다시확인한다.
+
+## 2026-11-16 재개
+
+[별도 처리기한 구현·최신 Payment 조사·남은 수용기준](processing-deadline.md) · [새 검증 결과](../../../worklog/2026-11-16.md). 위 이전 실행 결과는 이번 변경의 통과 증거로 재사용하지 않는다. REQUIRED 기록은 환불 요청 발행/소비/환불 완료가 아니다.
+
+## 후속 통합 작업
+
+[Frontend 단일 SKU·active·SDK 인계](frontend-relay-handoff.md)를 먼저 고정하고, 전용 환경에서 기존 Frontend 담당의 실제 브라우저 검증을 지원한다. 실제 환불 소비와 UNKNOWN 중단 통지의 최신 원본 확인, [보존 V104/Payment V4·null 기한 전용 PostgreSQL 재현](archived-database-cutover.md)을 수행하며 운영 금전 재개는 보류한다. 운영/공유 DB 변경과 미확정 기한 보정은 하지 않는다. 결과와 고정 SHA는 [워크로그](../../../worklog/2026-11-16.md)에 이어 기록한다.

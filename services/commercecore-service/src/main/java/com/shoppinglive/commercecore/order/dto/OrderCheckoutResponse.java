@@ -13,6 +13,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 public record OrderCheckoutResponse(
         Long productId,
         Long salesId,
+        Long skuId,
         String productName,
         long unitPrice,
         int quantity,
@@ -29,6 +30,7 @@ public record OrderCheckoutResponse(
         return new OrderCheckoutResponse(
                 checkout.productId(),
                 checkout.salesId(),
+                checkout.skuId(),
                 checkout.productName(),
                 checkout.unitPrice(),
                 checkout.quantity(),
@@ -47,6 +49,7 @@ public record OrderCheckoutResponse(
         return new OrderCheckoutResponse(
                 checkout.productId(),
                 checkout.salesId(),
+                checkout.skuId(),
                 checkout.productName(),
                 checkout.unitPrice(),
                 checkout.quantity(),
