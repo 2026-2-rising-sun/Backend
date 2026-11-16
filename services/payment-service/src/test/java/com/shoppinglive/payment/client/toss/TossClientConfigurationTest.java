@@ -189,11 +189,21 @@ class TossClientConfigurationTest {
         }
 
         private void handle(String rawResponse, Duration holdOpen) {
-            try (Socket connection = socket.accept()) {
-                request.complete(readRequest(connection.getInputStream()));
-                connection.getOutputStream().write(rawResponse.getBytes(StandardCharsets.UTF_8));
-                connection.getOutputStream().flush();
-                Thread.sleep(holdOpen);
+            try {
+                // 로컬 모니터링 등 다른 프로그램이 임시 포트로 붙을 수 있다. 토스 경로 요청만 받는다.
+                while (true) {
+                    try (Socket connection = socket.accept()) {
+                        String head = readRequest(connection.getInputStream());
+                        if (!head.startsWith("GET /v1/payments") && !head.startsWith("POST /v1/payments")) {
+                            continue;
+                        }
+                        request.complete(head);
+                        connection.getOutputStream().write(rawResponse.getBytes(StandardCharsets.UTF_8));
+                        connection.getOutputStream().flush();
+                        Thread.sleep(holdOpen);
+                        return;
+                    }
+                }
             } catch (IOException | InterruptedException ignored) {
                 // 테스트가 끝나 소켓이 닫히면 멈춘다.
             }
@@ -210,7 +220,19 @@ class TossClientConfigurationTest {
                 headers.write(next);
             }
             String head = headers.toString(StandardCharsets.ISO_8859_1);
-            input.readNBytes(contentLength(head));
+            if (head.toLowerCase().contains("transfer-encoding: chunked")) {
+                // JDK HttpClient는 본문 길이를 모르면 chunked로 보낸다. 마지막 0 크기 청크까지 읽는다.
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                while (!body.toString(StandardCharsets.ISO_8859_1).endsWith("0\r\n\r\n")) {
+                    int next = input.read();
+                    if (next < 0) {
+                        break;
+                    }
+                    body.write(next);
+                }
+            } else {
+                input.readNBytes(contentLength(head));
+            }
             return head;
         }
 
