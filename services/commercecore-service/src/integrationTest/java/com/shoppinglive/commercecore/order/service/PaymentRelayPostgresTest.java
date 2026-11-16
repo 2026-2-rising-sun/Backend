@@ -742,4 +742,46 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(reserved(501)).isEqualTo(3);
         verify(remote, never()).create(any());
     }
+
+    @Test
+    @DisplayName("늦은 생성 응답이 돌아와도 이미 저장한 새 결제창을 원래 결제창으로 되돌리지 않는다")
+    void latePreparationDoesNotRestoreStaleCheckout() {
+        String number = createRelay("late-prepare", false).number();
+        prepare(number);
+        var delivery = deliveries.relay(id(number), "PREPARE");
+        var original =
+                new Created(
+                        paymentId,
+                        "CREATED",
+                        remotePgOrderId,
+                        remoteCreate.amount(),
+                        remoteCreate.expiresAt());
+        relay.checkout(
+                MEMBER_A,
+                number,
+                new Checkout(number + "-2", remoteCreate.amount(), remoteCreate.expiresAt()));
+        relay.prepared(delivery, original);
+        assertThat(relay.state(MEMBER_A, number).pgOrderId()).isEqualTo(number + "-2");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+    }
+
+    @Test
+    @DisplayName("늦은202는 확정 실패 표시를 되돌리지 않고 이후 진짜 늦은 승인만 환불 요청으로 기록한다")
+    void delayedPendingDoesNotRegressConfirmedDecline() {
+        String number = createRelay("late-pending", false).number();
+        prepare(number);
+        var delivery = accept(number);
+        relay.declined(delivery, java.util.Map.of("status", "DECLINED"));
+        relay.pending(delivery, java.util.Map.of("status", "PENDING"), "PENDING");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("FAILED");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("DECLINED");
+        assertThat(deliveries.relay(id(number), "APPROVAL").status()).isEqualTo("FAILED");
+        assertThat(available(501)).isEqualTo(20);
+        relay.approved(fact(number));
+        relay.pending(delivery, java.util.Map.of("status", "PENDING"), "PENDING");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("FAILED");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("APPROVED");
+        assertThat(relay.state(MEMBER_A, number).refundStatus()).isEqualTo("REQUESTED");
+        assertThat(available(501)).isEqualTo(20);
+    }
 }

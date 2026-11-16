@@ -43,3 +43,7 @@ V106은 Core seller_order/order_payment_relay/payment_relay_refund와 기존 전
 사용자 직접 확정인600/600·확정 실패 FAILED를 적용한다. 팀원 Commerce 제안의 T+3분/승인 거절 뒤 PENDING 복귀를 새 정책으로 도입하지 않는다. Payment API/이벤트 wire와 Payment 소유 코드는 변경하지 않는다.
 
 [실행 결과와 실패 이력](../../../worklog/2026-11-16.md)
+
+## 늦은 HTTP 응답의 역행 방지
+
+준비 결과는 원결제 ID를 최초로 연결할 때만 저장한다. 중복 준비 응답이 새 checkout의 pgOrderId나 확정 결과를 덮지 않는다. 거절 확정 뒤 도착한202/미확정 조회도 DECLINED를 되돌리지 않는다. 이후 실제 승인이 확인되면 별도 승인 경로가 종료 주문을 유지하며 늦은 환불 요청을 기록한다. 이 두 순서를 실제 PostgreSQL에서 실패 재현 후 보완했고 최종 Core701건은 실패·스킵 없이 통과했다. 실제 환불 통합과 운영 이행 미완은 유지한다.

@@ -98,10 +98,13 @@ public class PaymentRelayStore {
     @Transactional(propagation = Propagation.MANDATORY)
     public void prepared(long groupId, Created result) {
         var prior = Objects.requireNonNull(binding(groupId));
-        if (prior.paymentId() != null && !prior.paymentId().equals(result.paymentId()))
-            throw conflict("원결제 ID가 변경되었습니다.");
+        if (prior.paymentId() != null) {
+            if (!prior.paymentId().equals(result.paymentId())) throw conflict("원결제 ID가 변경되었습니다.");
+            // 준비는 첫 연결만 저장한다. 늦은 재응답이 새 checkout·확정 결과를 덮지 않는다.
+            return;
+        }
         jdbc.update(
-                "UPDATE order_payment_relay SET remote_payment_id=?,pg_order_id=?,payment_status=? WHERE payment_group_id=? AND approved_at IS NULL",
+                "UPDATE order_payment_relay SET remote_payment_id=?,pg_order_id=?,payment_status=? WHERE payment_group_id=? AND remote_payment_id IS NULL AND approved_at IS NULL",
                 result.paymentId(),
                 result.pgOrderId(),
                 result.status(),
@@ -118,8 +121,9 @@ public class PaymentRelayStore {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void status(long groupId, String status) {
+        // 늦은 미확정 응답은 거절을 되돌리지 않는다. 진짜 늦은 승인은 approved에서 별도로 반영한다.
         jdbc.update(
-                "UPDATE order_payment_relay SET payment_status=? WHERE payment_group_id=? AND approved_at IS NULL",
+                "UPDATE order_payment_relay SET payment_status=? WHERE payment_group_id=? AND approved_at IS NULL AND payment_status<>'DECLINED'",
                 status,
                 groupId);
     }
