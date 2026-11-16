@@ -107,29 +107,34 @@ public class CartService {
             grouped.computeIfAbsent(item.getProductId(), ignored -> new ArrayList<>()).add(item);
         }
         return grouped.entrySet().stream()
-                .map(
-                        group -> {
-                            ProductSnapshot product = productById.get(group.getKey());
-                            boolean saleEnabled = product != null && product.saleEnabled();
-                            return new CartProductGroup(
-                                    group.getKey(),
-                                    product == null ? null : product.name(),
-                                    product == null ? null : product.mainImageUrl(),
-                                    saleEnabled,
-                                    group.getValue().stream()
-                                            .map(
-                                                    item ->
-                                                            view(
-                                                                    item,
-                                                                    item.getSkuId() == null
-                                                                            ? null
-                                                                            : skuById.get(
-                                                                                    item
-                                                                                            .getSkuId()),
-                                                                    saleEnabled))
-                                            .toList());
-                        })
+                .map(group -> productGroup(group.getKey(), group.getValue(), productById, skuById))
                 .toList();
+    }
+
+    private CartProductGroup productGroup(
+            Long productId,
+            List<CartItem> cartItems,
+            Map<Long, ProductSnapshot> productsById,
+            Map<Long, SkuView> skusById) {
+        ProductSnapshot product = productsById.get(productId);
+        boolean saleEnabled = product != null && product.saleEnabled();
+        List<CartSkuView> skuViews =
+                cartItems.stream()
+                        .map(
+                                item -> {
+                                    SkuView sku =
+                                            item.getSkuId() == null
+                                                    ? null
+                                                    : skusById.get(item.getSkuId());
+                                    return view(item, sku, saleEnabled);
+                                })
+                        .toList();
+        return new CartProductGroup(
+                productId,
+                product == null ? null : product.name(),
+                product == null ? null : product.mainImageUrl(),
+                saleEnabled,
+                skuViews);
     }
 
     private CartSkuView view(CartItem item, SkuView candidate, boolean saleEnabled) {

@@ -326,7 +326,6 @@ class PaymentGroupCheckoutService {
     }
 
     GroupResponse get(String member, String number) {
-        PaymentGroup found = owned(member, number);
         return tx.execute(t -> response(owned(member, number)));
     }
 
