@@ -102,11 +102,8 @@ class CouponSyncKafkaTest extends CommerceCoreSecurityTestSupport {
                                 StringDeserializer.class,
                                 "value.deserializer",
                                 StringDeserializer.class))) {
-            var partitions =
-                    topics.stream()
-                            .flatMap(topic -> consumer.partitionsFor(topic).stream())
-                            .map(info -> new TopicPartition(info.topic(), info.partition()))
-                            .toList();
+            // 이 검사에서 만든 두 토픽은 각 1개 파티션이다. 생성 직후 부분 메타데이터로 구독 토픽을 누락하지 않는다.
+            var partitions = topics.stream().map(topic -> new TopicPartition(topic, 0)).toList();
             consumer.assign(partitions);
             consumer.seekToEnd(partitions);
             partitions.forEach(consumer::position);

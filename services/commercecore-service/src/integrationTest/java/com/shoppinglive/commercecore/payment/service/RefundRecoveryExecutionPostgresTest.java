@@ -83,11 +83,10 @@ class RefundRecoveryExecutionPostgresTest extends RefundTestSupport {
                 .extracting(order -> order.getStatus())
                 .containsOnly(OrderStatus.PAID);
         assertThat(
-                        stocks.findById(
+                        legacyStock(
                                         orders.findByPaymentGroupIdOrderByIdAsc(groupId)
                                                 .getFirst()
-                                                .getSalesInfoId())
-                                .orElseThrow()
+                                                .getTradeSkuId())
                                 .getAvailable())
                 .isEqualTo(3);
     }

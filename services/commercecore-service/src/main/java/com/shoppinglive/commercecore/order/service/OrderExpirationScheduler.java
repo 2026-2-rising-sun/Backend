@@ -3,7 +3,6 @@ package com.shoppinglive.commercecore.order.service;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -16,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 미결제 주문을 만료하고 예약 재고를 복구한다.
  *
- * <p>{@code commercecore.order.expiration.duration} 이 지난 결제 전 주문을 자동 만료 처리한다. 60 초마다 실행. 초기 지연 60 초
- * (테스트 컨텍스트에서 자동 실행되어 데이터 간섭 방지).
+ * <p>이미 저장된 {@code expires_at}을 지난 결제 전 주문을 자동 만료 처리한다. 60 초마다 실행. 초기 지연 60 초 (테스트 컨텍스트에서 자동 실행되어
+ * 데이터 간섭 방지).
  *
  * <p>처리 단위: 한 번에 최대 {@link #BATCH_SIZE} 건. 대량 밀림 시에도 트랜잭션이 지나치게 길어지지 않도록 제한.
  */
@@ -28,9 +27,11 @@ public class OrderExpirationScheduler {
     private static final int BATCH_SIZE = 100;
 
     private final OrderJpaRepository orderRepository;
-    private final SalesService salesService;
+    private final com.shoppinglive.commercecore.sku.service.SkuService salesService;
 
-    public OrderExpirationScheduler(OrderJpaRepository orderRepository, SalesService salesService) {
+    public OrderExpirationScheduler(
+            OrderJpaRepository orderRepository,
+            com.shoppinglive.commercecore.sku.service.SkuService salesService) {
         this.orderRepository = orderRepository;
         this.salesService = salesService;
     }
@@ -57,7 +58,7 @@ public class OrderExpirationScheduler {
                                 OrderStatus.PENDING_PAYMENT, Instant.now(), Limit.of(BATCH_SIZE))
                         .stream()
                         .sorted(
-                                java.util.Comparator.comparing(Order::getSalesInfoId)
+                                java.util.Comparator.comparing(Order::getTradeSkuId)
                                         .thenComparing(Order::getId))
                         .toList();
 
@@ -68,7 +69,7 @@ public class OrderExpirationScheduler {
             }
             int updated = orderRepository.expireOrder(order.getId());
             if (updated == 1) {
-                salesService.restoreReserved(order.getSalesInfoId(), order.getQuantity());
+                salesService.release(order.getTradeSkuId(), order.getQuantity());
                 expired++;
             }
             // updated == 0 이면 이미 다른 흐름에서 상태 전이 (결제 시작·수동 취소 등). 무해.

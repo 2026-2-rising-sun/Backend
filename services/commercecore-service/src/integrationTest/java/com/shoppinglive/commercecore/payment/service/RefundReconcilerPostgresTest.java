@@ -213,14 +213,14 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                         .orElseThrow()
                                         .getId())
                         .getFirst()
-                        .getSalesInfoId();
-        jdbc.update("UPDATE sales_stock SET available=2147483647 WHERE sales_info_id=?", salesId);
+                        .getTradeSkuId();
+        jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", salesId);
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
         assertThat(queries.get(MEMBER_A, group.groupNumber(), first.id()).status())
                 .isEqualTo(RefundStatus.PROCESSING);
         assertThat(queries.get(MEMBER_A, group.groupNumber(), second.id()).status())
                 .isEqualTo(RefundStatus.SUCCESS);
-        jdbc.update("UPDATE sales_stock SET available=3 WHERE sales_info_id=?", salesId);
+        jdbc.update("UPDATE sku SET available=3 WHERE id=?", salesId);
         makeRefundDue(first.id());
         assertThat(reconciler.reconcileDue()).isEqualTo(1);
         assertThat(queries.get(MEMBER_A, group.groupNumber(), first.id()).status())
@@ -280,8 +280,8 @@ class RefundReconcilerPostgresTest extends RefundTestSupport {
                                         .orElseThrow()
                                         .getId())
                         .getFirst()
-                        .getSalesInfoId();
-        jdbc.update("UPDATE sales_stock SET available=2147483647 WHERE sales_info_id=?", salesId);
+                        .getTradeSkuId();
+        jdbc.update("UPDATE sku SET available=2147483647 WHERE id=?", salesId);
         makeRefundDue(request.id());
         assertThatThrownBy(() -> executions.execute(request.id()))
                 .isInstanceOf(RuntimeException.class);

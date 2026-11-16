@@ -1,4 +1,4 @@
-package com.shoppinglive.commercecore.order.exception;
+package com.shoppinglive.commercecore.cart.exception;
 
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;

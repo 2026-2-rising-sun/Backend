@@ -77,6 +77,7 @@ class OrderCancellationConcurrencyTest
                         null,
                         Instant.now().plusSeconds(900));
         orderRepository.save(order);
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -127,7 +128,7 @@ class OrderCancellationConcurrencyTest
         Order finalOrder = orderRepository.findByOrderNumber(orderNumber).orElseThrow();
         assertThat(finalOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
 
-        SalesStock finalStock = salesStockRepository.findById(salesInfoId).orElseThrow();
+        SalesStock finalStock = legacyStock(salesInfoId);
         assertThat(finalStock.getAvailable()).isEqualTo(5);
         assertThat(finalStock.getReserved()).isZero();
     }

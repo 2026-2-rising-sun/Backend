@@ -1,4 +1,4 @@
-package com.shoppinglive.commercecore.order.entity;
+package com.shoppinglive.commercecore.cart.entity;
 
 import com.shoppinglive.common.persistence.BaseEntity;
 import jakarta.persistence.Column;
@@ -13,14 +13,18 @@ import java.util.UUID;
         name = "cart_item",
         uniqueConstraints =
                 @UniqueConstraint(
-                        name = "uk_cart_member_product",
-                        columnNames = {"member_id", "product_id"}))
+                        name = "uk_cart_member_sku",
+                        columnNames = {"member_id", "sku_id"}))
 public class CartItem extends BaseEntity {
     @Column(name = "member_id", nullable = false, updatable = false, length = 36)
     private String memberId;
 
     @Column(name = "product_id", nullable = false, updatable = false)
     private Long productId;
+
+    // SKU가 없었던 기존 행은 상품 참조를 보존해 삭제 없이 표시한다.
+    @Column(name = "sku_id", updatable = false)
+    private Long skuId;
 
     @Column(nullable = false)
     private Integer quantity;
@@ -47,6 +51,14 @@ public class CartItem extends BaseEntity {
         this.quantity = quantity;
     }
 
+    public CartItem(String memberId, Long productId, Long skuId, int quantity) {
+        this(memberId, productId, quantity);
+        if (skuId == null || skuId <= 0) {
+            throw new IllegalArgumentException("skuId가 올바르지 않습니다.");
+        }
+        this.skuId = skuId;
+    }
+
     public String getMemberId() {
         return memberId;
     }
@@ -57,6 +69,10 @@ public class CartItem extends BaseEntity {
 
     public Integer getQuantity() {
         return quantity;
+    }
+
+    public Long getSkuId() {
+        return skuId;
     }
 
     public Long getVersion() {
