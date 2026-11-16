@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -826,10 +828,12 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
-    @Test
+    @ParameterizedTest(name = "정책 {0}")
+    @ValueSource(ints = {1, 2})
     @DisplayName("이전 미연결 진행중 내부 주문은 활성 없음으로 숨기지 않고 재정합 필요409를 반환한다")
-    void activeReadReportsUnlinkedHistoricalOrder() throws Exception {
+    void activeReadReportsUnlinkedHistoricalOrder(int policy) throws Exception {
         var old = create(1);
+        jdbc.update("UPDATE payment_group SET policy_version=? WHERE id=?", policy, groupId(old));
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isConflict());
         assertThat(
@@ -839,6 +843,12 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(groups.findById(groupId(old)).orElseThrow().getStatus().name())
                 .isEqualTo("PENDING_PAYMENT");
         assertThat(reserved(501)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT policy_version FROM payment_group WHERE id=?",
+                                Integer.class,
+                                groupId(old)))
+                .isEqualTo(policy);
     }
 
     @Test

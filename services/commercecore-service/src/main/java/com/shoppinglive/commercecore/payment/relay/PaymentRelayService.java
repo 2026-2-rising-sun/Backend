@@ -415,9 +415,9 @@ public class PaymentRelayService {
                                     List.of(
                                             OrderStatus.PENDING_PAYMENT,
                                             OrderStatus.PAYMENT_CONFIRMING))) {
-                        if (!found.isOrderSheet()) continue;
+                        if (found.usesLegacyExecution()) continue;
                         var group = locked(found.getId());
-                        if (store.binding(group.getId()) == null)
+                        if (!group.isOrderSheet() || store.binding(group.getId()) == null)
                             throw conflict("이전 주문의 결제 연동 상태를 먼저 확인해야 합니다.");
                         lifecycle.expire(group.getId());
                         group = locked(group.getId());
