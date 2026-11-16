@@ -194,11 +194,14 @@ class TossClientConfigurationTest {
                 while (true) {
                     try (Socket connection = socket.accept()) {
                         String head = readRequest(connection.getInputStream());
-                        if (!head.startsWith("GET /v1/payments") && !head.startsWith("POST /v1/payments")) {
+                        if (!head.startsWith("GET /v1/payments")
+                                && !head.startsWith("POST /v1/payments")) {
                             continue;
                         }
                         request.complete(head);
-                        connection.getOutputStream().write(rawResponse.getBytes(StandardCharsets.UTF_8));
+                        connection
+                                .getOutputStream()
+                                .write(rawResponse.getBytes(StandardCharsets.UTF_8));
                         connection.getOutputStream().flush();
                         Thread.sleep(holdOpen);
                         return;
