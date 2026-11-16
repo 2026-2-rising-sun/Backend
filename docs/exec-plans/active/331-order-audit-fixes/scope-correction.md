@@ -1,6 +1,6 @@
 # Payment 침범 정정과 남긴 범위
 
-상태: 범위 정정 중. **전체 설계 미충족·머지 불가**. 원래수용조건은 [현재 계획](README.md)에미완으로남는다. 보존ref `archive/order331-before-payment-scope-correction`은e08b8aea, 독립수정0146dc83, 선행Cart통합3b44a879다. forcepush/history rewrite 없이 일반정정커밋으로분리한다.
+당시 판정(2026-11-15): 범위 정정 중, 전체 설계 미충족·머지 불가였다. 현재는 사용자가 CommerceCore 한정 dev 병합을 승인했으며 최신 범위는 [현재 계획](README.md)에서 구분한다. 원래수용조건은 [현재 계획](README.md)에미완으로남는다. 보존ref `archive/order331-before-payment-scope-correction`은e08b8aea, 독립수정0146dc83, 선행Cart통합3b44a879다. forcepush/history rewrite 없이 일반정정커밋으로분리한다.
 
 ## 최신 dev 원본으로 원상분리할 Payment 파일
 
