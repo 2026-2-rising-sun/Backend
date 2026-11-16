@@ -1,6 +1,6 @@
 # Frontend 새 주문서 계약 인계
 
-공개 API·브라우저 실행 고정 Backend SHA: `7a64bbbd11cc37f2960854886de18f4750241cf0`. 이후 이행 회귀·문서 변경은 별도로 기록하며 실제 실행 jar와 설정은 환경 manifest에 보존한다. 계약 원본은 [CommerceCore OpenAPI](../../../../contracts/api/commercecore-service.yaml), 동작 기준은 [현재 계획](processing-deadline.md)이다. Backend 작성/환경 책임자는 Order 담당, UI 작성/브라우저 조작 책임자는 Frontend `ctx_ff5b03f8532d`다. Payment 소유 원본은 변경하지 않는다.
+초기 브라우저 실행 Backend SHA: `7a64bbbd11cc37f2960854886de18f4750241cf0`. 보존 정책2 active 누락 보완 뒤 SDK callback 추가 검사는 `4e99a0f5f86fb7f302aa8c2eb09bf02040f8650c` 불변jar를 사용했다. 실제 jar와 설정은 환경 manifest에 보존한다. 계약 원본은 [CommerceCore OpenAPI](../../../../contracts/api/commercecore-service.yaml), 동작 기준은 [현재 계획](processing-deadline.md)이다. Backend 작성/환경 책임자는 Order 담당, UI 작성/브라우저 조작 책임자는 Frontend `ctx_ff5b03f8532d`다. Payment 소유 원본은 변경하지 않는다.
 
 ## 호출과 응답
 
@@ -39,7 +39,7 @@ Cart는 `items` 대신 `cartItems:[{itemId,version}]`를 보낸다. Cart GET의 
 
 Core가 SDK 준비 값으로 주는 것은 `pgOrderId,amount,expiresAt`이다. SDK의 `orderId`에는 **받은 pgOrderId**를 쓴다. callback의 `paymentKey,orderId,amount`에서 `orderId`를 Core 승인 본문의 `pgOrderId`에 매핑한다. 결제창을 재발급했다면 이전 ID를 재사용하지 않는다. `buyerId`는 본문으로 보내지 않고 Core가 JWT에서 공급한다.
 
-SDK clientKey/customerKey·성공/실패 URL·결제 UI 설정은 Core 응답에 없다. 다만 **SDK 흐름 자체는 팀원 설계에 있다.** 팀원 dev Payment design.html의 인증 흐름과 위젯 절은 SDK 초기화·금액/UI 렌더링·requestPayment·successUrl의 paymentKey/orderId/amount·failUrl을 설명한다. [공식 v2 위젯 가이드](https://docs.tosspayments.com/guides/v2/payment-widget/integration)도 인증 결과를 서버에서 검증한 뒤 승인하는 순서다. 정확한 패키지 버전·공개키·customerKey 공급과 앱의 callback 경로가 아직 공급/확인되지 않은 점을 “전체 SDK 설계 없음”으로 확대하지 않는다.
+SDK clientKey/customerKey·성공/실패 URL·결제 UI 설정은 Core 응답에 없다. 다만 **SDK 흐름 자체는 팀원 설계에 있다.** 팀원 dev Payment design.html의 인증 흐름과 위젯 절은 SDK 초기화·금액/UI 렌더링·requestPayment·successUrl의 paymentKey/orderId/amount·failUrl을 설명한다. [공식 v2 위젯 가이드](https://docs.tosspayments.com/guides/v2/payment-widget/integration)도 인증 결과를 서버에서 검증한 뒤 승인하는 순서다. Frontend PR81의 provider/callback 연결은 94b1bee1에서 추가했고 명시적 SDK 인터페이스 대역으로 실Core 승인까지 검사했다. 실제 키 세트·customerKey 운영 공급과 원격 SDK 실행은 미확인이다. 이를 “전체 SDK 설계 없음”으로 확대하지 않는다.
 
 [공식 코어 API](https://docs.tosspayments.com/reference)는 orderId PG조회가 위젯 `gsk` 키를 지원하지 않는다고 명시한다. [API 키 기준](https://docs.tosspayments.com/reference/using-api/api-keys)은 client/secret을 같은 세트로 쓰며 위젯 키는 승인·paymentKey 조회를 지원한다고 설명한다. 현재 최신800b41fd(실행2c6aa250과 생산동일) `TossPaymentsClient`는 confirm·paymentKey 조회·cancel만 호출한다. `PaymentExpiryJob`은 DB CREATED만 닫고 orderId로 PG를 조회하지 않는다. 따라서 이 제한과 현재 실행 코드의 직접 충돌은 미발견이다. 공급 설정은 단일 `PAYMENT_TOSS_SECRET_KEY`이며 실제 키 종류/세트는 확인하지 않았다. 임의 API 개별 키 혼용이나 별도 Payment 키 정책을 만들지 않는다.
 
@@ -53,7 +53,7 @@ Cart GET 그룹 item의 `skuId`는 실제 주문 입력 원본이다. 직접 구
 
 ## 공유 검증 환경 조정
 
-전용 예정 포트는 PostgreSQL57036 / Kafka57037 / Core57038 / 팀원Payment57039 / PG대역57040 / 세션대역57041이다. 아직 기동 완료를 뜻하지 않는다. Order 담당이 소유·seed·정리하며 Frontend는 HTTP로만 조작한다. 실제 실행 jar SHA, seed의 product/sku/cart ID, 테스트 JWT와 상태제어 방법은 기동 후 별도 manifest로 전달한다. Frontend는 Vite 포트와 API proxy/callback 주소를 회신한다. 공유 kind·기존 컨테이너는 사용하지 않는다.
+사용한 전용 포트는 PostgreSQL57036 / Kafka57037 / Core57038 / 팀원Payment57039 / PG대역57040 / 세션대역57041, Frontend Vite5379다. 실제 readiness·JWT/세션HTTP·seed·Kafka 소비자 할당을 확인한 뒤 Frontend에 manifest를 전달했고 실API 검증을 완료했다. Order 담당은 Backend 앱/대역/컨테이너만 소유·정리했고 Frontend는 HTTP로 조작하고 본인 Vite를 정리한다. 검증 종료 통보 후 전용 DB5개를 백업하고 앱/본인 컨테이너2개를 종료·제거했다. 최종 `/tmp/order331-followup-browser/manifest.json`의 ready는 false이며 상시 실행 환경이 아니다. 공유 kind·기존 컨테이너는 사용하지 않았다.
 
 최신 팀원 앱은 생성a4cd70be·승인API47d4850a·복구2c6aa250이다. 실제 RefundRequested 소비/RefundSucceeded·Failed 생산은 아직 미발견이고 UNKNOWN30분 복구중단은 GET에 노출되지 않는다. 이 부재를 UI 타임아웃 실패나 환불 완료로 대체하지 않는다.
 

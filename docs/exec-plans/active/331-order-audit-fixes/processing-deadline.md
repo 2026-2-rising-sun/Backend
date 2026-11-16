@@ -37,7 +37,7 @@
 - [ ] V105 이전 확인중 null 기한과 과거 다른 V104/Payment V4 적용 환경의 운영 이행.
 - [x] 구매자 checkout.skuId 명시·새 active 조회/미연결 내부 주문409. PostgreSQL에서 소유 격리·정확 만료·가격 재검증·복수SKU/삭제/판매중지 회귀 검증.
 - [x] Frontend 실제 브라우저의 새 주문서 Cart·단건·인증 취소/실패·사용자 주문취소·legacy 재진입·늦은 승인 환불 요청 표시. 고정 Core7a64bbbd의 실제 HTTP/DB/Kafka와 PG·세션 대역을 사용했다. 늦은 승인은 복구조회 비활성 환경에서 Kafka 전이를 분리했다.
-- [ ] 실제 SDK/실 PG 검증. 위젯 흐름은 팀원/공식 문서에 있으며 주입형 provider/callback 코드 지원은 Frontend 담당이 이어간다. 실제 키 세트·customerKey 공급·운영callback은 미확인이다.
+- [ ] 실제 SDK/실 PG 검증. 위젯 흐름은 팀원/공식 문서에 있으며 Frontend94b1bee1의 주입형 provider/callback 소스와 Core4e99a0f5를 SDK 인터페이스 대역으로 연결했다. 실제 키 세트·customerKey 운영 공급·원격SDK/실PG 실행은 미확인이다.
 - [ ] 신규 사용자 수량 환불은 #345, 공개 다중 SKU/옵션 정책은 #340 보류 유지.
 
 V106은 Core seller_order/order_payment_relay/payment_relay_refund와 기존 전달 종류 확장이다. 기존 번호·금액·저장기한·전달 원문을 덮어쓰지 않는다. 새 내부 주문번호는 기존 이벤트 계약과 같은 PG-UUID(39자), seller 번호42자이며 기존 UUID 주문번호도 변경하지 않는다. legacy의 late_approval_refund(REQUIRED)는 새 원결제 ID 환불표와 분리하고 자동 이관하지 않는다.
@@ -53,3 +53,5 @@ V106은 Core seller_order/order_payment_relay/payment_relay_refund와 기존 전
 ## Frontend와 이전 DB 후속
 
 [고정 API/SDK 인계](frontend-relay-handoff.md) · [이전 DB의 기술적 이행과 금전 재개 경계](archived-database-cutover.md). 체크섬 정리를 전용 복제 DB에서 검증해도 기존 확인중 NULL 기한이나 Payment 종료·보상 명령의 실제 결과를 결정한 것은 아니다. 원문과 번호·금액·기한을 보존하며 운영 이행은 계속 미완으로 둔다.
+
+보존 정책2 진행중 주문은 legacy0이나 새 연결 주문으로 취급하지 않는다. 새 active에서 조정 필요409를 반환하며 원래 정책·상태·선점·전달을 보존한다. 이 경계의 누락을 실제 PostgreSQL에서409기대/204실제로 재현한 뒤 보완했고 관련30건이 통과했다. 수정 전 전체707건과 중복 합산하지 않는다.
