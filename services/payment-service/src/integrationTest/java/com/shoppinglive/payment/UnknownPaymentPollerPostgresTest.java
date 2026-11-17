@@ -195,6 +195,65 @@ class UnknownPaymentPollerPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:UNKNOWN", "QUERY:UNKNOWN");
     }
 
+    /** 토스 상태별 조회 성공은 모두 200이다. */
+    @ParameterizedTest
+    @ValueSource(
+            strings = {"DONE", "IN_PROGRESS", "ABORTED", "EXPIRED", "CANCELED", "PARTIAL_CANCELED"})
+    @DisplayName(
+            "[PAY-CONFIRM-12][PAY-RECOVER-03] 조회 성공 응답은 토스 상태와 관계없이 QUERY 호출 기록에 HTTP 200과 응답 시각을 남긴다")
+    void querySuccessRecordsHttpStatus(String pgStatus) {
+        ApproveCommand c = unknown(Duration.ofSeconds(15));
+        tossAnswers(c, new TossResult.Success(withStatus(c, pgStatus)));
+
+        poller.poll();
+
+        assertThat(lastQuery(c))
+                .containsEntry("outcome", "SUCCESS")
+                .containsEntry("http_status", 200);
+        assertThat(lastQuery(c).get("responded_at")).isNotNull();
+    }
+
+    /** 결과 종류, HTTP 상태(빈 값이면 응답 없음), 기대 outcome. */
+    @ParameterizedTest
+    @CsvSource({
+        "DECLINED, 404, DECLINED",
+        "NOT_SENT, 401, NOT_SENT",
+        "NOT_SENT, , NOT_SENT",
+        "UNKNOWN, 500, UNKNOWN",
+        "UNKNOWN, 503, UNKNOWN",
+        "UNKNOWN, , UNKNOWN"
+    })
+    @DisplayName(
+            "[PAY-CONFIRM-12][PAY-RECOVER-03] 조회가 4xx·5xx면 받은 HTTP 상태를, 응답을 받지 못했으면 NULL을 QUERY 호출 기록에 남긴다")
+    void queryFailureRecordsHttpStatus(String kind, Integer httpStatus, String outcome) {
+        ApproveCommand c = unknown(Duration.ofSeconds(15));
+        TossResult result =
+                switch (kind) {
+                    case "DECLINED" ->
+                            new TossResult.Declined("NOT_FOUND_PAYMENT", "없음", httpStatus);
+                    case "NOT_SENT" -> new TossResult.NotSent("보내지 않음", httpStatus);
+                    default -> new TossResult.Unknown("불명", httpStatus);
+                };
+        tossAnswers(c, result);
+
+        poller.poll();
+
+        Map<String, Object> call = lastQuery(c);
+        assertThat(call.get("outcome")).isEqualTo(outcome);
+        assertThat(call.get("http_status")).isEqualTo(httpStatus);
+        // 응답을 받은 호출만 응답 시각이 있다
+        assertThat(call.get("responded_at") != null)
+                .isEqualTo(httpStatus != null || !"UNKNOWN".equals(outcome));
+        assertThat(status(c.orderRef())).isEqualTo("UNKNOWN");
+    }
+
+    Map<String, Object> lastQuery(ApproveCommand c) {
+        return jdbc.queryForMap(
+                "SELECT c.outcome, c.http_status, c.responded_at FROM pg_call c JOIN payment p ON p.id = c.payment_id"
+                        + " WHERE p.order_ref = ? AND c.kind = 'QUERY' ORDER BY c.id DESC LIMIT 1",
+                c.orderRef());
+    }
+
     @Test
     @DisplayName("[PAY-RECOVER-03] 조회가 거절·보내지 않음·불명이면 UNKNOWN 유지, 호출 기록에 결과를 남기고 다음 조회를 예약한다")
     void failedQueriesKeepUnknown() {

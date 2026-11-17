@@ -201,6 +201,15 @@ class PaymentScenarioPostgresTest {
         poller.poll();
 
         toss.verify();
+        // 실제 토스 클라이언트가 분류한 HTTP 상태: 불명 승인 5xx 두 번, 조회 200
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT c.kind || ':' || c.outcome || ':' || COALESCE(CAST(c.http_status AS VARCHAR), '-')"
+                                        + " FROM pg_call c JOIN payment p ON p.id = c.payment_id"
+                                        + " WHERE p.order_ref = ? ORDER BY c.id",
+                                String.class,
+                                unknown.orderRef()))
+                .containsExactly("CONFIRM:UNKNOWN:500", "CONFIRM:UNKNOWN:500", "QUERY:SUCCESS:200");
         for (ApproveCommand c : List.of(first, retry, unknown)) {
             assertThat(status(c)).as(c.orderRef()).isEqualTo("APPROVED");
             assertThat(journals(c)).as(c.orderRef()).isEqualTo(1);
