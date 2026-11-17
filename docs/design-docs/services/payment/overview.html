@@ -60,9 +60,9 @@
 </tbody>
 </table></div>
 <h2 id="현재-코드-결제-재설계-구현-중">현재 코드 (결제 재설계 구현 중)</h2>
-<p>결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(<code>ApprovalService</code>·<code>PaymentOutcomeService</code>)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·<code>PaymentApproved</code> outbox에 한 트랜잭션으로 반영한다. 승인 HTTP 엔드포인트·8초 대기와 스케줄러는 아직 없다(#338 다음 PR·#349). 기존 Mock 결제·환불 코드는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a>에서 지웠다.</p>
+<p>결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(<code>ApprovalService</code>·<code>PaymentOutcomeService</code>)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·<code>PaymentApproved</code> outbox에 한 트랜잭션으로 반영한다. 승인 API(<code>ApprovalController</code>)는 검증·APPROVING 전환 뒤 토스 호출·반영을 가상 스레드에 넘기고 최대 8초(<code>payment.approval.response-wait</code>)만 기다려, 넘으면 202 PENDING으로 답한다. 결과 불명 조회·만료 스케줄러는 아직 없다(#349). 기존 Mock 결제·환불 코드는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a>에서 지웠다.</p>
 <ul>
-<li>API: <a href="api.html">API HTML</a> · <a href="../../../../contracts/api/payment-service.yaml">계약 YAML</a>. <code>X-Service-Token</code>(commercecore)만 허용하고, 허용 목록(<code>/v1/internal/payments</code>, <code>…/{orderRef}</code>, <code>…/{orderRef}/checkouts</code>, <code>…/{orderRef}/approval</code>) 밖의 <code>/v1/internal/**</code>는 403이다. 승인 경로는 컨트롤러가 없다(#338).</li>
+<li>API: <a href="api.html">API HTML</a> · <a href="../../../../contracts/api/payment-service.yaml">계약 YAML</a>. <code>X-Service-Token</code>(commercecore)만 허용하고, 허용 목록(<code>/v1/internal/payments</code>, <code>…/{orderRef}</code>, <code>…/{orderRef}/checkouts</code>, <code>…/{orderRef}/approval</code>) 밖의 <code>/v1/internal/**</code>는 403이다.</li>
 <li>결제 키는 <code>orderRef</code>다. 같은 orderRef 생성은 <code>INSERT … ON CONFLICT DO NOTHING</code>의 영향 행 수로 판단하고, 결제창은 <code>CREATED</code>·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 <a href="../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.html#api">#348 설계서</a>.</li>
 <li>DB: <a href="erd.html">ERD 설명</a> · <a href="erd.html">관계도</a></li>
 <li>결과 이벤트: <a href="../../../../contracts/events/payment-execution-results.yaml">계약 YAML</a>. <code>PaymentApproved</code>(키 orderRef)로 교체했다(호환 깨짐). CommerceCore 소비자는 아직 옛 <code>PaymentExecutionResolved</code>를 기다리므로 주문 연동(Phase 2) 전까지 통합 환경 결제는 동작하지 않는다.</li>
@@ -211,6 +211,6 @@
 <li><code>RefundOutcomeService.java</code>(#347에서 삭제)</li>
 </ul>
 <p>관련 기존 테스트: <code>RefundRecoveryStorePostgresTest.java</code>(#347에서 삭제) · <code>RefundMockEngineTest.java</code>(#347에서 삭제).</p>
-<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>27f3ac11cd687a50c16ff61aa4f27a72a59e1a7a5586be9ac1e8975b0499ea87</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>66eb3b6c2d479cc047175b1693e0cc2af0dcf18bb5a131e5ad7a0caa3eb4d032</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

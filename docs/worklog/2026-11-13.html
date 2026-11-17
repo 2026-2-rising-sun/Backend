@@ -73,6 +73,7 @@
 <li><a href="#338-결제-원장-분개-기록-추가">#338 결제 원장 분개 기록 추가</a></li>
 <li><a href="#338-토스-결제-클라이언트">#338 토스 결제 클라이언트</a></li>
 <li><a href="#338-결제-승인-처리와-paymentapproved-발행">#338 결제 승인 처리와 PaymentApproved 발행</a></li>
+<li><a href="#338-결제-승인-api와-8초-대기">#338 결제 승인 API와 8초 대기</a></li>
 </ul>
 </li>
 </ul>
@@ -574,6 +575,14 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-ledger' --external</code>(임시 PostgreSQL 16) 실패 0. Payment test 46, integrationTest 63, postgresTest 23(동시 승인 8건·승인 반영 8스레드 경합·outbox 실패 롤백·보상 취소 실패 포함), 스킵 0. 결과는 incomplete: 이 변경과 무관한 Core Kafka 2건·notification 3건 조건부 스킵 때문에 event-samples가 자동 실행되지 않아 수동 실행으로 표본 27건 통과. 독립 리뷰 지적 8건 중 2건 반영(보상 취소 CANCELED 선점·사람 확인 로그, 멱등 키 중복), 1건 설명(APPROVING 정체는 #349 스위퍼).</li>
 <li>미실행·한계: 승인 HTTP 엔드포인트·8초 대기(다음 PR), 실제 토스 테스트 키 호출, CommerceCore 소비자 연동(Phase 2).</li>
 <li>다음 작업: 승인 API와 8초 대기.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>a8de3e63fc343cb4949116f267c0d131d2efcf390c53706c32c344d6666ed642</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="338-결제-승인-api와-8초-대기">#338 결제 승인 API와 8초 대기</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/338-approval-ledger.html#8초-대기-pay-confirm-11">승인·원장 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/358">PR #358</a></p>
+<ul>
+<li>변경·판단(2026-11-16): <code>POST /v1/internal/payments/{orderRef}/approval</code> 컨트롤러를 추가했다. 요청 스레드는 검증·APPROVING 전환만 하고 토스 호출·결과 반영을 가상 스레드에 넘긴 뒤, 진입 시각부터 최대 8초(<code>payment.approval.response-wait</code>, 10초 이상이면 기동 실패)만 기다린다. 넘거나 처리 중 예외가 나면 202 PENDING + Location으로 답하고 작업은 cancel하지 않는다. 결과를 200·202·422(data에 토스 code·message)·503·409로 바꾸고 <code>DECLINED</code>·<code>PG_UNAVAILABLE</code> 오류 코드, 계약 YAML·<code>api.html</code>, 요구사항 체크(PAY-CONFIRM-01–11)를 갱신했다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-approval' --external</code>(임시 PostgreSQL 16) 통과. Payment test 48, integrationTest 75, postgresTest 27, 스킵 0. 토스 지연 → 202 → 뒤에서 APPROVED·CREATED·UNKNOWN 반영과 대기 중 DB 연결 0을 테스트로 확인했다. 독립 리뷰 지적 10건 중 4건 반영(대기 상한 검사, 테스트 타이밍, 종료 중 제출 거부, Error 로깅).</li>
+<li>미실행·한계: 검증 단계(①)가 DB 연결 대기로 늦어지면 8초를 넘길 수 있다(Hikari 기본 30초, 리뷰 부탁). 기본 8초 실측·실제 Tomcat 부하·실제 토스 키·Commerce 연동은 하지 않았다.</li>
+<li>다음 작업: 결과 불명 조회·정체 정리·만료(#349).</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>7a206c5792636b22b72171197dbde8c9b91e46a657ecaa1fa9e0283223e50eae</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
