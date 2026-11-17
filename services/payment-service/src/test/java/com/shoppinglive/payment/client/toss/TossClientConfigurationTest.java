@@ -161,6 +161,7 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).as("본문 끊김은 응답 없음").isNull();
         }
     }
 
