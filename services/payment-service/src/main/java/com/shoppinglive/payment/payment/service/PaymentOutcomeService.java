@@ -61,6 +61,12 @@ public class PaymentOutcomeService {
         this.recovery = recovery;
     }
 
+    /** 호출 하나의 결과를 기록만 한다(상태는 바꾸지 않는다). 재호출 전에 첫 불명 호출의 HTTP 상태를 남길 때 쓴다. */
+    @Transactional
+    public void recordCall(long pgCallId, TossResult result) {
+        record(pgCallId, result);
+    }
+
     /** 토스를 부르기 전에 호출 기록을 UNKNOWN으로 넣어 커밋한다(PAY-CONFIRM-12). */
     @Transactional
     public long insertCall(
@@ -77,7 +83,7 @@ public class PaymentOutcomeService {
      */
     @Transactional
     public boolean applyDone(long paymentId, long pgCallId, TossPayment response) {
-        pgCalls.recordResult(pgCallId, PgCallOutcome.SUCCESS.name(), null);
+        pgCalls.recordResult(pgCallId, PgCallOutcome.SUCCESS.name(), null, 200);
         Payment payment = payments.findById(paymentId).orElseThrow();
         if (payment.getStatus() == PaymentStatus.APPROVED) {
             // 이미 반영됐다. 승인된 결제는 어떤 응답이 와도 취소하지 않는다
@@ -122,15 +128,15 @@ public class PaymentOutcomeService {
 
     /** 첫 호출이 거절이면 CREATED로 되돌린다(PAY-CONFIRM-08). */
     @Transactional
-    public void applyDeclined(long paymentId, long pgCallId, String code) {
-        pgCalls.recordResult(pgCallId, PgCallOutcome.DECLINED.name(), code);
+    public void applyDeclined(long paymentId, long pgCallId, TossResult.Declined declined) {
+        record(pgCallId, declined);
         revertToCreated(paymentId);
     }
 
     /** 첫 호출이 토스에 가지 않았으면 CREATED로 되돌린다(PAY-CONFIRM-09). */
     @Transactional
-    public void applyNotSent(long paymentId, long pgCallId) {
-        pgCalls.recordResult(pgCallId, PgCallOutcome.NOT_SENT.name(), null);
+    public void applyNotSent(long paymentId, long pgCallId, TossResult.NotSent notSent) {
+        record(pgCallId, notSent);
         revertToCreated(paymentId);
     }
 
@@ -247,17 +253,25 @@ public class PaymentOutcomeService {
         }
     }
 
-    /** 불명은 기록을 UNKNOWN 그대로 둔다. */
+    /** 호출 기록에 결과·HTTP 상태를 남긴다. 불명은 결과를 UNKNOWN 그대로 둔다. */
     private void record(long pgCallId, TossResult result) {
         switch (result) {
-            case TossResult.Success s ->
-                    pgCalls.recordResult(pgCallId, PgCallOutcome.SUCCESS.name(), null);
+            case TossResult.Success s -> recordResult(pgCallId, PgCallOutcome.SUCCESS, null, s);
             case TossResult.Declined d ->
-                    pgCalls.recordResult(pgCallId, PgCallOutcome.DECLINED.name(), d.code());
-            case TossResult.NotSent n ->
-                    pgCalls.recordResult(pgCallId, PgCallOutcome.NOT_SENT.name(), null);
-            case TossResult.Unknown u -> {}
+                    recordResult(pgCallId, PgCallOutcome.DECLINED, d.code(), d);
+            case TossResult.NotSent n -> recordResult(pgCallId, PgCallOutcome.NOT_SENT, null, n);
+            case TossResult.Unknown u -> {
+                // 응답을 받은 불명(5xx 등)만 상태 코드를 남긴다. 결과는 UNKNOWN 그대로다
+                if (u.httpStatus() != null) {
+                    recordResult(pgCallId, PgCallOutcome.UNKNOWN, null, u);
+                }
+            }
         }
+    }
+
+    private void recordResult(
+            long pgCallId, PgCallOutcome outcome, String resultCode, TossResult result) {
+        pgCalls.recordResult(pgCallId, outcome.name(), resultCode, result.httpStatus());
     }
 
     /** PAY-CONFIRM-06 응답 검증. 기대 값은 DB에 저장한 값이다(#349 조회 결과도 같은 기준). */
