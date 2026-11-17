@@ -114,4 +114,63 @@ class ProductReplicaRepositoryTest {
                 Instant.parse("2026-11-08T00:00:00Z"),
                 Instant.parse("2026-11-08T01:00:00Z").plusSeconds(version));
     }
+
+    @Test
+    @DisplayName("전체 중지와 삭제는 사본에 반영되고 중복·역순·구형 snapshot이 삭제를 되돌리지 않는다")
+    void controlAndDeletionRemainProtectedByVersionAndTombstone() {
+        var old = snapshot(0, "처음", null);
+        assertThat(products.apply(old)).isTrue();
+        assertThat(
+                        products.apply(
+                                new ProductInfoEventMessage(
+                                        old.productId(),
+                                        old.name(),
+                                        old.description(),
+                                        old.category(),
+                                        old.mainImageId(),
+                                        old.mainImageUrl(),
+                                        old.sellerId(),
+                                        1,
+                                        old.createdAt(),
+                                        old.updatedAt(),
+                                        false,
+                                        null)))
+                .isTrue();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT sale_enabled FROM product WHERE id=7", Boolean.class))
+                .isFalse();
+        Instant deleted = Instant.parse("2026-11-13T00:00:00Z");
+        assertThat(
+                        products.apply(
+                                new ProductInfoEventMessage(
+                                        old.productId(),
+                                        old.name(),
+                                        old.description(),
+                                        old.category(),
+                                        old.mainImageId(),
+                                        old.mainImageUrl(),
+                                        old.sellerId(),
+                                        2,
+                                        old.createdAt(),
+                                        old.updatedAt(),
+                                        false,
+                                        deleted)))
+                .isTrue();
+        assertThat(products.apply(snapshot(1, "역순", null))).isFalse();
+        assertThat(products.apply(snapshot(2, "중복", null))).isFalse();
+        assertThat(products.apply(snapshot(3, "제어 필드 없는 구형", null))).isTrue();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT sale_enabled FROM product WHERE id=7", Boolean.class))
+                .isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                        "SELECT deleted_at FROM product WHERE id=7",
+                                        java.time.OffsetDateTime.class)
+                                .toInstant())
+                .isEqualTo(deleted);
+        assertThat(jdbc.queryForObject("SELECT version FROM product WHERE id=7", Long.class))
+                .isEqualTo(3);
+    }
 }

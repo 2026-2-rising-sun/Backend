@@ -16,9 +16,38 @@ public record ProductInfoEventMessage(
         String sellerId,
         long version,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean saleEnabled,
+        Instant deletedAt) {
     public static final String TOPIC = "commerce.product-info.v1";
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** 제어 필드가 없던 구형 snapshot은 기존 판매 상태를 보존한다. */
+    public ProductInfoEventMessage(
+            long productId,
+            String name,
+            String description,
+            ProductCategory category,
+            long mainImageId,
+            String mainImageUrl,
+            String sellerId,
+            long version,
+            Instant createdAt,
+            Instant updatedAt) {
+        this(
+                productId,
+                name,
+                description,
+                category,
+                mainImageId,
+                mainImageUrl,
+                sellerId,
+                version,
+                createdAt,
+                updatedAt,
+                true,
+                null);
+    }
 
     public static ProductInfoEventMessage parse(String key, String raw) {
         try {
@@ -46,6 +75,19 @@ public record ProductInfoEventMessage(
                     p.path("category").isNull()
                             ? null
                             : ProductCategory.valueOf(text(p, "category", 32));
+            JsonNode enabled = p.path("saleEnabled");
+            if (!enabled.isMissingNode() && !enabled.isBoolean()) {
+                throw new IllegalArgumentException("saleEnabled 값이 올바르지 않습니다.");
+            }
+            boolean saleEnabled = enabled.isMissingNode() || enabled.booleanValue();
+            JsonNode deleted = p.path("deletedAt");
+            Instant deletedAt =
+                    deleted.isMissingNode() || deleted.isNull()
+                            ? null
+                            : Instant.parse(text(p, "deletedAt", 100));
+            if (deletedAt != null && saleEnabled) {
+                throw new IllegalArgumentException("삭제된 상품은 판매를 허용할 수 없습니다.");
+            }
             return new ProductInfoEventMessage(
                     id,
                     text(p, "name", 100),
@@ -56,7 +98,9 @@ public record ProductInfoEventMessage(
                     seller,
                     integer(p, "version", 0),
                     Instant.parse(text(p, "createdAt", 100)),
-                    Instant.parse(text(p, "updatedAt", 100)));
+                    Instant.parse(text(p, "updatedAt", 100)),
+                    saleEnabled,
+                    deletedAt);
         } catch (Exception failure) {
             throw new InvalidMessageException("상품 snapshot 형식이 올바르지 않습니다.", failure);
         }

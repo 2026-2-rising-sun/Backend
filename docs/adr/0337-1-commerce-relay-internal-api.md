@@ -1,8 +1,8 @@
 # ADR 0337-1: 결제는 Commerce를 거치는 내부 API로만 받는다
 
 결정 상태: 채택
-구현 상태: [결제 요구사항](../requirements/payment.md)에서 추적
-관련 자료: [결제 재설계 실행 계획](../exec-plans/active/337-payment-redesign/README.md) · [Payment 목표 설계 API](../design-docs/services/payment/design.html#api)
+구현 상태: [결제 요구사항](../design-docs/services/payment/requirements/payment.md)에서 추적
+관련 자료: [결제 재설계 실행 계획](../worklog/plans/active/337-payment-redesign/README.md) · [Payment 목표 설계 API](../design-docs/services/payment/design.html#api)
 
 ## 문제
 

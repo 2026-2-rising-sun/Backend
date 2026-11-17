@@ -10,9 +10,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.*;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
@@ -70,7 +72,8 @@ class PaymentGroupIntegrationTest
     @Autowired OrderJpaRepository orders;
     @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
-    @MockitoSpyBean SalesStockJpaRepository stocks;
+    @Autowired SalesStockJpaRepository stocks;
+    @MockitoSpyBean com.shoppinglive.commercecore.sku.service.SkuService skuCommands;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
@@ -101,6 +104,9 @@ class PaymentGroupIntegrationTest
         salesB = sales.saveAndFlush(new Sales(2L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 10, 0));
         stocks.saveAndFlush(new SalesStock(salesB, 10, 0));
+        var unselectedSales = sales.saveAndFlush(new Sales(3L, 1000L, SalesStatus.ON_SALE));
+        stocks.saveAndFlush(new SalesStock(unselectedSales.getId(), 10, 0));
+        prepareLegacyTradeFixtures();
         a = cart.add(MEMBER_A, 1L, 2);
         b = cart.add(MEMBER_A, 2L, 1);
         unselected = cart.add(MEMBER_A, 3L, 1);
@@ -198,7 +204,7 @@ class PaymentGroupIntegrationTest
     }
 
     private void stock(Long id, int available, int reserved) {
-        var current = stocks.findById(id).orElseThrow();
+        var current = legacyStock(id);
         assertThat(current.getAvailable()).isEqualTo(available);
         assertThat(current.getReserved()).isEqualTo(reserved);
     }
@@ -595,7 +601,14 @@ class PaymentGroupIntegrationTest
     @Test
     void couponReservationRollsBackWhenLaterStockReservationFails() {
         issueCoupon();
-        doReturn(0).when(stocks).reserve(salesB, 1);
+        org.mockito.Mockito.doThrow(
+                        new com.shoppinglive.commercecore.sales.exception
+                                .InsufficientStockException("두 번째 SKU 예약 실패 주입"))
+                .when(
+                        (com.shoppinglive.commercecore.sku.service.SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuCommands))
+                .reserve(salesB, 1);
         assertThatThrownBy(
                         () ->
                                 service.create(
@@ -693,10 +706,10 @@ class PaymentGroupIntegrationTest
                                         MEMBER_A, selected(), "회원", "01012345678", 24999, "price"))
                 .isInstanceOf(BusinessException.class);
         assertThat(service.preview(MEMBER_A, selected()).totalAmount()).isEqualTo(25000);
-        jdbc.update("UPDATE sales_info SET price=11000 WHERE id=?", salesA);
+        jdbc.update("UPDATE sku SET price=11000 WHERE id=?", salesA);
         assertThatThrownBy(() -> create("price-changed-after-quote"))
                 .isInstanceOf(BusinessException.class);
-        jdbc.update("UPDATE sales_info SET price=10000 WHERE id=?", salesA);
+        jdbc.update("UPDATE sku SET price=10000 WHERE id=?", salesA);
         cart.changeQuantity(MEMBER_A, b.getId(), 11);
         assertThatThrownBy(
                         () ->
@@ -719,7 +732,14 @@ class PaymentGroupIntegrationTest
         double before = count("shoppinglive.order.requests", "result", "created");
         double events = count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated");
         // 주문서 조회 이후 재고가 줄어든 상황을 만들어 첫 항목의 실제 예약 이후 실패하도록 한다.
-        doReturn(0).when(stocks).reserve(salesB, 1);
+        org.mockito.Mockito.doThrow(
+                        new com.shoppinglive.commercecore.sales.exception
+                                .InsufficientStockException("두 번째 SKU 예약 실패 주입"))
+                .when(
+                        (com.shoppinglive.commercecore.sku.service.SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuCommands))
+                .reserve(salesB, 1);
         assertThatThrownBy(() -> create("race")).isInstanceOf(BusinessException.class);
         untouched();
         assertThat(count("shoppinglive.order.requests", "result", "created")).isEqualTo(before);
@@ -919,7 +939,7 @@ class PaymentGroupIntegrationTest
         var group = create("fault").group();
         var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-key");
         // A를 먼저 반영한 뒤 B를 잘못된 상태로 만들어 A의 재고 소비와 삭제 이후 트랜잭션을 실패시킨다.
-        jdbc.update("UPDATE sales_stock SET reserved=0 WHERE sales_info_id=?", salesB);
+        jdbc.update("UPDATE sku SET reserved=0 WHERE id=?", salesB);
         assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(
@@ -951,7 +971,7 @@ class PaymentGroupIntegrationTest
                 .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
         assertThat(items.count()).isEqualTo(3);
         stock(salesA, 8, 2);
-        jdbc.update("UPDATE sales_stock SET reserved=1 WHERE sales_info_id=?", salesB);
+        jdbc.update("UPDATE sku SET reserved=1 WHERE id=?", salesB);
         paymentServer.jdbc.update(
                 "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
                 attempt.getId());

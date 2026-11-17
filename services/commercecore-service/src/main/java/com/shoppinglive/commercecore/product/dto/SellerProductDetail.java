@@ -19,4 +19,5 @@ public record SellerProductDetail(
         SalesDisplayStatus salesStatus,
         Long price,
         Integer available,
-        ProductCategory category) {}
+        ProductCategory category,
+        boolean saleEnabled) {}
