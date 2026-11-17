@@ -74,6 +74,7 @@
 <li><a href="#338-토스-결제-클라이언트">#338 토스 결제 클라이언트</a></li>
 <li><a href="#338-결제-승인-처리와-paymentapproved-발행">#338 결제 승인 처리와 PaymentApproved 발행</a></li>
 <li><a href="#338-결제-승인-api와-8초-대기">#338 결제 승인 API와 8초 대기</a></li>
+<li><a href="#349-결제-결과-복구와-만료-스케줄러-추가">#349 결제 결과 복구와 만료 스케줄러 추가</a></li>
 </ul>
 </li>
 </ul>
@@ -583,6 +584,14 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-approval' --external</code>(임시 PostgreSQL 16) 통과. Payment test 48, integrationTest 75, postgresTest 27, 스킵 0. 토스 지연 → 202 → 뒤에서 APPROVED·CREATED·UNKNOWN 반영과 대기 중 DB 연결 0을 테스트로 확인했다. 독립 리뷰 지적 10건 중 4건 반영(대기 상한 검사, 테스트 타이밍, 종료 중 제출 거부, Error 로깅).</li>
 <li>미실행·한계: 검증 단계(①)가 DB 연결 대기로 늦어지면 8초를 넘길 수 있다(Hikari 기본 30초, 리뷰 부탁). 기본 8초 실측·실제 Tomcat 부하·실제 토스 키·Commerce 연동은 하지 않았다.</li>
 <li>다음 작업: 결과 불명 조회·정체 정리·만료(#349).</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7a206c5792636b22b72171197dbde8c9b91e46a657ecaa1fa9e0283223e50eae</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="349-결제-결과-복구와-만료-스케줄러-추가">#349 결제 결과 복구와 만료 스케줄러 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/349-recovery-expiry.html">복구·만료 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/359">PR #359</a></p>
+<ul>
+<li>변경·판단(2026-11-16): APPROVING 3분 정체 → UNKNOWN 스위퍼, UNKNOWN 조회기, CREATED 만료 작업과 <code>payment.recovery.*</code>·<code>payment.expiry.*</code> 설정을 추가했다. 조회기는 토스를 부르기 전에 다음 조회 예약 UPDATE로 조회 차례를 선점해(락 없이 한 곳만 조회) 경과 시간 기준 30초·1분·5분, 마감을 넘기지 않게 잡는다. 마감 시각 조회를 마지막으로 한 번 하고 멈추며 ERROR 로그를 1번 남긴다. DONE은 <code>applyDone</code>·보상 취소를 그대로 쓰고, ABORTED·EXPIRED → CREATED, CANCELED → CANCELED, PARTIAL_CANCELED → 사람 확인 로그. 시각은 DB <code>now()</code> 하나로 계산한다. 상태 문서·설계서·요구사항 체크를 갱신했다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-approval-api' --external</code>(임시 PostgreSQL 16) 통과. Payment test 50, integrationTest 75, postgresTest 53, 스킵 0. <code>--base origin/dev --external</code>은 무관한 Core Kafka 2건·notification 3건 스킵과 다른 서비스 postgresTest 미실행으로 incomplete, Payment test·integrationTest·postgresTest·migrationTest(9)는 통과, event-samples 수동 실행 통과. 종료 시나리오(생성→승인, 거절→재결제→승인, 불명→조회 DONE, 분개 차변 = 대변)를 <code>MockRestServiceServer</code>로 확인했다. 독립 리뷰 지적 9건 중 5건 반영(마감 시각 마지막 조회, 부분 취소 로그 1번, CANCELED 0행 로그, 로그 단언, 예외 뒤 재조회 테스트).</li>
+<li>미실행·한계: 실제 토스 테스트 키 조회, 여러 실제 인스턴스 배포, 스케줄러 실측 부하. 첫 PR 기준 검사에서 Payment 단위 테스트 1건이 한 번 실패했고 이후 6번 재실행에서 재현되지 않아 이름을 확인하지 못했다.</li>
+<li>다음 작업: 결제 1차 종료 처리(요구사항 완료 표시·계획 이동)와 주문 연동(Phase 2).</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>5e48c679079d00ec47b8c34c7006fdbc8cde320b98849928c336708324877281</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
