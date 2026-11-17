@@ -31,6 +31,16 @@ class ClassificationTests(unittest.TestCase):
         self.assertFalse(plan["api"])
         self.assertFalse(plan["run_tests"])
 
+    def test_plan_fragments_move_without_selecting_application_build(self):
+        """계획의 YAML·패치 이동은 문서이며 실제 계약·실행 설정은 기존 검사를 유지한다."""
+        for path in ('docs/exec-plans/active/333/api-changes.yaml',
+                     'docs/worklog/plans/active/333/api-changes.yaml',
+                     'docs/worklog/plans/active/332/compat.patch'):
+            for change in (Change(path, b'old', None), Change(path, None, b'new')):
+                self.assertEqual(classify([change])['gradle_tasks'], [])
+        self.assertTrue(classify([Change('contracts/api/commercecore-service.yaml', b'old', b'new')])['api'])
+        self.assertTrue(classify([Change('services/member-service/src/main/resources/application.yml', b'old', b'new')])['run_tests'])
+
     def test_runtime_resources_are_not_skipped_as_documentation(self):
         for path in ("services/member-service/src/main/resources/README.md",
                      "README.sh", "unknown-script.py"):

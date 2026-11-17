@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: #348 결제 스키마(V4). 컬럼 의미·예시와 스키마 원본은 [결제 생성·조회 설계](../../../exec-plans/active/337-payment-redesign/phase1/348-create-api.md#db-v4__payment_coresql)에 있다. 새 설계 전체는 [Payment 도메인 홈](README.md)에 있다.
+기준: #348 결제 스키마(V4). 컬럼 의미·예시와 스키마 원본은 [결제 생성·조회 설계](../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.md#db-v4__payment_coresql)에 있다. 새 설계 전체는 [Payment 도메인 홈](overview.md)에 있다.
 
 [시각 자료](erd.html)
 

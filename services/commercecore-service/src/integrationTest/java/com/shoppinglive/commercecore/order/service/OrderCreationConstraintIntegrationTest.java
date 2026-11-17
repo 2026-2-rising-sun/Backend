@@ -51,6 +51,7 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
         salesId = sales.saveAndFlush(new Sales(PRODUCT_ID, 1000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesId, 5, 0));
         given(numbers.generate()).willReturn(COLLIDING_NUMBER);
+        prepareLegacyTradeFixtures();
         service.create(command(MEMBER_A), "first");
     }
 
@@ -76,8 +77,8 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
         assertThat(orders.count()).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_group", Integer.class))
                 .isEqualTo(2);
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(3);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(2);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(3);
+        assertThat(legacyStock(salesId).getReserved()).isEqualTo(2);
         verify(numbers, times(3)).generate();
     }
 
@@ -93,8 +94,8 @@ class OrderCreationConstraintIntegrationTest extends CommerceCoreSecurityTestSup
         assertThat(orders.findByMemberIdAndIdempotencyKey(MEMBER_B, "second")).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_group", Integer.class))
                 .isEqualTo(1);
-        assertThat(stocks.findById(salesId).orElseThrow().getAvailable()).isEqualTo(4);
-        assertThat(stocks.findById(salesId).orElseThrow().getReserved()).isEqualTo(1);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(4);
+        assertThat(legacyStock(salesId).getReserved()).isEqualTo(1);
         verify(numbers, times(4)).generate();
     }
 

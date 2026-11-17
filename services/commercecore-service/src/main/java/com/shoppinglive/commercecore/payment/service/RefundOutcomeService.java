@@ -7,7 +7,7 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.RefundExecution;
 import com.shoppinglive.commercecore.payment.entity.MockRefundOutcome;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -23,7 +23,7 @@ public class RefundOutcomeService {
     private final JdbcTemplate jdbc;
     private final PaymentDeliveryStore deliveries;
     private final PaymentGroupRepository groups;
-    private final SalesService sales;
+    private final SkuService sales;
     private final PaymentGroupEventPublisher notificationEvents;
     @PersistenceContext private EntityManager entityManager;
 
@@ -31,7 +31,7 @@ public class RefundOutcomeService {
             JdbcTemplate jdbc,
             PaymentDeliveryStore deliveries,
             PaymentGroupRepository groups,
-            SalesService sales,
+            SkuService sales,
             PaymentGroupEventPublisher notificationEvents) {
         this.jdbc = jdbc;
         this.deliveries = deliveries;
@@ -99,9 +99,9 @@ public class RefundOutcomeService {
             List<RefundTarget> targets =
                     jdbc.query(
                             """
-                SELECT t.order_id,o.sales_info_id,o.quantity
+                SELECT t.order_id,COALESCE(o.sku_id,o.sales_info_id),o.quantity
                   FROM refund_target_order t JOIN orders o ON o.id=t.order_id
-                 WHERE t.refund_request_id=? ORDER BY o.sales_info_id,o.id
+                 WHERE t.refund_request_id=? ORDER BY COALESCE(o.sku_id,o.sales_info_id),o.id
                 """,
                             (rs, row) ->
                                     new RefundTarget(rs.getLong(1), rs.getLong(2), rs.getInt(3)),
@@ -117,7 +117,7 @@ public class RefundOutcomeService {
                 if (transitioned != 1) {
                     throw new BusinessException(ErrorCode.CONFLICT, "환불 대상 주문 상태가 변경되었습니다.");
                 }
-                sales.adjustAvailable(target.salesId(), target.quantity());
+                sales.restock(target.salesId(), target.quantity());
             }
             Long groupId =
                     jdbc.queryForObject(

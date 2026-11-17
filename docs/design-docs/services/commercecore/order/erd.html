@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order 독립 도메인과 물리 매핑</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="erd.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#관계">관계</a></li>
+<li><a href="#물리-이행">물리 이행</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Order 독립 도메인과 물리 매핑</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 900" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="논리 Order" data-target="payment_group"><title>논리 Order → payment_group: 기존 BIGINT PK·물리명·번호 보존. 신규 생성600초. processing_expires_at은 첫 실행부터별도600초</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="payment_group" data-target="late_approval_refund"><title>payment_group → late_approval_refund: Core 로컬 FK. 결제ID/late-{paymentId} 유일키, REQUIRED는 환불 완료가 아님</title><path class="connector" d="M725,77 L780,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="72.0">2</text></g><g class="edge-row" data-source="payment_group" data-target="seller_order"><title>payment_group → seller_order: seller_id별 할인 후 금액·생성 시 commerce.commission-rate·정렬 순번 보존</title><path class="connector" d="M565,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="157.5">3</text></g><g class="edge-row" data-source="payment_group" data-target="order_payment_relay"><title>payment_group → order_payment_relay: 새 원결제 ID/결제창/승인 사실. 기존 legacy 결제 ID와 구분</title><path class="connector" d="M565,120 L565,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">4</text></g><g class="edge-row" data-source="payment_group" data-target="payment_relay_refund"><title>payment_group → payment_relay_refund: late-{원결제ID}·REQUESTED→SUCCEEDED/FAILED. 환불 요청 outbox와 같은 TX</title><path class="connector" d="M565,120 L940,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="157.5">5</text></g><g class="edge-row" data-source="payment_group" data-target="payment_delivery_request"><title>payment_group → payment_delivery_request: PREPARE/APPROVAL 원문·고정 requestId. legacy PAYMENT/REFUND 전달기와 분리</title><path class="connector" d="M565,120 L190,375" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.5">6</text></g><g class="edge-row" data-source="논리 OrderItem" data-target="orders"><title>논리 OrderItem → orders: 1:N 항목, 생성당시SKU·상품명·수량·단가·할인·Cart출처</title><path class="connector" d="M725,417 L780,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="412.0">7</text></g><g class="edge-row" data-source="orders" data-target="SKU"><title>orders → SKU: sku_id 우선, 과거 sales_info_id 호환. 가격·재고 현재원본</title><path class="connector" d="M940,460 L190,545" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="497.5">8</text></g><g class="edge-row" data-source="orders" data-target="Product 불변소유자"><title>orders → Product 불변소유자: 신규 seller_id_snapshot 보존, 과거NULL의새환불접수만삭제포함내부소유자조회</title><path class="connector" d="M940,460 L565,545" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="497.5">9</text></g><g class="edge-row" data-source="환불계산 도메인" data-target="OrderRefundAmounts"><title>환불계산 도메인 → OrderRefundAmounts: 단가×수량과잔여실결제액 상한. 신규실행어댑터없음</title><path class="connector" d="M940,630 L190,715" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="667.5">10</text></g><g><title>논리 Order</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">논리 Order</tspan></text></g><g><title>payment_group</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">payment_group</tspan></text></g><g><title>late_approval_refund</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">late_approval_refund</tspan></text></g><g><title>seller_order</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">seller_order</tspan></text></g><g><title>order_payment_relay</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">order_payment_relay</tspan></text></g><g><title>payment_relay_refund</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">payment_relay_refund</tspan></text></g><g><title>payment_delivery_request</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">payment_delivery_request</tspan></text></g><g><title>논리 OrderItem</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">논리 OrderItem</tspan></text></g><g><title>orders</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">orders</tspan></text></g><g><title>SKU</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">SKU</tspan></text></g><g><title>Product 불변소유자</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">Product 불변소유자</tspan></text></g><g><title>환불계산 도메인</title><rect x="780" y="545" width="320" height="85" rx="5"/><text x="940" y="573" text-anchor="middle"><tspan x="940" dy="0">환불계산 도메인</tspan></text></g><g><title>OrderRefundAmounts</title><rect x="30" y="715" width="320" height="85" rx="5"/><text x="190" y="743" text-anchor="middle"><tspan x="190" dy="0">OrderRefundAmounts</tspan></text></g></svg></div></section><p><a href="overview.html">상세설계</a> · <a href="overview.html">상태</a> · <a href="../erd.html">Core 전체 ERD</a></p>
+<p>현재 PR은 CommerceCore 독립 모델이다. Payment V4/제어테이블/종료통지/COMPENSATION은 제외했고 새 공개 주문서와 Commerce 소유 중계를 추가했다. 실제 Payment 환불 통합은 후속이다. 과거 완성도표는 보존ref e08b8aea에 있다.</p>
+<p>작은 화면에서는 도표 안을 좌우로 이동해 양쪽 노드를 확인한다. 관련 항목 필터로 관계 수를 줄일 수 있다.</p>
+<h2 id="관계">관계</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·참조</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>논리 Order</td>
+<td>payment_group</td>
+<td>기존 BIGINT PK·물리명·번호 보존. 신규 생성600초. processing_expires_at은 첫 실행부터별도600초</td>
+</tr>
+<tr>
+<td>payment_group</td>
+<td>late_approval_refund</td>
+<td>Core 로컬 FK. 결제ID/late-{paymentId} 유일키, REQUIRED는 환불 완료가 아님</td>
+</tr>
+<tr>
+<td>payment_group</td>
+<td>seller_order</td>
+<td>seller_id별 할인 후 금액·생성 시 commerce.commission-rate·정렬 순번 보존</td>
+</tr>
+<tr>
+<td>payment_group</td>
+<td>order_payment_relay</td>
+<td>새 원결제 ID/결제창/승인 사실. 기존 legacy 결제 ID와 구분</td>
+</tr>
+<tr>
+<td>payment_group</td>
+<td>payment_relay_refund</td>
+<td>late-{원결제ID}·REQUESTED→SUCCEEDED/FAILED. 환불 요청 outbox와 같은 TX</td>
+</tr>
+<tr>
+<td>payment_group</td>
+<td>payment_delivery_request</td>
+<td>PREPARE/APPROVAL 원문·고정 requestId. legacy PAYMENT/REFUND 전달기와 분리</td>
+</tr>
+<tr>
+<td>논리 OrderItem</td>
+<td>orders</td>
+<td>1:N 항목, 생성당시SKU·상품명·수량·단가·할인·Cart출처</td>
+</tr>
+<tr>
+<td>orders</td>
+<td>SKU</td>
+<td>sku_id 우선, 과거 sales_info_id 호환. 가격·재고 현재원본</td>
+</tr>
+<tr>
+<td>orders</td>
+<td>Product 불변소유자</td>
+<td>신규 seller_id_snapshot 보존, 과거NULL의새환불접수만삭제포함내부소유자조회</td>
+</tr>
+<tr>
+<td>환불계산 도메인</td>
+<td>OrderRefundAmounts</td>
+<td>단가×수량과잔여실결제액 상한. 신규실행어댑터없음</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="물리-이행">물리 이행</h2>
+<p>V104는 정책구분/항목스냅샷/과거거래출처CHECK/환불대상수량/쿠폰사용출처를 확장한다. order_payment_closure와refund_request의신규목적·종료참조는 제외한다. 기존 PK/FK/Cart참조·금액·저장기한은재작성하지않고 새로운 모듈간FK도추가하지않는다. 이미보존V104를적용한환경은별도이행없이다시적용할수없으며배포가능이라주장하지않는다.</p>
+<p>옵션 공급은보류라null이다. 과거판매자를현재표시상품값으로추정하거나완료된NULL환불행을자동보정하지않는다.</p>
+<p>V105는 별도 처리기한 컬럼과 늦은 승인 환불 필요 기록을 추가한다. 기존 생성기한·상태·정책0/1/2 확인중 데이터의 null 처리기한은 보존한다. Payment DB/제어행/종료API는 수정하지 않는다. V106의 새 계약 중계는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 소비·결과 생산 검증은 미완이다.</p><p class="muted fingerprint">MD SHA-256: <code>5cf6eaeb737e94971c5b166421065a6cba18ec4dcf9e12f70c41c1f2db932b04</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

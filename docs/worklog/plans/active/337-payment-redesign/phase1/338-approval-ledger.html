@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#338 토스 결제 승인과 원장 분개</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="338-approval-ledger.md">MD 원본</a><a href="../../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#개요">개요</a></li>
+<li><a href="#범위">범위</a></li>
+<li><a href="#구성-요소">구성 요소</a></li>
+<li><a href="#1-토스-클라이언트-clienttoss">1. 토스 클라이언트 (client.toss)</a><ul>
+<li><a href="#설정-제안-이름">설정 (제안 이름)</a></li>
+<li><a href="#호출-3개">호출 3개</a></li>
+<li><a href="#응답에서-쓰는-필드-토스-payment-객체">응답에서 쓰는 필드 (토스 Payment 객체)</a></li>
+<li><a href="#결과-분류-tossresult">결과 분류 TossResult</a></li>
+</ul>
+</li>
+<li><a href="#2-승인-처리">2. 승인 처리</a><ul>
+<li><a href="#입력">입력</a></li>
+<li><a href="#순서와-트랜잭션">순서와 트랜잭션</a></li>
+<li><a href="#8초-대기-pay-confirm-11">8초 대기 (PAY-CONFIRM-11)</a></li>
+<li><a href="#응답-예시">응답 예시</a></li>
+<li><a href="#승인-api-오류-코드-전체">승인 API 오류 코드 전체</a></li>
+</ul>
+</li>
+<li><a href="#3-원장-ledgerservice">3. 원장 (ledger.service)</a></li>
+<li><a href="#4-이벤트-paymentapproved-pay-event-0102">4. 이벤트 PaymentApproved (PAY-EVENT-01–02)</a></li>
+<li><a href="#테스트">테스트</a></li>
+<li><a href="#바뀌는-점">바뀌는 점</a></li>
+<li><a href="#pr-나누기">PR 나누기</a></li>
+<li><a href="#미결정">미결정</a></li>
+<li><a href="#참고">참고</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#338 토스 결제 승인과 원장 분개</h1><p>상태: 설계 확정(2026-11-15)
+이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/338">#338</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a> · 스키마: <a href="348-create-api.html#db-v4__payment_coresql">#348 설계</a></p>
+<h2 id="개요">개요</h2>
+<p>끝나면 Commerce가 중계한 승인 요청을 Payment가 검증하고, <strong>토스 승인을 한 번만 호출</strong>하고, 결과를 상태·원장·이벤트에 <strong>한 트랜잭션으로</strong> 남긴다. 토스 응답이 8초 안에 없으면 202를 먼저 돌려주고 처리는 계속한다. 결과를 모르면 UNKNOWN으로 두고 #349가 확정한다. 이 이슈의 "승인 반영" 함수(<code>applyDone</code>)를 #349가 그대로 쓴다.</p>
+<h2 id="범위">범위</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>포함</th>
+<th>요구사항 ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>원장 서비스</td>
+<td>LED-01–05, LED-APPROVE-01(분개 내용은 승인 처리 PR에서 호출·검증)</td>
+</tr>
+<tr>
+<td>토스 클라이언트</td>
+<td>PAY-PG-01–04</td>
+</tr>
+<tr>
+<td>승인 처리(서비스)</td>
+<td>PAY-CONFIRM-01–10, 12, PAY-EVENT-01–02</td>
+</tr>
+<tr>
+<td>승인 API · 8초</td>
+<td>PAY-CONFIRM-11, 승인 HTTP 매핑</td>
+</tr>
+</tbody>
+</table></div>
+<p>하지 않는 것: 결과 불명 조회·정체 스위퍼·만료(#349), 환불(Phase 3), 웹훅, 동시 호출 수 제한.</p>
+<h2 id="구성-요소">구성 요소</h2>
+<pre><code class="language-text">payment/controller   ApprovalController            POST /v1/internal/payments/{orderRef}/approval
+payment/service      ApprovalService               start(①검증·APPROVING) · process(②토스 → ③반영). 8초 대기는 PR6
+                     PaymentOutcomeService         ③반영 함수들: insertCall · applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
+client/toss          TossPaymentsClient            confirm · getPayment · cancel. 결과 분류(TossResult)
+ledger/service       LedgerService                 record(refType, refId, lines) → boolean. 호출자 트랜잭션에 참여
+</code></pre>
+<h2 id="1-토스-클라이언트-clienttoss">1. 토스 클라이언트 (<code>client.toss</code>)</h2>
+<h3 id="설정-제안-이름">설정 (제안 이름)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>키</th>
+<th>환경 변수</th>
+<th>기본값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>payment.toss.base-url</code></td>
+<td><code>PAYMENT_TOSS_BASE_URL</code></td>
+<td><code>https://api.tosspayments.com</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>payment.toss.secret-key</code></td>
+<td><code>PAYMENT_TOSS_SECRET_KEY</code></td>
+<td>빈 값</td>
+<td>테스트 키 <code>test_sk_…</code>. <strong>로그·예외 메시지에 남기지 않는다</strong>. 비어 있으면 기동하고 WARN 로그 한 줄을 남긴 뒤, 모든 호출을 보내지 않고 <code>NotSent</code>로 돌려준다(2026-11-15 사용자 결정)</td>
+</tr>
+<tr>
+<td><code>payment.toss.connect-timeout</code></td>
+<td>—</td>
+<td><code>3s</code></td>
+<td>PAY-PG-01</td>
+</tr>
+<tr>
+<td><code>payment.toss.read-timeout</code></td>
+<td>—</td>
+<td><code>60s</code></td>
+<td>PAY-PG-04. 헤더와 본문을 합친 응답 대기다. JDK 요청 타임아웃은 헤더까지만 막으므로 호출 전체에 <code>connect-timeout + read-timeout</code> 데드라인을 두고, 넘으면 <code>Unknown</code>이다</td>
+</tr>
+</tbody>
+</table></div>
+<p>HTTP 클라이언트는 Spring <code>RestClient</code>(+ JDK <code>HttpClient</code> 요청 팩토리)로 만든다. 공통 <code>ServiceRestClientFactory</code>는 내부 서비스용이라 쓰지 않는다. Boot가 주입하는 <code>RestClient.Builder</code>도 쓰지 않는다. 공통 커스터마이저가 내부 요청 ID(<code>X-Request-Id</code>) 같은 헤더를 붙이기 때문이다. 외부 PG에는 토스 헤더만 보낸다.</p>
+<h3 id="호출-3개">호출 3개</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>메서드</th>
+<th>토스 API</th>
+<th>본문</th>
+<th><code>Idempotency-Key</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>confirm(paymentKey, orderId, amount, key)</code></td>
+<td><code>POST /v1/payments/confirm</code></td>
+<td><code>{paymentKey, orderId, amount}</code> (orderId·amount는 <strong>DB 값</strong>)</td>
+<td><code>confirm-{pg_order_id}</code></td>
+</tr>
+<tr>
+<td><code>getPayment(paymentKey)</code></td>
+<td><code>GET /v1/payments/{paymentKey}</code></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>cancel(paymentKey, reason, key)</code></td>
+<td><code>POST /v1/payments/{paymentKey}/cancel</code></td>
+<td><code>{cancelReason}</code> (금액 없음 = 전액)</td>
+<td><code>cancel-{pg_order_id}</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>공통 헤더: <code>Authorization: Basic base64(secretKey + ":")</code>, <code>Content-Type: application/json</code>.</p>
+<h3 id="응답에서-쓰는-필드-토스-payment-객체">응답에서 쓰는 필드 (토스 Payment 객체)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>쓰는 곳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paymentKey</code></td>
+<td>응답 검증</td>
+</tr>
+<tr>
+<td><code>orderId</code></td>
+<td>응답 검증(= <code>pg_order_id</code>)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>DONE</code> 판단, <code>pg_status</code> 저장</td>
+</tr>
+<tr>
+<td><code>totalAmount</code></td>
+<td>응답 검증(= <code>amount</code>)</td>
+</tr>
+<tr>
+<td><code>approvedAt</code></td>
+<td><code>approved_at</code>, 이벤트</td>
+</tr>
+<tr>
+<td><code>isPartialCancelable</code></td>
+<td><code>partial_cancelable</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>오류 응답은 <code>{code, message}</code>다. 모르는 필드는 무시한다(<code>FAIL_ON_UNKNOWN_PROPERTIES=false</code>).</p>
+<h3 id="결과-분류-tossresult">결과 분류 <code>TossResult</code></h3>
+<p><code>Success(payment)</code> · <code>Declined(code, message)</code> · <code>NotSent(reason)</code> · <code>Unknown(reason)</code> 네 가지다. <strong>위에서부터 처음 맞는 줄</strong>로 고른다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>결과</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>시크릿 키 미설정(호출하지 않음)</td>
+<td><code>NotSent</code></td>
+<td>PAY-PG-01</td>
+</tr>
+<tr>
+<td>연결 타임아웃, 연결 거부(요청을 보내기 전 예외)</td>
+<td><code>NotSent</code></td>
+<td>PAY-PG-01</td>
+</tr>
+<tr>
+<td>읽기 타임아웃, 응답 중 끊김, HTTP 5xx, 분류하지 못한 예외</td>
+<td><code>Unknown</code></td>
+<td>PAY-PG-03. 애매하면 불명</td>
+</tr>
+<tr>
+<td>HTTP 401 (<code>UNAUTHORIZED_KEY</code>), HTTP 429</td>
+<td><code>NotSent</code></td>
+<td>우리 키 문제, 호출 제한. 상태 코드만 본다(본문 code 불필요)</td>
+</tr>
+<tr>
+<td>HTTP 4xx인데 본문에서 <code>code</code>를 읽지 못함</td>
+<td><code>Unknown</code></td>
+<td>무엇이 거절됐는지 모른다</td>
+</tr>
+<tr>
+<td>HTTP 400 <code>INVALID_API_KEY</code>, HTTP 403 + code ∈ {<code>INCORRECT_BASIC_AUTH_FORMAT</code>, <code>API_KEY_ACCESS_DENIED</code>}</td>
+<td><code>NotSent</code></td>
+<td>우리 키·설정 문제</td>
+</tr>
+<tr>
+<td>HTTP 400 + code ∈ {<code>ALREADY_PROCESSED_PAYMENT</code>, <code>ALREADY_PROCESSING_REQUEST</code>}, HTTP 403 <code>FORBIDDEN_CONSECUTIVE_REQUEST</code>, HTTP 409 <code>IDEMPOTENT_REQUEST_PROCESSING</code></td>
+<td><code>Unknown</code></td>
+<td>PAY-PG-02. 앞선 요청이 처리 중일 수 있다. 409는 같은 멱등 키 요청이 처리 중이다(<a href="https://docs.tosspayments.com/reference/using-api/idempotency-key">토스 멱등 키</a>)</td>
+</tr>
+<tr>
+<td>그 밖의 HTTP 4xx (카드 거절 403 <code>REJECT_CARD_COMPANY</code> 등 포함)</td>
+<td><code>Declined(code, message)</code></td>
+<td>PAY-PG-02</td>
+</tr>
+<tr>
+<td>HTTP 200, 본문 <code>status</code>가 호출별 기대 상태</td>
+<td><code>Success(payment)</code></td>
+<td>값 검증은 ③에서</td>
+</tr>
+<tr>
+<td>HTTP 200, 본문 파싱 실패 또는 <code>status</code>가 기대 상태가 아님(<code>IN_PROGRESS</code> 등)</td>
+<td><code>Unknown</code></td>
+<td>조회로 확정한다. 보상 취소로 보내지 않는다</td>
+</tr>
+<tr>
+<td>그 밖의 HTTP 상태(1xx·3xx·200이 아닌 2xx)</td>
+<td><code>Unknown</code></td>
+<td>분류하지 못한 응답</td>
+</tr>
+</tbody>
+</table></div>
+<p>200의 기대 상태는 호출마다 다르다. <code>confirm</code>은 <code>DONE</code>, <code>cancel</code>은 <code>CANCELED</code>(전액 취소)다. <code>getPayment</code>는 본문만 읽히면 어떤 <code>status</code>든 <code>Success</code>로 돌려주고 판단은 호출자(#349의 PAY-RECOVER-02–03)가 한다. 4xx·5xx·예외 줄은 세 호출에 같게 적용한다.</p>
+<blockquote>
+<p><strong>요구사항 수정:</strong> 기존 PAY-PG-01은 "401·403·429는 보내지 않음"이었다. 토스 승인 API는 카드 거절 대부분(<code>REJECT_CARD_PAYMENT</code>, <code>REJECT_CARD_COMPANY</code>, <code>FDS_ERROR</code> 등)을 <strong>403</strong>으로 준다(<a href="https://docs.tosspayments.com/reference/error-codes">토스 오류 코드</a>, 2026-11-15 확인). 그대로 두면 카드 거절이 "결제사 연결 불가"로 보인다. 403은 위 2개 코드만 "보내지 않음"으로 보도록 요구사항 문장을 이 PR에서 함께 고친다. 돈 쪽 결과는 같다(둘 다 CREATED로 돌아간다). 바뀌는 것은 응답 코드(503 → 422)뿐이다.</p>
+</blockquote>
+<h2 id="2-승인-처리">2. 승인 처리</h2>
+<h3 id="입력">입력</h3>
+<p><code>POST /v1/internal/payments/{orderRef}/approval</code></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>의미</th>
+<th>형식·제약</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>경로 <code>orderRef</code></td>
+<td>결제 찾기 키</td>
+<td>#348 형식</td>
+<td><code>OD-20261110-K7Q2M9XA</code></td>
+</tr>
+<tr>
+<td><code>buyerId</code></td>
+<td>Commerce가 로그인 토큰에서 꺼낸 구매자</td>
+<td>필수, UUID</td>
+<td></td>
+</tr>
+<tr>
+<td><code>paymentKey</code></td>
+<td>브라우저가 받은 토스 paymentKey</td>
+<td>필수, ≤ 200자</td>
+<td><code>tgen_…</code></td>
+</tr>
+<tr>
+<td><code>pgOrderId</code></td>
+<td>브라우저가 받은 토스 orderId</td>
+<td>필수, ≤ 64자</td>
+<td><code>OD-20261110-K7Q2M9XA-1</code></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>브라우저가 받은 금액</td>
+<td>필수, ≥ 1</td>
+<td><code>30000</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="순서와-트랜잭션">순서와 트랜잭션</h3>
+<pre><code class="language-text">① 트랜잭션 A (검증 + 시작)        ② 트랜잭션 밖 (가상 스레드)        ③ 트랜잭션 C (반영)
+   검증 → CREATED→APPROVING          토스 confirm (같은 키로 1번 더)      결과별 반영 + pg_call 결과
+   pg_call(CONFIRM, UNKNOWN) INSERT  재호출이면 그 전에 pg_call 1행 INSERT  (+ 분개 + outbox)
+   커밋                                                                 커밋
+요청 스레드: ②③을 가상 스레드에 맡기고 최대 8초 기다린다. 끝나면 결과 응답, 아니면 202.
+</code></pre>
+<p><strong>① 검증</strong> (요구사항 순서. 처음 걸린 하나만 응답)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>검사</th>
+<th>실패 응답</th>
+<th>토스 호출</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>orderRef</code>로 결제 찾기</td>
+<td>404 <code>PAYMENT_NOT_FOUND</code></td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>pgOrderId</code>의 마지막 <code>-</code> 앞부분 = <code>orderRef</code></td>
+<td>400 <code>ORDER_ID_MISMATCH</code></td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>buyerId</code> = <code>buyer_id</code></td>
+<td>403 <code>BUYER_MISMATCH</code> + WARN 보안 로그</td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>amount</code> = <code>amount</code></td>
+<td>400 <code>AMOUNT_MISMATCH</code> + WARN 보안 로그</td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>pgOrderId</code> ≠ 현재 <code>pg_order_id</code>(현재 값이 NULL이어도)</td>
+<td>409 <code>STALE_CHECKOUT</code> (PAY-CONFIRM-02)</td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>6</td>
+<td>상태: APPROVED → <strong>200</strong>(같은 응답 반복), APPROVING·UNKNOWN → <strong>202</strong>, CANCELED·PARTIALLY_REFUNDED·REFUNDED → 409 <code>PAYMENT_CLOSED</code></td>
+<td></td>
+<td>안 함</td>
+</tr>
+<tr>
+<td>7</td>
+<td>CREATED인데 <code>expires_at</code> ≤ now()</td>
+<td>409 <code>PAYMENT_CLOSED</code> (PAY-CONFIRM-03)</td>
+<td>안 함</td>
+</tr>
+</tbody>
+</table></div>
+<p>요구사항 순서(01 → 02 → 03)를 따른다. 다만 만료 검사(7)는 CREATED에만 한다. 이미 승인된 결제는 만료 시각이 지나도 새로고침에 200을 줘야 하기 때문이다(PAY-CONFIRM-05).</p>
+<p>검사를 통과하면 조건부 UPDATE로 시작한다. 동시 요청은 여기서 한 건만 1행이 된다(PAY-CONFIRM-05).</p>
+<pre><code class="language-sql">UPDATE payment
+   SET status = 'APPROVING', approving_at = now(), pg_payment_key = :paymentKey, updated_at = now()
+ WHERE id = :id AND status = 'CREATED' AND pg_order_id = :pgOrderId
+   AND amount = :amount AND buyer_id = :buyerId AND expires_at &gt; now();
+-- 0행: 다시 읽어 표 5–7로 응답(경합에서 진 요청)
+-- 1행: 같은 트랜잭션에서 pg_call(kind=CONFIRM, outcome=UNKNOWN, idempotency_key=confirm-{pg_order_id}, requested_at=now()) INSERT
+</code></pre>
+<p><code>pg_payment_key</code> UNIQUE 위반(다른 결제가 이미 쓴 paymentKey)은 정상이라면 생기지 않는다. 400 <code>INVALID_REQUEST</code> + WARN 보안 로그로 거절한다.</p>
+<p><strong>② 토스 호출</strong> — 트랜잭션 밖. <code>confirm</code>이 <code>Unknown</code>이면 같은 키로 <strong>1번 더</strong> 부른다(PAY-CONFIRM-10). 두 번째 호출도 pg_call 1행을 남긴다(① 이후 ③ 전에 별도 짧은 트랜잭션으로 INSERT).</p>
+<p><strong>한 번이라도 <code>Unknown</code>을 받은 시도는 CREATED로 되돌리지 않는다.</strong> 첫 요청이 토스에 닿았을 수 있기 때문이다. 두 번째 결과가 <code>Success</code>면 그대로 반영하고, <code>Declined</code>·<code>NotSent</code>·<code>Unknown</code>이면 모두 아래 표의 <code>Unknown</code> 줄로 처리해 조회로 확정한다. 아래 표의 <code>Declined</code>·<code>NotSent</code> 줄은 <strong>첫 호출의 결과</strong>일 때만 쓴다.</p>
+<p><strong>③ 반영</strong> (<code>PaymentOutcomeService</code>, 결과마다 한 트랜잭션)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>결과</th>
+<th>상태 변경(조건부 UPDATE)</th>
+<th>함께 쓰는 것</th>
+<th>승인 API 응답</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Success</code> + 응답 검증 통과</td>
+<td><code>APPROVED</code>, <code>approved_at</code>, <code>pg_status</code>, <code>partial_cancelable</code> · <code>WHERE id AND status IN ('APPROVING','UNKNOWN')</code></td>
+<td>분개(아래), outbox <code>PaymentApproved</code>, pg_call <code>SUCCESS</code></td>
+<td>200 <code>{paymentId, status: APPROVED}</code></td>
+</tr>
+<tr>
+<td><code>Success</code> + 응답 검증 실패</td>
+<td>아래 "보상 취소"</td>
+<td>pg_call <code>SUCCESS</code> + CANCEL 행, ERROR 로그</td>
+<td>409 <code>PAYMENT_CLOSED</code></td>
+</tr>
+<tr>
+<td><code>Declined</code>(첫 호출)</td>
+<td><code>CREATED</code>, <code>approving_at = NULL</code>, <strong><code>pg_order_id = NULL</code></strong> · <code>WHERE id AND status = 'APPROVING'</code></td>
+<td>pg_call <code>DECLINED</code> + <code>result_code</code></td>
+<td>422 <code>DECLINED</code></td>
+</tr>
+<tr>
+<td><code>NotSent</code>(첫 호출)</td>
+<td>같은 변경</td>
+<td>pg_call <code>NOT_SENT</code></td>
+<td>503 <code>PG_UNAVAILABLE</code></td>
+</tr>
+<tr>
+<td><code>Unknown</code>, 또는 재호출 뒤 <code>Success</code>가 아닌 모든 결과</td>
+<td><code>UNKNOWN</code>, <code>next_check_at = now() + 10s</code>, <code>check_deadline_at = now() + 30m</code> · <code>WHERE status = 'APPROVING'</code></td>
+<td>첫 호출 pg_call은 <code>UNKNOWN</code> 유지. 재호출 pg_call에는 그 호출의 결과(<code>DECLINED</code>·<code>NOT_SENT</code>·<code>UNKNOWN</code>)를 남긴다</td>
+<td>202 <code>{paymentId, status: PENDING}</code></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>pg_call <code>http_status</code></strong>(2026-11-17 추가): 토스 응답을 받은 호출은 그 HTTP 상태(성공 200, 거절 4xx, 5xx, 200인데 기대 상태가 아님 등)를 남긴다. 응답을 받지 못했거나(연결 실패·읽기 타임아웃·데드라인·키 미설정) 본문을 끝까지 받지 못하면(연결 끊김, JSON이 중간에서 끝남) NULL이다. <code>TossResult.httpStatus()</code>가 이 값을 나르고 분류 규칙은 바뀌지 않는다. 첫 호출이 불명이면 재호출 전에 그 행의 <code>http_status</code>만 채우고 결과는 <code>UNKNOWN</code>으로 둔다. 이 브랜치에서는 CONFIRM·CANCEL 기록과 <code>applyDone</code>(성공이면 200)이 이 규칙을 따른다. QUERY의 나머지 결과 기록은 #349 조회기가 같은 규칙으로 남긴다.</li>
+<li>응답 검증(PAY-CONFIRM-06): <code>status = DONE</code>, <code>orderId = pg_order_id</code>, <code>totalAmount = amount</code>, <code>paymentKey = 보낸 값</code>. 하나라도 다르면 실패다.</li>
+<li><strong>CREATED로 되돌릴 때 <code>pg_order_id</code>를 NULL로 비운다.</strong> 같은 pgOrderId로 다시 승인하면 멱등 키 <code>confirm-{pg_order_id}</code>가 재사용되어 토스가 첫 거절 응답을 돌려줄 수 있다. 비워 두면 그 요청은 409 <code>STALE_CHECKOUT</code>이 되고, Commerce는 <code>POST …/checkouts</code>로 새 결제창을 연다(PAY-CONFIRM-08 "새 결제창으로 다시 승인").</li>
+<li><code>applyDone</code>의 조건부 UPDATE가 <strong>0행이면 다시 읽는다.</strong> APPROVED면 이미 반영된 것이므로 끝낸다(분개·outbox 없음, 중복 없음). 그 밖의 상태(CREATED·CANCELED 등)면 토스에서는 승인됐는데 우리는 다른 상태라는 뜻이다. ERROR 로그를 남기고 아래 보상 취소로 보낸다. 돈만 빠진 채 끝나는 경로를 남기지 않는다.</li>
+<li><strong><code>applyDone(paymentId, pgCallId, tossPayment) → boolean</code>은 #349의 조회 DONE도 같은 함수로 처리한다.</strong> 승인 반영 코드는 한 곳에만 있다. 응답은 DB 값(<code>pg_order_id</code>·<code>amount</code>·<code>pg_payment_key</code>)과 비교한다. 결제가 이미 APPROVED면 응답 검증 없이 true로 끝낸다(승인된 결제는 보상 취소하지 않는다). false면 호출자가 트랜잭션 밖에서 <code>compensate</code>를 부른다. 토스 응답에 <code>approvedAt</code>이 없으면 DB <code>now()</code>를 쓴다.</li>
+</ul>
+<p><strong>보상 취소</strong>(PAY-CONFIRM-07): 취소 대상은 <strong>토스 응답의 <code>paymentKey</code></strong>다(DB 값이 아니다. 검증 실패는 토스가 다른 결제를 응답했을 수 있다는 뜻이다). 순서: ⓐ 한 트랜잭션에서 <code>CANCELED</code>로 선점(<code>WHERE status IN ('APPROVING','UNKNOWN','CREATED')</code> 조건부 UPDATE 한 번) + pg_call(kind=CANCEL, outcome=UNKNOWN, idempotency_key=<code>cancel-{시도의 pg_order_id}</code>) INSERT 커밋. 0행이면 다시 읽어 CANCELED가 아니면(APPROVED·환불 상태) 다른 반영이 먼저 승인한 것이므로 <strong>취소하지 않고 끝낸다</strong> → ⓑ 트랜잭션 밖에서 <code>cancel(응답 paymentKey, "승인 응답 불일치", 키)</code> → ⓒ pg_call에 결과(outcome·result_code)를 남긴다. 선점을 먼저 하므로 취소 도중 <code>applyDone</code>이 승인으로 바꾸지 못한다(2026-11-16 리뷰 반영, 처음 설계는 ⓒ에서 CANCELED). 시도의 pg_order_id는 ①에서 읽어 메모리에 들고 있는 값을 쓴다(DB 값은 이미 NULL일 수 있다). 분개는 쓰지 않는다(확정된 돈이 없다고 본다). <strong>보상 취소가 <code>Success</code>가 아니면(거절·보내지 않음·불명) 자동 재시도 없이 사람이 확인한다</strong>: DB는 CANCELED인데 토스 결제가 남았을 수 있으므로 <code>[사람 확인 필요]</code> ERROR 로그에 paymentId·orderRef·paymentKey·금액·결과를 남긴다(감수, 거래 대사가 다시 잡는다).</p>
+<h3 id="8초-대기-pay-confirm-11">8초 대기 (PAY-CONFIRM-11)</h3>
+<ul>
+<li>요청 스레드는 ②③ 작업을 <code>Executors.newVirtualThreadPerTaskExecutor()</code>(Java 21)로 넘기고 <code>future.get(8, SECONDS)</code>로 기다린다.</li>
+<li>8초 안에 끝나면 ③의 응답을 준다. 넘으면 <strong>202 <code>{paymentId, status: PENDING}</code></strong>과 헤더 <code>Location: /v1/internal/payments/{orderRef}</code>를 주고, 작업은 계속 돈다(결과는 이벤트로 나간다).</li>
+<li>설정: <code>payment.approval.response-wait</code> 기본 <code>8s</code>(제안).</li>
+<li>동시 실행 수 제한은 두지 않는다(벌크헤드 범위 밖). ADR 0337-5의 "크기를 제한한 별도 스레드 풀" 문장은 이 결정에 맞게 정정 메모를 단다(이 PR).</li>
+</ul>
+<h3 id="응답-예시">응답 예시</h3>
+<pre><code class="language-json">// 200
+{ &quot;success&quot;: true, &quot;data&quot;: { &quot;paymentId&quot;: 1001, &quot;status&quot;: &quot;APPROVED&quot; }, &quot;error&quot;: null }
+// 202  (Location: /v1/internal/payments/OD-20261110-K7Q2M9XA)
+{ &quot;success&quot;: true, &quot;data&quot;: { &quot;paymentId&quot;: 1001, &quot;status&quot;: &quot;PENDING&quot; }, &quot;error&quot;: null }
+// 422 — 요구사항 표의 {status, code, message}를 data에 그대로 담는다
+{ &quot;success&quot;: false,
+  &quot;data&quot;: { &quot;status&quot;: &quot;DECLINED&quot;, &quot;code&quot;: &quot;REJECT_CARD_PAYMENT&quot;, &quot;message&quot;: &quot;한도초과 혹은 잔액부족으로 결제에 실패했습니다.&quot; },
+  &quot;error&quot;: { &quot;code&quot;: &quot;DECLINED&quot;, &quot;message&quot;: &quot;카드사에서 결제를 거절했습니다.&quot;, &quot;requestId&quot;: &quot;…&quot; } }
+</code></pre>
+<p>422는 <code>error.code = DECLINED</code>로 고정하고, 토스 코드·메시지는 요구사항 표대로 <code>data.code</code>·<code>data.message</code>에 담는다.</p>
+<h3 id="승인-api-오류-코드-전체">승인 API 오류 코드 전체</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>HTTP</th>
+<th>code</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>—</td>
+<td>승인됨(이미 승인된 결제의 재요청 포함)</td>
+</tr>
+<tr>
+<td>202</td>
+<td>—</td>
+<td>처리 중(8초 초과, APPROVING·UNKNOWN, 결과 불명)</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>INVALID_REQUEST</code></td>
+<td>입력 형식, paymentKey 중복</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>ORDER_ID_MISMATCH</code>(제안)</td>
+<td>pgOrderId가 경로 orderRef 것이 아님</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>AMOUNT_MISMATCH</code></td>
+<td>금액 다름</td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>UNAUTHORIZED</code></td>
+<td>서비스 토큰</td>
+</tr>
+<tr>
+<td>403</td>
+<td><code>BUYER_MISMATCH</code></td>
+<td>구매자 다름</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>PAYMENT_NOT_FOUND</code></td>
+<td>결제 없음</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>STALE_CHECKOUT</code>(제안)</td>
+<td>예전 결제창</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>PAYMENT_CLOSED</code></td>
+<td>만료·닫힘·응답 검증 실패 뒤 보상</td>
+</tr>
+<tr>
+<td>422</td>
+<td><code>DECLINED</code></td>
+<td>토스 거절</td>
+</tr>
+<tr>
+<td>503</td>
+<td><code>PG_UNAVAILABLE</code>(제안)</td>
+<td>토스에 요청이 가지 않음</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="3-원장-ledgerservice">3. 원장 (<code>ledger.service</code>)</h2>
+<pre><code class="language-java">// 호출자 트랜잭션 필수 (Propagation.MANDATORY, LED-04). 새로 기록하면 true, 이미 있으면 false
+boolean record(LedgerRefType refType, String refId, List&lt;Journal.Line&gt; lines)
+record Line(LedgerAccount account, long debit, long credit, String sellerId) {}
+</code></pre>
+<ul>
+<li><code>Journal</code>·<code>Journal.Line</code> 생성자가 줄 2개 이상, 각 줄 한쪽만 &gt; 0(음수 거절), <code>SELLER_PAYABLE</code> 줄의 판매자 ID(LED-02), 차변 합 = 대변 합(<code>Math.addExact</code>로 넘침 거절)을 검사한다. 어기면 <code>IllegalArgumentException</code>, DB에 닿기 전이라 아무것도 저장하지 않는다(LED-01).</li>
+<li><code>INSERT INTO ledger_journal … ON CONFLICT DO NOTHING</code>(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태) → 0행이면 이미 기록된 사건이므로 줄을 넣지 않고 false로 끝낸다(LED-03). H2 <code>create-drop</code>이 같은 UNIQUE를 만들도록 <code>LedgerJournal</code>에 <code>@UniqueConstraint</code>를 둔다.</li>
+<li>수정·삭제 메서드를 만들지 않는다. 원장 리포지토리는 <code>JpaRepository</code>가 아닌 <code>Repository</code>로 좁혀 삭제 메서드를 물려받지 않는다(LED-05).</li>
+</ul>
+<p><strong>결제 승인 분개</strong>(LED-APPROVE-01): 사건 키 (<code>PAYMENT_APPROVED</code>, <code>payment.id</code> 문자열)</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>계정</th>
+<th>차변</th>
+<th>대변</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PG_CUSTODY</code> (PG 보관금)</td>
+<td>amount</td>
+<td></td>
+</tr>
+<tr>
+<td><code>BUYER_DEPOSIT</code> (구매자 예수금)</td>
+<td></td>
+<td>amount</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="4-이벤트-paymentapproved-pay-event-0102">4. 이벤트 <code>PaymentApproved</code> (PAY-EVENT-01–02)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>토픽</td>
+<td><code>payment.execution-results.v1</code> (기존 토픽 그대로)</td>
+</tr>
+<tr>
+<td>Kafka 키 = <code>aggregateId</code></td>
+<td><code>orderRef</code> (문자열. 기존 계약의 <code>format: uuid</code> 제거)</td>
+</tr>
+<tr>
+<td>발행</td>
+<td>③ 승인 반영 트랜잭션 안에서 <code>EventOutbox.append(topic, envelope)</code></td>
+</tr>
+<tr>
+<td>봉투</td>
+<td><code>EventEnvelope.create("PaymentApproved", 1, "payment-service", orderRef, now, payload)</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>payload:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>의미</th>
+<th>형식</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paymentId</code></td>
+<td>Payment 결제 ID</td>
+<td>int64 ≥ 1</td>
+<td><code>1001</code></td>
+</tr>
+<tr>
+<td><code>orderRef</code></td>
+<td>주문 참조</td>
+<td>string 6–50</td>
+<td><code>OD-20261110-K7Q2M9XA</code></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>결제 금액</td>
+<td>int64 ≥ 1</td>
+<td><code>30000</code></td>
+</tr>
+<tr>
+<td><code>approvedAt</code></td>
+<td>토스 승인 시각</td>
+<td>date-time</td>
+<td><code>2026-11-10T14:02:11+09:00</code></td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{ &quot;eventId&quot;: &quot;8f0c2d4e-6b1a-4c3e-9f7d-2a5b8c1e0d93&quot;, &quot;eventType&quot;: &quot;PaymentApproved&quot;, &quot;schemaVersion&quot;: 1,
+  &quot;source&quot;: &quot;payment-service&quot;, &quot;aggregateId&quot;: &quot;OD-20261110-K7Q2M9XA&quot;, &quot;occurredAt&quot;: &quot;2026-11-10T05:02:11Z&quot;,
+  &quot;payload&quot;: { &quot;paymentId&quot;: 1001, &quot;orderRef&quot;: &quot;OD-20261110-K7Q2M9XA&quot;, &quot;amount&quot;: 30000,
+               &quot;approvedAt&quot;: &quot;2026-11-10T14:02:11+09:00&quot; } }
+</code></pre>
+<ul>
+<li><code>contracts/events/payment-execution-results.yaml</code>의 <code>PaymentExecutionResolved</code>를 <code>PaymentApproved</code>로 <strong>교체</strong>한다. 메시지마다 <code>examples</code>를 둔다.</li>
+<li>발행 객체로 만든 표본을 <code>build/contract-samples</code>에 남기는 직렬화 테스트가 계약 검사를 통과해야 한다(PAY-EVENT-02). #347이 옛 DTO 없이 표본만 만드는 형태로 남긴 <code>ExecutionEventContractTest</code>를 지우고 <code>PaymentApprovedContractTest</code>를 새로 만든다(표본 저장 방식은 같다).</li>
+<li>발행 전 재시작 뒤 발행(EC 30)은 common-module <code>OutboxTransactionIntegrationTest</code>가 이미 검증한다.</li>
+</ul>
+<h2 id="테스트">테스트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>테스트(제안 이름)</th>
+<th>종류</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LED-01–05</td>
+<td><code>JournalTest</code>(검사), <code>LedgerServiceTest</code>(H2 저장·롤백·메서드), <code>LedgerServicePostgresTest</code>(중복·동시 중복·롤백)</td>
+<td>단위 · 통합(H2) · <code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>LED-APPROVE-01</td>
+<td><code>ApprovalOutcomePostgresTest</code> 안 분개 검증</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-PG-01–04</td>
+<td><code>TossPaymentsClientTest</code>(<code>MockRestServiceServer</code>), <code>TossResultClassifierTest</code>(예외·상태·코드 → 결과)</td>
+<td>단위</td>
+</tr>
+<tr>
+<td>PAY-CONFIRM-01–03</td>
+<td><code>ApprovalValidationTest</code>(토스 호출 0번 검증)</td>
+<td>통합</td>
+</tr>
+<tr>
+<td>PAY-CONFIRM-04, 05</td>
+<td><code>ApprovalConcurrencyPostgresTest</code>(동시 2건 → 토스 1번)</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-CONFIRM-06–10, 12</td>
+<td><code>ApprovalOutcomePostgresTest</code>(결과 5종 × 상태·pg_call·분개·outbox 행 수)</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-CONFIRM-11</td>
+<td><code>ApprovalResponseWaitTest</code>(토스 지연 → 202 + Location, 이후 APPROVED)</td>
+<td>통합</td>
+</tr>
+<tr>
+<td>PAY-EVENT-01–02</td>
+<td><code>PaymentApprovedContractTest</code>(표본 생성)</td>
+<td>단위</td>
+</tr>
+</tbody>
+</table></div>
+<p>토스는 항상 <code>MockRestServiceServer</code> 또는 테스트 대역으로 대체한다. 실제 토스 테스트 키 호출은 Phase 2 끝의 수동 확인에서 한다.</p>
+<h2 id="바뀌는-점">바뀌는 점</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>유지</th>
+<th>바뀜·새로 생김</th>
+<th>없어짐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>API</td>
+<td>결제 키 <code>orderRef</code></td>
+<td>승인 API 1개</td>
+<td>—</td>
+</tr>
+<tr>
+<td>외부</td>
+<td>—</td>
+<td>토스 승인·조회·취소 클라이언트, 시크릿 키 설정</td>
+<td>Mock 실행기(#347에서 이미 삭제)</td>
+</tr>
+<tr>
+<td>이벤트</td>
+<td>토픽, outbox 릴레이</td>
+<td><code>PaymentApproved</code>(키 orderRef)</td>
+<td><code>PaymentExecutionResolved</code></td>
+</tr>
+<tr>
+<td>DB</td>
+<td>V4 스키마</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>운영</td>
+<td>—</td>
+<td><code>PAYMENT_TOSS_SECRET_KEY</code> 환경 변수(없으면 기동은 하고 토스 호출은 <code>NotSent</code>)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>요구사항</td>
+<td>—</td>
+<td>PAY-PG-01 문장(403 분류, 400 <code>INVALID_API_KEY</code>, 401·429는 상태 코드만, 키 미설정), PAY-PG-02 문장(409 <code>IDEMPOTENT_REQUEST_PROCESSING</code>)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>CommerceCore는 아직 <code>PaymentExecutionResolved</code>를 기다린다. Phase 2 전까지 통합 환경의 결제는 동작하지 않는다(이미 알려진 영향).</p>
+<p><strong>호환 깨짐을 감수한다(2026-11-15 사용자 결정).</strong> PR5는 옛 메시지를 남기지 않고 지운다. CommerceCore의 <code>PaymentEventConsumerConfiguration</code>과 통합 테스트 2개(<code>PaymentResultKafkaPostgresTest</code>, <code>PaymentRecoveryPostgresTest</code>)가 깨지면, PR5에서 컴파일·검사가 통과할 만큼만 고친다(옛 소비 코드는 Phase 2에서 다시 쓴다). PR 본문과 CommerceCore 담당자에게 깨지는 내용을 알린다.</p>
+<h2 id="pr-나누기">PR 나누기</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>PR</th>
+<th>범위</th>
+<th>base</th>
+<th>브랜치</th>
+<th>갱신할 문서</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR3 원장</td>
+<td><code>ledger/service</code>, <code>Journal</code></td>
+<td>#348 PR2</td>
+<td><code>feat/#338-payment-ledger</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>PR4 토스 클라이언트</td>
+<td><code>client/toss</code>, 설정</td>
+<td><code>dev</code>(병렬, PR5 전에 병합)</td>
+<td><code>feat/#338-toss-client</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>PR5 승인 처리</td>
+<td><code>ApprovalService</code>·<code>PaymentOutcomeService</code>(컨트롤러 없음), 이벤트 계약 교체</td>
+<td>PR3(PR4 브랜치를 merge로 포함)</td>
+<td><code>feat/#338-payment-approval</code></td>
+<td><code>states/payment.md</code>·<code>.html</code></td>
+</tr>
+<tr>
+<td>PR6 승인 API · 8초</td>
+<td><code>ApprovalController</code>, 8초 대기, 계약 YAML</td>
+<td>PR5</td>
+<td><code>feat/#338-payment-approval-api</code></td>
+<td><code>api.html</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>PR5와 PR6을 나누는 이유: 8초 대기 없이 엔드포인트가 먼저 배포되면 Payment가 Commerce 10초보다 오래 기다린다(<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a>). PR6이 #338을 <code>Closes</code>한다.</p>
+<h2 id="미결정">미결정</h2>
+<p>결정(2026-11-15, 사용자 동의):</p>
+<ol>
+<li>설정 키는 <code>payment.toss.*</code>, <code>payment.approval.response-wait</code>로 한다.</li>
+<li>보상 취소 뒤 상태는 CANCELED다.</li>
+<li>옛 이벤트는 호환을 깨고 지운다(위 "바뀌는 점" 아래 문단).</li>
+</ol>
+<h2 id="참고">참고</h2>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>90c67eddd1b7c97a0e1f9da9228d86a738a9d88073fbe30450c566302029a15f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

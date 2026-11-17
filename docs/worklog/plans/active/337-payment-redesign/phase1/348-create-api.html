@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#348 결제 생성·결제창·조회 내부 API</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="348-create-api.md">MD 원본</a><a href="../../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#개요">개요</a></li>
+<li><a href="#범위">범위</a></li>
+<li><a href="#패키지">패키지</a></li>
+<li><a href="#db-v4__payment_coresql">DB: V4__payment_core.sql</a><ul>
+<li><a href="#1-기존-테이블-삭제-파일-맨-앞-자식부터">1) 기존 테이블 삭제 (파일 맨 앞, 자식부터)</a></li>
+<li><a href="#2-새-테이블">2) 새 테이블</a></li>
+<li><a href="#payment-컬럼">payment 컬럼</a></li>
+<li><a href="#payment_seller_amount-컬럼">payment_seller_amount 컬럼</a></li>
+<li><a href="#시각-규칙">시각 규칙</a></li>
+</ul>
+</li>
+<li><a href="#api">API</a><ul>
+<li><a href="#오류-응답-만들기">오류 응답 만들기</a></li>
+<li><a href="#1-결제-생성-post-v1internalpayments">1. 결제 생성 POST /v1/internal/payments</a></li>
+<li><a href="#2-결제창-다시-열기-post-v1internalpaymentsorderrefcheckouts">2. 결제창 다시 열기 POST /v1/internal/payments/{orderRef}/checkouts</a></li>
+<li><a href="#3-조회-get-v1internalpaymentsorderref">3. 조회 GET /v1/internal/payments/{orderRef}</a></li>
+<li><a href="#오류-코드-이-이슈">오류 코드 (이 이슈)</a></li>
+<li><a href="#보안-설정">보안 설정</a></li>
+</ul>
+</li>
+<li><a href="#처리-순서와-트랜잭션">처리 순서와 트랜잭션</a></li>
+<li><a href="#테스트">테스트</a></li>
+<li><a href="#바뀌는-점">바뀌는 점</a></li>
+<li><a href="#pr-나누기">PR 나누기</a></li>
+<li><a href="#미결정">미결정</a></li>
+<li><a href="#참고">참고</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#348 결제 생성·결제창·조회 내부 API</h1><p>상태: 설계 확정(2026-11-15)
+이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/348">#348</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a></p>
+<h2 id="개요">개요</h2>
+<p>끝나면 Commerce가 내부 API로 <strong>결제를 만들고, 결제창을 다시 열고, 상태를 조회</strong>할 수 있다. 같은 요청을 다시 보내도 결제는 1건이다. 이 이슈가 만드는 V4 스키마와 결제 키 규칙을 #338·#349가 그대로 쓴다. <strong>스키마의 원본은 이 문서다.</strong> 컬럼을 바꿀 일이 생기면 이 문서를 먼저 고친다.</p>
+<h2 id="범위">범위</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>포함</th>
+<th>요구사항 ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V4 스키마, 엔티티·리포지토리</td>
+<td>PAY-DATA-01–03, LED-02(제약), LED-03(제약)</td>
+</tr>
+<tr>
+<td>결제 생성</td>
+<td>PAY-CREATE-01–06</td>
+</tr>
+<tr>
+<td>결제창 다시 열기</td>
+<td>PAY-CHECKOUT-01–02</td>
+</tr>
+<tr>
+<td>조회</td>
+<td>PAY-QUERY-01</td>
+</tr>
+<tr>
+<td>서비스 토큰 인증</td>
+<td>PAY-AUTH-01</td>
+</tr>
+</tbody>
+</table></div>
+<p>하지 않는 것: 승인·토스 호출·원장 서비스(#338), 스케줄러(#349), 기존 코드 삭제(#347).</p>
+<h2 id="패키지">패키지</h2>
+<pre><code class="language-text">com.shoppinglive.payment
+├─ payment/{controller,service,repository,entity,dto}   ← 이 이슈
+├─ ledger/{entity,repository}                           ← 이 이슈(엔티티·리포지토리만). 서비스는 #338
+└─ config/                                              ← #347이 남긴 보안·예외 처리. 경로 허용 목록만 고친다
+</code></pre>
+<h2 id="db-v4__payment_coresql">DB: <code>V4__payment_core.sql</code></h2>
+<p>위치: <code>services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql</code>. V1–V3는 고치지 않는다.</p>
+<h3 id="1-기존-테이블-삭제-파일-맨-앞-자식부터">1) 기존 테이블 삭제 (파일 맨 앞, 자식부터)</h3>
+<pre><code class="language-sql">DROP TABLE mock_refund_result;   -- → refund_execution
+DROP TABLE mock_gateway_result;  -- → payment_attempt
+DROP TABLE refund_execution;     -- → payment_attempt
+DROP TABLE payment_attempt;
+-- event_outbox(V2·V3)는 남긴다
+</code></pre>
+<h3 id="2-새-테이블">2) 새 테이블</h3>
+<pre><code class="language-sql">-- 결제 1건. 주문(Commerce)과는 order_ref 값으로만 연결한다.
+CREATE TABLE payment (
+    id                 BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    order_ref          VARCHAR(64)  NOT NULL UNIQUE
+                       CHECK (char_length(order_ref) BETWEEN 6 AND 50),
+    buyer_id           VARCHAR(36)  NOT NULL,
+    amount             BIGINT       NOT NULL CHECK (amount &gt; 0),
+    refunded_amount    BIGINT       NOT NULL DEFAULT 0,
+    status             VARCHAR(32)  NOT NULL,
+    expires_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    pg_provider        VARCHAR(32)  NOT NULL,
+    pg_order_id        VARCHAR(64)  UNIQUE,
+    checkout_seq       INTEGER      NOT NULL DEFAULT 0,
+    pg_payment_key     VARCHAR(200) UNIQUE,
+    pg_status          VARCHAR(32),
+    partial_cancelable BOOLEAN,
+    approved_at        TIMESTAMP WITH TIME ZONE,
+    approving_at       TIMESTAMP WITH TIME ZONE,
+    next_check_at      TIMESTAMP WITH TIME ZONE,
+    check_deadline_at  TIMESTAMP WITH TIME ZONE,
+    created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT ck_payment_status CHECK (status IN
+        ('CREATED','APPROVING','APPROVED','UNKNOWN','CANCELED','PARTIALLY_REFUNDED','REFUNDED')),
+    CONSTRAINT ck_payment_refunded CHECK (refunded_amount BETWEEN 0 AND amount)
+);
+CREATE INDEX ix_payment_check     ON payment(next_check_at) WHERE status = 'UNKNOWN';
+CREATE INDEX ix_payment_approving ON payment(approving_at)  WHERE status = 'APPROVING';
+CREATE INDEX ix_payment_expiry    ON payment(expires_at)    WHERE status = 'CREATED';
+
+CREATE TABLE payment_seller_amount (
+    id                  BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    payment_id          BIGINT       NOT NULL REFERENCES payment(id),
+    seller_order_number VARCHAR(64)  NOT NULL UNIQUE,
+    seller_id           VARCHAR(36)  NOT NULL,
+    amount              BIGINT       NOT NULL CHECK (amount &gt; 0),
+    commission_rate     NUMERIC(5,4) NOT NULL CHECK (commission_rate BETWEEN 0 AND 1)
+);
+CREATE INDEX ix_psa_payment ON payment_seller_amount(payment_id);
+
+-- PG 호출 기록. 호출 전에 outcome='UNKNOWN'으로 넣고, 응답을 받으면 그 행의 결과만 채운다(#338).
+CREATE TABLE pg_call (
+    id              BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    payment_id      BIGINT      NOT NULL REFERENCES payment(id),
+    kind            VARCHAR(16) NOT NULL CHECK (kind IN ('CONFIRM','QUERY','CANCEL')),
+    pg_order_id     VARCHAR(64),
+    idempotency_key VARCHAR(300),
+    outcome         VARCHAR(16) NOT NULL CHECK (outcome IN ('SUCCESS','DECLINED','NOT_SENT','UNKNOWN')),
+    http_status     INTEGER,
+    result_code     VARCHAR(64),
+    requested_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+    responded_at    TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX ix_pg_call_payment ON pg_call(payment_id, id);
+
+-- 원장. 분개는 고치거나 지우지 않는다. 정정은 반대 분개로 한다.
+CREATE TABLE ledger_journal (
+    id         BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    ref_type   VARCHAR(32) NOT NULL CHECK (ref_type IN
+        ('PAYMENT_APPROVED','REFUND_SUCCEEDED','PURCHASE_CONFIRMED','SETTLEMENT_REVERSED','PAYOUT_COMPLETED')),
+    ref_id     VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    CONSTRAINT uq_ledger_journal_ref UNIQUE (ref_type, ref_id)
+);
+CREATE TABLE ledger_entry (
+    id         BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    journal_id BIGINT      NOT NULL REFERENCES ledger_journal(id),
+    account    VARCHAR(32) NOT NULL CHECK (account IN
+        ('PG_CUSTODY','BUYER_DEPOSIT','SELLER_PAYABLE','COMMISSION_REVENUE')),
+    debit      BIGINT      NOT NULL DEFAULT 0,
+    credit     BIGINT      NOT NULL DEFAULT 0,
+    seller_id  VARCHAR(36),
+    CONSTRAINT ck_ledger_side   CHECK ((debit &gt; 0 AND credit = 0) OR (credit &gt; 0 AND debit = 0)),
+    CONSTRAINT ck_ledger_seller CHECK (account &lt;&gt; 'SELLER_PAYABLE' OR seller_id IS NOT NULL)
+);
+CREATE INDEX ix_ledger_entry_journal ON ledger_entry(journal_id);
+CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
+</code></pre>
+<p>설계 HTML <code>#ddl</code>의 V4와 같다. <code>pg_call</code>은 호출 전에 행을 먼저 커밋해야 하므로(공통 규칙 "외부 호출") 추가만 하지 않고 응답 뒤 그 행의 결과만 채운다(#348 스키마 PR에서 HTML 주석도 맞춤).</p>
+<h3 id="payment-컬럼"><code>payment</code> 컬럼</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>의미</th>
+<th>형식·제약</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_ref</code></td>
+<td>Commerce가 준 불투명 참조(지금은 주문 번호). 결제 1건의 업무 키</td>
+<td>6–50자, <code>[A-Za-z0-9_-]</code>, UNIQUE</td>
+<td><code>OD-20261110-K7Q2M9XA</code></td>
+</tr>
+<tr>
+<td><code>buyer_id</code></td>
+<td>구매자 member_id. 승인 요청자 확인용</td>
+<td>UUID 문자열</td>
+<td><code>5c2e8f1a-…-6d4c0b9e7a13</code></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>결제 금액(원)</td>
+<td>&gt; 0</td>
+<td><code>30000</code></td>
+</tr>
+<tr>
+<td><code>refunded_amount</code></td>
+<td>성공한 환불 합. Phase 1에서는 항상 0</td>
+<td>0 ≤ x ≤ amount</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>결제 상태</td>
+<td>7개 값 CHECK</td>
+<td><code>CREATED</code></td>
+</tr>
+<tr>
+<td><code>expires_at</code></td>
+<td>결제 만료 시각 T. Commerce가 정한다(주문 쪽 마감). 토스 결제창의 인증 유효 시간과는 다른 시계다</td>
+<td>생성 시 미래</td>
+<td><code>2026-11-10T14:10:00+09:00</code></td>
+</tr>
+<tr>
+<td><code>pg_provider</code></td>
+<td>PG 이름</td>
+<td>Phase 1은 상수 <code>TOSS</code></td>
+<td><code>TOSS</code></td>
+</tr>
+<tr>
+<td><code>pg_order_id</code></td>
+<td>현재 결제창의 토스 orderId</td>
+<td><code>{order_ref}-{checkout_seq}</code>, ≤ 64자</td>
+<td><code>OD-20261110-K7Q2M9XA-2</code></td>
+</tr>
+<tr>
+<td><code>checkout_seq</code></td>
+<td>결제창을 연 횟수</td>
+<td>생성 시 1, 결제창마다 +1</td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>pg_payment_key</code></td>
+<td>토스 paymentKey. 승인 시작 때 저장(결과 불명 조회용)</td>
+<td>≤ 200자, UNIQUE</td>
+<td><code>tgen_2026…</code></td>
+</tr>
+<tr>
+<td><code>pg_status</code></td>
+<td>토스 원본 상태. 참고용이며 로직은 보지 않는다</td>
+<td></td>
+<td><code>DONE</code></td>
+</tr>
+<tr>
+<td><code>partial_cancelable</code></td>
+<td>토스 <code>isPartialCancelable</code>. 환불에서 쓴다</td>
+<td></td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>approved_at</code></td>
+<td>토스 승인 시각</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>approving_at</code></td>
+<td>승인 시작 시각. 정체 판단(#349)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>next_check_at</code> / <code>check_deadline_at</code></td>
+<td>결과 불명 다음 조회 / 조회 마감(#338·#349)</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code> / <code>updated_at</code></td>
+<td>생성·변경 시각</td>
+<td>아래 "시각 규칙"</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="payment_seller_amount-컬럼"><code>payment_seller_amount</code> 컬럼</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>컬럼</th>
+<th>의미</th>
+<th>형식·제약</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>seller_order_number</code></td>
+<td>Commerce 판매자 주문 번호. 환불·정산의 기준</td>
+<td>≤ 64자, 전역 UNIQUE</td>
+<td><code>OD-20261110-K7Q2M9XA-S1</code></td>
+</tr>
+<tr>
+<td><code>seller_id</code></td>
+<td>판매자 ID</td>
+<td>UUID 문자열</td>
+<td></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>이 판매자 주문의 결제 금액</td>
+<td>&gt; 0</td>
+<td><code>20000</code></td>
+</tr>
+<tr>
+<td><code>commission_rate</code></td>
+<td>주문 시점 수수료율 복사</td>
+<td>0–1, 소수 4자리</td>
+<td><code>0.1000</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="시각-규칙">시각 규칙</h3>
+<ul>
+<li>엔티티는 common-module <code>AuditedEntity</code>를 상속하고, 애플리케이션이 <code>@Import(JpaAuditingConfig.class)</code>로 auditing을 켠다. INSERT의 <code>created_at</code>·<code>updated_at</code>은 auditing이 채운다. 네이티브 INSERT(<code>ON CONFLICT</code>)는 auditing을 거치지 않으므로 SQL에서 <code>now()</code>를 넣는다.</li>
+<li>상태를 바꾸는 UPDATE는 SQL에서 <code>updated_at = now()</code>로 쓴다. 만료·정체 같은 시간 판단은 모두 DB <code>now()</code>로 한다(공통 규칙 "시간").</li>
+<li>JPA는 <code>ddl-auto: validate</code>다. 엔티티 매핑이 위 DDL과 다르면 기동이 실패한다.</li>
+</ul>
+<h2 id="api">API</h2>
+<p>공통: 경로 접두 <code>/v1/internal</code>, 헤더 <code>X-Service-Token</code>(없거나 다르면 <strong>401</strong>, PAY-AUTH-01), 응답 <code>ApiResponse {success, data, error{code, message, requestId}}</code>. 계약 원본은 이 PR에서 <code>contracts/api/payment-service.yaml</code>을 다시 쓴 것이 된다.</p>
+<h3 id="오류-응답-만들기">오류 응답 만들기</h3>
+<p>공통 <code>ErrorCode</code>에는 업무 코드가 없다. Payment는 <code>PaymentError</code> enum(<code>code</code>, <code>httpStatus</code>)과 <code>PaymentException</code>을 두고, <code>PaymentExceptionHandler</code>가 <code>new ApiResponse.ApiError(code, message, CorrelationId.current())</code>로 응답한다. Catalog <code>RequestErrorExceptionHandler</code>와 같은 방식이다. Bean Validation 실패는 400 <code>INVALID_REQUEST</code>다.</p>
+<h3 id="1-결제-생성-post-v1internalpayments">1. 결제 생성 <code>POST /v1/internal/payments</code></h3>
+<p>요청:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>의미</th>
+<th>형식·제약</th>
+<th>예시</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>orderRef</code></td>
+<td>주문 참조</td>
+<td>필수(<code>@NotBlank</code>만). 형식 <code>^[A-Za-z0-9_-]{6,50}$</code>은 <strong>Bean Validation 밖</strong>에서 검사해 400 <code>INVALID_ORDER_REF</code>를 낸다. 문자 제한은 토스 orderId 규칙(영문·숫자·<code>-</code>·<code>_</code>, 6–64자)에서 왔고, 50자는 <code>-{시도 번호}</code>가 64자 안에 들어가게 한 값이다</td>
+<td><code>OD-20261110-K7Q2M9XA</code></td>
+</tr>
+<tr>
+<td><code>buyerId</code></td>
+<td>구매자</td>
+<td>필수, UUID</td>
+<td></td>
+</tr>
+<tr>
+<td><code>amount</code></td>
+<td>결제 금액</td>
+<td>필수, ≥ 1</td>
+<td><code>30000</code></td>
+</tr>
+<tr>
+<td><code>expiresAt</code></td>
+<td>결제 만료 시각</td>
+<td>필수, ISO-8601 오프셋 포함. <strong>새 결제를 만들 때만</strong> DB <code>now()</code> 이하면 400 <code>INVALID_EXPIRES_AT</code>(같은 orderRef가 있으면 검사하지 않는다)</td>
+<td><code>2026-11-10T14:10:00+09:00</code></td>
+</tr>
+<tr>
+<td><code>sellerAmounts[]</code></td>
+<td>판매자별 금액</td>
+<td>필수, 1개 이상</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sellerAmounts[].sellerOrderNumber</code></td>
+<td></td>
+<td>필수, ≤ 64자, 요청 안에서 중복 없음</td>
+<td><code>…-S1</code></td>
+</tr>
+<tr>
+<td><code>sellerAmounts[].sellerId</code></td>
+<td></td>
+<td>필수, UUID</td>
+<td></td>
+</tr>
+<tr>
+<td><code>sellerAmounts[].amount</code></td>
+<td></td>
+<td>필수, ≥ 1. 합 ≠ <code>amount</code>면 400 <code>SUM_MISMATCH</code></td>
+<td><code>20000</code></td>
+</tr>
+<tr>
+<td><code>sellerAmounts[].commissionRate</code></td>
+<td></td>
+<td>필수, 0–1, 소수 4자리 이하</td>
+<td><code>0.1000</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>응답 <code>data</code>: <code>{paymentId, status, pgOrderId, amount, expiresAt}</code></p>
+<pre><code class="language-json">// 201 (새 결제)
+{ &quot;paymentId&quot;: 1001, &quot;status&quot;: &quot;CREATED&quot;, &quot;pgOrderId&quot;: &quot;OD-20261110-K7Q2M9XA-1&quot;,
+  &quot;amount&quot;: 30000, &quot;expiresAt&quot;: &quot;2026-11-10T14:10:00+09:00&quot; }
+</code></pre>
+<p><strong>같은 orderRef가 이미 있을 때</strong> (PAY-CREATE-02·03·06). 위에서부터 처음 맞는 줄:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>기존 결제</th>
+<th>요청과 비교</th>
+<th>응답</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>없음</td>
+<td>—</td>
+<td>201 새 결제. <code>checkout_seq = 1</code>, <code>pg_order_id = {orderRef}-1</code></td>
+</tr>
+<tr>
+<td>있음</td>
+<td><code>amount</code> 또는 <code>buyerId</code>가 다름</td>
+<td>409 <code>AMOUNT_CONFLICT</code></td>
+</tr>
+<tr>
+<td>CREATED, 만료 전</td>
+<td>같음</td>
+<td>200 현재 값(현재 <code>pgOrderId</code>)</td>
+</tr>
+<tr>
+<td>APPROVING · UNKNOWN · APPROVED</td>
+<td>같음</td>
+<td>200 현재 값(<code>status</code> 그대로)</td>
+</tr>
+<tr>
+<td>CREATED 만료 · CANCELED · PARTIALLY_REFUNDED · REFUNDED</td>
+<td>같음</td>
+<td>409 <code>PAYMENT_CLOSED</code></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>비교는 <code>amount</code>·<code>buyerId</code>만 한다. <code>expiresAt</code>·<code>sellerAmounts</code>가 달라도 저장된 값을 유지하고 비교하지 않는다(미결정 1). 재시도 본문의 <code>expiresAt</code>이 이미 지났어도 기존 결제가 있으면 <code>INVALID_EXPIRES_AT</code>이 아니라 위 표로 응답한다(2026-11-16 결정, PAY-CREATE-02).</li>
+<li><strong>동시 생성</strong>(PAY-CREATE-02): <code>INSERT … ON CONFLICT DO NOTHING</code>(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태)의 영향 행 수로 판단한다. 0행이면 같은 트랜잭션에서 기존 행을 읽어 위 표로 응답한다. 예외를 잡는 방식은 쓰지 않는다(PostgreSQL은 UNIQUE 위반 시 트랜잭션 전체가 중단된다). <code>payment_seller_amount</code>는 INSERT가 1행일 때만 같은 트랜잭션에서 넣는다.</li>
+<li><code>sellerOrderNumber</code>가 다른 결제에 이미 있으면 UNIQUE 위반이다. 정상 Commerce라면 생기지 않는다. 400 <code>INVALID_REQUEST</code>로 응답하고 WARN 로그를 남긴다.</li>
+</ul>
+<h3 id="2-결제창-다시-열기-post-v1internalpaymentsorderrefcheckouts">2. 결제창 다시 열기 <code>POST /v1/internal/payments/{orderRef}/checkouts</code></h3>
+<p>요청 본문 없음. 응답 201 <code>data</code>: <code>{pgOrderId, amount, expiresAt}</code></p>
+<pre><code class="language-sql">UPDATE payment
+   SET checkout_seq = checkout_seq + 1,
+       pg_order_id  = order_ref || '-' || (checkout_seq + 1),
+       updated_at   = now()
+ WHERE order_ref = :orderRef AND status = 'CREATED' AND expires_at &gt; now();
+-- 1행: 같은 트랜잭션에서 다시 읽어 응답 (H2가 RETURNING을 지원하지 않으므로 다시 읽는다)
+-- 0행: 결제 없음 → 404 NOT_READY, 있음 → 409 PAYMENT_CLOSED
+</code></pre>
+<ul>
+<li>호출할 때마다 새 결제창이 생긴다(멱등 아님. 그래서 201). 이전 pgOrderId로 온 승인은 #338에서 409 <code>STALE_CHECKOUT</code>이 된다.</li>
+<li><code>NOT_READY</code>는 "Commerce의 결제 생성 요청이 아직 도착하지 않음"이다(결제 생성 재시도 중).</li>
+<li>APPROVING·UNKNOWN 중에 부르면 요구사항대로 409 <code>PAYMENT_CLOSED</code>지만, <code>message</code>는 "결제를 처리하고 있습니다"로 구분한다(닫힌 결제와 다르다는 것을 Commerce 로그에서 알 수 있게).</li>
+<li>승인이 거절되거나 조회에서 ABORTED가 나오면 #338·#349가 <code>pg_order_id</code>를 NULL로 비운다. 그 뒤의 결제 생성 재요청(200)은 <code>pgOrderId: null</code>을 돌려주고, Commerce는 이 API로 새 결제창을 연다.</li>
+</ul>
+<h3 id="3-조회-get-v1internalpaymentsorderref">3. 조회 <code>GET /v1/internal/payments/{orderRef}</code></h3>
+<p>응답 200 <code>data</code>: <code>{paymentId, status, amount, refundedAmount, pgOrderId, approvedAt}</code>. 없으면 404 <code>PAYMENT_NOT_FOUND</code>(제안). <code>approvedAt</code>은 승인 전 <code>null</code>.</p>
+<h3 id="오류-코드-이-이슈">오류 코드 (이 이슈)</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>HTTP</th>
+<th>code</th>
+<th>언제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>400</td>
+<td><code>INVALID_REQUEST</code></td>
+<td>Bean Validation 실패, 판매자 주문 번호 중복</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>INVALID_ORDER_REF</code></td>
+<td>orderRef 형식</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>INVALID_EXPIRES_AT</code></td>
+<td>만료 시각이 현재 이하</td>
+</tr>
+<tr>
+<td>400</td>
+<td><code>SUM_MISMATCH</code></td>
+<td>판매자별 금액 합 ≠ amount</td>
+</tr>
+<tr>
+<td>401</td>
+<td><code>UNAUTHORIZED</code></td>
+<td>서비스 토큰 없음·다름(공통 필터)</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>NOT_READY</code></td>
+<td>결제창: 결제 없음</td>
+</tr>
+<tr>
+<td>404</td>
+<td><code>PAYMENT_NOT_FOUND</code>(제안)</td>
+<td>조회: 결제 없음</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>AMOUNT_CONFLICT</code></td>
+<td>같은 orderRef에 금액·구매자 다름</td>
+</tr>
+<tr>
+<td>409</td>
+<td><code>PAYMENT_CLOSED</code></td>
+<td>닫힌 결제에 생성·결제창</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="보안-설정">보안 설정</h3>
+<p><code>PaymentSecurityConfiguration</code>의 허용 목록을 아래로 바꾼다. 나머지 <code>/v1/internal/**</code>는 <code>denyAll</code>이다.</p>
+<pre><code class="language-text">/v1/internal/payments
+/v1/internal/payments/*
+/v1/internal/payments/*/checkouts
+/v1/internal/payments/*/approval      ← 경로만 미리 허용. 컨트롤러는 #338
+</code></pre>
+<h2 id="처리-순서와-트랜잭션">처리 순서와 트랜잭션</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>트랜잭션</th>
+<th>외부 호출</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>생성</td>
+<td>1개: 형식 검증 → 기존 행 읽기(있으면 위 표) → <code>expiresAt</code> 검증 → INSERT ON CONFLICT → (1행) 판매자 금액 INSERT / (0행) 다시 읽어 위 표</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>결제창</td>
+<td>1개: 조건부 UPDATE → 읽기</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>조회</td>
+<td>읽기 전용</td>
+<td>없음</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="테스트">테스트</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>테스트(제안 이름)</th>
+<th>종류</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PAY-DATA-01–03, LED-02, LED-03(제약)</td>
+<td><code>PaymentSchemaMigrationTest</code></td>
+<td><code>@Tag("postgres")</code> <code>@Tag("migration")</code></td>
+</tr>
+<tr>
+<td>(엔티티 매핑)</td>
+<td><code>PaymentEntityPersistenceTest</code></td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-CREATE-01, 03–06</td>
+<td><code>PaymentCreateServiceTest</code></td>
+<td>통합(H2)</td>
+</tr>
+<tr>
+<td>PAY-CREATE-02 동시 생성</td>
+<td><code>PaymentCreateConcurrencyPostgresTest</code>(스레드 2개 이상)</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>PAY-CHECKOUT-01–02</td>
+<td><code>PaymentCheckoutServiceTest</code></td>
+<td>통합(H2)</td>
+</tr>
+<tr>
+<td>PAY-QUERY-01</td>
+<td><code>PaymentQueryControllerTest</code></td>
+<td>통합</td>
+</tr>
+<tr>
+<td>PAY-AUTH-01</td>
+<td><code>PaymentSecurityIntegrationTest</code>(다시 씀)</td>
+<td>통합</td>
+</tr>
+</tbody>
+</table></div>
+<p>V4 마이그레이션 테스트는 기존 결제 테이블 4개가 없고 <code>event_outbox</code>가 남아 있는지도 확인한다.</p>
+<h2 id="바뀌는-점">바뀌는 점</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>유지</th>
+<th>바뀜·새로 생김</th>
+<th>없어짐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DB</td>
+<td>V1–V3, <code>event_outbox</code></td>
+<td>V4: 테이블 5개, 인덱스</td>
+<td><code>payment_attempt</code>·<code>refund_execution</code>·Mock 결과 테이블 2개</td>
+</tr>
+<tr>
+<td>API</td>
+<td><code>X-Service-Token</code>, <code>ApiResponse</code></td>
+<td>생성·결제창·조회 3개. 결제 키가 <code>orderRef</code>가 됨</td>
+<td>— (기존 경로는 #347이 지움)</td>
+</tr>
+<tr>
+<td>계약</td>
+<td>—</td>
+<td><code>payment-service.yaml</code> 다시 씀, <code>api.html</code> 재생성</td>
+<td>—</td>
+</tr>
+<tr>
+<td>문서</td>
+<td>—</td>
+<td><code>design-docs/services/payment/erd.md</code>·<code>erd.html</code> 새 스키마로, README "현재 코드" 절</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="pr-나누기">PR 나누기</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>PR</th>
+<th>범위</th>
+<th>base</th>
+<th>브랜치</th>
+<th>갱신할 문서</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PR1 스키마</td>
+<td>V4, <code>payment/entity</code>·<code>repository</code>, <code>ledger/entity</code>·<code>repository</code>, 마이그레이션·매핑 테스트</td>
+<td>#347 PR</td>
+<td><code>feat/#348-payment-core-schema</code></td>
+<td><code>erd.md</code>·<code>erd.html</code></td>
+</tr>
+<tr>
+<td>PR2 API</td>
+<td>생성·결제창·조회, <code>PaymentError</code>, 보안 허용 목록, 계약 YAML</td>
+<td>PR1</td>
+<td><code>feat/#348-payment-create-api</code></td>
+<td><code>api.html</code>, 모듈 README</td>
+</tr>
+</tbody>
+</table></div>
+<p>PR2가 #348을 <code>Closes</code>한다.</p>
+<h2 id="미결정">미결정</h2>
+<p>결정(2026-11-15, 사용자 동의):</p>
+<ol>
+<li>같은 orderRef 재생성은 <code>amount</code>·<code>buyerId</code>만 비교한다. <code>expiresAt</code>·<code>sellerAmounts</code>가 달라도 처음 값을 유지하고 200을 준다.</li>
+<li>조회 404 코드는 <code>PAYMENT_NOT_FOUND</code>(승인 404와 같은 코드).</li>
+</ol>
+<p>용어: "결제창(checkout)"은 테이블이 아니다. <code>payment</code> 행의 <code>checkout_seq</code>·<code>pg_order_id</code>로 표현하는 토스 결제창 회차다.</p>
+<h2 id="참고">참고</h2>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>5db84b10a8218f6d85fc0b4f7415851037274d7a49a1fec261d75a5d0d7d2b0f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

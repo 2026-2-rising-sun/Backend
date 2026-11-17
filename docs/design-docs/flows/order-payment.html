@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>주문·결제 서비스 간 흐름</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="order-payment.md">MD 원본</a><a href="../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#새-계약-경로">새 계약 경로</a></li>
+<li><a href="#기존-경로와-이행">기존 경로와 이행</a></li>
+<li><a href="#이전-mock-설명의-기준">이전 Mock 설명의 기준</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>주문·결제 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 1070" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="사용자" data-target="Core 주문서"><title>사용자 → Core 주문서: SKU/Cart·예상 금액 검증, 선점·판매자별 금액/설정 수수료·PREPARE 전달 원문 같은 TX</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="Core 커밋 후" data-target="Payment 생성/checkout"><title>Core 커밋 후 → Payment 생성/checkout: 준비 데이터만 저장. PENDING/원래 기한 유지</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="사용자 인증 완료" data-target="Core PROCESSING"><title>사용자 인증 완료 → Core PROCESSING: 첫600초 처리기한·APPROVAL 원문 같은 TX. 반복 요청은 불연장</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="Core 커밋 후" data-target="Payment 조회/승인"><title>Core 커밋 후 → Payment 조회/승인: 먼저 조회, 유효한 미접수만 승인. 202/UNKNOWN·통신 예외는 실패가 아님</title><path class="connector" d="M940,120 L190,375" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="242.5">4</text></g><g class="edge-row" data-source="Payment 확정 승인" data-target="Core PAID"><title>Payment 확정 승인 → Core PAID: HTTP 조회 또는 PaymentApproved 검증·멱등 반영·재고 소진/쿠폰 사용</title><path class="connector" d="M725,417 L780,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="412.0">5</text></g><g class="edge-row" data-source="Core 기한 경계" data-target="EXPIRED"><title>Core 기한 경계 → EXPIRED: 재고/쿠폰 선점 한 번 해제. 이후 새 승인 POST 없이 조회 유지</title><path class="connector" d="M350,587 L405,587" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="582.0">6</text></g><g class="edge-row" data-source="종료 주문의 늦은 승인" data-target="환불 필요+Outbox"><title>종료 주문의 늦은 승인 → 환불 필요+Outbox: 주문 부활 없이 late-{paymentId}와 RefundRequested(LATE_APPROVAL) 같은 TX</title><path class="connector" d="M940,630 L190,715" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="667.5">7</text></g><g class="edge-row" data-source="Core 환불 요청 발행" data-target="Payment 환불 소비"><title>Core 환불 요청 발행 → Payment 환불 소비: 실제 소비자는 아직 미발견. 발행 성공은 환불 접수/완료가 아님</title><path class="connector" d="M725,757 L780,757" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="752.0">8</text></g><g class="edge-row" data-source="Payment 환불 결과" data-target="Core 환불 상태"><title>Payment 환불 결과 → Core 환불 상태: Core 소비자는 계약 대역으로 검증. 금액/판매자 원문 검증 뒤 SUCCEEDED/FAILED, 주문은 종료 상태 유지</title><path class="connector" d="M350,927 L405,927" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="922.0">9</text></g><g><title>사용자</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">사용자</tspan></text></g><g><title>Core 주문서</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">Core 주문서</tspan></text></g><g><title>Core 커밋 후</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">Core 커밋 후</tspan></text></g><g><title>Payment 생성/checkout</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">Payment 생성/checkout</tspan></text></g><g><title>사용자 인증 완료</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">사용자 인증 완료</tspan></text></g><g><title>Core PROCESSING</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Core PROCESSING</tspan></text></g><g><title>Payment 조회/승인</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">Payment 조회/승인</tspan></text></g><g><title>Payment 확정 승인</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">Payment 확정 승인</tspan></text></g><g><title>Core PAID</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">Core PAID</tspan></text></g><g><title>Core 기한 경계</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">Core 기한 경계</tspan></text></g><g><title>EXPIRED</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">EXPIRED</tspan></text></g><g><title>종료 주문의 늦은 승인</title><rect x="780" y="545" width="320" height="85" rx="5"/><text x="940" y="573" text-anchor="middle"><tspan x="940" dy="0">종료 주문의 늦은 승인</tspan></text></g><g><title>환불 필요+Outbox</title><rect x="30" y="715" width="320" height="85" rx="5"/><text x="190" y="743" text-anchor="middle"><tspan x="190" dy="0">환불 필요+Outbox</tspan></text></g><g><title>Core 환불 요청 발행</title><rect x="405" y="715" width="320" height="85" rx="5"/><text x="565" y="743" text-anchor="middle"><tspan x="565" dy="0">Core 환불 요청 발행</tspan></text></g><g><title>Payment 환불 소비</title><rect x="780" y="715" width="320" height="85" rx="5"/><text x="940" y="743" text-anchor="middle"><tspan x="940" dy="0">Payment 환불 소비</tspan></text></g><g><title>Payment 환불 결과</title><rect x="30" y="885" width="320" height="85" rx="5"/><text x="190" y="913" text-anchor="middle"><tspan x="190" dy="0">Payment 환불 결과</tspan></text></g><g><title>Core 환불 상태</title><rect x="405" y="885" width="320" height="85" rx="5"/><text x="565" y="913" text-anchor="middle"><tspan x="565" dy="0">Core 환불 상태</tspan></text></g></svg></div></section><p>새 주문서 경로는 결제창 준비와 실제 승인을 나눈다. 준비 동안 생성부터600초 PENDING을 유지하고 인증 후 승인 접수에서 PROCESSING 별도600초를 시작한다. 기존 공개 legacy 경로도 유지한다. Payment 실행·원장은 팀원 소유이며 Core는 주문·재고·쿠폰과 전달 기록을 소유한다.</p>
+<p>기존 Mock 실행 설명은 #337에서 교체할 예정이며 목표 설계 원본은 <a href="../services/payment/overview.html">Payment 도메인 홈</a>이다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 기존 결제·환불 호출은 403을 받는다. 이 문서의 새 경로는 Core 소유 어댑터와 주문 상태를 설명한다. 이 저장소 dev의 Payment 설명과 별도 팀원 구현 브랜치를 실행한 증거를 구분한다.</p>
+<h2 id="새-계약-경로">새 계약 경로</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·처리</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사용자</td>
+<td>Core 주문서</td>
+<td>SKU/Cart·예상 금액 검증, 선점·판매자별 금액/설정 수수료·PREPARE 전달 원문 같은 TX</td>
+</tr>
+<tr>
+<td>Core 커밋 후</td>
+<td>Payment 생성/checkout</td>
+<td>준비 데이터만 저장. PENDING/원래 기한 유지</td>
+</tr>
+<tr>
+<td>사용자 인증 완료</td>
+<td>Core PROCESSING</td>
+<td>첫600초 처리기한·APPROVAL 원문 같은 TX. 반복 요청은 불연장</td>
+</tr>
+<tr>
+<td>Core 커밋 후</td>
+<td>Payment 조회/승인</td>
+<td>먼저 조회, 유효한 미접수만 승인. 202/UNKNOWN·통신 예외는 실패가 아님</td>
+</tr>
+<tr>
+<td>Payment 확정 승인</td>
+<td>Core PAID</td>
+<td>HTTP 조회 또는 PaymentApproved 검증·멱등 반영·재고 소진/쿠폰 사용</td>
+</tr>
+<tr>
+<td>Core 기한 경계</td>
+<td>EXPIRED</td>
+<td>재고/쿠폰 선점 한 번 해제. 이후 새 승인 POST 없이 조회 유지</td>
+</tr>
+<tr>
+<td>종료 주문의 늦은 승인</td>
+<td>환불 필요+Outbox</td>
+<td>주문 부활 없이 late-{paymentId}와 RefundRequested(LATE_APPROVAL) 같은 TX</td>
+</tr>
+<tr>
+<td>Core 환불 요청 발행</td>
+<td>Payment 환불 소비</td>
+<td>실제 소비자는 아직 미발견. 발행 성공은 환불 접수/완료가 아님</td>
+</tr>
+<tr>
+<td>Payment 환불 결과</td>
+<td>Core 환불 상태</td>
+<td>Core 소비자는 계약 대역으로 검증. 금액/판매자 원문 검증 뒤 SUCCEEDED/FAILED, 주문은 종료 상태 유지</td>
+</tr>
+</tbody>
+</table></div>
+<p>팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.</p>
+<h2 id="기존-경로와-이행">기존 경로와 이행</h2>
+<p>legacy PAYMENT/REFUND 전달은 기존 requestId/원문을 유지한다. 기존 0원 경로도 유지하며 새 계약의 양수 제약은 새 order-sheets에만 적용한다. legacy의 late_approval_refund(REQUIRED)와 새 원결제용 payment_relay_refund(REQUESTED)는 별개다. 과거 번호/기한/금액/기존 null 처리기한을 임의 재작성하지 않는다. Frontend 호출자 전환과 SDK 대역 브라우저 검증은 확인했다. 실제 위젯 설정·실SDK/실PG·실환불 및 과거 미확정 거래의 운영 대사는 후속이다. 사용자는 이를 구분해 CommerceCore 범위의 dev 병합을 승인했으며 이번 통합은 운영 결제·배포 완료를 뜻하지 않는다.</p>
+<p><a href="../services/commercecore/order/overview.html">Core 상세</a> · <a href="../../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 원본·남은 기준</a> · <a href="../../worklog/2026-11-16.html">실행 기록</a> · <a href="../services/payment/overview.html">팀원 설계</a></p>
+<h2 id="이전-mock-설명의-기준">이전 Mock 설명의 기준</h2>
+<p>기존 공통 설명은 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사와 #330 문서 변경을 기준으로 했다. 당시 업무 코드나 실제 DB·HTTP·Kafka·PG 실행을 검증한 것으로 보지 않는다. 기존 Mock의 PAYMENT_CONFIRMING+PAYMENT 전달, Payment Mock 실행/결과 Outbox, Core의 재고·쿠폰 결과 반영은 legacy 경로의 설명이며 새 승인/환불 전체 통합의 증거로 합산하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>767d37222f5a6050ec20af2019beabac1b0e8967d0582406f8d57cc315561176</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

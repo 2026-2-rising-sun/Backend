@@ -1,19 +1,18 @@
 package com.shoppinglive.commercecore.order.service;
 
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
+import com.shoppinglive.commercecore.payment.service.LateApprovalRefundStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
@@ -28,12 +27,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class OrderPaymentOutcomeService {
+    private final OrderTimeSource time;
+    private final OrderSheetLifecycleService lifecycle;
+    private final LateApprovalRefundStore lateRefunds;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final CartItemRepository cart;
-    private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
-    private final SalesService singleOrderSales;
+    private final SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final TransactionTemplate tx;
@@ -43,24 +43,26 @@ public class OrderPaymentOutcomeService {
     @PersistenceContext private EntityManager entityManager;
 
     public OrderPaymentOutcomeService(
+            OrderTimeSource time,
+            OrderSheetLifecycleService lifecycle,
+            LateApprovalRefundStore lateRefunds,
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
             CartItemRepository cart,
-            SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
-            SalesService singleOrderSales,
+            SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents) {
+        this.time = time;
+        this.lifecycle = lifecycle;
+        this.lateRefunds = lateRefunds;
         this.groups = groups;
         this.orders = orders;
         this.cart = cart;
-        this.sales = sales;
-        this.stock = stock;
-        this.singleOrderSales = singleOrderSales;
+        this.skus = skus;
         this.payments = payments;
         this.guard = guard;
         this.tx = tx;
@@ -88,8 +90,22 @@ public class OrderPaymentOutcomeService {
                         payments.requireSameResult(delivery, result);
                         return false;
                     }
-                    if (g.getStatus() != OrderStatus.PAYMENT_CONFIRMING
-                            || !Objects.equals(g.getPaymentId(), id))
+                    if (!Objects.equals(g.getPaymentId(), id))
+                        throw conflict("결제 결과 대상 주문의 결제 참조가 다릅니다.");
+                    if (g.getStatus() == OrderStatus.PAYMENT_CONFIRMING
+                            && g.paymentDeadlineReached(time.now())) {
+                        lifecycle.expire(g.getId());
+                        g = lockedGroup(g.getId());
+                    }
+                    if (g.getStatus() == OrderStatus.EXPIRED
+                            || g.getStatus() == OrderStatus.CANCELLED) {
+                        if (result.status() == PaymentStatus.SUCCESS) {
+                            lateRefunds.require(g, result);
+                        }
+                        payments.record(delivery, result, result.status().name());
+                        return true;
+                    }
+                    if (g.getStatus() != OrderStatus.PAYMENT_CONFIRMING)
                         throw conflict("결제 결과 대상 주문의 상태가 다릅니다.");
                     List<Order> children = orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
                     // 생성 때와 동일하게 장바구니를 재고보다 먼저 잠그고, 재고는 판매 ID 오름차순으로 잠근다.
@@ -97,12 +113,6 @@ public class OrderPaymentOutcomeService {
                         if (child.getSourceCartItemId() != null) {
                             cart.lockOwned(child.getSourceCartItemId(), g.getMemberId());
                         }
-                    }
-                    for (Order child :
-                            children.stream()
-                                    .sorted(Comparator.comparing(Order::getSalesInfoId))
-                                    .toList()) {
-                        guard.lockSales(child.getSalesInfoId());
                     }
                     OrderStatus finalStatus =
                             result.status() == PaymentStatus.SUCCESS
@@ -113,17 +123,18 @@ public class OrderPaymentOutcomeService {
                     } else {
                         couponReservations.release(g.getMemberId(), g.getCouponId());
                     }
-                    for (Order child : children) {
+                    for (Order child :
+                            children.stream()
+                                    .sorted(Comparator.comparing(Order::getTradeSkuId))
+                                    .toList()) {
                         if (orders.transitionStatus(
                                         child.getId(), "PAYMENT_CONFIRMING", finalStatus.name())
                                 != 1) {
                             throw new IllegalStateException("결제 묶음 주문의 상태가 일치하지 않습니다.");
                         }
                         if (result.status() == PaymentStatus.SUCCESS) {
-                            if (stock.consumeReserved(child.getSalesInfoId(), child.getQuantity())
-                                    != 1) {
-                                throw new IllegalStateException("예약 재고가 누락되었습니다.");
-                            }
+                            skus.consume(child.getTradeSkuId(), child.getQuantity());
+
                             if (child.getSourceCartItemId() != null
                                     && child.getSourceCartItemVersion() != null) {
                                 jdbc.update(
@@ -177,11 +188,8 @@ public class OrderPaymentOutcomeService {
                                     success ? "PAID" : "FAILED")
                             != 1) throw new IllegalStateException("단건 결제 주문 상태가 다릅니다.");
                     if (success) {
-                        if (stock.consumeReserved(order.getSalesInfoId(), order.getQuantity()) != 1)
-                            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-                    } else
-                        singleOrderSales.restoreReserved(
-                                order.getSalesInfoId(), order.getQuantity());
+                        skus.consume(order.getTradeSkuId(), order.getQuantity());
+                    } else skus.release(order.getTradeSkuId(), order.getQuantity());
                     payments.record(current, p, p.status().name());
                     return true;
                 });
@@ -194,10 +202,7 @@ public class OrderPaymentOutcomeService {
     }
 
     private void restore(Order child) {
-        if (stock.restoreReserved(child.getSalesInfoId(), child.getQuantity()) != 1) {
-            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-        }
-        sales.reopenIfStockAvailable(child.getSalesInfoId());
+        skus.release(child.getTradeSkuId(), child.getQuantity());
     }
 
     private static BusinessException conflict(String message) {
