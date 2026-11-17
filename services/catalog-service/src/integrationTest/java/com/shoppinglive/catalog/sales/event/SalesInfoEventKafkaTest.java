@@ -195,7 +195,13 @@ class SalesInfoEventKafkaTest extends CatalogSecuritySupport {
     }
 
     private static void send(KafkaProducer<String, String> producer, String json) throws Exception {
-        producer.send(new ProducerRecord<>(SalesInfoEventContract.TOPIC_NAME, "9001", json))
+        String key = "invalid";
+        try {
+            key = new ObjectMapper().readTree(json).path("payload").path("salesId").asText();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+            // 잘못된 원문을 DLT로 보내는 시나리오에서는 파싱 전에 그대로 전송한다.
+        }
+        producer.send(new ProducerRecord<>(SalesInfoEventContract.TOPIC_NAME, key, json))
                 .get(10, TimeUnit.SECONDS);
     }
 
@@ -206,15 +212,15 @@ class SalesInfoEventKafkaTest extends CatalogSecuritySupport {
                         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper.writeValueAsString(
                 new EventEnvelope<>(
-                        "74b623b8-90ee-4f65-919c-d9ad2ea46fb2",
+                        UUID.randomUUID().toString(),
                         "PriceChanged",
                         1,
                         "commercecore-service",
-                        "9001",
+                        Long.toString(9000L + productId),
                         Instant.parse("2026-10-09T06:00:00Z"),
                         Map.of(
                                 "salesId",
-                                9001L,
+                                9000L + productId,
                                 "productId",
                                 productId,
                                 "snapshotVersion",

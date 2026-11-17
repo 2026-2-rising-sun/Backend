@@ -7,17 +7,17 @@ import com.shoppinglive.commercecore.sales.dto.RegisterSalesRequest;
 import com.shoppinglive.commercecore.sales.dto.SalesLookupResponse;
 import com.shoppinglive.commercecore.sales.dto.SalesResponse;
 import com.shoppinglive.commercecore.sales.dto.SalesStockResponse;
-import com.shoppinglive.commercecore.sales.entity.Sales;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.service.SalesLookupService;
-import com.shoppinglive.commercecore.sales.service.SalesRegistrationService;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.dto.SkuView;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
+import com.shoppinglive.common.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,16 +38,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/v1/sales")
 public class SalesController {
 
-    private final SalesService salesService;
-    private final SalesRegistrationService salesRegistrationService;
+    private final SkuSalesService salesService;
     private final SalesLookupService salesLookupService;
 
-    public SalesController(
-            SalesService salesService,
-            SalesRegistrationService salesRegistrationService,
-            SalesLookupService salesLookupService) {
+    public SalesController(SkuSalesService salesService, SalesLookupService salesLookupService) {
         this.salesService = salesService;
-        this.salesRegistrationService = salesRegistrationService;
         this.salesLookupService = salesLookupService;
     }
 
@@ -117,25 +112,33 @@ public class SalesController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public SalesResponse register(@Valid @RequestBody RegisterSalesRequest request) {
-        Sales registered =
-                salesRegistrationService.register(
-                        request.productId(), request.price(), request.initialStock());
+    public SalesResponse register(
+            @AuthenticationPrincipal AuthenticatedUser seller,
+            @Valid @RequestBody RegisterSalesRequest request) {
+        SkuView registered =
+                salesService.register(
+                        request.productId(),
+                        request.price(),
+                        request.initialStock(),
+                        seller.memberId());
         return SalesResponse.from(registered);
     }
 
     /** 판매정보의 가격을 변경한다 (판매 2). */
     @PatchMapping("/{id}/price")
     public SalesResponse changePrice(
-            @PathVariable Long id, @Valid @RequestBody ChangePriceRequest request) {
-        Sales updated = salesService.changePrice(id, request.price());
+            @AuthenticationPrincipal AuthenticatedUser seller,
+            @PathVariable Long id,
+            @Valid @RequestBody ChangePriceRequest request) {
+        SkuView updated = salesService.changePrice(id, request.price(), seller.memberId());
         return SalesResponse.from(updated);
     }
 
     /** 판매 재고를 조회한다 (판매 3). */
     @GetMapping("/{id}/stock")
-    public SalesStockResponse getStock(@PathVariable Long id) {
-        SalesStock stock = salesService.getStock(id);
+    public SalesStockResponse getStock(
+            @AuthenticationPrincipal AuthenticatedUser seller, @PathVariable Long id) {
+        SkuView stock = salesService.getStock(id, seller.memberId());
         return SalesStockResponse.from(stock);
     }
 
@@ -146,21 +149,25 @@ public class SalesController {
      */
     @PatchMapping("/{id}/stock")
     public SalesStockResponse adjustStock(
-            @PathVariable Long id, @Valid @RequestBody AdjustStockRequest request) {
-        SalesStock updated = salesService.adjustAvailable(id, request.delta());
+            @AuthenticationPrincipal AuthenticatedUser seller,
+            @PathVariable Long id,
+            @Valid @RequestBody AdjustStockRequest request) {
+        SkuView updated = salesService.adjustAvailable(id, request.delta(), seller.memberId());
         return SalesStockResponse.from(updated);
     }
 
     /**
      * 판매 상태를 변경한다 (판매 4).
      *
-     * <p>판매자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은 400, 조회 실패는 404, 동시 변경
-     * 감지는 409.
+     * <p>판매자는 {@code ON_SALE} 또는 {@code PRIVATE} 만 지정 가능. 잘못된 값·전이 규칙 위반은 400, 조회 실패는 404, 재고 감소의
+     * 범위 초과는 409.
      */
     @PatchMapping("/{id}/status")
     public SalesResponse changeStatus(
-            @PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request) {
-        Sales updated = salesService.changeStatus(id, request.status());
+            @AuthenticationPrincipal AuthenticatedUser seller,
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeStatusRequest request) {
+        SkuView updated = salesService.changeStatus(id, request.status(), seller.memberId());
         return SalesResponse.from(updated);
     }
 }

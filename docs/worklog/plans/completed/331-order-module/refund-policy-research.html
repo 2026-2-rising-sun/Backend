@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>부분 수량 환불과 쿠폰 정책 조사</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="refund-policy-research.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#사용자-확정과-조사-결론">사용자 확정과 조사 결론</a></li>
+<li><a href="#공식-근거와-접근-한계">공식 근거와 접근 한계</a></li>
+<li><a href="#우리-구현의-의미와-검증">우리 구현의 의미와 검증</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>부분 수량 환불과 쿠폰 정책 조사</h1><p>출처: 코디네이터가 제공한 공식 정책 조사 기록을 보존했다. Order 담당은 이 기록을 독립 재조사 결과로 표현하지 않는다.</p>
+<p>확인일: 2026-11-13. 범위: 쿠팡·올리브영·무신사의 공개 공식 자료. 실구매·고객센터 문의·운영 코드 확인은 하지 않았다.</p>
+<h2 id="사용자-확정과-조사-결론">사용자 확정과 조사 결론</h2>
+<p>우리 구현은 4,000원×3개에 쿠폰2,000원을 적용해 10,000원 결제한 뒤 순차 환불액을 4,000/4,000/2,000원으로 정하고 전량 환불 성공 시 쿠폰을 복구한다. 이전 비례배분 제안을 대체한다. 기존 쿠폰 원래 유효기간은 유지한다.</p>
+<p>세 서비스에서 이 순차 금액 알고리즘과 누적 전량 복구를 함께 사용한다고 확인할 수 없었다. 아래 공개 정책의 범위만 확인했으며 동일 SKU 수량별 원 단위 배분이나 내부 계산식은 추측하지 않는다. 조사 결과는 이미 승인된 구현을 막거나 변경하지 않는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>서비스</th>
+<th>환불액에 대한 공식 안내</th>
+<th>쿠폰 반환 안내</th>
+<th>우리 방식과 비교</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>쿠팡</td>
+<td>확인한 행사 쿠폰은 각 상품금액 비율로 쿠폰 할인액을 나누며 부분 환불 시 배분된 할인액을 제외한다.</td>
+<td>전체 취소/환불이면 재발행 가능, 부분 취소/환불이면 불가.</td>
+<td>해당 행사 규칙은 할인 전 금액부터 먼저 돌려주는 우리 방식과 다르다. 쿠팡의 모든 쿠폰으로 일반화할 수 없다.</td>
+</tr>
+<tr>
+<td>올리브영</td>
+<td>반품 상품에 적용한 쿠폰 할인액을 환불 대상에서 제외하고 실결제액을 환불한다. 제휴 할인 조건·배송비에 따라 추가 차감할 수 있다.</td>
+<td>전체 주문 취소 또는 회사 귀책 반품은 유효기간이 남으면 복구. 단순 변심 등 고객 귀책 반품은 복구 제외라고 안내한다.</td>
+<td>4,000/4,000/2,000 순차 계산의 근거는 없다. 상품별 할인액 제외와 귀책별 쿠폰 복구는 우리 정책과 차이가 있다.</td>
+</tr>
+<tr>
+<td>무신사</td>
+<td>공식 FAQ의 수량별 쿠폰 환불 계산식은 확인하지 못했다. 적립금 비율 반환 예시는 있으나 쿠폰 계산으로 대체 해석하지 않았다.</td>
+<td>FAQ 검색 색인과 현재 공개 첫 구매 쿠폰 페이지에서 환불 후 유효기간 내 재사용 안내를 확인했다.</td>
+<td>원래 유효기간 내 재사용은 유사하다. 마지막 수량에서만 할인액 차감 및 누적 전량 시점까지 같은지는 확인 불가.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="공식-근거와-접근-한계">공식 근거와 접근 한계</h2>
+<ol>
+<li><a href="https://m.coupang.com/vm/promotions/1792126/event">쿠팡 행사 쿠폰 안내</a>: 본문 행사기간 2025-09-10~2026-12-31, 상품금액 비율 분할 적용·부분 환불 및 전체/부분 재발행 조건. 공식 본문 직접 열기 확인. 특정 행사 적용 규칙이다.</li>
+<li><a href="https://www.oliveyoung.co.kr/store/counsel/getFaqList.do?faqLrclCd=200&amp;faqMdclCd=204">올리브영 FAQ — 취소/교환/반품</a>: 「환불 금액이 이상해요」 및 「쿠폰이 복구되지 않았어요」 본문 직접 열기 확인. 수량별 할인 배분·순차 환불 예시는 없다.</li>
+<li><a href="https://store.musinsa.com/app/cs/faq/005/005000">무신사 FAQ — 혜택</a>: 검색 결과에 쿠폰 사용·반환 및 적립금 환불 예시 본문이 노출된다. 직접 열면 신규 FAQ로 이동하며 웹 도구에는 빈 목록만 노출되어 현재 전체 본문 직접 확인은 제한되었다. 검색 색인은 오래될 가능성이 있어 계산 정책의 확정 근거로 사용하지 않는다.</li>
+<li><a href="https://www.musinsa.com/onboarding/engagement/andearfirst">무신사 앤디얼 첫 구매 쿠폰</a>: 현재 공개 본문에서 상품 단위 적용과 환불 후 쿠폰 유효기간 내 재사용을 직접 확인했다. 특정 쿠폰 조건이며 전체 쿠폰 공통 계산 규칙 증거는 아니다.</li>
+</ol>
+<h2 id="우리-구현의-의미와-검증">우리 구현의 의미와 검증</h2>
+<p>두 개 환불 후 남은 한 개의 실제 부담액은 2,000원이다. 쿠폰 할인2,000원이 남은 상품에 유지되는 효과다. 주문 당시 최소 구매액을 환불 때 다시 심사하는 정책은 이번 사용자 지시에 없으므로 새로 도입하지 않는다.</p>
+<p>순차 1+1+1과 일괄 2+1, 동시 환불의 금액/수량 잠금, 실패와 재시도, 중복 성공, 할인액이 커서 잔여 환불액0인 수량, 전량 성공 시 쿠폰 단일 복구·기존 만료 유지, 다른 항목이 남았을 때 미복구를 Order 담당이 검증한다. 이 문서는 조사/구현 지시 기록이며 해당 코드/테스트 완료 보고가 아니다.</p><p class="muted fingerprint">MD SHA-256: <code>9eb012a82da3f6ebaf9488e44f1b9d8f36d9f83e861cc57db569d76639dfb1ad</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

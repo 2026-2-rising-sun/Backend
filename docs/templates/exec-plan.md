@@ -17,3 +17,5 @@
 ```
 
 자료가 많으면 작업 폴더 안에 판단·조사를 분리하고 README에서 연결한다.
+
+계획은 `docs/worklog/plans/active/`에 두며 MD와 HTML을 함께 관리한다. 완료한 계획만 `completed/`로 옮긴다.

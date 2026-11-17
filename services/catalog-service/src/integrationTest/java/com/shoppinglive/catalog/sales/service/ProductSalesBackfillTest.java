@@ -158,6 +158,6 @@ class ProductSalesBackfillTest extends CatalogSecuritySupport {
     }
 
     private static SalesInfo sales(long productId, long price) {
-        return new SalesInfo(productId, 10L, price, SalesStatus.ON_SALE, 5);
+        return new SalesInfo(productId, productId * 10L, price, SalesStatus.ON_SALE, 5);
     }
 }

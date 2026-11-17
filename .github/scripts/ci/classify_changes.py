@@ -75,6 +75,9 @@ def document(path):
     # 실행 시 사용하는 리소스는 확장자나 이름만으로 문서로 분류하지 않는다.
     if "/src/" in path or path.startswith("contracts/api/"):
         return False
+    # 실행하지 않는 계획·인계 조각의 이동은 업무 코드·계약 변경이 아니다.
+    if path.startswith(('docs/worklog/plans/', 'docs/exec-plans/')) and Path(path).suffix.lower() in {'.yaml', '.yml', '.patch'}:
+        return True
     name = Path(path).name
     return (name == "AGENTS.md" or re.fullmatch(r"readme(?:\.(md|mdx|rst|adoc|txt))?", name, re.I)
             or Path(path).suffix.lower() in {".md", ".mdx", ".rst", ".adoc"}

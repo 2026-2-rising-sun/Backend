@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>하네스 변경 계획의 판단 기준</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="decision.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#하네스의-역할">하네스의 역할</a></li>
+<li><a href="#문서-종류별-배치와-작업별-묶음">문서 종류별 배치와 작업별 묶음</a></li>
+<li><a href="#기록-작성-조건">기록 작성 조건</a></li>
+<li><a href="#md와-html">MD와 HTML</a></li>
+<li><a href="#모듈별-apierd상태-문서">모듈별 API·ERD·상태 문서</a></li>
+<li><a href="#검증-의미와-실제-연결-범위">검증 의미와 실제 연결 범위</a></li>
+<li><a href="#공통-adr과-연결">공통 ADR과 연결</a></li>
+<li><a href="#구현한-생성-방식">구현한 생성 방식</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>하네스 변경 계획의 판단 기준</h1><p>상태: 채택 · 구현과 로컬 검증 완료 · 팀원별 적용은 미확인</p>
+<p><a href="README.html">실행 계획</a> · <a href="research.html">현황 조사</a></p>
+<h2 id="하네스의-역할">하네스의 역할</h2>
+<p>하네스는 AI 에이전트가 요청 범위를 지키고 팀의 공통 기준으로 작업하도록 하는 지침과 실행 절차다. 필요한 프로젝트 지식과 실제 판단·실행 기록을 연결해 다음 작업에서 근거를 찾아갈 수 있게 한다.</p>
+<h2 id="문서-종류별-배치와-작업별-묶음">문서 종류별 배치와 작업별 묶음</h2>
+<p>참고 이미지의 <code>product-specs</code>, <code>requirements</code>, <code>adr</code>, <code>design-docs</code>, <code>exec-plans</code>, <code>worklog</code>를 <code>docs/</code> 바로 아래에 둔다. 여러 작업에 지속적으로 적용되는 결정은 공통 ADR, 일일 결과는 날짜별 워크로그를 원본으로 둔다.</p>
+<p>복잡한 작업의 실행 계획은 작업 폴더의 <code>README.md</code>로 관리한다. 그 작업에서만 쓰는 선택 이유·조사·실험 자료는 같은 폴더에 둔다. 하나의 작업을 이어받을 때 진입점을 통해 필요한 자료를 읽을 수 있게 하기 위한 선택이다. 공통 ADR과 워크로그는 내용을 중복 갱신하지 않도록 원본을 링크한다.</p>
+<p>완료 후에는 작업 폴더를 <code>completed/</code>로 옮기고 연결된 링크를 갱신한다. 경로 이동에 따른 링크 점검은 이 방식의 관리 비용으로 받아들인다.</p>
+<h2 id="기록-작성-조건">기록 작성 조건</h2>
+<p>중요한 결정에는 ADR, 여러 단계·의존성·인계가 있는 작업에는 실행 계획을 작성한다. 실제 변경·의미 있는 조사·검증 결과는 일일 워크로그의 작업 항목에 요약한다. 모든 작업에서 세 종류의 문서를 새로 만들지는 않는다.</p>
+<p>이번 작업은 기존 하네스 이관, 문서 정책, 검사기와 CI 변경이 연결되므로 실행 계획과 판단·현황 자료가 필요하다. 모듈별 문서 범위·원본·진행 상태를 비교하기 위해 <a href="tables.html">tables.md</a>를 추가했다. <code>prompts.md</code>는 재현할 입력을 별도로 보존할 필요가 있을 때 추가한다.</p>
+<h2 id="md와-html">MD와 HTML</h2>
+<p>MD에는 AI 에이전트가 읽고 참조할 핵심 설명·규칙·근거를 남긴다. 사람도 이해할 수 있는 문장·표·링크로 작성한다. HTML은 구조·흐름·상태·차이를 시각적으로 설명할 때 추가하고 원본과 연결한다. 모든 문서를 두 형식으로 만들지는 않는다.</p>
+<h2 id="모듈별-apierd상태-문서">모듈별 API·ERD·상태 문서</h2>
+<p>서비스별 설명 파일을 <code>docs/design-docs/services/&lt;모듈명&gt;/</code> 폴더로 확장한다. 모듈의 API·ERD·상태 문서를 한곳에서 읽을 수 있게 하고, 여러 서비스를 관통하는 흐름은 상위 설계 문서로 연결한다.</p>
+<p>API 명세의 원본은 기존 OpenAPI YAML로 유지한다. API HTML은 계약과 공통 참조에서 생성해 명세의 수동 중복을 줄인다. ERD는 마이그레이션과 엔티티, 상태도는 실제 전이 코드·조건·테스트를 대조한 MD를 설명 기준으로 삼는다. 각 자료에 원본과 확인 범위를 표시한다.</p>
+<p>CommerceCore에서 API·ERD·상태 문서 한 세트를 먼저 검증한 뒤 Payment·Catalog, Member·Live·Notification으로 확장한다. 현재 상태가 복잡한 대표 모듈에서 원본 대조와 화면 탐색 방법을 확인해 나머지 문서에 적용하기 위한 순서다. 공통 모듈은 독립 서비스가 아닌 공유 구현으로 설명한다.</p>
+<h2 id="검증-의미와-실제-연결-범위">검증 의미와 실제 연결 범위</h2>
+<p>기존 실패·스킵·0건·외부 환경 미실행·검사 중 변경 처리는 유지한다. 문서 완료 근거는 문서의 성격에 맞는 검사와 실행 결과를 표현할 수 있어야 한다. 자동 검사는 링크·상태·참조의 구조를 점검하고, 결정 이유나 검증 내용의 적절성은 문맥으로 검토한다.</p>
+<p>사용할 기능이 정해지지 않은 가드·편집 후 훅·MCP 설정은 현재 연결된 것으로 표시하지 않는다. 팀의 실제 적용과 에이전트 실행 확인은 저장소의 문서 작성·정적 검사와 구분한다.</p>
+<h2 id="공통-adr과-연결">공통 ADR과 연결</h2>
+<p>문서의 배치·기록 작성 조건·검증 경계는 <a href="../../../../adr/0001-document-harness.html">ADR 0001</a>에 정리했다. 이 작업 문서는 작업에 필요한 판단과 구현 선택을 남긴다. 실제 실행 결과는 <a href="../../../2026-11-13.html">워크로그</a>를 참조한다.</p>
+<h2 id="구현한-생성-방식">구현한 생성 방식</h2>
+<p>공통 결정 원본은 <a href="../../../../adr/0001-document-harness.html">ADR 0001</a>이다. API는 기존 고정 PyYAML 환경의 저장소 내부 렌더러 버전 1로 생성한다. 외부 뷰어 자산·CDN·Node 실행 의존성을 추가하지 않고 모든 선언과 로컬 참조를 표시한다. ERD·상태·상위 흐름 HTML은 MD의 관계·전이 표에서 생성해 이중 편집을 피한다. 이는 스키마 의미 검증기나 전체 Markdown 변환기가 아니며 지원 범위와 검토 방법은 도구 안내에 명시했다.</p><p class="muted fingerprint">MD SHA-256: <code>449969e901de59b5327c3563550a78a2720e51c7b59d78f73e0f1bf4a455cdca</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

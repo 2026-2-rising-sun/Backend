@@ -30,6 +30,7 @@ public class ProductQueryService implements ProductLookup {
     public ProductSnapshot getSnapshot(Long productId) {
         return productRepository
                 .findById(productId)
+                .filter(product -> !product.isDeleted())
                 .map(this::toSnapshot)
                 .orElseThrow(
                         () ->
@@ -46,13 +47,17 @@ public class ProductQueryService implements ProductLookup {
                 .distinct()
                 .map(byId::get)
                 .filter(Objects::nonNull)
+                .filter(product -> !product.isDeleted())
                 .map(this::toSnapshot)
                 .toList();
     }
 
     @Override
     public java.util.Optional<ProductSnapshot> findProduct(Long productId) {
-        return productRepository.findById(productId).map(this::toSnapshot);
+        return productRepository
+                .findById(productId)
+                .filter(product -> !product.isDeleted())
+                .map(this::toSnapshot);
     }
 
     @Override
@@ -61,8 +66,18 @@ public class ProductQueryService implements ProductLookup {
     }
 
     @Override
+    public Map<Long, String> findHistoricalSellerIds(Collection<Long> productIds) {
+        // seller_id는 생성 후 불변이고 소프트 삭제에도 보존된다. 공개 상품 조회와 분리한다.
+        Map<Long, String> sellers = new java.util.HashMap<>();
+        for (Product product : productRepository.findAllById(productIds)) {
+            if (product.getSellerId() != null) sellers.put(product.getId(), product.getSellerId());
+        }
+        return sellers;
+    }
+
+    @Override
     public boolean exists(Long productId) {
-        return productRepository.existsById(productId);
+        return productRepository.existsByIdAndDeletedAtIsNull(productId);
     }
 
     private ProductSnapshot toSnapshot(Product product) {
@@ -70,6 +85,7 @@ public class ProductQueryService implements ProductLookup {
                 product.getId(),
                 product.getName(),
                 imageUrlResolver.urlOf(product.getMainImageId()),
-                product.getSellerId());
+                product.getSellerId(),
+                product.isSaleEnabled());
     }
 }
