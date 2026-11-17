@@ -70,6 +70,7 @@
 <li><a href="#347-기존-mock-결제-코드-삭제">#347 기존 Mock 결제 코드 삭제</a></li>
 <li><a href="#348-결제-v4-스키마와-엔티티-추가">#348 결제 V4 스키마와 엔티티 추가</a></li>
 <li><a href="#348-결제-생성결제창조회-api-추가">#348 결제 생성·결제창·조회 API 추가</a></li>
+<li><a href="#338-결제-원장-분개-기록-추가">#338 결제 원장 분개 기록 추가</a></li>
 </ul>
 </li>
 </ul>
@@ -547,6 +548,14 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#348-payment-core-schema' --external</code>(임시 PostgreSQL 16) 통과. Payment test 1, integrationTest 49, postgresTest 6(동시 생성·동시 결제창·판매자 번호 충돌 롤백 포함), migrationTest 9(별도 실행), 스킵 0. 독립 리뷰 지적 5건 중 4건 반영.</li>
 <li>미실행·한계: Commerce 실제 호출, 운영 DB, 부하. 같은 orderRef 재요청은 expiresAt을 검사하지 않도록 설계서 처리 순서를 고쳤다(2026-11-16 결정, PAY-CREATE-02).</li>
 <li>다음 작업: 원장 서비스(#338).</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>22d9847ed0f63c50d2c20a52975986f32d7fe4219b463247702acdb11975c5cf</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="338-결제-원장-분개-기록-추가">#338 결제 원장 분개 기록 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/338-approval-ledger.html#3-원장-ledgerservice">승인·원장 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/356">PR #356</a></p>
+<ul>
+<li>변경·판단(2026-11-16): <code>Journal</code>이 줄 수·한쪽 금액·판매자 ID·차대 균형(넘침 거절)을 만들 때 검사하고, <code>LedgerService.record</code>가 호출자 트랜잭션(MANDATORY) 안에서 <code>ON CONFLICT DO NOTHING</code>으로 사건당 한 번만 기록한다. 0행이면 같은 사건이 있는지 다시 읽어 확인한다. 원장 리포지토리는 <code>Repository</code>로 좁혀 삭제·저장 우회 메서드를 없앴다. LED-02를 범위에 넣었고, 승인 분개(LED-APPROVE-01)는 승인 처리 PR에서 호출·검증한다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#348-payment-create-api' --external</code>(임시 PostgreSQL 16) 통과. Payment test 10, integrationTest 57, postgresTest 9(같은 사건 순차·8스레드 동시 중복, 롤백 포함), 스킵 0. 독립 리뷰 지적 7건 중 6건 반영.</li>
+<li>미실행·한계: 실제 호출처(승인 반영)가 없어 상태 변경과 함께 롤백되는 경로는 다음 PR에서 확인한다. migrationTest는 변경 경로상 선택되지 않았다. 같은 사건을 다른 금액으로 다시 기록해도 조용히 무시한다(LED-03).</li>
+<li>다음 작업: 승인 처리 서비스와 이벤트 계약 교체.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>aff9a98013b338ff6d9f82522ff26306616f522a380b5b5786163b25b9208138</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

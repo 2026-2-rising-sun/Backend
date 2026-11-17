@@ -60,14 +60,14 @@
 </tbody>
 </table></div>
 <h2 id="현재-코드-결제-재설계-구현-중">현재 코드 (결제 재설계 구현 중)</h2>
-<p>결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 승인·토스 호출·원장 서비스·스케줄러는 아직 없다(#338·#349). 기존 Mock 결제·환불 코드는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a>에서 지웠다.</p>
+<p>결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 원장 서비스(<code>LedgerService.record</code>: 호출자 트랜잭션 안에서 사건당 한 번 분개)는 있지만 아직 부르는 곳이 없다. 승인·토스 호출·스케줄러는 아직 없다(#338·#349). 기존 Mock 결제·환불 코드는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a>에서 지웠다.</p>
 <ul>
 <li>API: <a href="api.html">API HTML</a> · <a href="../../../../contracts/api/payment-service.yaml">계약 YAML</a>. <code>X-Service-Token</code>(commercecore)만 허용하고, 허용 목록(<code>/v1/internal/payments</code>, <code>…/{orderRef}</code>, <code>…/{orderRef}/checkouts</code>, <code>…/{orderRef}/approval</code>) 밖의 <code>/v1/internal/**</code>는 403이다. 승인 경로는 컨트롤러가 없다(#338).</li>
 <li>결제 키는 <code>orderRef</code>다. 같은 orderRef 생성은 <code>INSERT … ON CONFLICT DO NOTHING</code>의 영향 행 수로 판단하고, 결제창은 <code>CREATED</code>·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 <a href="../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.html#api">#348 설계서</a>.</li>
 <li>DB: <a href="erd.html">ERD 설명</a> · <a href="erd.html">관계도</a></li>
 <li>결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.</li>
 </ul>
-<p>아래 "Payment 결제 실행"·"Payment 환불 실행"은 지운 Mock 구현의 기록이다. 기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>.</p>
+<p>아래 문서는 지운 Mock 구현의 기록이다. 기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>.</p>
 <ul>
 <li>서비스 간 흐름: <a href="../../flows/order-payment.html">주문·결제</a> · <a href="../../flows/refund.html">환불</a></li>
 </ul>
@@ -201,6 +201,6 @@
 <li><code>RefundOutcomeService.java</code>(#347에서 삭제)</li>
 </ul>
 <p>관련 기존 테스트: <code>RefundRecoveryStorePostgresTest.java</code>(#347에서 삭제) · <code>RefundMockEngineTest.java</code>(#347에서 삭제).</p>
-<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>499326f429f5068eb3c448098f9253793ee56ea7bfa5509cd3782bed84c90551</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>5a3233a22d2880395d2c349924c26d0f19a88747b430d0cf5d9e6a90e4d96b9a</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
