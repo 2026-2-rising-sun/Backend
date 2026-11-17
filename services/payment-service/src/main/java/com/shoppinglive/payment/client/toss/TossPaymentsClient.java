@@ -1,6 +1,8 @@
 package com.shoppinglive.payment.client.toss;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.io.JsonEOFException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.http.HttpConnectTimeoutException;
@@ -142,6 +144,17 @@ public class TossPaymentsClient {
     private static TossResult classify(
             ConvertibleClientHttpResponse response, Predicate<String> isExpectedStatus)
             throws IOException {
+        try {
+            return classifyResponse(response, isExpectedStatus);
+        } catch (IncompleteBody exception) {
+            // 상태 줄은 받았지만 본문을 끝까지 받지 못했다(읽기 타임아웃·끊김). 받은 응답이 없는 것으로 본다
+            return new TossResult.Unknown("응답 본문을 끝까지 받지 못함", null);
+        }
+    }
+
+    private static TossResult classifyResponse(
+            ConvertibleClientHttpResponse response, Predicate<String> isExpectedStatus)
+            throws IOException {
         HttpStatusCode status = response.getStatusCode();
         int statusCode = status.value();
         if (statusCode == 200) {
@@ -152,40 +165,64 @@ public class TossPaymentsClient {
                 return new TossResult.Success(payment);
             }
             return new TossResult.Unknown(
-                    "HTTP 200 결제 상태 불일치: " + (payment == null ? "본문 파싱 실패" : payment.status()));
+                    "HTTP 200 결제 상태 불일치: " + (payment == null ? "본문 파싱 실패" : payment.status()),
+                    statusCode);
         }
         if (status.is5xxServerError()) {
-            return new TossResult.Unknown("HTTP " + statusCode);
+            return new TossResult.Unknown("HTTP " + statusCode, statusCode);
         }
         if (!status.is4xxClientError()) {
-            return new TossResult.Unknown("분류하지 못한 HTTP " + statusCode);
+            return new TossResult.Unknown("분류하지 못한 HTTP " + statusCode, statusCode);
         }
         if (statusCode == 401 || statusCode == 429) {
-            return new TossResult.NotSent("HTTP " + statusCode);
+            return new TossResult.NotSent("HTTP " + statusCode, statusCode);
         }
         TossError error = readOrNull(response, TossError.class);
         if (error == null || error.code() == null || error.code().isBlank()) {
-            return new TossResult.Unknown("HTTP " + statusCode + " 오류 code를 읽지 못함");
+            return new TossResult.Unknown("HTTP " + statusCode + " 오류 code를 읽지 못함", statusCode);
         }
         String code = error.code();
         if ((statusCode == 400 && OUR_KEY_BAD_REQUEST_CODES.contains(code))
                 || (statusCode == 403 && OUR_CONFIGURATION_FORBIDDEN_CODES.contains(code))) {
-            return new TossResult.NotSent("HTTP " + statusCode + " " + code);
+            return new TossResult.NotSent("HTTP " + statusCode + " " + code, statusCode);
         }
         if ((statusCode == 400 && POSSIBLY_IN_FLIGHT_BAD_REQUEST_CODES.contains(code))
                 || (statusCode == 403 && CONSECUTIVE_REQUEST_FORBIDDEN_CODE.equals(code))
                 || (statusCode == 409 && IDEMPOTENT_REQUEST_PROCESSING_CODE.equals(code))) {
-            return new TossResult.Unknown("HTTP " + statusCode + " " + code);
+            return new TossResult.Unknown("HTTP " + statusCode + " " + code, statusCode);
         }
-        return new TossResult.Declined(code, error.message());
+        return new TossResult.Declined(code, error.message(), statusCode);
     }
 
-    /** 본문이 비었거나 JSON으로 읽지 못하거나 읽는 중 끊기면 null이다. */
+    /**
+     * 본문이 비었거나 JSON으로 읽지 못하면 null이다. 읽는 중 I/O 오류(타임아웃·끊김)나 JSON이 중간에서 끝나면 {@link IncompleteBody}다.
+     */
     private static <T> T readOrNull(ConvertibleClientHttpResponse response, Class<T> type) {
         try {
             return response.bodyTo(type);
         } catch (RestClientException exception) {
-            return null;
+            if (incomplete(exception)) {
+                throw new IncompleteBody();
+            }
+            return null; // 본문은 다 받았고 JSON이 아니다
+        }
+    }
+
+    /** JSON이 중간에서 끝났거나(EOF) JSON 오류가 아닌 I/O 오류(읽기 타임아웃·연결 끊김)가 원인이면 본문을 끝까지 받지 못한 것이다. */
+    private static boolean incomplete(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof JsonEOFException
+                    || (cause instanceof IOException
+                            && !(cause instanceof JsonProcessingException))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final class IncompleteBody extends RuntimeException {
+        IncompleteBody() {
+            super(null, null, false, false);
         }
     }
 

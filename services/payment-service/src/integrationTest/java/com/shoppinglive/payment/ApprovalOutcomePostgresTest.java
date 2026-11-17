@@ -81,6 +81,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(row.get("pg_status")).isEqualTo("DONE");
         assertThat(row.get("partial_cancelable")).isEqualTo(true);
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(200);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT idempotency_key || '/' || pg_order_id FROM pg_call WHERE payment_id = ?",
@@ -126,6 +127,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
                         org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:SUCCESS");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(200, 200);
         assertThat(journals(c.orderRef())).isZero();
         assertThat(outboxRows(c.orderRef())).isEmpty();
     }
@@ -144,6 +146,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
 
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:UNKNOWN");
+        assertThat(httpStatuses(c.orderRef())).as("취소 응답 없음").containsExactly(200, null);
         assertThat(journals(c.orderRef())).isZero();
     }
 
@@ -157,13 +160,14 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
                 .thenReturn(new TossResult.Success(wrongAmount));
         when(toss.cancel(anyString(), anyString(), anyString()))
-                .thenReturn(new TossResult.Declined("NOT_CANCELABLE_PAYMENT", "취소할 수 없는 결제"));
+                .thenReturn(new TossResult.Declined("NOT_CANCELABLE_PAYMENT", "취소할 수 없는 결제", 403));
 
         assertThat(approvals.approve(c)).isInstanceOf(ApprovalResult.Closed.class);
 
         long id = paymentId(c.orderRef());
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:DECLINED");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(200, 403);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT result_code FROM pg_call WHERE payment_id = ? AND kind = 'CANCEL'",
@@ -200,7 +204,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
     void declined() {
         ApproveCommand c = newPayment();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
-                .thenReturn(new TossResult.Declined("REJECT_CARD_PAYMENT", "한도초과"));
+                .thenReturn(new TossResult.Declined("REJECT_CARD_PAYMENT", "한도초과", 403));
 
         ApprovalResult result = approvals.approve(c);
 
@@ -213,6 +217,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(row.get("approving_at")).isNull();
         assertThat(row.get("pg_order_id")).isNull();
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:DECLINED");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(403);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT result_code FROM pg_call WHERE payment_id = ?",
@@ -256,6 +261,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(row.get("status")).isEqualTo("CREATED");
         assertThat(row.get("pg_order_id")).isNull();
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:NOT_SENT");
+        assertThat(httpStatuses(c.orderRef())).as("응답을 받지 못함").containsExactly((Integer) null);
         verify(toss, times(1)).confirm(anyString(), anyString(), anyLong(), anyString());
     }
 
@@ -266,7 +272,12 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         ApproveCommand c = newPayment();
         AtomicInteger n = new AtomicInteger();
         when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
-                .thenAnswer(inv -> assertOutsideTransaction(c, n.incrementAndGet(), unknown()));
+                .thenAnswer(
+                        inv ->
+                                assertOutsideTransaction(
+                                        c,
+                                        n.incrementAndGet(),
+                                        new TossResult.Unknown("HTTP 500", 500)));
 
         Instant before = Instant.now();
         assertThat(approvals.approve(c))
@@ -282,6 +293,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(Duration.between(before, next).toSeconds()).isBetween(8L, 12L);
         assertThat(Duration.between(before, deadline).toMinutes()).isBetween(29L, 31L);
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:UNKNOWN", "CONFIRM:UNKNOWN");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(500, 500);
         assertThat(journals(c.orderRef())).isZero();
         assertThat(outboxRows(c.orderRef())).isEmpty();
     }
@@ -297,6 +309,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
 
         assertThat(status(c.orderRef())).isEqualTo("APPROVED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:UNKNOWN", "CONFIRM:SUCCESS");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(null, 200);
         assertThat(journals(c.orderRef())).isEqualTo(1);
         assertThat(outboxRows(c.orderRef())).hasSize(1);
     }

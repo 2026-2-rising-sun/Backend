@@ -91,6 +91,7 @@ public class ApprovalService {
         long callId = attempt.pgCallId();
         boolean unknownOnce = first instanceof TossResult.Unknown;
         if (unknownOnce) {
+            outcomes.recordCall(attempt.pgCallId(), first);
             // 같은 멱등 키로 1번 더(PAY-CONFIRM-10). 호출 기록을 먼저 커밋한다
             callId =
                     outcomes.insertCall(
@@ -109,10 +110,10 @@ public class ApprovalService {
             return new ApprovalResult.Pending(paymentId);
         }
         if (result instanceof TossResult.Declined declined) {
-            outcomes.applyDeclined(paymentId, callId, declined.code());
+            outcomes.applyDeclined(paymentId, callId, declined);
             return new ApprovalResult.Declined(paymentId, declined.code(), declined.message());
         }
-        outcomes.applyNotSent(paymentId, callId);
+        outcomes.applyNotSent(paymentId, callId, (TossResult.NotSent) result);
         return new ApprovalResult.PgUnavailable(paymentId);
     }
 
