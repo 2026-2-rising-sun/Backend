@@ -52,6 +52,8 @@ spring:
   config:
     activate:
       on-profile: local
+    # 로컬 비밀값은 services/payment-service/.env에서 읽는다(bootRun은 모듈 폴더, IDE는 저장소 루트에서 실행할 수 있어 두 경로). 없으면 무시. 형식은 .env.example.
+    import: optional:file:.env[.properties],optional:file:services/payment-service/.env[.properties]
   datasource:
     url: ${PAYMENT_DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:56432}/payment}
     username: ${PAYMENT_DB_USER:${POSTGRES_USER:msa}}
