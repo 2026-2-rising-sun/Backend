@@ -67,7 +67,12 @@
 <li><a href="#337-결제-재설계-스펙계획-정리">#337 결제 재설계 스펙·계획 정리</a></li>
 <li><a href="#337-결제-재설계-전체-로드맵과-구현-보류">#337 결제 재설계 전체 로드맵과 구현 보류</a></li>
 <li><a href="#337-결제-1차-이슈별-상세-설계">#337 결제 1차 이슈별 상세 설계</a></li>
+<li><a href="#347-기존-mock-결제-코드-삭제">#347 기존 Mock 결제 코드 삭제</a></li>
+<li><a href="#348-결제-v4-스키마와-엔티티-추가">#348 결제 V4 스키마와 엔티티 추가</a></li>
+<li><a href="#348-결제-생성결제창조회-api-추가">#348 결제 생성·결제창·조회 API 추가</a></li>
+<li><a href="#338-결제-원장-분개-기록-추가">#338 결제 원장 분개 기록 추가</a></li>
 <li><a href="#338-토스-결제-클라이언트">#338 토스 결제 클라이언트</a></li>
+<li><a href="#338-결제-승인-처리와-paymentapproved-발행">#338 결제 승인 처리와 PaymentApproved 발행</a></li>
 </ul>
 </li>
 </ul>
@@ -522,6 +527,38 @@
 <li>미실행·한계: 업무 코드·계약 변경 없음. 토스 멱등 키 재사용 응답과 H2의 <code>ON CONFLICT</code> 형태는 실행해 확인하지 않았다. 결정 반영 뒤 재리뷰는 하지 않았다.</li>
 <li>다음 작업: 기존 결제 코드 삭제와 토스 클라이언트 구현을 병렬로 시작한다.</li>
 </ul>
+<h2 id="347-기존-mock-결제-코드-삭제">#347 기존 Mock 결제 코드 삭제</h2>
+<p>관련 작업: <a href="plans/active/337-payment-redesign/phase1/347-legacy-removal.html">기존 코드 삭제 설계</a></p>
+<ul>
+<li>변경·판단(2026-11-15): payment-service의 Mock 결제·환불 코드와 내부 API를 지우고 <code>/v1/internal/**</code>을 모두 막았다. 테이블은 다음 스키마 PR이 지운다. CommerceCore 테스트가 옛 Payment를 테스트 의존성으로 띄우던 결합을 끊었다(Core 운영 코드는 그대로). 지운 Core 테스트는 설계서 "CommerceCore 테스트 정리"에 주문 연동에서 복구할 회귀로 적었다. 이벤트 표본 테스트는 옛 DTO 없이 다시 썼다.</li>
+<li>검증: <code>scripts/check.sh --base origin/dev --external</code>(임시 PostgreSQL) 실패 0. Core <code>test</code> 151, <code>integrationTest</code> 238(Kafka 조건부 스킵 2), Core <code>postgresTest</code> 24, Payment 테스트 전부 통과. 표본 검사는 수동 실행으로 22건 통과. 독립 리뷰 지적 5건 반영.</li>
+<li>미실행·한계: Kafka 테스트 2건. 병합 뒤 주문 연동까지 통합 환경의 결제·환불과 로컬 결제 시나리오 지정은 403을 받는다.</li>
+<li>다음 작업: 결제 스키마(V4).</li>
+</ul>
+<h2 id="348-결제-v4-스키마와-엔티티-추가">#348 결제 V4 스키마와 엔티티 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/348-create-api.html">결제 생성·조회 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/354">PR #354</a></p>
+<ul>
+<li>변경·판단(2026-11-16): V4에서 Mock 결제 테이블 4개를 지우고 결제·판매자별 금액·PG 호출·원장 테이블을 만들었다. 엔티티는 연관관계 없이 ID 컬럼으로 매핑하고 상태 setter를 두지 않았다. <code>order_ref</code> 문자 집합과 금액 합·분개 균형은 DB가 아니라 앱이 검사한다(다음 API PR·#338). <code>design.html</code>의 <code>pg_call</code> 주석을 스키마 원본에 맞췄다.</li>
+<li>검증: <code>scripts/check.sh --base origin/refactor/#347-payment-legacy-removal --external</code>(임시 PostgreSQL 16) 통과. Payment test 1, integrationTest 5, migrationTest 9, postgresTest 3, 스킵 0. 독립 리뷰 지적 8건 중 2건 반영, 3건 설명.</li>
+<li>미실행·한계: 데이터가 있는 옛 테이블 위의 V4 적용, 운영 DB 적용, NOT NULL·부분 인덱스 개별 검사.</li>
+<li>다음 작업: 결제 생성·결제창·조회 내부 API.</li>
+</ul>
+<h2 id="348-결제-생성결제창조회-api-추가">#348 결제 생성·결제창·조회 API 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/348-create-api.html">결제 생성·조회 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/355">PR #355</a></p>
+<ul>
+<li>변경·판단(2026-11-16): 결제 생성·결제창 다시 열기·조회 내부 API와 <code>PaymentError</code>, 서비스 토큰 허용 목록 4개 경로를 만들었다. 같은 orderRef는 <code>ON CONFLICT DO NOTHING</code> 영향 행 수로, 결제창은 CREATED·만료 전 조건부 UPDATE로 판단한다. 계약 YAML을 다시 쓰고 <code>api.html</code>·모듈 README를 갱신했다. H2 테스트를 위해 엔티티 UNIQUE 컬럼에 <code>unique = true</code>를 달았다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#348-payment-core-schema' --external</code>(임시 PostgreSQL 16) 통과. Payment test 1, integrationTest 49, postgresTest 6(동시 생성·동시 결제창·판매자 번호 충돌 롤백 포함), migrationTest 9(별도 실행), 스킵 0. 독립 리뷰 지적 5건 중 4건 반영.</li>
+<li>미실행·한계: Commerce 실제 호출, 운영 DB, 부하. 같은 orderRef 재요청은 expiresAt을 검사하지 않도록 설계서 처리 순서를 고쳤다(2026-11-16 결정, PAY-CREATE-02).</li>
+<li>다음 작업: 원장 서비스(#338).</li>
+</ul>
+<h2 id="338-결제-원장-분개-기록-추가">#338 결제 원장 분개 기록 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/338-approval-ledger.html#3-원장-ledgerservice">승인·원장 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/356">PR #356</a></p>
+<ul>
+<li>변경·판단(2026-11-16): <code>Journal</code>이 줄 수·한쪽 금액·판매자 ID·차대 균형(넘침 거절)을 만들 때 검사하고, <code>LedgerService.record</code>가 호출자 트랜잭션(MANDATORY) 안에서 <code>ON CONFLICT DO NOTHING</code>으로 사건당 한 번만 기록한다. 0행이면 같은 사건이 있는지 다시 읽어 확인한다. 원장 리포지토리는 <code>Repository</code>로 좁혀 삭제·저장 우회 메서드를 없앴다. LED-02를 범위에 넣었고, 승인 분개(LED-APPROVE-01)는 승인 처리 PR에서 호출·검증한다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#348-payment-create-api' --external</code>(임시 PostgreSQL 16) 통과. Payment test 10, integrationTest 57, postgresTest 9(같은 사건 순차·8스레드 동시 중복, 롤백 포함), 스킵 0. 독립 리뷰 지적 7건 중 6건 반영.</li>
+<li>미실행·한계: 실제 호출처(승인 반영)가 없어 상태 변경과 함께 롤백되는 경로는 다음 PR에서 확인한다. migrationTest는 변경 경로상 선택되지 않았다. 같은 사건을 다른 금액으로 다시 기록해도 조용히 무시한다(LED-03).</li>
+<li>다음 작업: 승인 처리 서비스와 이벤트 계약 교체.</li>
+</ul>
 <h2 id="338-토스-결제-클라이언트">#338 토스 결제 클라이언트</h2>
 <p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/338-approval-ledger.html">승인·원장 설계</a></p>
 <ul>
@@ -529,6 +566,14 @@
 <li>검증: <code>scripts/check.sh --base origin/dev</code> 통과(토스 테스트 36건 포함). 독립 리뷰에서 돈 쪽 오분류 없음, 지적 3건 반영.</li>
 <li>미실행·한계: <code>postgresTest</code>(로컬 환경 없음, 이 변경은 DB를 쓰지 않음). 실제 토스 테스트 키 호출과 연결 타임아웃 실측은 하지 않았다.</li>
 <li>다음 작업: 승인 처리 서비스에서 이 클라이언트를 쓴다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>36d8380d17c56e17768cb0b0b1db4c7370d03f7866dae7de84e0faea9b31f38b</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="338-결제-승인-처리와-paymentapproved-발행">#338 결제 승인 처리와 PaymentApproved 발행</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/338-approval-ledger.html#2-승인-처리">승인·원장 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/357">PR #357</a></p>
+<ul>
+<li>변경·판단(2026-11-16): <code>ApprovalService</code>가 검증·CREATED→APPROVING·호출 기록을 한 트랜잭션으로 커밋한 뒤 트랜잭션 밖에서 토스 승인을 부르고, <code>PaymentOutcomeService</code>가 결과별로 상태·pg_call·승인 분개·<code>PaymentApproved</code> outbox를 한 트랜잭션에 반영한다. 불명이면 같은 키로 1번 더 부르고, 한 번이라도 불명이면 CREATED로 되돌리지 않는다. 승인 반영이 0행이면 다시 읽어 APPROVED면 끝내고, 아니면 CANCELED로 선점한 뒤 토스 응답의 paymentKey로 보상 취소한다(취소 실패는 사람이 확인). 이벤트 계약을 <code>PaymentExecutionResolved</code>에서 <code>PaymentApproved</code>(키 orderRef)로 교체했다(호환 깨짐, CommerceCore 운영 코드는 그대로). 토스 클라이언트 브랜치를 merge로 포함했다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-ledger' --external</code>(임시 PostgreSQL 16) 실패 0. Payment test 46, integrationTest 63, postgresTest 23(동시 승인 8건·승인 반영 8스레드 경합·outbox 실패 롤백·보상 취소 실패 포함), 스킵 0. 결과는 incomplete: 이 변경과 무관한 Core Kafka 2건·notification 3건 조건부 스킵 때문에 event-samples가 자동 실행되지 않아 수동 실행으로 표본 27건 통과. 독립 리뷰 지적 8건 중 2건 반영(보상 취소 CANCELED 선점·사람 확인 로그, 멱등 키 중복), 1건 설명(APPROVING 정체는 #349 스위퍼).</li>
+<li>미실행·한계: 승인 HTTP 엔드포인트·8초 대기(다음 PR), 실제 토스 테스트 키 호출, CommerceCore 소비자 연동(Phase 2).</li>
+<li>다음 작업: 승인 API와 8초 대기.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>a8de3e63fc343cb4949116f267c0d131d2efcf390c53706c32c344d6666ed642</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
