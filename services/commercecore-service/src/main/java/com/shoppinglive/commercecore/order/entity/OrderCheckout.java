@@ -10,7 +10,7 @@ import com.shoppinglive.commercecore.sales.entity.SalesStatus;
  * 구분이다.
  *
  * @param productId Shopping 상품 식별자
- * @param salesId 판매정보 식별자. 주문 생성 때 서버가 다시 찾으므로 화면이 보관할 필요는 없다
+ * @param salesId 기존 호환 이름. 현재 단일 SKU 조회가 확인한 SKU 식별자
  * @param productName 조회 시점 상품명. 주문이 만들어지면 그 시점 값이 주문에 스냅샷으로 남는다
  * @param unitPrice 조회 시점 단가 (원)
  * @param quantity 확인을 요청한 수량
@@ -31,6 +31,11 @@ public record OrderCheckout(
         SalesStatus salesStatus,
         boolean orderable,
         Reason reason) {
+
+    /** LegacyOrderSkuService가 선택한 실제 SKU를 명시적인 이름으로 제공한다. */
+    public Long skuId() {
+        return salesId;
+    }
 
     /**
      * 주문 불가 사유. Shopping 의 {@code purchase-check} 와 같은 이름을 쓰는 값은 같은 뜻이다 (화면이 두 API 를 오가며 같은 문구를 쓸 수

@@ -4,11 +4,7 @@ import com.shoppinglive.commercecore.order.entity.OrderCheckout;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.exception.ProductNotFoundException;
 import com.shoppinglive.commercecore.product.service.ProductLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.exception.SalesNotFoundException;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import org.springframework.stereotype.Service;
@@ -25,16 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderCheckoutService {
 
-    private final SalesJpaRepository salesRepository;
-    private final SalesStockJpaRepository salesStockRepository;
+    private final LegacyOrderSkuService trading;
     private final ProductLookup productLookup;
 
-    public OrderCheckoutService(
-            SalesJpaRepository salesRepository,
-            SalesStockJpaRepository salesStockRepository,
-            ProductLookup productLookup) {
-        this.salesRepository = salesRepository;
-        this.salesStockRepository = salesStockRepository;
+    public OrderCheckoutService(LegacyOrderSkuService trading, ProductLookup productLookup) {
+        this.trading = trading;
         this.productLookup = productLookup;
     }
 
@@ -60,21 +51,7 @@ public class OrderCheckoutService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST, "수량은 1 이상이어야 합니다: " + quantity);
         }
 
-        Sales sales =
-                salesRepository
-                        .findByProductId(productId)
-                        .orElseThrow(
-                                () ->
-                                        new SalesNotFoundException(
-                                                "상품의 판매정보를 찾을 수 없습니다: productId=" + productId));
-
-        SalesStock stock =
-                salesStockRepository
-                        .findById(sales.getId())
-                        .orElseThrow(
-                                () ->
-                                        new SalesNotFoundException(
-                                                "판매 재고를 찾을 수 없습니다: salesId=" + sales.getId()));
+        var sales = trading.read(productId, null);
 
         // 상품명 없이 주문서를 그리면 무엇을 사는지 모르는 화면이 된다. 상품 저장소 장애는 그대로
         // 전파해 503 으로 재시도를 안내하고, 확인된 "없음" 만 404 로 구분한다.
@@ -85,11 +62,13 @@ public class OrderCheckoutService {
 
         return OrderCheckout.of(
                 productId,
-                sales.getId(),
+                sales.skuId(),
                 product.name(),
-                sales.getPrice(),
+                sales.price(),
                 quantity,
-                stock.getAvailable(),
-                sales.getStatus());
+                sales.available(),
+                product.saleEnabled()
+                        ? sales.status()
+                        : com.shoppinglive.commercecore.sales.entity.SalesStatus.PRIVATE);
     }
 }

@@ -16,6 +16,8 @@ public record PurchaseCheck(
         long unitPrice) {
 
     public enum Reason {
+        /** 상품 전체 판매가 중지됨. SKU 품절과 구분한다. */
+        SALE_SUSPENDED,
         /** 품절이거나 판매중인데 재고가 0. */
         SOLD_OUT,
         /** 요청 수량이 주문 가능 재고보다 많다. */
@@ -24,9 +26,11 @@ public record PurchaseCheck(
 
     public static PurchaseCheck of(PublicProductDetail detail, int quantity) {
         Reason reason =
-                !detail.purchasable()
-                        ? Reason.SOLD_OUT
-                        : quantity > detail.maxQuantity() ? Reason.EXCEEDS_STOCK : null;
+                !detail.product().isSaleEnabled()
+                        ? Reason.SALE_SUSPENDED
+                        : !detail.purchasable()
+                                ? Reason.SOLD_OUT
+                                : quantity > detail.maxQuantity() ? Reason.EXCEEDS_STOCK : null;
         return new PurchaseCheck(
                 detail.product().getId(),
                 quantity,

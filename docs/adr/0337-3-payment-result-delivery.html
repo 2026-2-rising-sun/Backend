@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ADR 0337-3: 결제 결과는 outbox 이벤트로 알리고 판단은 Commerce가 한다</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="0337-3-payment-result-delivery.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#문제">문제</a></li>
+<li><a href="#결정과-대안">결정과 대안</a></li>
+<li><a href="#영향">영향</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>ADR 0337-3: 결제 결과는 outbox 이벤트로 알리고 판단은 Commerce가 한다</h1><p>결정 상태: 채택
+구현 상태: <a href="../design-docs/services/payment/requirements/payment.html">결제 요구사항</a>, <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a>에서 추적
+관련 자료: <a href="../design-docs/services/payment/design.html#contract">이벤트 계약</a> · <a href="../design-docs/services/payment/design.html#saga">Saga</a></p>
+<h2 id="문제">문제</h2>
+<p>승인 결과는 동기 응답, 지연 응답(202 뒤), 결과 불명 복구로 늦게 확정될 수 있다. 주문이 이미 만료·취소된 뒤 승인이 확정되면 돈만 빠져나간다.</p>
+<h2 id="결정과-대안">결정과 대안</h2>
+<ul>
+<li>Payment는 상태 변경과 같은 트랜잭션에서 공통 outbox에 이벤트를 쓴다. 받는 쪽은 업무 키(UNIQUE·조건부 UPDATE)로 한 번만 반영한다.</li>
+<li>Payment는 "토스에서 승인됐다"는 사실만 알린다. 주문을 결제 완료로 바꿀지 환불할지는 주문 상태를 가진 Commerce가 판단한다(코레오그래피 Saga).</li>
+<li>늦은 승인은 Commerce가 <code>RefundRequested</code>(사유 LATE_APPROVAL)를 보내고 Payment가 전액 환불한다.</li>
+<li>Payment는 주문 만료·취소 이벤트를 구독하지 않는다. 자기 만료 시각으로 CREATED 결제를 닫는다.</li>
+<li>대안: 오케스트레이터 또는 Payment가 주문 상태를 판단. 판단 주체가 둘이 되어 택하지 않았다.</li>
+</ul>
+<h2 id="영향">영향</h2>
+<ul>
+<li>Commerce가 "주문은 닫혔는데 승인됨" 처리를 빠뜨리면 환불이 누락된다. 계약 테스트와 지표(0행 처리 수 = 환불 요청 수)로 막는다.</li>
+<li>남은 불일치는 거래 대사가 잡는다.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>c201c0c5495e35e89528bb996b5356dbb0b54933e36dd5bc49e5fbd8d52fd004</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

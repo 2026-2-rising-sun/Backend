@@ -239,6 +239,65 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                     .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
     }
 
+    @Test
+    @DisplayName("복수 SKU는 공개·비공개 조합과 정렬·커서에 관계없이 대표값 대신 503을 반환한다")
+    void rejectsMultipleSkusBeforeFilteringAndPaging() throws Exception {
+        long ambiguous =
+                product(
+                        "니트 중복",
+                        100,
+                        SalesStatus.ON_SALE,
+                        JwtTestTokens.SELLER,
+                        ProductCategory.FASHION);
+        for (int i = 0; i < 3; i++)
+            product(
+                    "니트 단일 " + i,
+                    200,
+                    SalesStatus.ON_SALE,
+                    JwtTestTokens.SELLER,
+                    ProductCategory.FASHION);
+        String cursor = listing("니트", "ON_SALE", "LATEST", "").path("nextCursor").asText();
+        long version = 10;
+        for (SalesStatus second :
+                List.of(SalesStatus.PRIVATE, SalesStatus.ON_SALE, SalesStatus.SOLD_OUT)) {
+            sales.apply(new SalesInfo(ambiguous, ambiguous * 10 + 1, 300, second, 1), version++);
+            mvc.perform(get("/v1/products")).andExpect(status().isServiceUnavailable());
+            if (second == SalesStatus.SOLD_OUT) {
+                mvc.perform(get("/v1/products").param("status", "SOLD_OUT"))
+                        .andExpect(status().isServiceUnavailable());
+            }
+            for (String sort : List.of("LATEST", "PRICE_ASC", "PRICE_DESC")) {
+                mvc.perform(
+                                get("/v1/products")
+                                        .param("q", "니트")
+                                        .param("status", "ON_SALE")
+                                        .param("category", "FASHION")
+                                        .param("sort", sort)
+                                        .param("size", "1"))
+                        .andExpect(status().isServiceUnavailable());
+            }
+            mvc.perform(
+                            get("/v1/products")
+                                    .param("q", "니트")
+                                    .param("status", "ON_SALE")
+                                    .param("sort", "LATEST")
+                                    .param("cursor", cursor)
+                                    .param("size", "2"))
+                    .andExpect(status().isServiceUnavailable());
+            mvc.perform(get("/v1/products/" + ambiguous))
+                    .andExpect(status().isServiceUnavailable());
+        }
+        // 요청 검색·카테고리 밖의 다중 SKU가 무관한 목록까지 막지 않는다.
+        mvc.perform(get("/v1/products").param("q", "니트 단일")).andExpect(status().isOk());
+        mvc.perform(get("/v1/products").param("category", "BEAUTY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isEmpty());
+        jdbc.update(
+                "UPDATE product SET deleted_at=CURRENT_TIMESTAMP,sale_enabled=FALSE WHERE id=?",
+                ambiguous);
+        mvc.perform(get("/v1/products")).andExpect(status().isOk());
+    }
+
     private MockHttpServletRequestBuilder categoryListing(String category, String cursor) {
         MockHttpServletRequestBuilder request =
                 get("/v1/products")

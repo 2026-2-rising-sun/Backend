@@ -40,6 +40,7 @@ class SalesRegistrationApiTest
     private static final long UNKNOWN_PRODUCT_ID = 999L;
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -51,14 +52,19 @@ class SalesRegistrationApiTest
 
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id IN (900,999)");
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
         productLookupStub.clear();
         productLookupStub.register(new ProductSnapshot(REGISTERED_PRODUCT_ID, "테스트 상품", null));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, REGISTERED_PRODUCT_ID, SELLER);
     }
 
     @AfterEach
     void tearDown() {
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id IN (900,999)");
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
         productLookupStub.clear();
@@ -141,6 +147,7 @@ class SalesRegistrationApiTest
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10)).andExpect(status().isNotFound());
 
         productLookupStub.register(new ProductSnapshot(UNKNOWN_PRODUCT_ID, "뒤늦게 생긴 상품", null));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, UNKNOWN_PRODUCT_ID, SELLER);
 
         register(body(UNKNOWN_PRODUCT_ID, 15_000, 10)).andExpect(status().isCreated());
     }

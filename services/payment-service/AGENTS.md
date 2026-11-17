@@ -1,6 +1,6 @@
 # Payment 작업 주의점
 
-스펙은 [결제](../../docs/requirements/payment.md)·[원장](../../docs/requirements/ledger.md)·[환불](../../docs/requirements/refund.md), 할 일은 [실행 계획](../../docs/exec-plans/active/337-payment-redesign/README.md)이 연결한 단계 문서에서 해당 PR 블록만 읽는다. 테스트 `@DisplayName`에 요구사항 ID를 넣는다.
+스펙은 [결제](../../docs/design-docs/services/payment/requirements/payment.md)·[원장](../../docs/design-docs/services/payment/requirements/ledger.md)·[환불](../../docs/design-docs/services/payment/requirements/refund.md), 할 일은 [실행 계획](../../docs/worklog/plans/active/337-payment-redesign/README.md)이 연결한 단계 문서에서 해당 PR 블록만 읽는다. 테스트 `@DisplayName`에 요구사항 ID를 넣는다.
 
 - 토스 호출은 DB 트랜잭션 밖에서 한다. 호출 전에 APPROVING과 pg_call을 먼저 커밋한다.
 - 상태 변경은 이전 상태 조건부 UPDATE다. 0행이면 다시 읽어 판단한다.
