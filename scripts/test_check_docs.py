@@ -118,3 +118,27 @@ class DocumentChecks(unittest.TestCase):
         self.assertEqual(check_docs.main(["--root", str(self.root)]), 1)
         self.write("docs/new.md", "# 새 문서")
         self.assertEqual(check_docs.main(["--root", str(self.root)]), 0)
+
+
+class DocumentPairs(unittest.TestCase):
+    def test_pair_is_required_in_design_decisions_and_records(self):
+        """새 구조의 각 주제에서 한쪽 파일 누락을 탐지한다."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('design-docs/flows/order-payment', 'adr/0002-layout', 'worklog/2026-11-17'):
+                source = root / ('docs/' + name + '.md')
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text('# 예제')
+                self.assertEqual(len(check_docs.check_pairs(root, [source.relative_to(root).as_posix()])), 1)
+                source.with_suffix('.html').write_text('<h1>예제</h1>')
+                self.assertEqual(check_docs.check_pairs(root, [source.relative_to(root).as_posix()]), [])
+
+    def test_relocated_requirements_keep_status_validation(self):
+        """Payment로 이동한 요구사항도 기존 완료·검증 기준을 검사한다."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative = 'docs/design-docs/services/payment/requirements/payment.md'
+            source = root / relative
+            source.parent.mkdir(parents=True)
+            source.write_text('# 요구사항\n상태: 끝남\n')
+            self.assertTrue(any('요구사항 상태' in error for error in check_docs.check_documents(root, [relative])))

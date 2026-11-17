@@ -16,7 +16,9 @@ public record ProductResponse(
         Long version,
         Instant createdAt,
         String sellerId,
-        ProductCategory category) {
+        ProductCategory category,
+        boolean saleEnabled,
+        Instant deletedAt) {
 
     public static ProductResponse of(Product product, String mainImageUrl) {
         return new ProductResponse(
@@ -28,6 +30,8 @@ public record ProductResponse(
                 product.getVersion(),
                 product.getCreatedAt(),
                 product.getSellerId(),
-                product.getCategory());
+                product.getCategory(),
+                product.isSaleEnabled(),
+                product.getDeletedAt());
     }
 }

@@ -10,6 +10,10 @@ import com.shoppinglive.commercecore.sales.entity.SalesStock;
  */
 public record SalesStockResponse(Long salesInfoId, Integer available, Integer reserved) {
 
+    public static SalesStockResponse from(com.shoppinglive.commercecore.sku.dto.SkuView sku) {
+        return new SalesStockResponse(sku.skuId(), sku.available(), sku.reserved());
+    }
+
     public static SalesStockResponse from(SalesStock stock) {
         return new SalesStockResponse(
                 stock.getSalesInfoId(), stock.getAvailable(), stock.getReserved());

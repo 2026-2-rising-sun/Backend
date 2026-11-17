@@ -15,4 +15,5 @@ public record SellerProductSummary(
         Instant createdAt,
         SalesDisplayStatus salesStatus,
         Long price,
-        Integer available) {}
+        Integer available,
+        boolean saleEnabled) {}

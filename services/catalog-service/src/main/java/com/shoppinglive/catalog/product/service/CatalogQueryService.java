@@ -2,6 +2,7 @@ package com.shoppinglive.catalog.product.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
+import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.product.dto.PublicProductItemResponse;
 import com.shoppinglive.catalog.product.dto.PublicProductListResponse;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 가격·상태의 전체 목록 조건은 기존 이벤트 읽기 모델에서 함께 적용한다. 상세·주문 확정 경로는 바꾸지 않는다. */
@@ -30,7 +32,7 @@ public class CatalogQueryService {
         this.mapper = mapper;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PublicProductListResponse list(
             String query,
             SalesDisplayStatus status,
@@ -58,7 +60,7 @@ public class CatalogQueryService {
                 "%" + keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%");
         params.put("size", size + 1);
         String where =
-                " WHERE s.status IN ('ON_SALE', 'SOLD_OUT') AND LOWER(p.name) LIKE :keyword ESCAPE '!'";
+                " WHERE p.deleted_at IS NULL AND s.status IN ('ON_SALE', 'SOLD_OUT') AND LOWER(p.name) LIKE :keyword ESCAPE '!'";
         if (status != null) {
             where += " AND s.status = :status";
             params.put("status", status.name());
@@ -67,6 +69,9 @@ public class CatalogQueryService {
             where += " AND p.category = :category";
             params.put("category", category.name());
         }
+        // 단일 판매정보 계약은 SKU 상태 필터나 페이지 경계로 우회할 수 없다.
+        // 두 조회는 같은 스냅샷을 사용하므로 검사 직후 도착한 두 번째 SKU도 섞이지 않는다.
+        String matchingProducts = where;
         if (cursor != null && !cursor.isBlank()) {
             Position after = decode(cursor);
             if (!fingerprint.equals(after.fingerprint())
@@ -88,6 +93,16 @@ public class CatalogQueryService {
                                 " AND (s.price < :price OR (s.price = :price AND p.id < :id))";
                     };
         }
+        Boolean multipleSkus =
+                jdbc.queryForObject(
+                        "SELECT EXISTS (SELECT 1 FROM product p JOIN product_sales s ON s.product_id=p.id"
+                                + matchingProducts
+                                + " AND (SELECT COUNT(*) FROM product_sales all_s WHERE all_s.product_id=p.id)>1)",
+                        params,
+                        Boolean.class);
+        if (Boolean.TRUE.equals(multipleSkus)) {
+            throw new SalesInfoUnavailableException("상품의 여러 SKU를 단일 판매정보로 조회할 수 없습니다.");
+        }
         String order =
                 switch (ordering) {
                     case LATEST -> "p.created_at DESC, p.id DESC";
@@ -96,7 +111,7 @@ public class CatalogQueryService {
                 };
         List<CatalogRow> rows =
                 jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_url, p.category, p.created_at, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
+                        "SELECT p.id, p.name, p.main_image_url, p.category, p.created_at, p.sale_enabled, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
                                 + where
                                 + " ORDER BY "
                                 + order
@@ -111,7 +126,8 @@ public class CatalogQueryService {
                                         rs.getLong("price"),
                                         SalesDisplayStatus.valueOf(rs.getString("status")),
                                         rs.getInt("available"),
-                                        rs.getString("category")));
+                                        rs.getString("category"),
+                                        rs.getBoolean("sale_enabled")));
         boolean hasNext = rows.size() > size;
         List<CatalogRow> page = rows.subList(0, Math.min(size, rows.size()));
         String next = null;
@@ -130,7 +146,9 @@ public class CatalogQueryService {
                                                 row.price(),
                                                 row.available(),
                                                 row.status(),
-                                                row.status().isPurchasable() && row.available() > 0,
+                                                row.saleEnabled()
+                                                        && row.status().isPurchasable()
+                                                        && row.available() > 0,
                                                 row.category() == null
                                                         ? null
                                                         : ProductCategory.valueOf(row.category())))
@@ -184,5 +202,6 @@ public class CatalogQueryService {
             long price,
             SalesDisplayStatus status,
             int available,
-            String category) {}
+            String category,
+            boolean saleEnabled) {}
 }

@@ -10,29 +10,26 @@ import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
-import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 class PaymentGroupLifecycleService {
-    private final ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry;
+    private final OrderTimeSource time;
+    private final OrderSheetLifecycleService localOrders;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final SalesJpaRepository sales;
-    private final SalesStockJpaRepository stock;
+    private final SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
     private final PaymentDispatcher dispatcher;
@@ -44,22 +41,22 @@ class PaymentGroupLifecycleService {
 
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
+            OrderTimeSource time,
+            OrderSheetLifecycleService localOrders,
             OrderJpaRepository orders,
-            SalesJpaRepository sales,
-            SalesStockJpaRepository stock,
+            SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
             PaymentDispatcher dispatcher,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             CouponReservationService couponReservations,
-            PaymentGroupEventPublisher notificationEvents,
-            ObjectProvider<com.shoppinglive.common.observability.BusinessTelemetry> telemetry) {
-        this.telemetry = telemetry;
+            PaymentGroupEventPublisher notificationEvents) {
         this.groups = groups;
+        this.time = time;
+        this.localOrders = localOrders;
         this.orders = orders;
-        this.sales = sales;
-        this.stock = stock;
+        this.skus = skus;
         this.payments = payments;
         this.guard = guard;
         this.dispatcher = dispatcher;
@@ -83,7 +80,7 @@ class PaymentGroupLifecycleService {
                                 throw conflict("이미 결제를 시작했습니다. 기존 결과를 확인해 주세요.");
                             }
                             if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                                    || !g.getExpiresAt().isAfter(Instant.now()))
+                                    || !g.getExpiresAt().isAfter(time.now()))
                                 throw conflict("결제를 시작할 수 없는 주문입니다.");
                             List<Order> children =
                                     orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
@@ -95,7 +92,10 @@ class PaymentGroupLifecycleService {
                                             g.getPayableAmount(),
                                             key,
                                             null);
-                            g.transition(OrderStatus.PAYMENT_CONFIRMING);
+                            var processingStartedAt = time.now();
+                            if (!g.getExpiresAt().isAfter(processingStartedAt))
+                                throw conflict("결제를 시작할 수 없는 주문입니다.");
+                            g.beginProcessing(processingStartedAt);
                             g.setPaymentId(request.paymentId());
                             groups.saveAndFlush(g);
                             for (Order child : children) {
@@ -108,6 +108,7 @@ class PaymentGroupLifecycleService {
                             }
                             return request;
                         });
+        if (accepted == null) throw conflict("주문의 10분 기한이 지났습니다.");
         // 전달 요청과 주문 상태를 커밋한 뒤 HTTP를 호출한다. 0원도 Payment 원본을 저장한다.
         return dispatcher.paymentAfterCommit(accepted.paymentId());
     }
@@ -138,19 +139,7 @@ class PaymentGroupLifecycleService {
     }
 
     boolean expire(Long groupId) {
-        PaymentGroup found = groups.findById(groupId).orElseThrow();
-        guard.ensure(found.getMemberId());
-        return tx.execute(
-                t -> {
-                    guard.lock(found.getMemberId());
-                    PaymentGroup g = lockedGroup(groupId);
-                    if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                            || g.getExpiresAt().isAfter(Instant.now())) {
-                        return false;
-                    }
-                    close(g, OrderStatus.EXPIRED);
-                    return true;
-                });
+        return localOrders.expire(groupId);
     }
 
     private PaymentGroup lockedGroup(Long id) {
@@ -162,18 +151,16 @@ class PaymentGroupLifecycleService {
     private void close(PaymentGroup g, OrderStatus terminal) {
         List<Order> children =
                 orders.findByPaymentGroupIdOrderByIdAsc(g.getId()).stream()
-                        .sorted(Comparator.comparing(Order::getSalesInfoId))
+                        .sorted(Comparator.comparing(Order::getTradeSkuId))
                         .toList();
-        for (Order child : children) {
-            guard.lockSales(child.getSalesInfoId());
-        }
         for (Order child : children) {
             int changed =
                     terminal == OrderStatus.CANCELLED
                             ? orders.cancelOrder(child.getId())
                             : jdbc.update(
-                                    "UPDATE orders SET status='EXPIRED',cancelled_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='PENDING_PAYMENT'",
-                                    child.getId());
+                                    "UPDATE orders SET status='EXPIRED',cancelled_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status=?",
+                                    child.getId(),
+                                    g.getStatus().name());
             if (changed != 1) {
                 throw new IllegalStateException("결제 묶음 종료 상태가 일치하지 않습니다.");
             }
@@ -191,14 +178,12 @@ class PaymentGroupLifecycleService {
     }
 
     private void restore(Order child) {
-        if (stock.restoreReserved(child.getSalesInfoId(), child.getQuantity()) != 1) {
-            throw new IllegalStateException("예약 재고가 누락되었습니다.");
-        }
-        sales.reopenIfStockAvailable(child.getSalesInfoId());
+        skus.release(child.getTradeSkuId(), child.getQuantity());
     }
 
     private PaymentGroup owned(String member, String number) {
         return groups.findByGroupNumberAndMemberId(number, member)
+                .filter(g -> g.usesLegacyExecution())
                 .orElseThrow(() -> error(ErrorCode.NOT_FOUND, "주문 묶음을 찾을 수 없습니다."));
     }
 

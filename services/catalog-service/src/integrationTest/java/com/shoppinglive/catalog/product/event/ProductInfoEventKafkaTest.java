@@ -31,7 +31,7 @@ class ProductInfoEventKafkaTest extends CatalogSecuritySupport {
     @Autowired ProductRepository products;
 
     @Test
-    @DisplayName("실제 Kafka에서 version 0 등록과 수정 snapshot을 받고 중복·역순은 무시한다")
+    @DisplayName("EmbeddedKafka로 등록·수정·전체 제어·삭제를 반영하고 중복·역순으로 되살리지 않는다")
     void appliesInitialAndUpdatedSnapshotsThroughBroker() throws Exception {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, broker.getBrokersAsString());
@@ -47,6 +47,7 @@ class ProductInfoEventKafkaTest extends CatalogSecuritySupport {
                                 var p = found.orElseThrow();
                                 assertThat(p.getVersion()).isZero();
                                 assertThat(p.getName()).isEqualTo("처음");
+                                assertThat(p.isSaleEnabled()).isFalse();
                             });
             send(producer, 4, "수정");
             send(producer, 4, "중복");
@@ -61,8 +62,31 @@ class ProductInfoEventKafkaTest extends CatalogSecuritySupport {
             var current = products.findById(7L).orElseThrow();
             assertThat(current.getVersion()).isEqualTo(4);
             assertThat(current.getName()).isEqualTo("수정");
+            assertThat(current.isSaleEnabled()).isTrue();
             assertThat(current.getMainImageUrl())
                     .isEqualTo("/api/commercecore/v1/product-images/10");
+            var deleted =
+                    (com.fasterxml.jackson.databind.node.ObjectNode)
+                            new ObjectMapper().readTree(event(7, 5, "삭제"));
+            ((com.fasterxml.jackson.databind.node.ObjectNode) deleted.path("payload"))
+                    .put("saleEnabled", false)
+                    .put("deletedAt", "2026-11-13T00:00:00Z");
+            producer.send(
+                            new ProducerRecord<>(
+                                    ProductInfoEventMessage.TOPIC, "7", deleted.toString()))
+                    .get(10, TimeUnit.SECONDS);
+            send(producer, 4, "삭제 뒤 역순");
+            producer.send(
+                            new ProducerRecord<>(
+                                    ProductInfoEventMessage.TOPIC, "9", event(9, 0, "삭제 처리 뒤")))
+                    .get(10, TimeUnit.SECONDS);
+            await().atMost(Duration.ofSeconds(20))
+                    .untilAsserted(() -> assertThat(products.existsById(9L)).isTrue());
+            current = products.findById(7L).orElseThrow();
+            assertThat(current.getVersion()).isEqualTo(5);
+            assertThat(current.isSaleEnabled()).isFalse();
+            assertThat(current.getDeletedAt())
+                    .isEqualTo(java.time.Instant.parse("2026-11-13T00:00:00Z"));
         }
     }
 
@@ -91,6 +115,8 @@ class ProductInfoEventKafkaTest extends CatalogSecuritySupport {
                 .put("mainImageUrl", "/api/commercecore/v1/product-images/10")
                 .put("sellerId", "seller")
                 .put("version", version)
+                .put("saleEnabled", version > 0)
+                .putNull("deletedAt")
                 .put("createdAt", "2026-11-08T00:00:00Z")
                 .put("updatedAt", "2026-11-08T00:00:00Z");
         return root.toString();

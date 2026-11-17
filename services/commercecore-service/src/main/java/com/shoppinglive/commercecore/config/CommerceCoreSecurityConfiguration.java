@@ -99,6 +99,8 @@ public class CommerceCoreSecurityConfiguration {
                                     .requestMatchers(
                                             "/v1/orders",
                                             "/v1/orders/**",
+                                            "/v1/order-sheets",
+                                            "/v1/order-sheets/**",
                                             "/v1/cart/items",
                                             "/v1/cart/items/**",
                                             "/v1/cart/checkout",

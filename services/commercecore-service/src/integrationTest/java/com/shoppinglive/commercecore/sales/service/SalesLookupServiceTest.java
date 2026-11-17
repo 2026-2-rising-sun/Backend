@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shoppinglive.commercecore.sales.dto.SalesLookup;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
@@ -38,6 +36,8 @@ class SalesLookupServiceTest
 
     @Autowired private SalesLookupService salesLookupService;
 
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired private com.shoppinglive.commercecore.sku.service.SkuService skus;
     @Autowired private SalesJpaRepository salesRepository;
 
     @Autowired private SalesStockJpaRepository salesStockRepository;
@@ -56,14 +56,15 @@ class SalesLookupServiceTest
     }
 
     private void clean() {
+        jdbc.update("DELETE FROM sku");
         salesStockRepository.deleteAll();
         salesRepository.deleteAll();
     }
 
     private void register(
             long productId, long price, SalesStatus status, int available, int reserved) {
-        Sales sales = salesRepository.save(new Sales(productId, price, status));
-        salesStockRepository.save(new SalesStock(sales.getId(), available, reserved));
+        com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                jdbc, productId, price, status, available, reserved);
     }
 
     @DisplayName("요청한 상품의 가격·상태·재고를 한 번에 반환한다")
@@ -87,7 +88,7 @@ class SalesLookupServiceTest
         assertThat(lookup.price()).isEqualTo(15_000L);
         assertThat(lookup.status()).isEqualTo(SalesStatus.ON_SALE);
         assertThat(lookup.salesId()).isNotNull();
-        assertThat(salesRepository.findById(lookup.salesId())).isPresent();
+        assertThat(skus.findBySkuIds(List.of(lookup.salesId()))).hasSize(1);
     }
 
     /**
@@ -142,9 +143,9 @@ class SalesLookupServiceTest
         salesLookupService.findByProductIds(List.of(ON_SALE_PRODUCT));
         salesLookupService.findByProductIds(List.of(ON_SALE_PRODUCT));
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
-        assertThat(stock.getAvailable()).isEqualTo(7);
-        assertThat(stock.getReserved()).isEqualTo(2);
+        var stock = skus.findBySkuIds(List.of(salesId)).getFirst();
+        assertThat(stock.available()).isEqualTo(7);
+        assertThat(stock.reserved()).isEqualTo(2);
     }
 
     @DisplayName("상품 ID는 상한인 100개까지 허용한다")

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CommerceCore 결제 연동 후속 요구 인계</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="payment-handoff.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#345-동시환불346-실행기한분리의-별도-작업공간은-재개하지-않았다-이번600초-값-확정은-새payment-구현권한이나-unknown-종료정책-승인으로-확대하지-않는다">345 동시환불·#346 실행기한분리의 별도 작업공간은 재개하지 않았다. 이번600초 값 확정은 새Payment 구현권한이나 UNKNOWN 종료정책 승인으로 확대하지 않는다.</a><ul>
+<li><a href="#기존-코드와-팀원-목표의-차이">기존 코드와 팀원 목표의 차이</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>CommerceCore 결제 연동 후속 요구 인계</h1><p>상태: 요구·미구현. Payment 담당의 코드/DTO/DB/API/이벤트를 이 문서로 변경하거나 새 설계를 대신 채택하지 않는다. 팀원 dev ADR0337-1~5는 채택됐지만 결제 교체·주문연동·환불은 별도 실행 계획이다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>소유</th>
+<th>상태/기한</th>
+<th>시작 기준</th>
+<th>현재 구현/미확정</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CommerceCore 목표</td>
+<td>주문 PENDING600초</td>
+<td>주문 생성·선점</td>
+<td>내부 도메인만 구현, 공개 legacy 기본15분 적용은 기존동작으로 남음</td>
+</tr>
+<tr>
+<td>CommerceCore 목표</td>
+<td>PAYMENT_PROCESSING 별도600초</td>
+<td>실제 결제 실행 진입</td>
+<td>2026-11-15 직접 확정시간. 준비데이터 생성만으로 전환하지 않고 재전송으로 연장하지 않음. 새상태/타이머 미구현</td>
+</tr>
+<tr>
+<td>Payment 팀원 목표</td>
+<td>CREATED</td>
+<td>새결제 생성/준비</td>
+<td>주문PENDING과 다른소유/상태이며 새API는 이번PR에서 구현하지 않음</td>
+</tr>
+<tr>
+<td>Payment 팀원 목표</td>
+<td>APPROVING/UNKNOWN</td>
+<td>PG실행/조회</td>
+<td>CommerceCore PROCESSING과 동일상태가 아님. 통신대기8초/PGtimeout10초 같은 기술시간은 주문600초와 다름</td>
+</tr>
+<tr>
+<td>서비스 경계 후속</td>
+<td>UNKNOWN·기한종료·늦은승인</td>
+<td>원문/금전사실 조회</td>
+<td>PROCESSING600초 경과가 PG실패확정·즉시재고해제승인은 아님. 조회·종료·보상계약 별도정의 필요</td>
+</tr>
+</tbody>
+</table></div>
+<p>필요 인계: orderRef/구매자/판매자별금액·멱등키 소유, Commerce 승인중계·주문잠금, 결과시간/환불기간 기준, PaymentApproved의 중복·순서와 상태확정, M3 RefundRequested/LATE_APPROVAL·영속재시도·늦은성공부활금지, 금전성공후Core반영실패의 재조회/중복금전금지. U1단가우선/U2누적전량·원기한, Product중지후기선점결제허용도 유지해야 한다.</p>
+<p>현재 PR은 신규 주문서 공개API/금전연동과 legacy600초 확대분을 후속으로 분리한다. 503 또는 다른 코드로 새 차단 정책을 설치하지 않는다. 진행중policy1/2를0으로 바꾸거나 저장기한을 소급 변경하지 않는다. 보존ref e08b8aea의 기존Mock전용 구현/검증과 현재 축소범위를 구분하며 기존V104/PaymentV4 적용환경의 무중단이행을 보장하지 않는다.</p>
+<h1 id="345-동시환불346-실행기한분리의-별도-작업공간은-재개하지-않았다-이번600초-값-확정은-새payment-구현권한이나-unknown-종료정책-승인으로-확대하지-않는다">345 동시환불·#346 실행기한분리의 별도 작업공간은 재개하지 않았다. 이번600초 값 확정은 새Payment 구현권한이나 UNKNOWN 종료정책 승인으로 확대하지 않는다.</h1>
+<h2 id="기존-코드와-팀원-목표의-차이">기존 코드와 팀원 목표의 차이</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>현재 legacy 소비 계약</th>
+<th>팀원 목표/CommerceCore 미연결</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>결제 식별/입력</td>
+<td>requestId/paymentId/orderId/paymentGroupId·amount·scenario</td>
+<td>불투명orderRef·buyerId·expiresAt·판매자별금액/수수료율. 공급원·스냅샷 계약 미연결</td>
+</tr>
+<tr>
+<td>상태 소유</td>
+<td>Core PAYMENT_CONFIRMING, 기존Payment PROCESSING/SUCCESS/FAILED/UNKNOWN</td>
+<td>Core 목표PAYMENT_PROCESSING은별도주문상태. Payment CREATED/APPROVING/APPROVED/UNKNOWN과동일상태가아님</td>
+</tr>
+<tr>
+<td>기한</td>
+<td>공개legacy기본15분/확인중유지, 내부PENDING600초</td>
+<td>목표PENDING600초+실제실행진입PROCESSING600초. PG대기/통신timeout과다른시계</td>
+</tr>
+<tr>
+<td>결과/환불</td>
+<td>기존실행결과HTTP·이벤트와항목전체환불</td>
+<td>새PaymentApproved·RefundRequested/LATE_APPROVAL과원장/금전정합성은팀원로드맵후속. 이번PR에서구현/채택대행하지않음</td>
+</tr>
+</tbody>
+</table></div>
+<p>팀원 최신dev df36802e의로드맵은구현보류/Phase단위이며원문을보존했다. 이표는CommerceCore측필요사항의인계이고Payment계약/DB/코드를수정하라는지시가아니다.</p><p class="muted fingerprint">MD SHA-256: <code>3f9944e855e8f24b214bd7e6c9a29021ced06f6728319f2f08143ebd4e55b2d4</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

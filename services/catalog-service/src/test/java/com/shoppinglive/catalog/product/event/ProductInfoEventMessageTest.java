@@ -38,6 +38,27 @@ class ProductInfoEventMessageTest {
         assertThat(result.version()).isZero();
         assertThat(result.category()).isNull();
         assertThat(result.sellerId()).isNull();
+        assertThat(result.saleEnabled()).isTrue();
+        assertThat(result.deletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("신규 판매 준비·삭제 snapshot을 구분하고 잘못된 제어 타입과 삭제 후 판매허용은 거절한다")
+    void validatesSaleControlAndDeletion() {
+        var node = event();
+        var p = (ObjectNode) node.path("payload");
+        p.put("saleEnabled", false).putNull("deletedAt");
+        assertThat(ProductInfoEventMessage.parse("7", node.toString()).saleEnabled()).isFalse();
+        p.put("deletedAt", "2026-11-13T00:00:00Z");
+        assertThat(ProductInfoEventMessage.parse("7", node.toString()).deletedAt()).isNotNull();
+        p.put("saleEnabled", true);
+        reject(node);
+        p.put("saleEnabled", "false");
+        reject(node);
+        p.putNull("saleEnabled");
+        reject(node);
+        p.put("saleEnabled", false).put("deletedAt", "invalid");
+        reject(node);
     }
 
     @Test

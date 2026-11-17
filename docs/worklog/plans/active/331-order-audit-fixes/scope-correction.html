@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payment 침범 정정과 남긴 범위</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="scope-correction.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#최신-dev-원본으로-원상분리할-payment-파일">최신 dev 원본으로 원상분리할 Payment 파일</a></li>
+<li><a href="#core-제외-api실행db">Core 제외 API/실행/DB</a></li>
+<li><a href="#계약-종료-테스트와-대체-증거">계약 종료 테스트와 대체 증거</a></li>
+<li><a href="#적용-환경-한계">적용 환경 한계</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Payment 침범 정정과 남긴 범위</h1><p>당시 판정(2026-11-15): 범위 정정 중, 전체 설계 미충족·머지 불가였다. 현재는 사용자가 CommerceCore 한정 dev 병합을 승인했으며 최신 범위는 <a href="README.html">현재 계획</a>에서 구분한다. 원래수용조건은 <a href="README.html">현재 계획</a>에미완으로남는다. 보존ref <code>archive/order331-before-payment-scope-correction</code>은e08b8aea, 독립수정0146dc83, 선행Cart통합3b44a879다. forcepush/history rewrite 없이 일반정정커밋으로분리한다.</p>
+<h2 id="최신-dev-원본으로-원상분리할-payment-파일">최신 dev 원본으로 원상분리할 Payment 파일</h2>
+<p>비교기준 dev df36802e (Payment 생산/계약은059eaee60과 동일). 아래는 보존e08에서 dev와달랐던파일이며 현재정정은팀원원본을보존한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이전차이</th>
+<th>파일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>M</td>
+<td><code>contracts/api/payment-service.yaml</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/README.md</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/api.html</code></td>
+</tr>
+<tr>
+<td>D</td>
+<td><code>docs/design-docs/services/payment/design.html</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/erd.html</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/erd.md</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/states/payment.html</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/states/payment.md</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/states/refund.html</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>docs/design-docs/services/payment/states/refund.md</code></td>
+</tr>
+<tr>
+<td>D</td>
+<td><code>services/payment-service/AGENTS.md</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/integrationTest/java/com/shoppinglive/payment/PaymentSecurityIntegrationTest.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentBoundaryPostgresTest.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentRecoveryStorePostgresTest.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentSchemaPostgresTest.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/config/PaymentSecurityConfiguration.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/controller/InternalPaymentController.java</code></td>
+</tr>
+<tr>
+<td>A</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/dto/OrderClosureCommand.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/dto/RefundCommand.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentAttempt.java</code></td>
+</tr>
+<tr>
+<td>A</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentOrderControl.java</code></td>
+</tr>
+<tr>
+<td>A</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/OrderClosureService.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentRecoveryStore.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentService.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundIntakeService.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundMockEngine.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundReconciler.java</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundRecoveryStore.java</code></td>
+</tr>
+<tr>
+<td>A</td>
+<td><code>services/payment-service/src/main/resources/db/payment-migration/V4__order_closure_compensation.sql</code></td>
+</tr>
+<tr>
+<td>M</td>
+<td><code>services/payment-service/src/test/java/com/shoppinglive/payment/service/RefundMockEngineTest.java</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Payment생산/테스트/DB/API·이벤트 원본의현재차이는0이다. Payment문서MD와새팀원design.html/ADR0337/요구/계획도 dev원본이다. <strong>Payment영역전체raw diff0은아니다:</strong> 공통renderer의Cart모바일select폭CSS 때문에 <code>docs/design-docs/services/payment/api.html</code>, <code>erd.html</code>, <code>states/payment.html</code>, <code>states/refund.html</code> 4개생성물은style태그내공통CSS만다르다. style을제거하면본문/기능/원본hash는완전동일하며새Payment업무수정이아니다. 공통renderer출처는Cart ae903c3d→146700da 인계다.</p>
+<h2 id="core-제외-api실행db">Core 제외 API/실행/DB</h2>
+<p>제외: OrderSheetController/OrderSheetRefundController와 <code>/v1/order-sheets</code> POST, <code>/{number}</code> GET, <code>/{number}/payments</code> POST, <code>/{number}/cancel</code> POST, <code>/{number}/refunds</code> POST, <code>/{number}/refunds/{id}</code> GET. 새로운503/다른에러의차단정책을설치한것이아니라공개핸들러·계약추가자체를후속으로분리했다. 따라서신규cartItems maxItems100 공개계약도이번제공완료가아니며내부Cart선택경계만남는다.</p>
+<p>제외: Core OrderClosureDeliveryService/OrderClosureCommand/OrderPaymentClosure, PaymentDeliveryStore/Dispatcher의COMPENSATION분기, RefundCommand.orderClosureRequestId, 신규주문서금전start/apply·수량환불어댑터. V104에서 order_payment_closure 및 refund_request purpose/order_closure_request_id·관련인덱스를제외했다. 기존스냅샷·거래출처·환불quantity·쿠폰사용출처는보존한다.</p>
+<p>유지: 내부OrderSheetService의1:N스냅샷·SKU선점·키멱등·PENDING600초·로컬만료반환, 독립OrderRefundAmounts계산, Product중지/삭제후기선점허용, seller저장/과거불변소유자조회/타판매자권한, SKU/Cart통합. 공개legacy는기존policy0/PT15M/확인중호환을보존한다. 내부policy1은legacy start/get/refund/active 경로가실행하지않으며새영속금전원문도만들지않는다.</p>
+<h2 id="계약-종료-테스트와-대체-증거">계약 종료 테스트와 대체 증거</h2>
+<p>보존e08의 <code>OrderSheetPostgresTest</code>16건(신규공개금전/수량환불포함), <code>OrderSheetCompensationPostgresTest</code>8건, <code>OrderDeadlinePostgresTest</code>14건은제외된어댑터계약과함께현재범위에서분리했다. <code>RefundDispatchDisabledPostgresTest</code>는Order추가백로그1건과미커밋lease진단수정을분리하고기존dev기본2시나리오를복원했다. 이전반복실패를통과로바꾸거나숨기지않는다.</p>
+<p>내부OrderSheetDomainPostgresTest는다중스냅샷·키/기한불변·취소·정확600초·롤백·Cart100/101·공개매핑없음·기존단건/묶음결제/환불우회불가·금전원문0을검사한다. 기존OrderLegacySkuPostgresTest의SKU/멱등/상태/수량/롤백검증은보존하고버전/기한기대만이번PR의<strong>기존dev보존값0/900초</strong>에맞춰명시했다. 목표600초를구현했다고표시하지않는다.</p>
+<p>새LegacyOrderSellerSnapshotPostgresTest의실제ProductQuery·삭제·PG/PaymentHTTP는기존계약환불4000/재고/판매자목록·상세·다른판매자차단을검사한다. 금전성공뒤재고상한오류는Core만롤백하며여유복구뒤동일UUID로재적용·금전실행1건을검사한다. 신규수량환불전체완료의증거로확대하지않는다.</p>
+<h2 id="적용-환경-한계">적용 환경 한계</h2>
+<p>이전V104/PaymentV4·진행중policy1/2를현재축소SQL로자동변환/재배포하지않는다. 원본로컬검증환경은보존ref와분리하고이번검증은새전용스키마다. 기존배포DB를조작하지않으며운영이행완료라주장하지않는다. 전체원래설계와기한/UNKNOWN·보상계약은미완이다.</p>
+<p>정정 후 최초전체9700f04c 실행은 H2 PaymentGroupIntegrationTest가 제외된정책2의FAILED/확인중기한해제를기대해1건실패했다. 이메서드를최신dev원본 그대로복원하여 policy0의EXPIRED/확인중만료제외·예약8/2 및9/1을검사한다. 원래600초설계완료로세지않으며첫실패/이벤트표본미실행을보존하고재검증한다.</p><p class="muted fingerprint">MD SHA-256: <code>36701c0ffc0ddf6593eb0433854f0348ce8f34237381473c167894c5a536e052</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>
