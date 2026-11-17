@@ -55,7 +55,9 @@ class TossClientConfigurationTest {
             TossPaymentsClient client = clientFor(server, " ", Duration.ofMillis(300));
 
             assertThat(client.confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
-                    .isInstanceOf(TossResult.NotSent.class);
+                    .isInstanceOf(TossResult.NotSent.class)
+                    .extracting(TossResult::httpStatus)
+                    .isNull();
             assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.NotSent.class);
             assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                     .isInstanceOf(TossResult.NotSent.class);
@@ -113,7 +115,9 @@ class TossClientConfigurationTest {
         assertThat(
                         clientFor("http://127.0.0.1:" + closedPort, SECRET, Duration.ofSeconds(1))
                                 .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
-                .isInstanceOf(TossResult.NotSent.class);
+                .isInstanceOf(TossResult.NotSent.class)
+                .extracting(TossResult::httpStatus)
+                .isNull();
     }
 
     @Test
@@ -125,6 +129,7 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
         }
     }
 
@@ -140,6 +145,7 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).as("데드라인 초과는 응답 없음").isNull();
             assertThat(Duration.ofNanos(System.nanoTime() - startedAt))
                     .isLessThan(Duration.ofSeconds(3));
         }

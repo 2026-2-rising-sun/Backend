@@ -106,6 +106,15 @@ abstract class ApprovalPostgresTestSupport {
                 orderRef);
     }
 
+    /** pg_call.http_status 목록, id 순. 응답을 받지 못한 호출은 null. */
+    List<Integer> httpStatuses(String orderRef) {
+        return jdbc.queryForList(
+                "SELECT c.http_status FROM pg_call c JOIN payment p ON p.id = c.payment_id"
+                        + " WHERE p.order_ref = ? ORDER BY c.id",
+                Integer.class,
+                orderRef);
+    }
+
     /** "계정:차변:대변" 목록. */
     List<String> approvalEntries(String orderRef) {
         return jdbc.queryForList(
