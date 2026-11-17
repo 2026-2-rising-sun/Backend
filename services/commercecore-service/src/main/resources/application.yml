@@ -54,7 +54,7 @@ commercecore:
     execution-enabled: true
   order:
     expiration:
-      duration: PT15M
+      duration: PT10M
   image:
     storage:
       dir: ${COMMERCECORE_IMAGE_DIR:${user.home}/.shoppinglive/commercecore-images}
@@ -83,6 +83,10 @@ management:
 logging:
   pattern:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
+
+# 팀원 계약: 주문 생성 때 판매자 주문에 복사한다. 운영 수수료율은 환경 설정으로 공급한다.
+commerce:
+  commission-rate: ${COMMERCE_COMMISSION_RATE:}
 
 ---
 # 새 서비스의 빈 전용 DB만 사용한다. 기존 commerce DB로 자동 연결하지 않는다.

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>하네스 변경 전 현황 조사</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="research.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#조사-범위">조사 범위</a></li>
+<li><a href="#확인한-문제와-계획에-미치는-영향">확인한 문제와 계획에 미치는 영향</a></li>
+<li><a href="#문서-검사-기준선">문서 검사 기준선</a></li>
+<li><a href="#이번-조사에서-실행하지-않은-항목">이번 조사에서 실행하지 않은 항목</a></li>
+<li><a href="#모듈-문서-범위-추가-조사">모듈 문서 범위 추가 조사</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>하네스 변경 전 현황 조사</h1><p>확인일: 2026-11-13</p>
+<p>상태: 구현 전 조사 기록 보존. 아래의 현재·미확인 표현은 조사 당시를 뜻한다. 이후 해결 결과와 실제 검증은 <a href="README.html">완료 계획</a>과 <a href="../../../2026-11-13.html">워크로그</a>에 있다.</p>
+<p><a href="README.html">실행 계획</a> · <a href="decision.html">판단 기준</a></p>
+<h2 id="조사-범위">조사 범위</h2>
+<p>현재 워크트리의 Git 상태, 이관한 가이드, 문서 검사기, 변경 선택기와 CI 정의를 읽었다. 서비스 업무 코드나 외부 환경의 동작을 검증한 조사는 아니다.</p>
+<p>로컬 HEAD와 <code>origin/dev</code>는 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>다. 기존 <code>harness/</code>의 삭제와 <code>docs/</code>·<code>scripts/</code>의 추가를 포함한 미커밋 변경이 있으며, 원본 프로젝트에서는 작업하지 않는다.</p>
+<h2 id="확인한-문제와-계획에-미치는-영향">확인한 문제와 계획에 미치는 영향</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>확인 사항</th>
+<th>근거</th>
+<th>계획에 반영할 내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>루트 지침이 삭제된 경로를 가리킨다.</td>
+<td><a href="../../../../../AGENTS.md">AGENTS.md</a>에 <code>harness/README.md</code>, <code>harness/quality/</code>, <code>harness/workflow/</code> 링크가 남아 있다.</td>
+<td>진입점과 실제 사용하는 링크를 먼저 복구한다.</td>
+</tr>
+<tr>
+<td>기존 작업 절차가 새 기록 방향을 충분히 설명하지 못한다.</td>
+<td><a href="../../../../guides/workflow.md">workflow.md</a>의 시작 부분은 별도 계획서·보고서가 매번 필요하지 않다는 안내만 제공한다.</td>
+<td>기록 종류별 작성 조건과 작업 종료·인계 시점의 갱신 절차를 추가한다.</td>
+</tr>
+<tr>
+<td>요구사항 완료가 테스트 파일 이름에 의존한다.</td>
+<td><a href="../../../../../scripts/check_docs.py">check_docs.py</a>의 <code>check_requirement</code>는 <code>test_</code>, <code>Test.</code>, <code>.test.</code> 이름과 워크로그 링크를 요구한다.</td>
+<td>문서·HTML 작업에 적합한 검사·브라우저·수동 검증 근거도 표현하도록 보완한다.</td>
+</tr>
+<tr>
+<td>문서 추적 해제가 전체 검사를 선택한다.</td>
+<td><a href="../../../../../.gitignore">.gitignore</a> 변경은 <a href="../../../../../.github/scripts/ci/classify_changes.py">classify_changes.py</a>의 기본 <code>full-fallback</code>으로 분류된다.</td>
+<td>문서 패턴만 변경한 경우를 좁게 구분하고 다른 변경의 보수적인 선택은 유지한다.</td>
+</tr>
+<tr>
+<td>새 경로의 검사 호출이 추가돼 있다.</td>
+<td><a href="../../../../../scripts/verify.py">verify.py</a>는 문서 검사를 추가하고, <a href="../../../../../.github/workflows/ci.yml">ci.yml</a>은 문서 검사와 <code>scripts/</code> 테스트 탐색을 호출한다.</td>
+<td>파일 수정 사실과 실제 회귀 검사·원격 CI 통과를 구분한다.</td>
+</tr>
+<tr>
+<td>실행 리소스와 API 계약을 문서로 처리하지 않는 분기가 있다.</td>
+<td>변경 선택기의 <code>document</code> 함수는 <code>/src/</code>와 <code>contracts/api/</code>를 먼저 제외한다.</td>
+<td>이 경계를 회귀 검사로 유지한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="문서-검사-기준선">문서 검사 기준선</h2>
+<p>계획 문서와 일일 기록을 추가하기 전에 실행했다.</p>
+<pre><code class="language-bash">.venv-api/bin/python scripts/check_docs.py
+</code></pre>
+<ul>
+<li>종료 코드: <code>1</code></li>
+<li>검사 대상: 문서 18개</li>
+<li>오류: 19개, 모두 <code>AGENTS.md</code>의 로컬 링크 없음</li>
+<li>대표 경로: <code>harness/README.md</code>, <code>harness/workflow/README.md</code>, <code>harness/quality/code.md</code></li>
+</ul>
+<p>이 결과는 현재 문서 검사기의 출력이다. 검사기 자체의 회귀 테스트 통과나 모든 Markdown 문법 지원을 증명하지 않는다. 문서 수는 이후 계획·기록 추가에 따라 달라지므로 최종 검증 때 다시 기록한다.</p>
+<h2 id="이번-조사에서-실행하지-않은-항목">이번 조사에서 실행하지 않은 항목</h2>
+<ul>
+<li>문서 검사기·실행기·변경 선택기의 전체 회귀 테스트</li>
+<li>Java 빌드·서비스 테스트·실제 PostgreSQL·Kafka 검증</li>
+<li>원격 CI 및 다른 팀원의 에이전트 작업</li>
+<li>가드·편집 후 훅·MCP 연결</li>
+</ul>
+<p>현재 변경의 목적은 계획 수립이며 위 구현·실행 결과를 완료한 것으로 취급하지 않는다.</p>
+<h2 id="모듈-문서-범위-추가-조사">모듈 문서 범위 추가 조사</h2>
+<p>사용자가 모듈별 API 명세·DB ERD·상태 전이도의 HTML 문서화까지 계획에 포함하도록 요청했다. 이전 단계에서 후속 범위로 두었던 서비스별 문서를 전체 변경 계획의 단계별 산출물로 추가했다.</p>
+<p>6개 서비스의 API YAML과 마이그레이션 경로, 상태 관련 파일 이름을 확인했다. Payment는 <code>db/payment-migration/</code>을 사용한다. Catalog의 판매 상태 enum 설명과 CommerceCore의 주문 상태 enum을 일부 읽었으나, 실제 허용 전이 전체는 아직 확인하지 않았다. 상태 변경 서비스·영속 필드·테스트를 함께 읽어야 한다.</p>
+<p>조사한 경로와 앞으로 작성할 자료는 <a href="tables.html">모듈별 문서 범위</a>에 정리했다. 이 조사는 API 렌더링, DB 스키마 적용 결과, 실제 상태 전이 실행을 확인한 결과가 아니다.</p><p class="muted fingerprint">MD SHA-256: <code>94582ce6fd852401da18532c2a7c9efddef795b45edf1a321362f86d3c25d81c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

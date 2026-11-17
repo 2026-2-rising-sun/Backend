@@ -54,6 +54,7 @@ class SellerProductStatusHttpTest extends ProductSecuritySupport {
 
     @AfterEach
     void clean() {
+        jdbc.update("DELETE FROM sku");
         jdbc.update("DELETE FROM sales_stock");
         jdbc.update("DELETE FROM sales_info");
         products.deleteAll();
@@ -67,12 +68,8 @@ class SellerProductStatusHttpTest extends ProductSecuritySupport {
                                         name, name, imageId, UUID.randomUUID().toString(), seller))
                         .getId();
         if (status != null) {
-            var saved =
-                    sales.saveAndFlush(
-                            new com.shoppinglive.commercecore.sales.entity.Sales(
-                                    id, price, status));
-            stocks.saveAndFlush(
-                    new com.shoppinglive.commercecore.sales.entity.SalesStock(saved.getId(), 1, 0));
+            com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                    jdbc, id, price, status, status == SalesStatus.SOLD_OUT ? 0 : 1, 0);
         }
         return id;
     }

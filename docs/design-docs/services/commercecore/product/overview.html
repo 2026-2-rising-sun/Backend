@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Product 모듈</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="overview.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#product-상태--전체-제어와-sku-개별-조건">Product 상태 — 전체 제어와 SKU 개별 조건</a><ul>
+<li><a href="#전이">전이</a></li>
+<li><a href="#불변조건">불변조건</a></li>
+<li><a href="#잠금과-기존-주문">잠금과 기존 주문</a></li>
+<li><a href="#api와-근거">API와 근거</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Product 모듈</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 390" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="미생성" data-target="판매 준비·전체 false"><title>미생성 → 판매 준비·전체 false: 상품 기본정보 저장. SKU는 별도 생성이며 SKU 초기 READY. Product 등록과 Outbox version 0 저장.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="판매 준비·전체 false" data-target="전체 true"><title>판매 준비·전체 false → 전체 true: 판매자가 판매 시작, 본인·미삭제·version 확인. Product만 변경하고 Outbox 기록.</title><path class="connector" d="M725,77 L780,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="72.0">2</text></g><g class="edge-row" data-source="전체 true" data-target="전체 false"><title>전체 true → 전체 false: 판매자 전체 중지. Product만 변경하고 SKU 상태·수량은 보존.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">3</text></g><g class="edge-row" data-source="전체 false" data-target="전체 true"><title>전체 false → 전체 true: 판매자 재개. 기존 개별 SKU 중지/품절 조건을 그대로 유지.</title><path class="connector" d="M190,205 L940,120" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">4</text></g><g class="edge-row" data-source="전체 true" data-target="삭제·전체 false"><title>전체 true → 삭제·전체 false: 본인·version 확인 후 deleted_at 저장. 원본·이미지·SKU·기존 주문 보존.</title><path class="connector" d="M940,120 L565,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="157.5">5</text></g><g class="edge-row" data-source="전체 false" data-target="삭제·전체 false"><title>전체 false → 삭제·전체 false: 판매 준비 또는 중지 중에도 소프트 삭제 가능.</title><path class="connector" d="M350,247 L405,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">6</text></g><g class="edge-row" data-source="삭제·전체 false" data-target="삭제·전체 false"><title>삭제·전체 false → 삭제·전체 false: 같은 판매자의 완료된 삭제 재요청은 추가 이벤트 없이 204. 복구 기능은 추가하지 않음.</title><path class="connector" d="M565,205 C505,167 665,167 615,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="585" y="180">7</text></g><g><title>미생성</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">미생성</tspan></text></g><g><title>판매 준비·전체 false</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">판매 준비·전체 false</tspan></text></g><g><title>전체 true</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">전체 true</tspan></text></g><g><title>전체 false</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">전체 false</tspan></text></g><g><title>삭제·전체 false</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">삭제·전체 false</tspan></text></g></svg></div></section><p>Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 기준은 <code>cc91c09b</code> 위의 이 워크트리 구현이며 배포/운영 DB 적용 결과는 아니다. SKU #334의 가격·재고·개별 상태 구현과 후속 Order 연결은 별도로 통합한다.</p>
+<ul>
+<li><a href="erd.html">ERD 원본</a> · <a href="erd.html">ERD HTML</a></li>
+<li><a href="overview.html">상태 원본</a> · <a href="overview.html">상태 HTML</a></li>
+<li><a href="../../../../worklog/plans/active/333-product-module/README.html">실행 계획</a> · <a href="../../../../worklog/plans/active/333-product-module/api-changes.html">API 변경 조각</a></li>
+<li><a href="../../../../adr/0333-product-sku-boundary.html">정책과 대안</a> · <a href="../erd.html">현재 서비스 ERD</a></li>
+</ul>
+<p>MD가 원본이고 HTML은 저장소 렌더러로 생성한다. 실제 테스트 결과와 환경·미실행 범위는 <a href="../../../../worklog/2026-11-13.html">작업 기록</a>을 따른다.</p>
+<h2 id="product-상태--전체-제어와-sku-개별-조건">Product 상태 — 전체 제어와 SKU 개별 조건</h2>
+<p>기준: <code>cc91c09b</code> 위 Product #333 구현. ProductLifecycleService와 ProductTradingService, Catalog의 최소 제어 반영을 설명한다. SKU/Order의 후속 연결은 통합 대상이며 운영 배포 완료를 뜻하지 않는다.</p>
+<p><a href="overview.html">시각 자료</a></p>
+<p>전체 스위치는 매장의 상품 전체에 붙은 판매 허용 조건이다. 각 SKU의 개별 중지나 재고 부족과 독립적이다. 전체 스위치를 다시 켜도 개별 중지된 옵션을 재개하거나 재고를 늘리지 않는다.</p>
+<h3 id="전이">전이</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·부수 효과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>미생성</td>
+<td>판매 준비·전체 false</td>
+<td>상품 기본정보 저장. SKU는 별도 생성이며 SKU 초기 READY. Product 등록과 Outbox version 0 저장.</td>
+</tr>
+<tr>
+<td>판매 준비·전체 false</td>
+<td>전체 true</td>
+<td>판매자가 판매 시작, 본인·미삭제·version 확인. Product만 변경하고 Outbox 기록.</td>
+</tr>
+<tr>
+<td>전체 true</td>
+<td>전체 false</td>
+<td>판매자 전체 중지. Product만 변경하고 SKU 상태·수량은 보존.</td>
+</tr>
+<tr>
+<td>전체 false</td>
+<td>전체 true</td>
+<td>판매자 재개. 기존 개별 SKU 중지/품절 조건을 그대로 유지.</td>
+</tr>
+<tr>
+<td>전체 true</td>
+<td>삭제·전체 false</td>
+<td>본인·version 확인 후 deleted_at 저장. 원본·이미지·SKU·기존 주문 보존.</td>
+</tr>
+<tr>
+<td>전체 false</td>
+<td>삭제·전체 false</td>
+<td>판매 준비 또는 중지 중에도 소프트 삭제 가능.</td>
+</tr>
+<tr>
+<td>삭제·전체 false</td>
+<td>삭제·전체 false</td>
+<td>같은 판매자의 완료된 삭제 재요청은 추가 이벤트 없이 204. 복구 기능은 추가하지 않음.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="불변조건">불변조건</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th>Product/SKU 동작</th>
+<th>거래·표시 결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Product false, SKU 판매중·재고 있음</td>
+<td>SKU 값 유지</td>
+<td>신규 거래 포트 거절. Catalog의 기존 공개 노출은 유지하되 구매 불가, SALE_SUSPENDED.</td>
+</tr>
+<tr>
+<td>Product true, SKU 개별 중지</td>
+<td>Product true 유지</td>
+<td>SKU 조건 때문에 구매 불가. 전체 재개가 개별 중지를 해제하지 않음.</td>
+</tr>
+<tr>
+<td>Product true, SKU 재고 0</td>
+<td>Product true 유지</td>
+<td>SKU 품절 조건으로 구매 불가. Product에 SOLD_OUT을 저장하지 않음.</td>
+</tr>
+<tr>
+<td>Product 삭제</td>
+<td>deleted_at != null이면 sale_enabled=false</td>
+<td>신규 수정·거래·SKU 생성 거절. 일반 조회와 공개 조회 제외.</td>
+</tr>
+<tr>
+<td>전체 상태가 요청과 동일</td>
+<td>version 일치 검사 후 변경 없음</td>
+<td>중복 Outbox/버전 증가 없음. 오래된 version은 409.</td>
+</tr>
+<tr>
+<td>타 판매자/소유자 없는 레거시의 새 제어 요청</td>
+<td>새 전체 제어/삭제 권한 부여 안 함</td>
+<td>403. 기존 기본정보 수정의 레거시 처리와 구분.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="잠금과-기존-주문">잠금과 기존 주문</h3>
+<p>신규 주문은 호출자 트랜잭션에서 모든 Product ID를 정렬해 공유 잠금·미삭제/전체 허용을 검사한 다음 모든 SKU를 잠근다. 반환 값은 불변 ProductTradeSnapshot이다. Product 포트는 MANDATORY여서 단독 트랜잭션으로 먼저 커밋하지 않는다.</p>
+<p>주문이 공유 잠금을 먼저 얻으면 해당 트랜잭션 뒤에 전체 중지/삭제가 완료된다. 중지/삭제가 먼저 완료되면 후속 신규 거래는 최신 상태로 거절한다. 앞선 일반 조회가 같은 영속성 컨텍스트에 있어도 잠금 뒤 다시 읽는다.</p>
+<p>SKU 생성은 미삭제·본인만 검사하므로 전체 중지 중에도 준비할 수 있다. 기존 주문의 완료·예약 해제·환불 성공 복구에는 신규 거래의 판매허용 검사를 재사용하지 않는다. 해당 수량/멱등성 처리는 Order/SKU가 소유한다.</p>
+<h3 id="api와-근거">API와 근거</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>API</th>
+<th>요청/응답</th>
+<th>실제 상태</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PATCH /v1/seller/products/{productId}/sale-state</td>
+<td>saleEnabled·version 필수, 200 Product envelope</td>
+<td>구현·Order 검토 승인한 YAML 제한 반영. 루트 BearerAuth와 SELLER 권한.</td>
+</tr>
+<tr>
+<td>DELETE /v1/seller/products/{productId}</td>
+<td>version 필수 쿼리, 204</td>
+<td>구현. 본인 삭제 재요청 멱등, 첫 삭제 version 충돌 409.</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/service/ProductLifecycleService.java">Lifecycle 구현</a> · <a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/product/service/ProductTradingService.java">거래 포트</a> · <a href="../../../../worklog/plans/active/333-product-module/api-changes.html">API 조각</a> · <a href="erd.html">ERD</a> · <a href="../../../../worklog/2026-11-13.html">작업 기록</a></p>
+<p>버전 충돌이나 Outbox 기록 실패는 부분 반영하지 않는다. 정책/대안은 ADR을 원본으로 유지하며 HTML에 미확정 전이나 별도 정책을 추가하지 않는다. 실제 PostgreSQL 공유 잠금 보장은 해당 실행 기록이 있을 때만 검증됐다고 판단한다.</p><p class="muted fingerprint">MD SHA-256: <code>1fb1e4b53517168d87faa36d7152c6ee4b7c2a2471c00193c7fdddc148eb1146</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

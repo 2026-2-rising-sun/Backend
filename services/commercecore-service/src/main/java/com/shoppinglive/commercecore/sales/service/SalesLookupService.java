@@ -1,7 +1,7 @@
 package com.shoppinglive.commercecore.sales.service;
 
 import com.shoppinglive.commercecore.sales.dto.SalesLookup;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.util.Collection;
@@ -31,9 +31,9 @@ public class SalesLookupService {
      */
     public static final int MAX_PRODUCT_IDS = 100;
 
-    private final SalesJpaRepository salesRepository;
+    private final SkuSalesService salesRepository;
 
-    public SalesLookupService(SalesJpaRepository salesRepository) {
+    public SalesLookupService(SkuSalesService salesRepository) {
         this.salesRepository = salesRepository;
     }
 
@@ -57,7 +57,7 @@ public class SalesLookupService {
         if (unique.isEmpty()) {
             return List.of();
         }
-        return salesRepository.findLookupsByProductIds(unique);
+        return salesRepository.findSingleByProductIds(unique);
     }
 
     /**

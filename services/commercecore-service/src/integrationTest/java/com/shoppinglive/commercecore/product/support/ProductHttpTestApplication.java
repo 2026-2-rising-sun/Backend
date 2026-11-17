@@ -21,7 +21,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @TestComponent
 @Configuration(proxyBeanMethods = false)
 @EnableAutoConfiguration
-@EntityScan(basePackageClasses = {Product.class, Sales.class, OutboxMessage.class})
+@EntityScan(
+        basePackageClasses = {
+            com.shoppinglive.commercecore.sku.entity.Sku.class,
+            Product.class,
+            Sales.class,
+            OutboxMessage.class
+        })
 @EnableJpaRepositories(
         basePackageClasses = {
             ProductRepository.class,
@@ -31,7 +37,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @ComponentScan(
         basePackages = {
             "com.shoppinglive.commercecore.product",
-            "com.shoppinglive.commercecore.storage"
+            "com.shoppinglive.commercecore.storage",
+            "com.shoppinglive.commercecore.sku"
         },
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = ".*Test.*"))
 @Import({

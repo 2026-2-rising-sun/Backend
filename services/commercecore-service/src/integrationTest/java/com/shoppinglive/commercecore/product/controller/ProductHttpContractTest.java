@@ -2,6 +2,7 @@ package com.shoppinglive.commercecore.product.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -318,5 +319,95 @@ class ProductHttpContractTest extends ProductSecuritySupport {
                         .getResponse()
                         .getContentAsString();
         return mapper.readTree(response).path("data");
+    }
+
+    @Test
+    @DisplayName("전체 판매 시작은 본인·version을 검증하고 삭제 재요청은 204이며 이후 조회·수정은 거절한다")
+    void saleControlAndDeletionPreserveTheHttpContract() throws Exception {
+        var registered = register();
+        long id = registered.path("productId").asLong();
+        assertThat(registered.path("saleEnabled").asBoolean()).isFalse();
+        mvc.perform(
+                        patch("/v1/seller/products/{id}/sale-state", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"saleEnabled\":true,\"version\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.saleEnabled").value(true))
+                .andExpect(jsonPath("$.data.version").value(1));
+        mvc.perform(
+                        patch("/v1/seller/products/{id}/sale-state", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"saleEnabled\":false,\"version\":0}"))
+                .andExpect(status().isConflict());
+        mvc.perform(
+                        delete("/v1/seller/products/{id}", id)
+                                .param("version", "0")
+                                .header("Authorization", sellerBearer()))
+                .andExpect(status().isConflict());
+        for (int replay = 0; replay < 2; replay++) {
+            mvc.perform(
+                            delete("/v1/seller/products/{id}", id)
+                                    .param("version", "1")
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isNoContent());
+        }
+        assertThat(products.findById(id).orElseThrow().getVersion()).isEqualTo(2);
+        assertThat(images.existsById(imageId)).isTrue();
+        mvc.perform(get("/v1/internal/products/{id}", id).header("X-Service-Token", LIVE_KEY))
+                .andExpect(status().isNotFound());
+        mvc.perform(
+                        patch("/v1/seller/products/{id}/sale-state", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"saleEnabled\":true,\"version\":2}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("제어·삭제의 누락·잘못된 version은 400이고 일반 사용자·다른 판매자는 제어할 수 없다")
+    void lifecycleValidatesInputsAndSellerAuthority() throws Exception {
+        long id = register().path("productId").asLong();
+        for (String body :
+                List.of("{}", "{\"saleEnabled\":true}", "{\"saleEnabled\":true,\"version\":-1}")) {
+            mvc.perform(
+                            patch("/v1/seller/products/{id}/sale-state", id)
+                                    .header("Authorization", sellerBearer())
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(delete("/v1/seller/products/{id}", id).header("Authorization", sellerBearer()))
+                .andExpect(status().isBadRequest());
+        for (String version : List.of("invalid", "-1", "9223372036854775808")) {
+            mvc.perform(
+                            delete("/v1/seller/products/{id}", id)
+                                    .param("version", version)
+                                    .header("Authorization", sellerBearer()))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(
+                        delete("/v1/seller/products/")
+                                .param("version", "0")
+                                .header("Authorization", sellerBearer()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(
+                        delete("/v1/seller/products/{id}", id)
+                                .param("version", "0")
+                                .header("Authorization", userBearer()))
+                .andExpect(status().isForbidden());
+        String otherSeller =
+                "Bearer "
+                        + TOKENS.token(
+                                com.shoppinglive.common.security.test.JwtTestTokens.MEMBER_B,
+                                java.util.Set.of("SELLER"));
+        mvc.perform(
+                        patch("/v1/seller/products/{id}/sale-state", id)
+                                .header("Authorization", otherSeller)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"saleEnabled\":true,\"version\":0}"))
+                .andExpect(status().isForbidden());
+        assertThat(products.findById(id).orElseThrow().isSaleEnabled()).isFalse();
     }
 }

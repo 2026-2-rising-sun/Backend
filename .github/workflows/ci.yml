@@ -35,11 +35,11 @@ jobs:
       - name: Select work from changed files
         id: changes
         run: python .github/scripts/ci/classify_changes.py
-      - name: 문서 링크와 요구사항 상태 점검
+      - name: 문서 링크·MD/HTML 쌍·요구사항 상태 점검
         run: python scripts/check_docs.py
-      - name: API HTML 최신성 점검
+      - name: API MD·HTML 최신성 점검
         run: python scripts/render_api_docs.py --check
-      - name: 설계 HTML 최신성 점검
+      - name: 설계·ADR·워크로그 HTML 최신성 점검
         run: python scripts/render_design_docs.py --check
       - uses: actions/setup-java@v5
         if: steps.changes.outputs.gradle_tasks != '[]'

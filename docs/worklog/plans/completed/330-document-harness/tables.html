@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>모듈별 문서 범위와 원본</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="tables.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#공통-산출물">공통 산출물</a></li>
+<li><a href="#서비스별-원본과-상태-주제">서비스별 원본과 상태 주제</a></li>
+<li><a href="#구현-전-상태-조사의-출발점">구현 전 상태 조사의 출발점</a></li>
+<li><a href="#서비스-간-문서와-갱신-조건">서비스 간 문서와 갱신 조건</a></li>
+<li><a href="#구현-결과">구현 결과</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>모듈별 문서 범위와 원본</h1><p>상태: 작성·원본 대조·로컬 화면 확인</p>
+<p><a href="README.html">실행 계획</a> · <a href="research.html">현황 조사</a></p>
+<p>서비스별 계약 YAML에서 API HTML을 생성했다. CREATE/ALTER 마이그레이션의 테이블·키·관계와 엔티티 매핑, 주요 상태 변경 코드를 대조했다. 실제 DB 적용·HTTP·Kafka 실행 검증과는 구분한다. 모든 런타임 경로의 검증을 주장하지 않는다.</p>
+<h2 id="공통-산출물">공통 산출물</h2>
+<p>모듈 문서는 <code>docs/design-docs/services/&lt;모듈명&gt;/</code>에 모은다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>산출물</th>
+<th>원본과 역할</th>
+<th>완료를 확인할 내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>README.md</code></td>
+<td>책임·소유 데이터·외부 의존·문서 지도·관련 코드와 계약의 연결</td>
+<td>모듈의 경계와 원본·검증 범위·미확인 사항을 찾을 수 있다.</td>
+</tr>
+<tr>
+<td><code>api.html</code></td>
+<td><code>contracts/api/&lt;서비스명&gt;.yaml</code>과 공통 참조에서 생성한 API 열람 화면</td>
+<td>경로·메서드·인증·요청·응답·스키마를 확인할 수 있다. 최신 입력으로 생성한 결과와 일치한다.</td>
+</tr>
+<tr>
+<td><code>erd.md</code></td>
+<td>마이그레이션의 적용 결과와 엔티티 매핑을 대조한 테이블·키·관계·제약 설명</td>
+<td>현재 코드 기준의 구조와 근거가 연결되고 실제 DB 확인 여부가 구분된다.</td>
+</tr>
+<tr>
+<td><code>erd.html</code></td>
+<td>ERD 설명을 사람이 탐색하는 관계도</td>
+<td>MD의 테이블·관계와 일치하고 물리 FK·논리 참조·서비스 간 식별자를 구분한다.</td>
+</tr>
+<tr>
+<td><code>states/&lt;주제&gt;.md</code></td>
+<td>상태·트리거·선행 조건·허용 전이·부수 효과·실패·멱등 처리와 구현·테스트 근거</td>
+<td>enum·주석을 넘어 실제 상태 변경 경로를 대조한다. 확인하지 못한 전이는 표시한다.</td>
+</tr>
+<tr>
+<td><code>states/&lt;주제&gt;.html</code></td>
+<td>상태 전이와 조건을 사람이 탐색하는 화면</td>
+<td>MD의 상태·전이·조건과 일치하고 실패·복구 경로를 읽을 수 있다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>독립 API·DB·상태 전이가 없는 항목은 모듈 안내에 적용되지 않는 이유를 적는다. API 명세를 MD에 다시 복사하지 않는다. 사람용 HTML에 필요한 스크립트·스타일은 로컬 자산으로 관리하고 문서 열람에 별도 API 서버를 요구하지 않는 방향으로 구성한다.</p>
+<h2 id="서비스별-원본과-상태-주제">서비스별 원본과 상태 주제</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>순서·모듈</th>
+<th>계약·스키마 입력</th>
+<th>문서화한 상태 주제</th>
+<th>작성 상태</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. CommerceCore</td>
+<td><a href="../../../../../contracts/api/commercecore-service.yaml">API 계약</a> · <a href="../../../../../services/commercecore-service/src/main/resources/db/migration">마이그레이션</a></td>
+<td>주문·결제 접수·환불 접수·판매. Payment 실행 상태와 구분한다.</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>2. Payment</td>
+<td><a href="../../../../../contracts/api/payment-service.yaml">API 계약</a> · <a href="../../../../../services/payment-service/src/main/resources/db/payment-migration">전용 마이그레이션</a></td>
+<td>결제 실행·환불 실행과 실패·미확정 결과의 복구</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>3. Catalog</td>
+<td><a href="../../../../../contracts/api/catalog-service.yaml">API 계약</a> · <a href="../../../../../services/catalog-service/src/main/resources/db/migration">마이그레이션</a></td>
+<td>판매 상태의 조회 사본·표시와 동기화 조건. 원본 상태 변경의 주체로 표현하지 않는다.</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>4. Member</td>
+<td><a href="../../../../../contracts/api/member-service.yaml">API 계약</a> · <a href="../../../../../services/member-service/src/main/resources/db/migration">마이그레이션</a></td>
+<td>세션 발급·만료·폐기·갱신의 실제 수명 주기</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>5. Live</td>
+<td><a href="../../../../../contracts/api/live-service.yaml">API 계약</a> · <a href="../../../../../services/live-service/src/main/resources/db/migration">마이그레이션</a></td>
+<td>방송·프로모션과 상태 변경 조건</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>6. Notification</td>
+<td><a href="../../../../../contracts/api/notification-service.yaml">API 계약</a> · <a href="../../../../../services/notification-service/src/main/resources/db/migration">마이그레이션</a></td>
+<td>알림 읽음 처리·구독 설정의 실제 전이</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+<tr>
+<td>공통 모듈</td>
+<td><a href="../../../../../common-module/src/main/java/com/shoppinglive/common">공통 구현</a> · <a href="../../../../../common-module/src/main/java/com/shoppinglive/common/outbox">Outbox</a></td>
+<td>공통 처리와 Outbox 수명 주기. 저장 데이터는 각 소유 서비스의 ERD에 반영한다.</td>
+<td>작성·소스 대조·화면 확인</td>
+</tr>
+</tbody>
+</table></div>
+<p>공통 모듈에는 <code>README.md</code>, <code>outbox.md</code>, <code>outbox.html</code>을 작성했다. 독립 API·DB가 없는 이유와 소유 서비스의 테이블·설정을 연결했다.</p>
+<h2 id="구현-전-상태-조사의-출발점">구현 전 상태 조사의 출발점</h2>
+<p>다음은 초기 조사 당시의 메모다. 이후 서비스·저장소·엔티티·기존 테스트를 읽어 확인한 조건은 각 모듈 상태 문서와 아래 구현 결과에 반영했다.</p>
+<ul>
+<li>CommerceCore의 <code>OrderStatus</code>, <code>PaymentStatus</code>, <code>RefundStatus</code>, <code>SalesStatus</code> 파일을 찾았다. 상태값과 주석만으로 허용 전이를 확정하지 않고 변경 서비스·테스트를 함께 읽는다.</li>
+<li>Payment에 결제·환불 상태 파일이 있고, DDL은 다른 서비스와 달리 <code>db/payment-migration/</code>에 있다.</li>
+<li>Catalog의 <a href="../../../../../services/catalog-service/src/main/java/com/shoppinglive/catalog/client/commercecore/SalesStatus.java">SalesStatus</a>는 Commerce의 상태 문자열과 결합하는 클라이언트 enum임을 주석에서 확인했다.</li>
+<li>Member는 <code>Status</code>·<code>State</code> 이름의 파일을 찾지 못했다. <a href="../../../../../services/member-service/src/main/java/com/shoppinglive/member/auth/service/MemberSessionService.java">MemberSessionService</a>와 영속 필드·테스트를 통해 수명 주기를 확인한다.</li>
+<li>Live의 <code>BroadcastStatus</code>, <code>PromotionStatus</code>와 Notification의 알림함·구독 관련 파일을 찾았다. 실제 전이·보존·만료 정책은 추가로 확인한다.</li>
+</ul>
+<h2 id="서비스-간-문서와-갱신-조건">서비스 간 문서와 갱신 조건</h2>
+<p>주문·결제, 환불, Catalog 동기화, 인증·세션, 방송·알림은 <code>docs/design-docs/</code>의 상위 문서에서 여러 서비스의 협력을 설명한다. 모듈 내부 상세는 해당 모듈 문서를 링크한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>변경</th>
+<th>함께 확인할 자료</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>서비스 API YAML 또는 공통 참조</td>
+<td>API HTML 재생성·최신성 검사·표시 내용 확인</td>
+</tr>
+<tr>
+<td>마이그레이션·엔티티 매핑</td>
+<td>ERD MD·HTML, 키·제약·관계의 근거</td>
+</tr>
+<tr>
+<td>상태값·변경 조건·이벤트 처리</td>
+<td>상태 MD·HTML, 실패·복구·중복 처리와 관련 테스트</td>
+</tr>
+<tr>
+<td>서비스 간 호출·이벤트·책임 경계</td>
+<td>상위 흐름 문서와 각 모듈의 책임·상태 설명</td>
+</tr>
+</tbody>
+</table></div>
+<p>각 모듈은 작성 완료, 원본 대조, HTML 화면 확인, 실제 실행 여부를 구분해 기록한다. 코드·계약을 읽어 만든 설명을 운영 DB·실제 HTTP·브로커 동작의 검증 결과로 취급하지 않는다.</p>
+<h2 id="구현-결과">구현 결과</h2>
+<p>6개 API HTML, 6개 ERD, 12개 상태 설명, 공통 Outbox와 5개 서비스 간 흐름을 작성했다. HTML 30개를 1359px·390px에서 열어 제목·내용·가로 넘침·외부 자산을 검사했고 대표 페이지의 검색·펼치기·스키마 이동·상태 필터를 확인했다. 상세 결과와 실행 한계는 <a href="../../../2026-11-13.html">워크로그</a>에 연결한다.</p><p class="muted fingerprint">MD SHA-256: <code>c185a78b13a236c2c3e46a3cb9d63c3ce784f251f5039ecb5af8c22f488467c2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>
