@@ -14,7 +14,7 @@
 | SKU.id | cart_item.sku_id | SKU 1 : Cart 항목 N. 레거시 행은 sku_id가 NULL일 수 있으며 물리 FK 없음 |
 | Member 회원 ID | cart_item.member_id | 회원 1 : Cart 항목 N. 다른 서비스와의 ID 참조이며 물리 FK 없음 |
 | Product.id | cart_item.product_id | 기존 상품 참조 보존. 신규 SKU 항목도 상품별 묶음·기존 Order 연결을 위해 함께 저장 |
-| cart_item.id/version 값 | Order 출처 ID/version | 결제 성공 정리와 과거 환불 식별을 위한 복사값. Cart 삭제 후에도 Order 값은 남으므로 FK 없음 |
+| cart_item.id/version 값 | Order 출처 ID/version | 주문 생성 검증·과거 선택 환불 식별을 위한 복사값. 성공 삭제 조건에는 사용하지 않음. Cart 삭제 후에도 Order 값은 남으므로 FK 없음 |
 
 Product·SKU·Cart 항목 ID는 BIGINT/Long이다. Order 목표 저장 위치는 Order 담당이 소유하며 이 문서에서 연결 테이블이나 Cart 상태를 추가하지 않는다.
 
@@ -46,7 +46,7 @@ Core V101 Product → V102 SKU → V103 Cart → V104 Order 순서다. 적용된
 
 ## 성공 정리와 실패 복구
 
-최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 감사 기준 `5048413b`의 OrderSheetService와 OrderSheetLifecycleService가 생성/성공 정리에 사용했다. 최종 독립 PR에 포함되는 공개 API/연계 범위는 최신 Order 계약과 별도로 확인한다. 독립 Cart 브랜치에 포함된 이전 Order 코드와 최종 통합 코드를 혼동하지 않는다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 원본 ID·회원·version이 같은 행만 삭제한다. 수정되거나 다시 담긴 행과 선택하지 않은 항목은 남긴다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
+최종 Order 연결은 선택 Cart 행의 ID순 잠금 → Product/SKU 검증·예약 순서다. Cart는 해당 잠금 포트를 제공하며 감사 기준 `5048413b`의 OrderSheetService와 OrderSheetLifecycleService가 생성/성공 정리에 사용했다. 최종 독립 PR에 포함되는 공개 API/연계 범위는 최신 Order 계약과 별도로 확인한다. 독립 Cart 브랜치에 포함된 이전 Order 코드와 최종 통합 코드를 혼동하지 않는다. 완료 처리는 사라지거나 수정된 Cart도 허용하며 Cart 출처가 있는 구매 SKU의 본인 현재 행 전체를 삭제한다(#340). 수량 변경·재추가도 같은 SKU이면 삭제하며 다른 SKU·회원은 보존한다. 최초 성공 이후 중복 결과는 정리하지 않아 성공 후 재담기를 보존한다. 삭제 SQL 오류는 Order 상태·재고 변경과 함께 롤백한다. 실패·취소·만료에 성공 정리를 수행하지 않는다.
 
 Cart에는 별도 업무 상태 enum이 없으므로 독립 상태관리도는 작성하지 않는다. SKU READY/판매 상태와 Order 결제 상태를 Cart에 복제하지 않는다.
 

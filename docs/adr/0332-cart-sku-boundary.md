@@ -1,6 +1,6 @@
 # ADR 0332: Cart의 SKU 조작 단위와 결제 성공 후 정리 경계
 
-결정 상태: 업무 방향 채택 · 1차 기술 경계 고정 · 나머지 연결안 미결정
+결정 상태: 업무 방향 채택 · 2026-11-18 #340 성공 정리 후속 결정 채택
 
 구현 상태: Cart 독립 구현을 마쳤으며 소비자 호환 감사 후속을 진행 중이다. 감사 기준의 Order 통합 기록과 최신 독립 PR 범위는 아래에서 구분한다. [실행 계획](../worklog/plans/active/332-cart-module/README.md) · [설계](../design-docs/services/commercecore/cart/overview.md) · [Cart #332](https://github.com/2026-2-rising-sun/Backend/issues/332) · [정리 검토 #340](https://github.com/2026-2-rising-sun/Backend/issues/340)
 
@@ -41,3 +41,11 @@ V103은 원본 product_id를 유지하고 sku_id를 nullable로 확장한다. �
 Cart `6f9dda99`는 Order 통합 `5048413b`에 포함됐다. [최종 통합 계획](https://github.com/2026-2-rising-sun/Backend/blob/5048413b26337cbdc84e258347750d1870f763a8/docs/exec-plans/completed/331-order-module/README.md)과 [2026-11-15 후속 기록](../worklog/2026-11-15.md)을 현재 진행의 연결점으로 사용한다. 과거 Cart 브랜치의 33실패는 그 시점의 기록이며 최종 통합 상태를 뜻하지 않는다.
 
 준비/중지/품절 SKU의 담기 허용은 아직 직접 사용자 확정이 없고 현재 구현을 유지한다. 기존 선점 주문의 결제 허용·새 주문 차단은 후속 사용자 답변에 따라 Order/Product 담당이 반영한다. #340/#345/#346 및 공개 다중 SKU·대표가/옵션 보류는 해제하지 않는다. 소비자 어댑터·계약 한도 보완은 기존 합의를 실현하는 호환 수정이며 새 업무 정책이 아니다.
+
+## 2026-11-18 후속 결정: 회원 + 구매 SKU 정리 (#340)
+
+위 ID/version 유지안은 당시의 보류 결정이다. 사용자는 주문 후 결제 중 Cart 변경이 드물고 강한 정합성 비용을 중요하게 보지 않는다고 확정했다. 최초 결제 성공 때 Cart 출처가 있는 구매 SKU의 본인 현재 행 전체를 삭제한다. 변경 수량 차감이나 재추가 행 보존 대신 같은 SKU 행 전체 삭제를 선택한다. 상품 ID로 삭제하면 다른 옵션 SKU까지 지워지므로 회원+SKU를 사용한다. 새 테이블·Cart 상태·예약·편집 제한은 도입하지 않는다.
+
+ID/version은 삭제 조건에서만 제외한다. Order 출처는 기존 선택 환불 계약이 사용하므로 임의 제거하지 않으며 Cart `@Version`과 주문 생성의 엄격한 선택 검증도 유지한다. 구 결과 처리·새 relay의 최초 성공 상태 반영 멱등성과 같은 트랜잭션의 롤백으로 재처리 안전성을 보존한다. 성공 이후 새로 담은 행은 중복 성공에 정리되지 않지만 최초 성공 전 재추가는 정리 대상이다. 직접 구매·실패·취소·만료·늦은 승인은 Cart를 정리하지 않는다. 복수 주문은 기존 회원 guard·활성 주문 제한과 각 주문의 최초 성공 경계를 유지한다.
+
+이 결정은 공개 다중 SKU/옵션 정책이나 #345/#346/#360의 승인이 아니다. [현재 Cart 설계](../design-docs/services/commercecore/cart/overview.md) · [이번 계획](../worklog/plans/active/340-cart-sku-cleanup/README.md). FigJam 반영은 이번 권한 밖이므로 잔여다.

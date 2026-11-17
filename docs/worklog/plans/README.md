@@ -11,3 +11,5 @@
 Order 별도 후속 [#345 동시 환불](https://github.com/2026-2-rising-sun/Backend/issues/345)과 이전 [#346 보류 작업 공간](https://github.com/2026-2-rising-sun/Backend/issues/346)은 이번에 재개하거나 병합하지 않는다. 현재 Core의 준비/승인 기한 분리 구현은 [최신 계획](active/331-order-audit-fixes/processing-deadline.md)에 기록하며, 보류 작업의 전체 승인·운영 검증과 구분한다.
 
 사용자는 CommerceCore 구현 범위의 dev 병합을 승인했다. 실제 SDK/PG·환불 실행·UNKNOWN 중단 통지·과거 미확정 거래 대사는 서비스 공동 후속이며 이번 Core 병합의 선행조건으로 확대하지 않는다. 전체 후속 계획은 active에 남기고 completed331은 이전 범위의 역사 기록으로 유지한다.
+
+- [#340 구매 SKU 장바구니 정리](active/340-cart-sku-cleanup/README.md): 로컬 구현·검증과 외부 FigJam 잔여.
