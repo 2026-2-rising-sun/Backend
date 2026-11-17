@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -33,6 +35,7 @@ public class TossPaymentsClient {
     private static final String IDEMPOTENT_REQUEST_PROCESSING_CODE =
             "IDEMPOTENT_REQUEST_PROCESSING";
 
+    private static final Logger log = LoggerFactory.getLogger(TossPaymentsClient.class);
     private static final Set<String> OUR_KEY_BAD_REQUEST_CODES = Set.of("INVALID_API_KEY");
 
     // 본문 읽기가 멈춰도 데드라인에 끝내려고 호출을 별도 가상 스레드에서 실행한다.
@@ -160,8 +163,11 @@ public class TossPaymentsClient {
         if (!status.is4xxClientError()) {
             return new TossResult.Unknown("분류하지 못한 HTTP " + statusCode);
         }
-        if (statusCode == 401 || statusCode == 429) {
-            return new TossResult.NotSent("HTTP " + statusCode);
+        if (statusCode == 401) {
+            return rejectedByOurConfiguration("HTTP 401");
+        }
+        if (statusCode == 429) {
+            return new TossResult.NotSent("HTTP 429");
         }
         TossError error = readOrNull(response, TossError.class);
         if (error == null || error.code() == null || error.code().isBlank()) {
@@ -170,7 +176,7 @@ public class TossPaymentsClient {
         String code = error.code();
         if ((statusCode == 400 && OUR_KEY_BAD_REQUEST_CODES.contains(code))
                 || (statusCode == 403 && OUR_CONFIGURATION_FORBIDDEN_CODES.contains(code))) {
-            return new TossResult.NotSent("HTTP " + statusCode + " " + code);
+            return rejectedByOurConfiguration("HTTP " + statusCode + " " + code);
         }
         if ((statusCode == 400 && POSSIBLY_IN_FLIGHT_BAD_REQUEST_CODES.contains(code))
                 || (statusCode == 403 && CONSECUTIVE_REQUEST_FORBIDDEN_CODE.equals(code))
@@ -178,6 +184,14 @@ public class TossPaymentsClient {
             return new TossResult.Unknown("HTTP " + statusCode + " " + code);
         }
         return new TossResult.Declined(code, error.message());
+    }
+
+    /** 결제는 처음 상태로 돌아가 응답만으로는 원인이 보이지 않으므로 운영자가 키 설정을 확인하게 남긴다. 키 값은 남기지 않는다. */
+    private static TossResult rejectedByOurConfiguration(String reason) {
+        log.error(
+                "토스가 우리 키·설정 오류로 거부했다({}). PAYMENT_TOSS_SECRET_KEY가 API 개별 연동 시크릿 키(test_sk_·live_sk_)인지 확인한다.",
+                reason);
+        return new TossResult.NotSent(reason);
     }
 
     /** 본문이 비었거나 JSON으로 읽지 못하거나 읽는 중 끊기면 null이다. */
