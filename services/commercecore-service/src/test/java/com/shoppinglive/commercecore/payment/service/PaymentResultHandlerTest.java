@@ -30,7 +30,7 @@ class PaymentResultHandlerTest {
     @Mock SalesService sales;
     @Mock JdbcTemplate jdbc;
     @Mock com.shoppinglive.commercecore.order.repository.PaymentGroupRepository groups;
-    @Mock com.shoppinglive.commercecore.cart.repository.CartItemRepository cart;
+    @Mock com.shoppinglive.commercecore.cart.service.CartSelectionPort cart;
     @Mock com.shoppinglive.commercecore.sales.repository.SalesJpaRepository salesRepository;
     @Mock com.shoppinglive.commercecore.order.service.PurchaseGuard guard;
     @Mock com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons;

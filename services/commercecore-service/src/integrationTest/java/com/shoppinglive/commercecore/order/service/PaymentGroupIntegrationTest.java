@@ -795,9 +795,9 @@ class PaymentGroupIntegrationTest
         stock(salesB, 9, 1);
     }
 
-    @DisplayName("결제 성공은 재고를 소진하고 수정되지 않은 선택 장바구니 항목만 삭제한다")
+    @DisplayName("결제 성공은 재고를 소진하고 수정된 구매 SKU도 정리하며 성공 후 재담기는 보존한다")
     @Test
-    void onePaymentSuccessConsumesStockAndDeletesOnlyUneditedSelectedCartRows() {
+    void onePaymentSuccessDeletesPurchasedSkusAndReplayPreservesReaddedItem() {
         var group = create("success").group();
         cart.changeQuantity(MEMBER_A, a.getId(), 3);
         var first = service.start(MEMBER_A, group.groupNumber(), "payment-key");
@@ -821,10 +821,10 @@ class PaymentGroupIntegrationTest
         assertThat(orders.findAll())
                 .extracting(order -> order.getStatus())
                 .containsOnly(OrderStatus.PAID);
-        assertThat(items.findAll())
-                .extracting(CartItem::getId)
-                .containsExactlyInAnyOrder(a.getId(), unselected.getId());
-        assertThat(items.findById(a.getId()).orElseThrow().getQuantity()).isEqualTo(3);
+        assertThat(items.findAll()).extracting(CartItem::getId).containsExactly(unselected.getId());
+        var readded = cart.add(MEMBER_A, 1L, 4);
+        assertThat(dispatcher.dispatch(deliveries.byPayment(first.getId()))).isFalse();
+        assertThat(items.findById(readded.getId()).orElseThrow().getQuantity()).isEqualTo(4);
         assertThat(orders.findAll())
                 .extracting(order -> order.getQuantity())
                 .containsExactlyInAnyOrder(2, 1);
