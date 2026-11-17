@@ -1,0 +1,60 @@
+### IntelliJ HTTP Client용. 줄 왼쪽 ▶ 버튼으로 하나씩 실행한다. 시나리오별 값은 README.md 표를 따른다.
+### 가짜 토스 paymentKey: pk-ok pk-decline pk-retry pk-slow pk-5xx pk-mismatch (toss-mock/mappings/toss.json)
+@pay = http://localhost:8086
+### .env.example의 COMMERCECORE_PAYMENT_SERVICE_TOKEN 기본값. .env에서 바꿨으면 여기도 바꾼다.
+@token = local-payment-token-change-me-0123456789
+@buyer = 5c2e8f1a-0000-4000-8000-6d4c0b9e7a13
+@ref = OD-LOCAL-OK
+### 생성 금액. 판매자 금액은 20000 + (금액 - 20000)
+@total = 30000
+### 결제 만료까지 분
+@expiresInMinutes = 30
+### 승인 요청 값. 실제 토스는 success.html이 보여 주는 값을 넣는다
+@pgOrderId = {{ref}}-1
+@paymentKey = pk-ok
+@amount = 30000
+@approveBuyer = {{buyer}}
+
+### 1. 결제 생성 (201, 같은 요청 다시 보내면 200)
+< {%
+  const total = Number(request.variables.get("total"));
+  request.variables.set("exp", new Date(Date.now() + Number(request.variables.get("expiresInMinutes")) * 60000).toISOString());
+  request.variables.set("rest", String(total - 20000));
+%}
+POST {{pay}}/v1/internal/payments
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "orderRef": "{{ref}}",
+  "buyerId": "{{buyer}}",
+  "amount": {{total}},
+  "expiresAt": "{{exp}}",
+  "sellerAmounts": [
+    {"sellerOrderNumber": "{{ref}}-S1", "sellerId": "7a1c0000-0000-4000-8000-000000000001", "amount": 20000, "commissionRate": 0.1},
+    {"sellerOrderNumber": "{{ref}}-S2", "sellerId": "7a1c0000-0000-4000-8000-000000000002", "amount": {{rest}}, "commissionRate": 0.055}
+  ]
+}
+
+### 2. 결제 조회
+GET {{pay}}/v1/internal/payments/{{ref}}
+X-Service-Token: {{token}}
+
+### 3. 결제창 다시 열기 (pgOrderId 회차 +1. 이전 결제창 인증은 못 쓴다)
+POST {{pay}}/v1/internal/payments/{{ref}}/checkouts
+X-Service-Token: {{token}}
+
+### 4. 승인
+POST {{pay}}/v1/internal/payments/{{ref}}/approval
+X-Service-Token: {{token}}
+Content-Type: application/json
+
+{
+  "buyerId": "{{approveBuyer}}",
+  "paymentKey": "{{paymentKey}}",
+  "pgOrderId": "{{pgOrderId}}",
+  "amount": {{amount}}
+}
+
+### 5. 토큰 없음 (401)
+GET {{pay}}/v1/internal/payments/{{ref}}
