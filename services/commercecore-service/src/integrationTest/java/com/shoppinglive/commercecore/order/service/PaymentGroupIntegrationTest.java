@@ -2,11 +2,12 @@ package com.shoppinglive.commercecore.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doReturn;
 
+import com.shoppinglive.commercecore.cart.entity.CartItem;
+import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.entity.*;
-import com.shoppinglive.commercecore.order.repository.CartItemRepository;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
@@ -54,7 +55,8 @@ class PaymentGroupIntegrationTest
     @Autowired PaymentService singlePayments;
     @Autowired OrderJpaRepository orders;
     @Autowired SalesJpaRepository sales;
-    @MockitoSpyBean SalesStockJpaRepository stocks;
+    @Autowired SalesStockJpaRepository stocks;
+    @MockitoSpyBean com.shoppinglive.commercecore.sku.service.SkuService skuCommands;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired JdbcTemplate jdbc;
 
@@ -75,6 +77,9 @@ class PaymentGroupIntegrationTest
         salesB = sales.saveAndFlush(new Sales(2L, 5000L, SalesStatus.ON_SALE)).getId();
         stocks.saveAndFlush(new SalesStock(salesA, 10, 0));
         stocks.saveAndFlush(new SalesStock(salesB, 10, 0));
+        var unselectedSales = sales.saveAndFlush(new Sales(3L, 1000L, SalesStatus.ON_SALE));
+        stocks.saveAndFlush(new SalesStock(unselectedSales.getId(), 10, 0));
+        prepareLegacyTradeFixtures();
         a = cart.add(MEMBER_A, 1L, 2);
         b = cart.add(MEMBER_A, 2L, 1);
         unselected = cart.add(MEMBER_A, 3L, 1);
@@ -167,7 +172,7 @@ class PaymentGroupIntegrationTest
     }
 
     private void stock(Long id, int available, int reserved) {
-        var current = stocks.findById(id).orElseThrow();
+        var current = legacyStock(id);
         assertThat(current.getAvailable()).isEqualTo(available);
         assertThat(current.getReserved()).isEqualTo(reserved);
     }
@@ -405,7 +410,14 @@ class PaymentGroupIntegrationTest
     @Test
     void couponReservationRollsBackWhenLaterStockReservationFails() {
         issueCoupon();
-        doReturn(0).when(stocks).reserve(salesB, 1);
+        org.mockito.Mockito.doThrow(
+                        new com.shoppinglive.commercecore.sales.exception
+                                .InsufficientStockException("두 번째 SKU 예약 실패 주입"))
+                .when(
+                        (com.shoppinglive.commercecore.sku.service.SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuCommands))
+                .reserve(salesB, 1);
         assertThatThrownBy(
                         () ->
                                 service.create(
@@ -502,10 +514,10 @@ class PaymentGroupIntegrationTest
                                         MEMBER_A, selected(), "회원", "01012345678", 24999, "price"))
                 .isInstanceOf(BusinessException.class);
         assertThat(service.preview(MEMBER_A, selected()).totalAmount()).isEqualTo(25000);
-        jdbc.update("UPDATE sales_info SET price=11000 WHERE id=?", salesA);
+        jdbc.update("UPDATE sku SET price=11000 WHERE id=?", salesA);
         assertThatThrownBy(() -> create("price-changed-after-quote"))
                 .isInstanceOf(BusinessException.class);
-        jdbc.update("UPDATE sales_info SET price=10000 WHERE id=?", salesA);
+        jdbc.update("UPDATE sku SET price=10000 WHERE id=?", salesA);
         cart.changeQuantity(MEMBER_A, b.getId(), 11);
         assertThatThrownBy(
                         () ->
@@ -528,7 +540,14 @@ class PaymentGroupIntegrationTest
         double before = count("shoppinglive.order.requests", "result", "created");
         double events = count("shoppinglive.domain.events", "event_type", "PaymentGroupCreated");
         // 주문서 조회 이후 재고가 줄어든 상황을 만들어 첫 항목의 실제 예약 이후 실패하도록 한다.
-        doReturn(0).when(stocks).reserve(salesB, 1);
+        org.mockito.Mockito.doThrow(
+                        new com.shoppinglive.commercecore.sales.exception
+                                .InsufficientStockException("두 번째 SKU 예약 실패 주입"))
+                .when(
+                        (com.shoppinglive.commercecore.sku.service.SkuService)
+                                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(
+                                        skuCommands))
+                .reserve(salesB, 1);
         assertThatThrownBy(() -> create("race")).isInstanceOf(BusinessException.class);
         untouched();
         assertThat(count("shoppinglive.order.requests", "result", "created")).isEqualTo(before);

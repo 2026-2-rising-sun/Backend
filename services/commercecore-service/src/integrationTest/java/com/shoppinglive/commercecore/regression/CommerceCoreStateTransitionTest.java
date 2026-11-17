@@ -14,12 +14,10 @@ import com.shoppinglive.commercecore.order.service.OrderExpirationScheduler;
 import com.shoppinglive.commercecore.order.service.OrderService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
-import com.shoppinglive.commercecore.sales.entity.Sales;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
-import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
-import com.shoppinglive.commercecore.sales.service.SalesService;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +46,7 @@ class CommerceCoreStateTransitionTest
     @Autowired
     com.shoppinglive.commercecore.order.service.PaymentGroupExpirationScheduler groupExpiration;
 
-    @Autowired SalesService sales;
+    @Autowired SkuSalesService sales;
     @Autowired OrderJpaRepository orderRepository;
     @Autowired SalesJpaRepository salesRepository;
     @Autowired SalesStockJpaRepository stockRepository;
@@ -62,9 +60,12 @@ class CommerceCoreStateTransitionTest
     @BeforeEach
     void setUp() {
         clean();
-        productLookup.register(new ProductSnapshot(920L, "마지막 재고", null));
-        salesId = salesRepository.save(new Sales(920L, 10_000L, SalesStatus.ON_SALE)).getId();
-        stockRepository.save(new SalesStock(salesId, 1, 0));
+        productLookup.register(new ProductSnapshot(920L, "마지막 재고", null, SELLER, true));
+        com.shoppinglive.commercecore.sku.SkuFixtures.product(jdbc, 920L, SELLER);
+        jdbc.update("UPDATE product SET sale_enabled=TRUE WHERE id=920");
+        salesId =
+                com.shoppinglive.commercecore.sku.SkuFixtures.insert(
+                        jdbc, 920, 10000, SalesStatus.ON_SALE, 1, 0);
     }
 
     @AfterEach
@@ -73,6 +74,8 @@ class CommerceCoreStateTransitionTest
         orderRepository.deleteAll();
         stockRepository.deleteAll();
         salesRepository.deleteAll();
+        jdbc.update("DELETE FROM sku");
+        jdbc.update("DELETE FROM product WHERE id=920");
         productLookup.clear();
     }
 
@@ -110,12 +113,10 @@ class CommerceCoreStateTransitionTest
     @ValueSource(strings = {"cancel", "expire"})
     void allowsNewOrderAfterRestoringLastReservedItem(String path) {
         Order order = create();
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.SOLD_OUT);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
         release(order, path);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.ON_SALE);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.ON_SALE);
         assertThat(create().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
@@ -124,11 +125,10 @@ class CommerceCoreStateTransitionTest
     @ValueSource(strings = {"cancel", "expire"})
     void preservesPrivateStatusWhenRestoringStock(String path) {
         Order order = create();
-        sales.changeStatus(salesId, SalesStatus.PRIVATE);
+        sales.changeStatus(salesId, SalesStatus.PRIVATE, SELLER);
         release(order, path);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.PRIVATE);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
     }
 
     @DisplayName("실제 스케줄 진입점에서 재고 복구에 실패하면 주문 만료도 롤백한다")
@@ -139,7 +139,7 @@ class CommerceCoreStateTransitionTest
                 "UPDATE payment_group SET expires_at = ? WHERE id = ?",
                 java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
                 order.getPaymentGroup().getId());
-        jdbc.update("UPDATE sales_stock SET reserved = 0 WHERE sales_info_id = ?", salesId);
+        jdbc.update("UPDATE sku SET reserved = 0 WHERE id = ?", salesId);
         assertThatThrownBy(() -> groups.expire(order.getPaymentGroup().getId()))
                 .isInstanceOf(IllegalStateException.class);
         // 묶음 스케줄러는 실패한 묶음 하나를 분리해 로그로 남긴다.
@@ -147,43 +147,49 @@ class CommerceCoreStateTransitionTest
         groupExpiration.run();
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isZero();
+        assertThat(legacyStock(salesId).getAvailable()).isZero();
     }
 
-    @DisplayName("재고가 0이면 ON_SALE로 변경하지 않는다")
+    @DisplayName("0재고 SKU는 수동 상태를 ON_SALE로 저장하고 외부에는 SOLD_OUT을 반환한다")
     @ParameterizedTest
     @EnumSource(
             value = SalesStatus.class,
             names = {"READY", "ON_SALE", "SOLD_OUT", "PRIVATE"})
-    void rejectsOnSaleTransitionWhenStockIsZero(SalesStatus current) throws Exception {
-        jdbc.update("UPDATE sales_info SET status = ? WHERE id = ?", current.name(), salesId);
-        jdbc.update("UPDATE sales_stock SET available = 0 WHERE sales_info_id = ?", salesId);
-        var result =
-                mvc.perform(
-                        patch("/v1/sales/{id}/status", salesId)
+    void derivesSoldOutWhenStartingZeroStockSku(SalesStatus current) throws Exception {
+        long skuId = salesId;
+        jdbc.update(
+                "UPDATE sku SET sale_status=?,available=0 WHERE id=?",
+                current == SalesStatus.SOLD_OUT ? "ON_SALE" : current.name(),
+                skuId);
+        mvc.perform(
+                        patch("/v1/sales/{id}/status", skuId)
                                 .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"status\":\"ON_SALE\"}"));
-        if (current == SalesStatus.READY || current == SalesStatus.ON_SALE) {
-            result.andExpect(status().isConflict());
-        } else {
-            result.andExpect(status().isOk());
-            assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                    .isEqualTo(SalesStatus.SOLD_OUT);
-        }
+                                .content("{\"status\":\"ON_SALE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                                        "$.status")
+                                .value("SOLD_OUT"));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT sale_status FROM sku WHERE id=?", String.class, skuId))
+                .isEqualTo("ON_SALE");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT available FROM sku WHERE id=?", Integer.class, skuId))
+                .isZero();
     }
 
     @DisplayName("판매자가 재고를 보충하면 품절만 해제하고 다른 상태는 유지한다")
     @Test
     void reopensOnlySoldOutSalesAfterStockReplenishment() {
         create();
-        sales.adjustAvailable(salesId, 1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.ON_SALE);
-        sales.changeStatus(salesId, SalesStatus.PRIVATE);
-        sales.adjustAvailable(salesId, 1);
-        assertThat(salesRepository.findById(salesId).orElseThrow().getStatus())
-                .isEqualTo(SalesStatus.PRIVATE);
+        sales.adjustAvailable(salesId, 1, SELLER);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.ON_SALE);
+        sales.changeStatus(salesId, SalesStatus.PRIVATE, SELLER);
+        sales.adjustAvailable(salesId, 1, SELLER);
+        assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.PRIVATE);
     }
 
     @DisplayName("업무 거절은 500 대신 해당하는 400·404·409로 응답한다")
@@ -209,7 +215,7 @@ class CommerceCoreStateTransitionTest
                         post("/v1/orders/{number}/cancel", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isNoContent());
-        assertThat(stockRepository.findById(salesId).orElseThrow().getAvailable()).isEqualTo(1);
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(1);
         mvc.perform(
                         post("/v1/orders/{number}/payments", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A)))

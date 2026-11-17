@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>환불 서비스 간 흐름</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="refund.md">MD 원본</a><a href="../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#책임과-경계">책임과 경계</a></li>
+<li><a href="#전이">전이</a></li>
+<li><a href="#상세와-근거">상세와 근거</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>환불 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 730" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="사용자" data-target="Core 접수"><title>사용자 → Core 접수: 소유권·기간·대상·누적 금액·멱등 키를 확인한다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="Core 요청" data-target="Payment 실행"><title>Core 요청 → Payment 실행: 환불 전달 토글이 활성일 때 영속 원문을 전달한다. Payment 실행 토글은 별도로 적용한다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="Payment 확정" data-target="Core 결과 반영"><title>Payment 확정 → Core 결과 반영: 원결제·금액·대상과 결과 일치 확인 후 성공 대상 주문만 REFUNDED 및 재고 복원</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="부분 환불" data-target="묶음 PAID 유지"><title>부분 환불 → 묶음 PAID 유지: 남은 자식 주문이 있으면 묶음 전체를 REFUNDED로 변경하지 않는다.</title><path class="connector" d="M350,417 L405,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="412.0">4</text></g><g class="edge-row" data-source="모든 대상 완료" data-target="묶음 REFUNDED"><title>모든 대상 완료 → 묶음 REFUNDED: 모든 자식 주문의 상태가 REFUNDED인 경우.</title><path class="connector" d="M940,460 L190,545" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="497.5">5</text></g><g class="edge-row" data-source="UNKNOWN" data-target="결과 조회 유지"><title>UNKNOWN → 결과 조회 유지: 예산 소진·시간 초과만으로 확정 실패하지 않는다.</title><path class="connector" d="M725,587 L780,587" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="582.0">6</text></g><g><title>사용자</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">사용자</tspan></text></g><g><title>Core 접수</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">Core 접수</tspan></text></g><g><title>Core 요청</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">Core 요청</tspan></text></g><g><title>Payment 실행</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">Payment 실행</tspan></text></g><g><title>Payment 확정</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">Payment 확정</tspan></text></g><g><title>Core 결과 반영</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Core 결과 반영</tspan></text></g><g><title>부분 환불</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">부분 환불</tspan></text></g><g><title>묶음 PAID 유지</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">묶음 PAID 유지</tspan></text></g><g><title>모든 대상 완료</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">모든 대상 완료</tspan></text></g><g><title>묶음 REFUNDED</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">묶음 REFUNDED</tspan></text></g><g><title>UNKNOWN</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">UNKNOWN</tspan></text></g><g><title>결과 조회 유지</title><rect x="780" y="545" width="320" height="85" rx="5"/><text x="940" y="573" text-anchor="middle"><tspan x="940" dy="0">결과 조회 유지</tspan></text></g></svg></div></section><p><strong>교체 예정:</strong> 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 <a href="../services/payment/overview.html">Payment 도메인 홈</a>에 있다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 기존 결제·환불 호출은 403을 받는다.</p>
+<p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
+<p><a href="refund.html">시각 자료</a></p>
+<h2 id="책임과-경계">책임과 경계</h2>
+<p>Core 접수·전달과 Payment 실행의 토글을 구분한다. 실행 중/미확정/성공 환불을 누적 금액에 포함하고 중복 결과로 재고를 다시 복원하지 않는다.</p>
+<h2 id="전이">전이</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·처리</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사용자</td>
+<td>Core 접수</td>
+<td>소유권·기간·대상·누적 금액·멱등 키를 확인한다.</td>
+</tr>
+<tr>
+<td>Core 요청</td>
+<td>Payment 실행</td>
+<td>환불 전달 토글이 활성일 때 영속 원문을 전달한다. Payment 실행 토글은 별도로 적용한다.</td>
+</tr>
+<tr>
+<td>Payment 확정</td>
+<td>Core 결과 반영</td>
+<td>원결제·금액·대상과 결과 일치 확인 후 성공 대상 주문만 REFUNDED 및 재고 복원</td>
+</tr>
+<tr>
+<td>부분 환불</td>
+<td>묶음 PAID 유지</td>
+<td>남은 자식 주문이 있으면 묶음 전체를 REFUNDED로 변경하지 않는다.</td>
+</tr>
+<tr>
+<td>모든 대상 완료</td>
+<td>묶음 REFUNDED</td>
+<td>모든 자식 주문의 상태가 REFUNDED인 경우.</td>
+</tr>
+<tr>
+<td>UNKNOWN</td>
+<td>결과 조회 유지</td>
+<td>예산 소진·시간 초과만으로 확정 실패하지 않는다.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="상세와-근거">상세와 근거</h2>
+<ul>
+<li><a href="../services/commercecore/order/overview.html">CommerceCore 환불 접수·결과 반영</a></li>
+<li><a href="../services/payment/overview.html">Payment 환불 실행</a></li>
+</ul>
+<p><a href="../services/common-module/outbox.html">공통 Outbox</a> · <a href="../../../contracts/events">이벤트 계약</a></p><p class="muted fingerprint">MD SHA-256: <code>7d52be9b18e964cbfb1b895d758ed8dd5e7f38cec41f60126f912eeed5d5d8c5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

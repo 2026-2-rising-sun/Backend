@@ -177,6 +177,15 @@ class OutboxRecoveryPostgresTest {
     @Test
     @DisplayName("전송 실패는 같은 이벤트를 보존하고 지수 backoff 중 같은 판매의 후속 발행을 막는다")
     void retryBackoffPreservesPayloadAndDoesNotBlockOtherKeys() {
+        // 테스트 실행이 1초를 넘겨도 backoff 중이라는 전제가 바뀌지 않게 한다.
+        // 실제 대기는 하지 않고 아래에서 due 시각을 과거로 옮겨 재시도를 진행한다.
+        var leases =
+                new OutboxLeaseStore(
+                        jdbc,
+                        new DataSourceTransactionManager(source),
+                        Duration.ofSeconds(30),
+                        Duration.ofHours(1),
+                        Duration.ofHours(4));
         String id = append("sale-a");
         append("sale-a");
         var failed = leases.claim();
@@ -194,13 +203,22 @@ class OutboxRecoveryPostgresTest {
             assertThat(retry.eventId()).isEqualTo(failed.eventId());
             assertThat(retry.payload()).isEqualTo(failed.payload());
             assertThat(retry.attempts()).isEqualTo(attempt);
+            var before =
+                    jdbc.queryForObject("SELECT CURRENT_TIMESTAMP", java.sql.Timestamp.class)
+                            .toInstant();
             assertThat(leases.failed(retry, "재시도")).isTrue();
-            double seconds =
+            var after =
+                    jdbc.queryForObject("SELECT CURRENT_TIMESTAMP", java.sql.Timestamp.class)
+                            .toInstant();
+            var nextAttempt =
                     jdbc.queryForObject(
-                            "SELECT EXTRACT(EPOCH FROM (next_attempt_at-CURRENT_TIMESTAMP)) FROM event_outbox WHERE event_id=?",
-                            Double.class,
-                            id);
-            assertThat(seconds).isBetween(attempt == 1 ? 1.0 : 3.0, attempt == 1 ? 2.1 : 4.1);
+                                    "SELECT next_attempt_at FROM event_outbox WHERE event_id=?",
+                                    java.sql.Timestamp.class,
+                                    id)
+                            .toInstant();
+            long delaySeconds = Duration.ofHours(attempt == 1 ? 2 : 4).toSeconds();
+            assertThat(nextAttempt)
+                    .isBetween(before.plusSeconds(delaySeconds), after.plusSeconds(delaySeconds));
         }
         assertThat(
                         jdbc.queryForObject(

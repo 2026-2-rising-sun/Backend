@@ -1,7 +1,7 @@
 # ADR 0337-5: PG 결과를 모르면 UNKNOWN으로 두고 조회로 확정한다
 
 결정 상태: 채택
-구현 상태: [결제 요구사항](../requirements/payment.md)의 PAY-CONFIRM·PAY-PG·PAY-RECOVER
+구현 상태: [결제 요구사항](../design-docs/services/payment/requirements/payment.md)의 PAY-CONFIRM·PAY-PG·PAY-RECOVER
 관련 자료: [응답 시간 예산](../design-docs/services/payment/design.html#api) · [결과 불명](../design-docs/services/payment/design.html#f4) · [토스 흐름](../design-docs/services/payment/design.html#toss)
 
 ## 문제
@@ -13,7 +13,7 @@
 - 연결 실패만 "보내지 않음", 나머지 애매한 실패는 UNKNOWN이다. UNKNOWN은 같은 멱등 키 재시도 1번 뒤 조회 스케줄러가 확정한다. 마감이 지나면 대사가 맡는다.
 - 타임아웃은 위가 아래보다 길다: 토스 읽기 60초(토스 권장), Payment 승인 응답 대기 8초 뒤 202, Commerce→Payment 승인 10초, Gateway 15초. 결제 생성 호출은 3초.
 - 토스 호출은 크기를 제한한 별도 스레드 풀에서 한다.
-  - 정정(2026-11-15): 동시 실행 수 제한(벌크헤드)은 두지 않기로 했다([작은 판단](../exec-plans/active/337-payment-redesign/decision.md)). 토스 호출은 요청 스레드와 분리된 가상 스레드에서 한다. "보내지 않음"도 연결 실패에 더해 우리 키·설정 문제 응답(401, 429, 설정 403 코드)을 포함한다([결제 요구사항 PAY-PG-01](../requirements/payment.md)). 결정의 뜻(애매하면 불명)은 바뀌지 않는다.
+  - 정정(2026-11-15): 동시 실행 수 제한(벌크헤드)은 두지 않기로 했다([작은 판단](../worklog/plans/active/337-payment-redesign/decision.md)). 토스 호출은 요청 스레드와 분리된 가상 스레드에서 한다. "보내지 않음"도 연결 실패에 더해 우리 키·설정 문제 응답(401, 429, 설정 403 코드)을 포함한다([결제 요구사항 PAY-PG-01](../design-docs/services/payment/requirements/payment.md)). 결정의 뜻(애매하면 불명)은 바뀌지 않는다.
 - 결제창마다 새 pg_order_id를 쓰고, 승인 멱등 키는 `confirm-{pg_order_id}`다. 거절 뒤 다른 카드로 다시 시도해도 첫 거절 응답이 돌아오지 않는다.
 - 대안: 응답이 없으면 바로 취소(망취소). 정상 결제까지 잃어 택하지 않았다.
 

@@ -2,7 +2,7 @@
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약·설정. #330은 문서·도구만 변경한다. 운영 배포·실제 PG·브로커 실행 결과를 뜻하지 않는다.
 
-[프로젝트 소개](README.md) · [모듈 문서](docs/design-docs/services/README.md) · [업무 흐름](docs/design-docs/README.md)
+[프로젝트 소개](README.md) · [모듈 문서](docs/design-docs/README.md) · [업무 흐름](docs/design-docs/README.md)
 
 ## 모듈과 데이터 소유권
 
@@ -28,10 +28,14 @@
 - Catalog/Core/Live/Notification → Member: 접근 세션 활성 상태 확인.
 - Core/Live → Notification: 주문·쿠폰·판매·방송 이벤트. 중복·순서 처리는 소비 코드와 계약을 함께 읽는다.
 
-[주문·결제](docs/design-docs/order-payment.md) · [환불](docs/design-docs/refund.md) · [Catalog 동기화](docs/design-docs/catalog-sync.md) · [인증](docs/design-docs/authentication.md) · [방송·알림](docs/design-docs/live-notification.md)
+[주문·결제](docs/design-docs/flows/order-payment.md) · [환불](docs/design-docs/flows/refund.md) · [Catalog 동기화](docs/design-docs/flows/catalog-sync.md) · [인증](docs/design-docs/flows/authentication.md) · [방송·알림](docs/design-docs/flows/live-notification.md)
 
 ## 외부 환경과 복구
 
 각 서비스의 PostgreSQL 스키마는 Flyway와 엔티티가 설명한다. Payment는 `db/payment-migration/`, 다른 서비스는 `db/migration/`를 사용한다. Outbox는 DB 상태와 발행 요청을 같은 트랜잭션에 저장하지만 브로커 전달·소비 반영까지 한 번에 보장하는 것은 아니다.
 
 결제·환불 제공자는 현재 Mock 구현이다. UNKNOWN은 확정 실패와 구분하고 조회·lease·재시도로 복구한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
+
+## Order 처리 기한 후속
+
+2026-11-16 Core 변경은 새 주문 생성600초와 첫 실행부터별도600초를 적용한다. 주문 기한 종료는 Payment 실패 확정이 아니다. 늦은 승인은 Core의 환불 필요 REQUIRED 기록으로 보존하고 새 Payment 환불 이벤트 연동은 미완이다. [현재 범위와 제약](docs/worklog/plans/active/331-order-audit-fixes/processing-deadline.md). Payment 소유 코드·DB·계약은 수정하지 않는다.

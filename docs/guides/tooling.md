@@ -41,11 +41,11 @@ scripts/render-api-docs.sh --check
 .venv-api/bin/python scripts/render_design_docs.py --check
 ```
 
-API 렌더러는 저장소의 [render_api_docs.py](../../scripts/render_api_docs.py) 버전 1과 기존 고정 PyYAML 의존성을 사용한다. YAML의 경로·인증·요청·응답·전체 선언과 로컬 JSON Pointer 참조를 표시한다. 외부 CDN·실행 중인 API 서버가 필요 없고 HTTP 요청을 보내는 기능은 없다. 스키마의 의미 검증이나 실제 응답 검증을 대신하지 않는다.
+API 렌더러는 [render_api_docs.py](../../scripts/render_api_docs.py)와 고정 Python 의존성을 사용한다. 계약 YAML에서 서비스·모듈별 `api.md`·`api.html`을 함께 생성한다. YAML의 경로·인증·요청·응답·전체 선언과 로컬 JSON Pointer 참조를 표시한다. 외부 CDN·실행 중인 API 서버가 필요 없고 HTTP 요청을 보내는 기능은 없다. 스키마의 의미 검증이나 실제 응답 검증을 대신하지 않는다.
 
-설계 HTML은 `visual: relations` 주석이 있는 MD의 표에서 생성한다. 설명·관계·전이 표를 수정하고 재생성하며 HTML을 직접 고치지 않는다. 기본 제목·문장·링크·인라인 코드·표를 지원한다. 전체 Markdown 변환기가 아니다. 두 생성기의 `--check`는 파일을 쓰지 않고 생성 결과 불일치를 종료 코드 1로 보고한다. CI와 `check.sh`는 링크·API/설계 최신성을 항상 확인한다.
+`render_design_docs.py`는 `docs/README.md`, `docs/design-docs/`, `docs/adr/`, `docs/worklog/`의 MD에서 HTML을 생성한다. 제목·목차·표·코드 블록을 표시하며 출발·도착·조건 표는 전체 관계도로 함께 제공한다. API MD는 API 생성기가 소유한다. 기존 수작업 Payment 목표 설계는 `html: authored` 표시로 덮어쓰지 않고 MD/HTML 쌍과 MD 지문을 검사한다. 두 생성기의 `--check`는 파일을 쓰지 않고 불일치를 종료 코드 1로 보고한다. CI와 `check.sh`는 링크·쌍 구성·API/설계/기록 최신성을 항상 확인한다.
 
-쉘 진입점의 `PYTHON`에는 실행 파일 경로 또는 명령 이름을 지정한다. `check.sh`와 API 생성은 기본 `.venv-api/bin/python`을 우선 사용하며, 문서 링크 검사는 표준 라이브러리만 사용한다. 프레젠테이션의 의미·표시·탐색은 [문서 검토 방법](../design-docs/document-harness.md#html-검토-방법)을 따른다.
+쉘 진입점의 `PYTHON`에는 실행 파일 경로 또는 명령 이름을 지정한다. `check.sh`와 API 생성은 기본 `.venv-api/bin/python`을 우선 사용하며, 문서 링크 검사는 표준 라이브러리만 사용한다. 프레젠테이션의 의미·표시·탐색은 [문서 관리 기준](../README.md#작성갱신완료)을 따른다.
 
 ## 포맷과 빌드
 
