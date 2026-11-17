@@ -186,8 +186,10 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
   .flow-card { padding: 4px 14px 14px; }
 }
 </style>
+<!-- md-sha256: 53733920b00e15fd84065e4f991c12cf387928ad65af9fa638869d89db402b7b -->
 </head>
 <body>
+<a href="design.md">MD 원본</a>
 <div class="wrap">
 <nav class="toc" aria-label="목차">
   <ol>
@@ -233,7 +235,7 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
 
 <main>
 <h1>Payment 목표 설계</h1>
-<div class="box"><strong>구현 전 목표 설계입니다.</strong> 결제 재설계가 끝날 때까지 지금 코드와 다릅니다. 현재 코드는 <a href="README.md">Payment 모듈 문서</a>에 있습니다. 동작의 원본은 <a href="../../../requirements/payment.md">결제</a>·<a href="../../../requirements/ledger.md">원장</a>·<a href="../../../requirements/refund.md">환불</a> 요구사항과 ADR이고, 이 문서는 그것을 그림과 예시로 풀어 씁니다. 원본을 바꾸는 PR에서 이 문서도 함께 고칩니다.</div>
+<div class="box"><strong>구현 전 목표 설계입니다.</strong> 결제 재설계가 끝날 때까지 지금 코드와 다릅니다. 현재 코드는 <a href="overview.md">Payment 모듈 문서</a>에 있습니다. 동작의 원본은 <a href="requirements/payment.md">결제</a>·<a href="requirements/ledger.md">원장</a>·<a href="requirements/refund.md">환불</a> 요구사항과 ADR이고, 이 문서는 그것을 그림과 예시로 풀어 씁니다. 원본을 바꾸는 PR에서 이 문서도 함께 고칩니다.</div>
 <p class="lead">결제 시스템을 만들 때 꼭 있어야 하는 흐름을 먼저 고릅니다. 그다음 흐름마다 "어떤 상황인지, 안 하면 무슨 일이 생기는지, 왜 이 방법을 고르는지"를 설명합니다. 기준 PG는 토스페이먼츠입니다. 토스 개발자 문서는 2026-11-06에 확인했습니다.</p>
 
 <section id="summary">

@@ -31,6 +31,8 @@ commercecore:
     recovery-enabled: false
     delivery-recovery-enabled: false
     results-enabled: false
+  payment-relay:
+    recovery-enabled: false
   refunds:
     api-enabled: false
     execution-enabled: false

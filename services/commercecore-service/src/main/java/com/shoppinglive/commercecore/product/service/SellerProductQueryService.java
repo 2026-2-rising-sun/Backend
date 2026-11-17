@@ -7,7 +7,9 @@ import com.shoppinglive.commercecore.product.dto.SellerProductSummary;
 import com.shoppinglive.commercecore.product.entity.Product;
 import com.shoppinglive.commercecore.product.repository.ProductRepository;
 import com.shoppinglive.commercecore.sales.dto.SalesLookup;
-import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
+import com.shoppinglive.commercecore.sku.dto.SkuView;
+import com.shoppinglive.commercecore.sku.service.SkuSalesService;
+import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.commercecore.storage.ImageUrlResolver;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -29,15 +31,18 @@ public class SellerProductQueryService {
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
     private final ProductRepository productRepository;
-    private final SalesJpaRepository salesRepository;
+    private final SkuSalesService singleSkuSales;
+    private final SkuService skus;
     private final ImageUrlResolver imageUrlResolver;
 
     public SellerProductQueryService(
             ProductRepository productRepository,
-            SalesJpaRepository salesRepository,
+            SkuSalesService singleSkuSales,
+            SkuService skus,
             ImageUrlResolver imageUrlResolver) {
         this.productRepository = productRepository;
-        this.salesRepository = salesRepository;
+        this.singleSkuSales = singleSkuSales;
+        this.skus = skus;
         this.imageUrlResolver = imageUrlResolver;
     }
 
@@ -53,7 +58,7 @@ public class SellerProductQueryService {
                     ErrorCode.INVALID_REQUEST, "page × size는 2147483647 이하여야 합니다.");
         }
         Page<Product> products =
-                productRepository.findBySellerId(
+                productRepository.findBySellerIdAndDeletedAtIsNull(
                         sellerId, PageRequest.of(page, size, LATEST_FIRST));
         List<Long> ids = products.getContent().stream().map(Product::getId).toList();
         Map<Long, SalesLookup> sales = findSales(ids);
@@ -69,7 +74,8 @@ public class SellerProductQueryService {
                                             product.getCreatedAt(),
                                             view.status(),
                                             view.price(),
-                                            view.available());
+                                            view.available(),
+                                            product.isSaleEnabled());
                                 })
                         .toList();
         return new SellerProductPage(
@@ -86,6 +92,7 @@ public class SellerProductQueryService {
                 productRepository
                         .findById(productId)
                         .filter(found -> sellerId.equals(found.getSellerId()))
+                        .filter(found -> !found.isDeleted())
                         .orElseThrow(
                                 () ->
                                         new BusinessException(
@@ -104,12 +111,25 @@ public class SellerProductQueryService {
                 view.status(),
                 view.price(),
                 view.available(),
-                product.getCategory());
+                product.getCategory(),
+                product.isSaleEnabled());
+    }
+
+    @Transactional(readOnly = true)
+    public List<SkuView> listSkus(Long productId, String sellerId) {
+        productRepository
+                .findById(productId)
+                .filter(p -> !p.isDeleted() && sellerId.equals(p.getSellerId()))
+                .orElseThrow(
+                        () ->
+                                new BusinessException(
+                                        ErrorCode.NOT_FOUND, "상품을 찾을 수 없습니다: " + productId));
+        return skus.findByProductId(productId);
     }
 
     private Map<Long, SalesLookup> findSales(List<Long> productIds) {
         if (productIds.isEmpty()) return Map.of();
-        return salesRepository.findLookupsByProductIds(productIds).stream()
+        return singleSkuSales.findSingleByProductIds(productIds).stream()
                 .collect(Collectors.toMap(SalesLookup::productId, Function.identity()));
     }
 

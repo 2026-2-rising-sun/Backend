@@ -1,0 +1,4942 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CommerceCore Service API / cart</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="api.md">MD 명세</a><a href="../../../../../contracts/api/commercecore-service.yaml">계약 YAML</a><a href="../../../../README.html">문서 지도</a><a href="overview.html">서비스·모듈 개요</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#공통-인증과-서버">공통 인증과 서버</a></li>
+<li><a href="#get-v1cartitems">GET /v1/cart/items</a></li>
+<li><a href="#post-v1cartitems">POST /v1/cart/items</a></li>
+<li><a href="#patch-v1cartitemsitemid">PATCH /v1/cart/items/{itemId}</a></li>
+<li><a href="#delete-v1cartitemsitemid">DELETE /v1/cart/items/{itemId}</a></li>
+<li><a href="#post-v1cartitemsitemidorders">POST /v1/cart/items/{itemId}/orders</a></li>
+<li><a href="#post-v1cartcheckout">POST /v1/cart/checkout</a></li>
+<li><a href="#post-v1cartorders">POST /v1/cart/orders</a></li>
+<li><a href="#전체-스키마-원본">전체 스키마 원본</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>CommerceCore Service API / cart</h1><label for="search">API 찾기</label> <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="예: /orders 또는 상품…"><p id="count" role="status"></p><div class="controls"><button id="expand" type="button">모두 펼치기</button><button id="collapse" type="button">모두 접기</button></div><!-- generated: OpenAPI -->
+
+<p><a href="../../../../../contracts/api/commercecore-service.yaml">계약 YAML</a> · OpenAPI 3.1.0 · 계약 2.0.0</p>
+<p>계약에 선언된 API입니다. 실제 응답·인증·외부 서비스 실행 결과는 워크로그에서 확인합니다.</p>
+<p>cart 모듈에 속한 API를 분리해 표시합니다. 전체 계약의 공통 설명은 계약 YAML에서 확인합니다.</p>
+<details><summary id="공통-인증과-서버">공통 인증과 서버</summary>
+<pre><code class="language-yaml">security:
+- BearerAuth: []
+securitySchemes:
+  BearerAuth:
+    $ref: ./common.yaml#/components/securitySchemes/BearerAuth
+  ServiceToken:
+    type: apiKey
+    in: header
+    name: X-Service-Token
+    description: 대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다.
+servers:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="get-v1cartitems"><summary><span class="badge method-get">GET</span> /v1/cart/items</summary>
+<p>본인 장바구니를 상품별 SKU 항목으로 조회</p>
+<p>담긴 SKU만 상품별로 묶는다. 가격·재고는 현재 조회값이며 예약하지 않는다. 미매핑·삭제된 항목은 보존하고 purchasable=false로 표시한다. purchasable은 표시용이며 주문서 생성 시 원본을 다시 검증한다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="응답">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>상품별 묶음, 없으면 빈 배열</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>503</td>
+<td>JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&#91;&#93;.productId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.productName</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>&#91;&#93;.mainImageUrl</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>&#91;&#93;.saleEnabled</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.id</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.skuId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.unitPrice</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.available</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.skuStatus</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;READY&quot;, &quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;, &quot;PRIVATE&quot;, null&#93;}</td>
+</tr>
+<tr>
+<td>&#91;&#93;.items&#91;&#93;.purchasable</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+operationId: listMyCart
+summary: 본인 장바구니를 상품별 SKU 항목으로 조회
+description: 담긴 SKU만 상품별로 묶는다. 가격·재고는 현재 조회값이며 예약하지 않는다. 미매핑·삭제된 항목은 보존하고 purchasable=false로
+  표시한다. purchasable은 표시용이며 주문서 생성 시 원본을 다시 검증한다.
+x-required-roles:
+- USER
+- SELLER
+responses:
+  '200':
+    description: 상품별 묶음, 없으면 빈 배열
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartProductGroup'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '503':
+    $ref: '#/components/responses/AuthUnavailable'
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="post-v1cartitems"><summary><span class="badge method-post">POST</span> /v1/cart/items</summary>
+<p>본인 장바구니에 SKU 추가</p>
+<p>skuId 또는 기존 productId 중 하나만 지정한다. productId는 SKU가 정확히 하나일 때만 호환하고 0개/여러 개이면 409다. 같은 회원의 같은 SKU 중복도 409이며 수량을 누적하지 않는다. 판매 준비·중지·품절 여부로 담기 자체를 예약으로 바꾸지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-본문">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>skuId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>선택</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>productId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>선택</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>&#91;oneOf 1&#93;.skuId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;oneOf 1&#93;.productId</td>
+<td>null</td>
+<td>선택</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>&#91;oneOf 2&#93;.productId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>&#91;oneOf 2&#93;.skuId</td>
+<td>null</td>
+<td>선택</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_1">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>201</td>
+<td>SKU 항목 생성</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>중복·상태·동시 수정·멱등키 입력 충돌</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션 인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="201--applicationjson">201 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>productId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>skuId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_1">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_1">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="409--applicationjson">409 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_1">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_1">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+operationId: addMyCartItem
+summary: 본인 장바구니에 SKU 추가
+description: skuId 또는 기존 productId 중 하나만 지정한다. productId는 SKU가 정확히 하나일 때만 호환하고 0개/여러
+  개이면 409다. 같은 회원의 같은 SKU 중복도 409이며 수량을 누적하지 않는다. 판매 준비·중지·품절 여부로 담기 자체를 예약으로 바꾸지
+  않는다.
+x-required-roles:
+- USER
+- SELLER
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/AddCartItemRequest'
+responses:
+  '201':
+    description: SKU 항목 생성
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CartItem'
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '409':
+    $ref: '#/components/responses/Conflict'
+  '503':
+    $ref: '#/components/responses/ShoppingUnavailable'
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="patch-v1cartitemsitemid"><summary><span class="badge method-patch">PATCH</span> /v1/cart/items/{itemId}</summary>
+<p>본인 SKU 항목의 절대 수량 변경</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-파라미터">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>itemId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="요청-본문_1">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_2">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>변경한 항목</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>503</td>
+<td>JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_1">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>productId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>skuId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_1">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_2">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_2">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_1">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_2">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_2">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+operationId: updateMyCartQuantity
+summary: 본인 SKU 항목의 절대 수량 변경
+x-required-roles:
+- USER
+- SELLER
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/QuantityRequest'
+responses:
+  '200':
+    description: 변경한 항목
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CartItem'
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '503':
+    $ref: '#/components/responses/AuthUnavailable'
+경로 공통 선언:
+  parameters:
+  - $ref: '#/components/parameters/ItemId'
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="delete-v1cartitemsitemid"><summary><span class="badge method-delete">DELETE</span> /v1/cart/items/{itemId}</summary>
+<p>본인 SKU 항목 삭제</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-파라미터_1">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>itemId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="응답_3">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>204</td>
+<td>삭제, 응답 본문 없음</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>503</td>
+<td>JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_2">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_3">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_3">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_2">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_3">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_3">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+operationId: deleteMyCartItem
+summary: 본인 SKU 항목 삭제
+x-required-roles:
+- USER
+- SELLER
+responses:
+  '204':
+    description: 삭제, 응답 본문 없음
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '503':
+    $ref: '#/components/responses/AuthUnavailable'
+경로 공통 선언:
+  parameters:
+  - $ref: '#/components/parameters/ItemId'
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="post-v1cartitemsitemidorders"><summary><span class="badge method-post">POST</span> /v1/cart/items/{itemId}/orders</summary>
+<p>장바구니 한 항목 주문</p>
+<p>기존 한 항목 주문 경로를 유지하며 주문 하나를 가진 결제 묶음으로 생성한다. 회원당 활성 묶음 하나 제한은 단건에도 적용한다. 선택 항목의 상품·수량 변경과 현재 가격·판매·재고를 재검증하며 주문 저장·예약은 원자적이다. 생성 시 카트를 유지하고 결제 성공 때 원본 ID·버전이 같은 항목만 삭제한다. 대기 중 수량 변경·삭제는 허용하며 주문 스냅샷은 바뀌지 않는다. 동일 키·입력 재전송은 카트 삭제 뒤에도 원래 주문을 반환한다. 여러 항목은 POST /v1/cart/orders를 사용한다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-파라미터_2">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>itemId</td>
+<td>path</td>
+<td>필수</td>
+<td>integer</td>
+<td></td>
+</tr>
+<tr>
+<td>X-Idempotency-Key</td>
+<td>header</td>
+<td>필수</td>
+<td>string</td>
+<td>회원별 요청 식별자. 동일 키·입력 재전송은 카트 변경·삭제 뒤에도 기존 결과로 연결한다. 다른 입력은 409이며 재전송 HTTP 상태는 각 API의 응답 정의를 따른다.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="요청-본문_2">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minLength&quot;: 1, &quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>buyerPhone</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;pattern&quot;: &quot;^&#91;0-9-&#93;{9,32}$&quot;, &quot;writeOnly&quot;: true}</td>
+</tr>
+<tr>
+<td>expectedTotalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;buyerName&quot;: &quot;구매자&quot;,
+  &quot;buyerPhone&quot;: &quot;010-1234-5678&quot;,
+  &quot;expectedTotalAmount&quot;: 30000
+}
+</code></pre>
+<h3 id="응답_4">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>201</td>
+<td>성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>중복·상태·동시 수정·멱등키 입력 충돌</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션 인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.</td>
+</tr>
+<tr>
+<td>200</td>
+<td>동일 회원·멱등키·입력 재전송</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="201--applicationjson_1">201 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>orderNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>groupNumber</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>productName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>unitPrice</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>expiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>cancelledAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>salesInfoId</td>
+<td>schema</td>
+<td>선택</td>
+<td>기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의 skuId를 사용한다.</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="400--applicationjson_3">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_4">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_4">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_3">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="409--applicationjson_1">409 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_4">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_2">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>orderNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>groupNumber</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>productName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>unitPrice</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>expiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>cancelledAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>salesInfoId</td>
+<td>schema</td>
+<td>선택</td>
+<td>기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의 skuId를 사용한다.</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_4">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+summary: 장바구니 한 항목 주문
+operationId: orderMyCartItem
+description: 기존 한 항목 주문 경로를 유지하며 주문 하나를 가진 결제 묶음으로 생성한다. 회원당 활성 묶음 하나 제한은 단건에도 적용한다.
+  선택 항목의 상품·수량 변경과 현재 가격·판매·재고를 재검증하며 주문 저장·예약은 원자적이다. 생성 시 카트를 유지하고 결제 성공 때 원본 ID·버전이
+  같은 항목만 삭제한다. 대기 중 수량 변경·삭제는 허용하며 주문 스냅샷은 바뀌지 않는다. 동일 키·입력 재전송은 카트 삭제 뒤에도 원래 주문을
+  반환한다. 여러 항목은 POST /v1/cart/orders를 사용한다.
+parameters:
+- $ref: '#/components/parameters/RequiredIdempotencyKey'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CartOrderRequest'
+      example:
+        buyerName: 구매자
+        buyerPhone: 010-1234-5678
+        expectedTotalAmount: 30000
+x-required-roles:
+- USER
+- SELLER
+responses:
+  '201':
+    description: 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Order'
+        examples:
+          created:
+            value:
+              orderNumber: 20261001-000001
+              productName: 가을 니트
+              quantity: 2
+              unitPrice: 15000
+              totalAmount: 30000
+              discountAmount: 0
+              payableAmount: 30000
+              status: PENDING_PAYMENT
+              buyerName: 구매자
+              createdAt: '2026-10-01T00:00:00Z'
+              expiresAt: '2026-10-01T00:10:00Z'
+              cancelledAt: null
+              groupNumber: PG-00000000-0000-0000-0000-000000000149
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '409':
+    $ref: '#/components/responses/Conflict'
+  '503':
+    $ref: '#/components/responses/ShoppingUnavailable'
+  '200':
+    description: 동일 회원·멱등키·입력 재전송
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/Order'
+        examples:
+          replay:
+            value:
+              orderNumber: 20261001-000001
+              productName: 가을 니트
+              quantity: 2
+              unitPrice: 15000
+              totalAmount: 30000
+              discountAmount: 0
+              payableAmount: 30000
+              status: PENDING_PAYMENT
+              buyerName: 구매자
+              createdAt: '2026-10-01T00:00:00Z'
+              expiresAt: '2026-10-01T00:10:00Z'
+              cancelledAt: null
+              groupNumber: PG-00000000-0000-0000-0000-000000000149
+경로 공통 선언:
+  parameters:
+  - $ref: '#/components/parameters/ItemId'
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="post-v1cartcheckout"><summary><span class="badge method-post">POST</span> /v1/cart/checkout</summary>
+<p>선택 상품 통합 주문서 확인</p>
+<p>1~100개 항목의 소유권·버전·판매 상태·재고와 최신 가격을 확인한다. couponId가 있으면 회원 보유·사용 가능 기간과 대상 상품을 서버에서 확인하고 대상 주문에만 정액 할인을 비례 배분한다. 중복 ID는 400, 변경된 버전·판매 불가·재고 부족·사용할 수 없는 쿠폰은 409. 조회 단계는 쿠폰·재고를 예약하거나 주문을 만들지 않는다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-본문_3">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.itemId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>couponId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>선택</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;items&quot;: [
+    {
+      &quot;itemId&quot;: 1,
+      &quot;version&quot;: 0
+    },
+    {
+      &quot;itemId&quot;: 2,
+      &quot;version&quot;: 0
+    }
+  ],
+  &quot;couponId&quot;: &quot;33333333-3333-4333-8333-333333333334&quot;
+}
+</code></pre>
+<h3 id="응답_5">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>성공</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>중복·상태·동시 수정·멱등키 입력 충돌</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션 인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_3">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.itemId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.productId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.productName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.unitPrice</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>couponId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>선택</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;items&quot;: [
+    {
+      &quot;itemId&quot;: 1,
+      &quot;version&quot;: 0,
+      &quot;productId&quot;: 1,
+      &quot;productName&quot;: &quot;상품 1&quot;,
+      &quot;quantity&quot;: 2,
+      &quot;unitPrice&quot;: 10000,
+      &quot;totalAmount&quot;: 20000,
+      &quot;discountAmount&quot;: 2000,
+      &quot;payableAmount&quot;: 18000
+    },
+    {
+      &quot;itemId&quot;: 2,
+      &quot;version&quot;: 0,
+      &quot;productId&quot;: 2,
+      &quot;productName&quot;: &quot;상품 2&quot;,
+      &quot;quantity&quot;: 1,
+      &quot;unitPrice&quot;: 5000,
+      &quot;totalAmount&quot;: 5000,
+      &quot;discountAmount&quot;: 0,
+      &quot;payableAmount&quot;: 5000
+    }
+  ],
+  &quot;totalAmount&quot;: 25000,
+  &quot;couponId&quot;: &quot;33333333-3333-4333-8333-333333333334&quot;,
+  &quot;discountAmount&quot;: 2000,
+  &quot;payableAmount&quot;: 23000
+}
+</code></pre>
+<h4 id="400--applicationjson_4">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_5">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_5">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_4">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="409--applicationjson_2">409 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_5">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_5">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+summary: 선택 상품 통합 주문서 확인
+operationId: previewMyCartGroup
+description: 1~100개 항목의 소유권·버전·판매 상태·재고와 최신 가격을 확인한다. couponId가 있으면 회원 보유·사용 가능 기간과
+  대상 상품을 서버에서 확인하고 대상 주문에만 정액 할인을 비례 배분한다. 중복 ID는 400, 변경된 버전·판매 불가·재고 부족·사용할 수 없는
+  쿠폰은 409. 조회 단계는 쿠폰·재고를 예약하거나 주문을 만들지 않는다.
+x-required-roles:
+- USER
+- SELLER
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CartCheckoutRequest'
+      example:
+        items:
+        - itemId: 1
+          version: 0
+        - itemId: 2
+          version: 0
+        couponId: 33333333-3333-4333-8333-333333333334
+responses:
+  '200':
+    description: 성공
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CartCheckout'
+        example:
+          items:
+          - itemId: 1
+            version: 0
+            productId: 1
+            productName: 상품 1
+            quantity: 2
+            unitPrice: 10000
+            totalAmount: 20000
+            discountAmount: 2000
+            payableAmount: 18000
+          - itemId: 2
+            version: 0
+            productId: 2
+            productName: 상품 2
+            quantity: 1
+            unitPrice: 5000
+            totalAmount: 5000
+            discountAmount: 0
+            payableAmount: 5000
+          totalAmount: 25000
+          couponId: 33333333-3333-4333-8333-333333333334
+          discountAmount: 2000
+          payableAmount: 23000
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '409':
+    $ref: '#/components/responses/Conflict'
+  '503':
+    $ref: '#/components/responses/ShoppingUnavailable'
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="operation endpoint" id="post-v1cartorders"><summary><span class="badge method-post">POST</span> /v1/cart/orders</summary>
+<p>상품별 주문과 결제 묶음 생성</p>
+<p>선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때 원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 새 주문 생성 기한은 기본600초이며 첫 승인 실행 접수부터 별도600초를 적용한다. 같은 승인 재요청은 처리 기한을 연장하지 않는다. 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다.</p>
+<p><strong>인증:</strong> <code>[{"BearerAuth": []}]</code>
+<strong>태그:</strong> Cart</p>
+<h3 id="요청-파라미터_3">요청 파라미터</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>위치</th>
+<th>필수</th>
+<th>타입</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>X-Idempotency-Key</td>
+<td>header</td>
+<td>필수</td>
+<td>string</td>
+<td>회원별 요청 식별자. 동일 키·입력 재전송은 카트 변경·삭제 뒤에도 기존 결과로 연결한다. 다른 입력은 409이며 재전송 HTTP 상태는 각 API의 응답 정의를 따른다.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="요청-본문_4">요청 본문</h3>
+<p>본문: 필수</p>
+<p><strong>application/json</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>items</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.itemId</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>items&#91;&#93;.version</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minLength&quot;: 1, &quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>buyerPhone</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;pattern&quot;: &quot;^&#91;0-9-&#93;{9,32}$&quot;, &quot;writeOnly&quot;: true}</td>
+</tr>
+<tr>
+<td>expectedTotalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>couponId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>선택</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;items&quot;: [
+    {
+      &quot;itemId&quot;: 1,
+      &quot;version&quot;: 0
+    },
+    {
+      &quot;itemId&quot;: 2,
+      &quot;version&quot;: 0
+    }
+  ],
+  &quot;buyerName&quot;: &quot;구매자&quot;,
+  &quot;buyerPhone&quot;: &quot;01012345678&quot;,
+  &quot;expectedTotalAmount&quot;: 25000
+}
+</code></pre>
+<h3 id="응답_6">응답</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상태 코드</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>동일 입력 재전송, 현재 묶음 결과</td>
+</tr>
+<tr>
+<td>201</td>
+<td>새 묶음과 상품별 주문 생성</td>
+</tr>
+<tr>
+<td>400</td>
+<td>요청 값·형식 또는 금액 범위 오류</td>
+</tr>
+<tr>
+<td>401</td>
+<td>인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>검증된 주체의 권한 부족 또는 비활성 개발 API</td>
+</tr>
+<tr>
+<td>404</td>
+<td>대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>중복·상태·동시 수정·멱등키 입력 충돌</td>
+</tr>
+<tr>
+<td>503</td>
+<td>Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션 인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="200--applicationjson_4">200 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>groupNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>couponId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>expiresAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>processingExpiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.</td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.orderNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.groupNumber</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.productName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.unitPrice</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.expiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.cancelledAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.salesInfoId</td>
+<td>schema</td>
+<td>선택</td>
+<td>기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의 skuId를 사용한다.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>paymentId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;,
+  &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+  &quot;totalAmount&quot;: 25000,
+  &quot;discountAmount&quot;: 0,
+  &quot;payableAmount&quot;: 25000,
+  &quot;couponId&quot;: null,
+  &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+  &quot;processingExpiresAt&quot;: null,
+  &quot;orders&quot;: [
+    {
+      &quot;orderNumber&quot;: &quot;OD-20261008-000001&quot;,
+      &quot;productName&quot;: &quot;상품 1&quot;,
+      &quot;quantity&quot;: 2,
+      &quot;unitPrice&quot;: 10000,
+      &quot;totalAmount&quot;: 20000,
+      &quot;discountAmount&quot;: 0,
+      &quot;payableAmount&quot;: 20000,
+      &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+      &quot;buyerName&quot;: &quot;구매자&quot;,
+      &quot;createdAt&quot;: &quot;2026-10-08T00:00:00Z&quot;,
+      &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+      &quot;cancelledAt&quot;: null,
+      &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;
+    },
+    {
+      &quot;orderNumber&quot;: &quot;OD-20261008-000002&quot;,
+      &quot;productName&quot;: &quot;상품 2&quot;,
+      &quot;quantity&quot;: 1,
+      &quot;unitPrice&quot;: 5000,
+      &quot;totalAmount&quot;: 5000,
+      &quot;discountAmount&quot;: 0,
+      &quot;payableAmount&quot;: 5000,
+      &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+      &quot;buyerName&quot;: &quot;구매자&quot;,
+      &quot;createdAt&quot;: &quot;2026-10-08T00:00:00Z&quot;,
+      &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+      &quot;cancelledAt&quot;: null,
+      &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;
+    }
+  ],
+  &quot;paymentId&quot;: null
+}
+</code></pre>
+<h4 id="201--applicationjson_2">201 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>groupNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>couponId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;maxLength&quot;: 64}</td>
+</tr>
+<tr>
+<td>expiresAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>processingExpiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.</td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders</td>
+<td>array</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.orderNumber</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.groupNumber</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td>연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.productName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.quantity</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.unitPrice</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.totalAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.discountAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.payableAmount</td>
+<td>integer</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.status</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.buyerName</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.createdAt</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.expiresAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.cancelledAt</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;date-time&quot;}</td>
+</tr>
+<tr>
+<td>orders&#91;&#93;.salesInfoId</td>
+<td>schema</td>
+<td>선택</td>
+<td>기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의 skuId를 사용한다.</td>
+<td>—</td>
+</tr>
+<tr>
+<td>paymentId</td>
+<td>&#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>{&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1}</td>
+</tr>
+</tbody>
+</table></div>
+<pre><code class="language-json">{
+  &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;,
+  &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+  &quot;totalAmount&quot;: 25000,
+  &quot;discountAmount&quot;: 0,
+  &quot;payableAmount&quot;: 25000,
+  &quot;couponId&quot;: null,
+  &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+  &quot;processingExpiresAt&quot;: null,
+  &quot;orders&quot;: [
+    {
+      &quot;orderNumber&quot;: &quot;OD-20261008-000001&quot;,
+      &quot;productName&quot;: &quot;상품 1&quot;,
+      &quot;quantity&quot;: 2,
+      &quot;unitPrice&quot;: 10000,
+      &quot;totalAmount&quot;: 20000,
+      &quot;discountAmount&quot;: 0,
+      &quot;payableAmount&quot;: 20000,
+      &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+      &quot;buyerName&quot;: &quot;구매자&quot;,
+      &quot;createdAt&quot;: &quot;2026-10-08T00:00:00Z&quot;,
+      &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+      &quot;cancelledAt&quot;: null,
+      &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;
+    },
+    {
+      &quot;orderNumber&quot;: &quot;OD-20261008-000002&quot;,
+      &quot;productName&quot;: &quot;상품 2&quot;,
+      &quot;quantity&quot;: 1,
+      &quot;unitPrice&quot;: 5000,
+      &quot;totalAmount&quot;: 5000,
+      &quot;discountAmount&quot;: 0,
+      &quot;payableAmount&quot;: 5000,
+      &quot;status&quot;: &quot;PENDING_PAYMENT&quot;,
+      &quot;buyerName&quot;: &quot;구매자&quot;,
+      &quot;createdAt&quot;: &quot;2026-10-08T00:00:00Z&quot;,
+      &quot;expiresAt&quot;: &quot;2026-10-08T00:10:00Z&quot;,
+      &quot;cancelledAt&quot;: null,
+      &quot;groupNumber&quot;: &quot;PG-00000000-0000-0000-0000-000000000149&quot;
+    }
+  ],
+  &quot;paymentId&quot;: null
+}
+</code></pre>
+<h4 id="400--applicationjson_5">400 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="401--applicationjson_6">401 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="403--applicationjson_6">403 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="404--applicationjson_5">404 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="409--applicationjson_3">409 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="503--applicationjson_6">503 · application/json</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>타입</th>
+<th>필수</th>
+<th>설명</th>
+<th>제약</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>success</td>
+<td>boolean</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>data</td>
+<td>null</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error</td>
+<td>object</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.code</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.message</td>
+<td>string</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+<tr>
+<td>error.requestId</td>
+<td>&#91;&#x27;string&#x27;, &#x27;null&#x27;&#93;</td>
+<td>필수</td>
+<td></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="계약-원문_6">계약 원문</h3>
+<pre><code class="language-yaml">tags:
+- Cart
+summary: 상품별 주문과 결제 묶음 생성
+operationId: createMyCartGroup
+description: 선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서
+  예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성
+  묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된
+  항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰
+  예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 성공 때
+  원본 itemId/version이 같은 항목만 삭제하고 이후 변경·재등록된 항목은 유지한다. 새 주문 생성 기한은 기본600초이며 첫 승인 실행
+  접수부터 별도600초를 적용한다. 같은 승인 재요청은 처리 기한을 연장하지 않는다. 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다.
+x-required-roles:
+- USER
+- SELLER
+parameters:
+- $ref: '#/components/parameters/RequiredIdempotencyKey'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/CreateCartGroupRequest'
+      example:
+        items:
+        - itemId: 1
+          version: 0
+        - itemId: 2
+          version: 0
+        buyerName: 구매자
+        buyerPhone: 01012345678
+        expectedTotalAmount: 25000
+responses:
+  '200':
+    description: 동일 입력 재전송, 현재 묶음 결과
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/PaymentGroup'
+        example:
+          groupNumber: PG-00000000-0000-0000-0000-000000000149
+          status: PENDING_PAYMENT
+          totalAmount: 25000
+          discountAmount: 0
+          payableAmount: 25000
+          couponId: null
+          expiresAt: '2026-10-08T00:10:00Z'
+          processingExpiresAt: null
+          orders:
+          - orderNumber: OD-20261008-000001
+            productName: 상품 1
+            quantity: 2
+            unitPrice: 10000
+            totalAmount: 20000
+            discountAmount: 0
+            payableAmount: 20000
+            status: PENDING_PAYMENT
+            buyerName: 구매자
+            createdAt: '2026-10-08T00:00:00Z'
+            expiresAt: '2026-10-08T00:10:00Z'
+            cancelledAt: null
+            groupNumber: PG-00000000-0000-0000-0000-000000000149
+          - orderNumber: OD-20261008-000002
+            productName: 상품 2
+            quantity: 1
+            unitPrice: 5000
+            totalAmount: 5000
+            discountAmount: 0
+            payableAmount: 5000
+            status: PENDING_PAYMENT
+            buyerName: 구매자
+            createdAt: '2026-10-08T00:00:00Z'
+            expiresAt: '2026-10-08T00:10:00Z'
+            cancelledAt: null
+            groupNumber: PG-00000000-0000-0000-0000-000000000149
+          paymentId: null
+  '201':
+    description: 새 묶음과 상품별 주문 생성
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/PaymentGroup'
+        example:
+          groupNumber: PG-00000000-0000-0000-0000-000000000149
+          status: PENDING_PAYMENT
+          totalAmount: 25000
+          discountAmount: 0
+          payableAmount: 25000
+          couponId: null
+          expiresAt: '2026-10-08T00:10:00Z'
+          processingExpiresAt: null
+          orders:
+          - orderNumber: OD-20261008-000001
+            productName: 상품 1
+            quantity: 2
+            unitPrice: 10000
+            totalAmount: 20000
+            discountAmount: 0
+            payableAmount: 20000
+            status: PENDING_PAYMENT
+            buyerName: 구매자
+            createdAt: '2026-10-08T00:00:00Z'
+            expiresAt: '2026-10-08T00:10:00Z'
+            cancelledAt: null
+            groupNumber: PG-00000000-0000-0000-0000-000000000149
+          - orderNumber: OD-20261008-000002
+            productName: 상품 2
+            quantity: 1
+            unitPrice: 5000
+            totalAmount: 5000
+            discountAmount: 0
+            payableAmount: 5000
+            status: PENDING_PAYMENT
+            buyerName: 구매자
+            createdAt: '2026-10-08T00:00:00Z'
+            expiresAt: '2026-10-08T00:10:00Z'
+            cancelledAt: null
+            groupNumber: PG-00000000-0000-0000-0000-000000000149
+          paymentId: null
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '404':
+    $ref: '#/components/responses/NotFound'
+  '409':
+    $ref: '#/components/responses/Conflict'
+  '503':
+    $ref: '#/components/responses/ShoppingUnavailable'
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+</code></pre>
+</details><details class="schema-source"><summary id="전체-스키마-원본">참조 스키마 원문 펼치기</summary>
+<p>공통·순환 참조는 계약의 components 정의를 따릅니다.</p>
+<h3 id="commercecore-serviceyaml">commercecore-service.yaml</h3>
+<pre><code class="language-yaml">components:
+  schemas:
+    CartProductGroup:
+      type: object
+      required:
+      - productId
+      - productName
+      - mainImageUrl
+      - saleEnabled
+      - items
+      properties:
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        productName:
+          type:
+          - string
+          - 'null'
+        mainImageUrl:
+          type:
+          - string
+          - 'null'
+        saleEnabled:
+          type: boolean
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartSkuView'
+    CartSkuView:
+      type: object
+      required:
+      - id
+      - skuId
+      - quantity
+      - version
+      - unitPrice
+      - available
+      - skuStatus
+      - purchasable
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        unitPrice:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        available:
+          type:
+          - integer
+          - 'null'
+          format: int32
+          minimum: 0
+        skuStatus:
+          type:
+          - string
+          - 'null'
+          enum:
+          - READY
+          - ON_SALE
+          - SOLD_OUT
+          - PRIVATE
+          - null
+        purchasable:
+          type: boolean
+    ErrorEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: 'null'
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiError:
+      $ref: ./common.yaml#/components/schemas/ApiError
+    AddCartItemRequest:
+      type: object
+      required:
+      - quantity
+      properties:
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        productId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+          deprecated: true
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+      oneOf:
+      - required:
+        - skuId
+        properties:
+          skuId:
+            type: integer
+            minimum: 1
+          productId:
+            type: 'null'
+      - required:
+        - productId
+        properties:
+          productId:
+            type: integer
+            minimum: 1
+          skuId:
+            type: 'null'
+    CartItem:
+      type: object
+      required:
+      - id
+      - productId
+      - skuId
+      - quantity
+      - version
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        skuId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    QuantityRequest:
+      type: object
+      required:
+      - quantity
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+      description: 증감량이 아닌 최종 절대 수량.
+    CartOrderRequest:
+      type: object
+      required:
+      - buyerName
+      - buyerPhone
+      - expectedTotalAmount
+      properties:
+        buyerName:
+          type: string
+          minLength: 1
+          maxLength: 64
+        buyerPhone:
+          type: string
+          pattern: ^[0-9-]{9,32}$
+          writeOnly: true
+        expectedTotalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+      description: 선택 항목 하나를 단건 주문으로 전환한다. expectedTotalAmount 필수.
+    Order:
+      type: object
+      required:
+      - orderNumber
+      - productName
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - status
+      - buyerName
+      - createdAt
+      - expiresAt
+      - cancelledAt
+      - groupNumber
+      properties:
+        orderNumber:
+          type: string
+        groupNumber:
+          type:
+          - string
+          - 'null'
+          description: 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 1
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        buyerName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        cancelledAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        salesInfoId:
+          anyOf:
+          - type: integer
+            format: int64
+            minimum: 1
+          - type: 'null'
+          description: 기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의
+            skuId를 사용한다.
+    CartCheckoutRequest:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CartSelection'
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+      description: 항목별 현재 버전이 필수이며 항목 ID 중복은 허용하지 않는다. 배열 순서는 멱등성 비교에 영향을 주지 않는다.
+    CartSelection:
+      type: object
+      required:
+      - itemId
+      - version
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          minimum: 1
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    CartCheckout:
+      type: object
+      required:
+      - items
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CartCheckoutItem'
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+    CartCheckoutItem:
+      type: object
+      required:
+      - itemId
+      - version
+      - productId
+      - productName
+      - quantity
+      - unitPrice
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      properties:
+        itemId:
+          type: integer
+          format: int64
+          minimum: 1
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        productId:
+          type: integer
+          format: int64
+          minimum: 1
+        productName:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 1
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+    CreateCartGroupRequest:
+      type: object
+      required:
+      - items
+      - buyerName
+      - buyerPhone
+      - expectedTotalAmount
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/CartSelection'
+        buyerName:
+          type: string
+          minLength: 1
+          maxLength: 64
+        buyerPhone:
+          type: string
+          pattern: ^[0-9-]{9,32}$
+          writeOnly: true
+        expectedTotalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+    PaymentGroup:
+      type: object
+      required:
+      - groupNumber
+      - status
+      - totalAmount
+      - discountAmount
+      - payableAmount
+      - couponId
+      - expiresAt
+      - processingExpiresAt
+      - orders
+      - paymentId
+      properties:
+        groupNumber:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING_PAYMENT
+          - PAYMENT_CONFIRMING
+          - PAID
+          - FAILED
+          - CANCELLED
+          - EXPIRED
+          - REFUNDED
+          - PARTIALLY_REFUNDED
+        totalAmount:
+          type: integer
+          format: int64
+          minimum: 1
+        discountAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        payableAmount:
+          type: integer
+          format: int64
+          minimum: 0
+        couponId:
+          type:
+          - string
+          - 'null'
+          maxLength: 64
+        expiresAt:
+          type: string
+          format: date-time
+        processingExpiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.
+        orders:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Order'
+        paymentId:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+      description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가
+        없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미
+        생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는
+        할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인
+        묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를
+        유지하고 전량 환불이면 REFUNDED다. 새 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다. V105
+        이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 신규 내부 주문서 공개 결제/수량환불
+        및 새 Payment 생성·승인·환불 이벤트 연동은 미완이다.
+  responses:
+    Unauthorized:
+      description: 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            unauthorized:
+              value:
+                success: false
+                data: null
+                error:
+                  code: UNAUTHORIZED
+                  message: 인증이 필요합니다.
+                  requestId: request-001
+    Forbidden:
+      description: 검증된 주체의 권한 부족 또는 비활성 개발 API
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            forbidden:
+              value:
+                success: false
+                data: null
+                error:
+                  code: FORBIDDEN
+                  message: 권한이 없습니다.
+                  requestId: request-001
+    AuthUnavailable:
+      description: JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            authUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 인증 상태를 확인할 수 없습니다.
+                  requestId: request-001
+    BadRequest:
+      description: 요청 값·형식 또는 금액 범위 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            invalidRequest:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INVALID_REQUEST
+                  message: 잘못된 요청입니다.
+                  requestId: request-001
+    NotFound:
+      description: 대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            notFound:
+              value:
+                success: false
+                data: null
+                error:
+                  code: NOT_FOUND
+                  message: 대상을 찾을 수 없습니다.
+                  requestId: request-001
+    Conflict:
+      description: 중복·상태·동시 수정·멱등키 입력 충돌
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            conflict:
+              value:
+                success: false
+                data: null
+                error:
+                  code: CONFLICT
+                  message: 요청이 현재 상태와 충돌합니다.
+                  requestId: request-001
+            insufficientStock:
+              value:
+                success: false
+                data: null
+                error:
+                  code: CONFLICT
+                  message: 재고가 부족합니다.
+                  requestId: request-001
+            amountChanged:
+              value:
+                success: false
+                data: null
+                error:
+                  code: CONFLICT
+                  message: 주문 금액이 변경되었습니다.
+                  requestId: request-001
+            duplicateCartItem:
+              value:
+                success: false
+                data: null
+                error:
+                  code: CONFLICT
+                  message: 이미 장바구니에 있는 상품입니다. 수량을 변경해 주세요.
+                  requestId: request-001
+    ShoppingUnavailable:
+      description: Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션
+        인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            shoppingUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SHOPPING_UNAVAILABLE
+                  message: 상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+                  requestId: request-001
+            authUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 인증 상태를 확인할 수 없습니다.
+                  requestId: request-001
+  parameters:
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    RequiredIdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+      description: 회원별 요청 식별자. 동일 키·입력 재전송은 카트 변경·삭제 뒤에도 기존 결과로 연결한다. 다른 입력은 409이며
+        재전송 HTTP 상태는 각 API의 응답 정의를 따른다.
+  securitySchemes:
+    BearerAuth:
+      $ref: ./common.yaml#/components/securitySchemes/BearerAuth
+    ServiceToken:
+      type: apiKey
+      in: header
+      name: X-Service-Token
+      description: 대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다.
+</code></pre>
+<h3 id="commonyaml">common.yaml</h3>
+<pre><code class="language-yaml">components:
+  schemas:
+    ApiError:
+      type: object
+      required:
+      - code
+      - message
+      - requestId
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type:
+          - string
+          - 'null'
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member,
+        aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의
+        세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
+</code></pre>
+<p>입력 SHA-256: <code>6848661917bc2a2466ef759c83984ec57e78f444b76fac8a96d7ec7578edbd7b</code></p></details><h2>참조 탐색</h2><details><summary>commercecore-service.yaml</summary><dl id="ref-3c2916482de5b21f0d68"><dt>components</dt><dd><dl id="ref-310ab604ede99a5c886b"><dt>schemas</dt><dd><dl id="ref-257837673bd1e24f9750"><dt>CartProductGroup</dt><dd><dl id="ref-41b467134d40668dbc2d"><dt>type</dt><dd><span id="ref-b70a88265e30d74bbd01">object</span></dd><dt>required</dt><dd><ol id="ref-dcb2013729952bbba881"><li><span id="ref-a229f67ab3b88686540b">productId</span></li><li><span id="ref-611249678c71d214a00a">productName</span></li><li><span id="ref-4d4785257115c6bdcd7d">mainImageUrl</span></li><li><span id="ref-b5c03a012769d8130835">saleEnabled</span></li><li><span id="ref-7d436fa6ff26da01d49c">items</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-e25c0104a28f405ecf2c"><dt>productId</dt><dd><dl id="ref-04d37b301b28e0212462"><dt>type</dt><dd><span id="ref-0a28ff898e3b2ff3986b">integer</span></dd><dt>format</dt><dd><span id="ref-a4cf47ca683549d87142">int64</span></dd><dt>minimum</dt><dd><span id="ref-650c8475c87a051554d7">1</span></dd></dl></dd><dt>productName</dt><dd><dl id="ref-a3b38adae59f6b97cca6"><dt>type</dt><dd><ol id="ref-6e37de23801eb114200e"><li><span id="ref-2da7d293738adfe1346b">string</span></li><li><span id="ref-e4abd855586c331f182f">null</span></li></ol></dd></dl></dd><dt>mainImageUrl</dt><dd><dl id="ref-bbdd8006ea91b142924b"><dt>type</dt><dd><ol id="ref-ddc0adca4e0fd4916735"><li><span id="ref-3f1054b0171585c41629">string</span></li><li><span id="ref-1a48bd51c6ce7633e16d">null</span></li></ol></dd></dl></dd><dt>saleEnabled</dt><dd><dl id="ref-28120401c200dd170340"><dt>type</dt><dd><span id="ref-92a1230c5fca193a4fec">boolean</span></dd></dl></dd><dt>items</dt><dd><dl id="ref-e8d9ed5bf172ff16448f"><dt>type</dt><dd><span id="ref-24d90bdc4001111890c7">array</span></dd><dt>minItems</dt><dd><span id="ref-4a69685cfc011337bca8">1</span></dd><dt>items</dt><dd><dl id="ref-3ecf9cd1d4d00d3129de"><dt>$ref</dt><dd><span id="ref-4ed7504a6958c4deab1b"><a href="#ref-cc9e431636181084ffb3">#/components/schemas/CartSkuView</a></span></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>CartSkuView</dt><dd><dl id="ref-cc9e431636181084ffb3"><dt>type</dt><dd><span id="ref-2a0dc6486ccaca870762">object</span></dd><dt>required</dt><dd><ol id="ref-7d1f257a484482501b28"><li><span id="ref-795899d21e38cc194210">id</span></li><li><span id="ref-4b8c2049f5ee2aa96c02">skuId</span></li><li><span id="ref-e22a1978f139e7e7c43a">quantity</span></li><li><span id="ref-e02725e6d6be1be3d1d6">version</span></li><li><span id="ref-ce9726e46adaba4d8ee7">unitPrice</span></li><li><span id="ref-c653bd9ae11ae7e96323">available</span></li><li><span id="ref-01d04f9ddf6605607716">skuStatus</span></li><li><span id="ref-a8b54a17b3a9b7721009">purchasable</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-77558d32cd05a8d38b86"><dt>id</dt><dd><dl id="ref-43623f00e9ad792dca64"><dt>type</dt><dd><span id="ref-bec68097daba07e42d75">integer</span></dd><dt>format</dt><dd><span id="ref-c9e20905b3e9765eafcd">int64</span></dd><dt>minimum</dt><dd><span id="ref-edf02b66aa998c1e4fdf">1</span></dd></dl></dd><dt>skuId</dt><dd><dl id="ref-2b9af462468c8a7f9c59"><dt>type</dt><dd><ol id="ref-b1cf51ff4454d5023bb8"><li><span id="ref-bebef2d7cc4adbb256fd">integer</span></li><li><span id="ref-84e7877815dd362a6333">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-fe61a2831fad61407bc8">int64</span></dd><dt>minimum</dt><dd><span id="ref-518e509a2a80098ada83">1</span></dd></dl></dd><dt>quantity</dt><dd><dl id="ref-b99a12f9f479f583b249"><dt>type</dt><dd><span id="ref-31e63584ba9a169cf8dc">integer</span></dd><dt>format</dt><dd><span id="ref-ee9bfbb6c0c1545cc20f">int32</span></dd><dt>minimum</dt><dd><span id="ref-d33d7fd7e0ba6905f15b">1</span></dd><dt>maximum</dt><dd><span id="ref-fb0f82a8d1f4f65d5e1d">2147483647</span></dd></dl></dd><dt>version</dt><dd><dl id="ref-937a462f19a7bfb3e382"><dt>type</dt><dd><span id="ref-6c655ae1a00a5c1ce339">integer</span></dd><dt>format</dt><dd><span id="ref-fd6707db8dc828ebd5b9">int64</span></dd><dt>minimum</dt><dd><span id="ref-f18deeb818665b087d1e">0</span></dd></dl></dd><dt>unitPrice</dt><dd><dl id="ref-c719f1c8c49c1a9fe388"><dt>type</dt><dd><ol id="ref-183f459794b21a175e2d"><li><span id="ref-85a8a8e31f3a5be06261">integer</span></li><li><span id="ref-d99e95c20a454a28ad3e">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-fcc3c5c87c07de8c94c5">int64</span></dd><dt>minimum</dt><dd><span id="ref-a57fad88b6e4584a2f0b">1</span></dd></dl></dd><dt>available</dt><dd><dl id="ref-f6bfb04f4218cad83fac"><dt>type</dt><dd><ol id="ref-afe2411f5b54bf4f35d9"><li><span id="ref-d7dc831ba75d190daa7d">integer</span></li><li><span id="ref-a3e7a2ca7c12ecf74d41">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-6f9a5d18d79b0339dcab">int32</span></dd><dt>minimum</dt><dd><span id="ref-68e018ce45552d89e653">0</span></dd></dl></dd><dt>skuStatus</dt><dd><dl id="ref-f8de5fd9ee0a909c3958"><dt>type</dt><dd><ol id="ref-c169f2ba4c1bba55dd1e"><li><span id="ref-ead6fb33363324647700">string</span></li><li><span id="ref-b538db44c9602abca535">null</span></li></ol></dd><dt>enum</dt><dd><ol id="ref-d16349832b2ceffa9bec"><li><span id="ref-d705747dc7589b7a1a5b">READY</span></li><li><span id="ref-46864adc88560fe88503">ON_SALE</span></li><li><span id="ref-e58b2375d776c577aab5">SOLD_OUT</span></li><li><span id="ref-58bea005d0fca88f2c76">PRIVATE</span></li><li><span id="ref-739a95af73448f5205e4">null</span></li></ol></dd></dl></dd><dt>purchasable</dt><dd><dl id="ref-0a220bf4802d72922285"><dt>type</dt><dd><span id="ref-c1416abaa8ab114e3b5b">boolean</span></dd></dl></dd></dl></dd></dl></dd><dt>ErrorEnvelope</dt><dd><dl id="ref-5092b8a1173457a6c861"><dt>type</dt><dd><span id="ref-67be8215545f363c7b57">object</span></dd><dt>required</dt><dd><ol id="ref-94497fd053c7287ce372"><li><span id="ref-affa7734419679795b09">success</span></li><li><span id="ref-ea3610629d042f94ef7f">data</span></li><li><span id="ref-9f61b69e004cacfdf597">error</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-2975ee486299e7abd978"><dt>success</dt><dd><dl id="ref-842f7bc8673b8d0ded2b"><dt>type</dt><dd><span id="ref-2d5e00386cdf5017f380">boolean</span></dd><dt>const</dt><dd><span id="ref-a219c635adf55d6a3c40">false</span></dd></dl></dd><dt>data</dt><dd><dl id="ref-0156d6486c21ca2915a9"><dt>type</dt><dd><span id="ref-3773d714457988c213c6">null</span></dd></dl></dd><dt>error</dt><dd><dl id="ref-4fb1fec352d2f6e0b34f"><dt>$ref</dt><dd><span id="ref-4a771c96ea707de2abef"><a href="#ref-44a75845c973253f3ec0">#/components/schemas/ApiError</a></span></dd></dl></dd></dl></dd></dl></dd><dt>ApiError</dt><dd><dl id="ref-44a75845c973253f3ec0"><dt>$ref</dt><dd><span id="ref-84c45afb3a402b07cda9"><a href="#ref-2845906e170daf47b047">./common.yaml#/components/schemas/ApiError</a></span></dd></dl></dd><dt>AddCartItemRequest</dt><dd><dl id="ref-4232ae729300a4182dfc"><dt>type</dt><dd><span id="ref-5f80aac8dfe168fdcb42">object</span></dd><dt>required</dt><dd><ol id="ref-f5953f4e29ca8c5ce5a3"><li><span id="ref-c9a743e6550915ab5a05">quantity</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-49e233c62a9d7125f6c9"><dt>skuId</dt><dd><dl id="ref-702900aa2604c9e03607"><dt>type</dt><dd><ol id="ref-ca6c0c2abed558f77659"><li><span id="ref-0f583c28b5267bda74c7">integer</span></li><li><span id="ref-299cec12c36c38cc5531">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-063460ea5ecb465db9fb">int64</span></dd><dt>minimum</dt><dd><span id="ref-e8bcd494bd17db65c7b9">1</span></dd></dl></dd><dt>productId</dt><dd><dl id="ref-7ea6249118ad7b796ce9"><dt>type</dt><dd><ol id="ref-2ba89add1b1a123885bb"><li><span id="ref-74334f7c7cdb38f3fe71">integer</span></li><li><span id="ref-6b7080ff9992829e0608">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-ce3e77265e1fb2ca1ff9">int64</span></dd><dt>minimum</dt><dd><span id="ref-c24371782c92d42acb2b">1</span></dd><dt>deprecated</dt><dd><span id="ref-18dd2cab44af2ac59310">true</span></dd></dl></dd><dt>quantity</dt><dd><dl id="ref-0363cd92f6dd03e94120"><dt>type</dt><dd><span id="ref-18ae43c27e3eb202a8ab">integer</span></dd><dt>format</dt><dd><span id="ref-d40e5ef50184c42ea7ae">int32</span></dd><dt>minimum</dt><dd><span id="ref-62ab4bd0dda55b1b9dcf">1</span></dd><dt>maximum</dt><dd><span id="ref-fb161eb950a392db36a3">2147483647</span></dd></dl></dd></dl></dd><dt>oneOf</dt><dd><ol id="ref-b87266d44b9e710396e9"><li><dl id="ref-6929a2a49b41052fb738"><dt>required</dt><dd><ol id="ref-0d3f5cf79806d4583290"><li><span id="ref-96c2e0d0887e8cef1435">skuId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-cfa04ebb89a058176484"><dt>skuId</dt><dd><dl id="ref-c2e5ddbd737ee8d09876"><dt>type</dt><dd><span id="ref-b87fb30d1391adcd7120">integer</span></dd><dt>minimum</dt><dd><span id="ref-ef2403f7fc64770c143f">1</span></dd></dl></dd><dt>productId</dt><dd><dl id="ref-d5947b06ef2945dbc323"><dt>type</dt><dd><span id="ref-bd742b58c2463f4d8e37">null</span></dd></dl></dd></dl></dd></dl></li><li><dl id="ref-1afa625d055c7e6090df"><dt>required</dt><dd><ol id="ref-ffae7ee0baaac3b348a7"><li><span id="ref-f68d80329d2cc5beecc1">productId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-6335ef51479c767be611"><dt>productId</dt><dd><dl id="ref-9c59faa237779109b780"><dt>type</dt><dd><span id="ref-788a103c2c58935408bb">integer</span></dd><dt>minimum</dt><dd><span id="ref-84555e94a4ef9db232e9">1</span></dd></dl></dd><dt>skuId</dt><dd><dl id="ref-cee0cf68fa9b19bc26a5"><dt>type</dt><dd><span id="ref-7fb8b25d0a91f6b30142">null</span></dd></dl></dd></dl></dd></dl></li></ol></dd></dl></dd><dt>CartItem</dt><dd><dl id="ref-975a4c6ef79dfe37b8b3"><dt>type</dt><dd><span id="ref-98c4c74311eed44f737d">object</span></dd><dt>required</dt><dd><ol id="ref-3af53a2e68097cf651f8"><li><span id="ref-e262d0c4e5cc79fb5195">id</span></li><li><span id="ref-9433f76128a7cbd013bb">productId</span></li><li><span id="ref-555fc23e13649890d780">skuId</span></li><li><span id="ref-3d747508f889a6b3ea8e">quantity</span></li><li><span id="ref-84409f5cf0de3d6c9e56">version</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-1a525fa8c58f2ca0b8c6"><dt>id</dt><dd><dl id="ref-921faebc4282a8db1b5f"><dt>type</dt><dd><span id="ref-83c0d121763757337d8d">integer</span></dd><dt>format</dt><dd><span id="ref-7e98e3492f642d35fabf">int64</span></dd><dt>minimum</dt><dd><span id="ref-0ecab2362dc6b0f9b965">1</span></dd></dl></dd><dt>productId</dt><dd><dl id="ref-1002fda34e6d89bcbea6"><dt>type</dt><dd><span id="ref-fbb118d22e5d9b628729">integer</span></dd><dt>format</dt><dd><span id="ref-d7f1ca221f949911ec2a">int64</span></dd><dt>minimum</dt><dd><span id="ref-252f043ff723657989e7">1</span></dd></dl></dd><dt>skuId</dt><dd><dl id="ref-0f8b5d2dd0b461d0d0a0"><dt>type</dt><dd><ol id="ref-bbe4173ed3aff7ee0e90"><li><span id="ref-019f53ce82a1bd79e076">integer</span></li><li><span id="ref-c5b669c4ee741aaeec81">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-7bb5eaad09d213b79790">int64</span></dd><dt>minimum</dt><dd><span id="ref-b65e565638ced889d17d">1</span></dd></dl></dd><dt>quantity</dt><dd><dl id="ref-a54a4c0acc4c475404f6"><dt>type</dt><dd><span id="ref-d373a3bdbd702536128c">integer</span></dd><dt>format</dt><dd><span id="ref-90729a0d4aac3e04c8ac">int32</span></dd><dt>minimum</dt><dd><span id="ref-4d6e69326510c58c9703">1</span></dd><dt>maximum</dt><dd><span id="ref-f600806dc324b1c96c11">2147483647</span></dd></dl></dd><dt>version</dt><dd><dl id="ref-19910a14e8b39dcd5b78"><dt>type</dt><dd><span id="ref-d729e356bf8281007350">integer</span></dd><dt>format</dt><dd><span id="ref-12a7c8b1bc2c187555fb">int64</span></dd><dt>minimum</dt><dd><span id="ref-e807eb85b26e38b4b71c">0</span></dd></dl></dd></dl></dd></dl></dd><dt>QuantityRequest</dt><dd><dl id="ref-3395bb15a2e83e36cd83"><dt>type</dt><dd><span id="ref-03ec009bc4b3aa156eb2">object</span></dd><dt>required</dt><dd><ol id="ref-bea489f681a26c5e8a1e"><li><span id="ref-0aa3e3f38b356e0144d3">quantity</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-684449117d33f4865809"><dt>quantity</dt><dd><dl id="ref-bd59e1a3a559a76a9987"><dt>type</dt><dd><span id="ref-828f46b53367028d25a1">integer</span></dd><dt>format</dt><dd><span id="ref-b8ede02431e239678187">int32</span></dd><dt>minimum</dt><dd><span id="ref-87ccf69b82b4cfb66aa3">1</span></dd><dt>maximum</dt><dd><span id="ref-c8ba0fa0c527173aab2c">2147483647</span></dd></dl></dd></dl></dd><dt>description</dt><dd><span id="ref-1b45f679d745e376084a">증감량이 아닌 최종 절대 수량.</span></dd></dl></dd><dt>CartOrderRequest</dt><dd><dl id="ref-eebff170d7950749794e"><dt>type</dt><dd><span id="ref-991857e5e4636fcd7c87">object</span></dd><dt>required</dt><dd><ol id="ref-29e80659ac456e424388"><li><span id="ref-569e00d7cc7dd91356d0">buyerName</span></li><li><span id="ref-e7149e9190a14560e3d3">buyerPhone</span></li><li><span id="ref-2693bd32bbb00ec86a99">expectedTotalAmount</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-e665085a533df239357d"><dt>buyerName</dt><dd><dl id="ref-5bc5e2efcb3865003fd0"><dt>type</dt><dd><span id="ref-3ef27f6a80cd38bef531">string</span></dd><dt>minLength</dt><dd><span id="ref-ad7b126e7dd394dd8930">1</span></dd><dt>maxLength</dt><dd><span id="ref-f9a3486aa670a6223c66">64</span></dd></dl></dd><dt>buyerPhone</dt><dd><dl id="ref-0f28810a8e1fb6e7d6bf"><dt>type</dt><dd><span id="ref-50a6008c2b0fbdef3d7a">string</span></dd><dt>pattern</dt><dd><span id="ref-a6511a0d594e3a2295a4">^[0-9-]{9,32}$</span></dd><dt>writeOnly</dt><dd><span id="ref-f5ce1f0e26dbb298db1e">true</span></dd></dl></dd><dt>expectedTotalAmount</dt><dd><dl id="ref-6cae61781f63871930c6"><dt>type</dt><dd><span id="ref-6e960b21a349b1844a22">integer</span></dd><dt>format</dt><dd><span id="ref-d4c46280bb0651c6bdc8">int64</span></dd><dt>minimum</dt><dd><span id="ref-3b2269d0d7778de2dbad">1</span></dd></dl></dd></dl></dd><dt>description</dt><dd><span id="ref-900f4647b7ebce2eb46f">선택 항목 하나를 단건 주문으로 전환한다. expectedTotalAmount 필수.</span></dd></dl></dd><dt>Order</dt><dd><dl id="ref-ef5f8c41fc1ae15b6286"><dt>type</dt><dd><span id="ref-09d8cee96ca86391bb66">object</span></dd><dt>required</dt><dd><ol id="ref-857d3015e2acaa2d6295"><li><span id="ref-7c692636746e7b14043f">orderNumber</span></li><li><span id="ref-ca90a2e9801cc75122d2">productName</span></li><li><span id="ref-45623a597d25f3e9f20e">quantity</span></li><li><span id="ref-e1ac29e05c6255714a04">unitPrice</span></li><li><span id="ref-06906bf2a542f59780ae">totalAmount</span></li><li><span id="ref-9b3309451036999159bc">discountAmount</span></li><li><span id="ref-d201c8f022a2dbe4f5a5">payableAmount</span></li><li><span id="ref-7e0c6fffa0d482574176">status</span></li><li><span id="ref-935bb82feeaf3bed1d97">buyerName</span></li><li><span id="ref-a9de27fe23f0ed44a2b6">createdAt</span></li><li><span id="ref-cd8fa476bee389d9a731">expiresAt</span></li><li><span id="ref-5886f9b042cb98318ee1">cancelledAt</span></li><li><span id="ref-bc4a113b4e806cd8f670">groupNumber</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-d61b96cabcbadad94a66"><dt>orderNumber</dt><dd><dl id="ref-b902aa32bfba3d8a2759"><dt>type</dt><dd><span id="ref-7e376675b297ee3d7bb6">string</span></dd></dl></dd><dt>groupNumber</dt><dd><dl id="ref-f89fe2c0b0f418a93f05"><dt>type</dt><dd><ol id="ref-591a7bd572b9e9776234"><li><span id="ref-25066f6d6c103d1a2d07">string</span></li><li><span id="ref-5ede2d837354bcbf9716">null</span></li></ol></dd><dt>description</dt><dd><span id="ref-edf6b02409264e0c1ffe">연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null.</span></dd></dl></dd><dt>productName</dt><dd><dl id="ref-40067f3a08ebdc9775ed"><dt>type</dt><dd><span id="ref-99a5f814cb8da0042fed">string</span></dd></dl></dd><dt>quantity</dt><dd><dl id="ref-6a70b09672c378e79bfd"><dt>type</dt><dd><span id="ref-85e93543efa342d10884">integer</span></dd><dt>format</dt><dd><span id="ref-59b7b663d8e015281a9a">int32</span></dd><dt>minimum</dt><dd><span id="ref-1496425ff2ea3624dc36">1</span></dd><dt>maximum</dt><dd><span id="ref-8a7c8b44995053d257af">2147483647</span></dd></dl></dd><dt>unitPrice</dt><dd><dl id="ref-01fdce0fe390acd933f0"><dt>type</dt><dd><span id="ref-310cc49aa4691bd29e58">integer</span></dd><dt>format</dt><dd><span id="ref-04da4b99d2d0b82a499c">int64</span></dd><dt>minimum</dt><dd><span id="ref-5c5256a2121991f17ec5">1</span></dd></dl></dd><dt>totalAmount</dt><dd><dl id="ref-ecd503394d05b6ea0e33"><dt>type</dt><dd><span id="ref-573f7636ccc65e729d38">integer</span></dd><dt>format</dt><dd><span id="ref-01d68ae0434c0524cb89">int64</span></dd><dt>minimum</dt><dd><span id="ref-f7115e10858e4bd1d800">1</span></dd></dl></dd><dt>discountAmount</dt><dd><dl id="ref-4cfab3dc836f95e2a91e"><dt>type</dt><dd><span id="ref-70dff2d172f4a18cfdde">integer</span></dd><dt>format</dt><dd><span id="ref-5f7777bef8df39797d9c">int64</span></dd><dt>minimum</dt><dd><span id="ref-0df03e8ccf6eda080e2b">0</span></dd></dl></dd><dt>payableAmount</dt><dd><dl id="ref-67f5acb243c536635a1a"><dt>type</dt><dd><span id="ref-6aee725fc50a9f523d3e">integer</span></dd><dt>format</dt><dd><span id="ref-8e95c8537007d1b5a30d">int64</span></dd><dt>minimum</dt><dd><span id="ref-b7b5ea1151649ea3c2b6">0</span></dd></dl></dd><dt>status</dt><dd><dl id="ref-4193fa52226ca4330997"><dt>type</dt><dd><span id="ref-e772baa346a0170ee407">string</span></dd><dt>enum</dt><dd><ol id="ref-350311589c168845eb4f"><li><span id="ref-8276640aab495754f01d">PENDING_PAYMENT</span></li><li><span id="ref-b8d00aa31053908adadd">PAYMENT_CONFIRMING</span></li><li><span id="ref-70ac3a0fbbcd600a4d1b">PAID</span></li><li><span id="ref-fcc7fc4c3ee65e832541">FAILED</span></li><li><span id="ref-cdb0a763e9de2a73aaf5">CANCELLED</span></li><li><span id="ref-853d8f4af6678dbb045e">EXPIRED</span></li><li><span id="ref-f28c77d9977b0e0da770">REFUNDED</span></li><li><span id="ref-55a20514ece9970bae24">PARTIALLY_REFUNDED</span></li></ol></dd></dl></dd><dt>buyerName</dt><dd><dl id="ref-bc5f21bb9cee9f4f8239"><dt>type</dt><dd><span id="ref-309186cd802959e5d117">string</span></dd></dl></dd><dt>createdAt</dt><dd><dl id="ref-e198c74bf8f60857a82f"><dt>type</dt><dd><span id="ref-fbed51c5f2653b4b58ec">string</span></dd><dt>format</dt><dd><span id="ref-d624e18d79de92b5bc78">date-time</span></dd></dl></dd><dt>expiresAt</dt><dd><dl id="ref-f357101018306c0afcf7"><dt>type</dt><dd><ol id="ref-052767dbffa31bffcbf3"><li><span id="ref-af6049da132ef24d5fde">string</span></li><li><span id="ref-2713aa35424c086f1313">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-9fe295d48226d9129991">date-time</span></dd></dl></dd><dt>cancelledAt</dt><dd><dl id="ref-10f32fd411684c126d26"><dt>type</dt><dd><ol id="ref-35a6e41c6f4a15383947"><li><span id="ref-8f7286e32969d3e44a34">string</span></li><li><span id="ref-95848832c0f04edea5b9">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-64db2686cb38c2f30670">date-time</span></dd></dl></dd><dt>salesInfoId</dt><dd><dl id="ref-5d2b6c4aedc40c212b4c"><dt>anyOf</dt><dd><ol id="ref-297eaa56b030ccc46bb4"><li><dl id="ref-e2ea7002a20812d4cf69"><dt>type</dt><dd><span id="ref-5c464678455f9a7d8745">integer</span></dd><dt>format</dt><dd><span id="ref-24dfff97f739ac1c5676">int64</span></dd><dt>minimum</dt><dd><span id="ref-32c4ea4c3c9bdf375b32">1</span></dd></dl></li><li><dl id="ref-08e77859cb0d4f206fb9"><dt>type</dt><dd><span id="ref-51f3f16109cfc42e4e49">null</span></dd></dl></li></ol></dd><dt>description</dt><dd><span id="ref-98f1c32b44bdb3ff1461">기존 Sales 식별자 보존. 별도 Sales가 없는 신규 SKU 항목은 null이며 내부 주문서 도메인의 skuId를 사용한다.</span></dd></dl></dd></dl></dd></dl></dd><dt>CartCheckoutRequest</dt><dd><dl id="ref-aec118cf8c698af13e1c"><dt>type</dt><dd><span id="ref-c7c1d75a28e9be12006c">object</span></dd><dt>required</dt><dd><ol id="ref-a6b0dcbad4f87a8a4329"><li><span id="ref-bbb23f9be30e63be5a02">items</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-b6a106173079a048d24e"><dt>items</dt><dd><dl id="ref-deff5b20c067b0ddb99f"><dt>type</dt><dd><span id="ref-8b628b55b0549acddd24">array</span></dd><dt>minItems</dt><dd><span id="ref-51e1965ed03d02e1effa">1</span></dd><dt>maxItems</dt><dd><span id="ref-268291ce51957f899cdc">100</span></dd><dt>items</dt><dd><dl id="ref-57b6446730097d8bdccb"><dt>$ref</dt><dd><span id="ref-7160d3021353b26e348a"><a href="#ref-477ae88d5ab4d9d83150">#/components/schemas/CartSelection</a></span></dd></dl></dd></dl></dd><dt>couponId</dt><dd><dl id="ref-eaed2af6a03c206366f3"><dt>type</dt><dd><ol id="ref-327849e5b0fe6c7aab9a"><li><span id="ref-54369fc9d90b26cf32b3">string</span></li><li><span id="ref-ed2ccb3eef60ea89308a">null</span></li></ol></dd><dt>maxLength</dt><dd><span id="ref-9bfc65b2ebab5f72dccc">64</span></dd></dl></dd></dl></dd><dt>description</dt><dd><span id="ref-38a9d1382d8a723c18d2">항목별 현재 버전이 필수이며 항목 ID 중복은 허용하지 않는다. 배열 순서는 멱등성 비교에 영향을 주지 않는다.</span></dd></dl></dd><dt>CartSelection</dt><dd><dl id="ref-477ae88d5ab4d9d83150"><dt>type</dt><dd><span id="ref-6b4e1c8165b66e561e6b">object</span></dd><dt>required</dt><dd><ol id="ref-f03d84bfdb5150ec368e"><li><span id="ref-cb2a492a432a030e45f3">itemId</span></li><li><span id="ref-e6971fc6a22970854d35">version</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-c683b832555f8ec47d31"><dt>itemId</dt><dd><dl id="ref-892c47b952eb077acb70"><dt>type</dt><dd><span id="ref-2c8697ebdaa40363b7a2">integer</span></dd><dt>format</dt><dd><span id="ref-24702f9dc8be958ea32c">int64</span></dd><dt>minimum</dt><dd><span id="ref-8fae71a82be0df8ffc43">1</span></dd></dl></dd><dt>version</dt><dd><dl id="ref-5c4ce2e15291f5132407"><dt>type</dt><dd><span id="ref-ba5a651d9dfddf35b352">integer</span></dd><dt>format</dt><dd><span id="ref-9efc6ea7101232089526">int64</span></dd><dt>minimum</dt><dd><span id="ref-13fed24968ef94c78ac3">0</span></dd></dl></dd></dl></dd></dl></dd><dt>CartCheckout</dt><dd><dl id="ref-a374eb26495812bb5dc2"><dt>type</dt><dd><span id="ref-caa0acf4fe70b879c705">object</span></dd><dt>required</dt><dd><ol id="ref-d82db63217191de82d4e"><li><span id="ref-8efd161bfc4a4dd70aeb">items</span></li><li><span id="ref-352e1cea824870ef8ea4">totalAmount</span></li><li><span id="ref-d7139b7f840d5b0554b1">discountAmount</span></li><li><span id="ref-65245590d80f330b8293">payableAmount</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-fc0026f06b031dd12e75"><dt>items</dt><dd><dl id="ref-6c468e759c8b0a5c611c"><dt>type</dt><dd><span id="ref-34b282e1aea7a86b2911">array</span></dd><dt>minItems</dt><dd><span id="ref-261b0bf9518e9db79a0e">1</span></dd><dt>maxItems</dt><dd><span id="ref-a55826e258e72c58a298">100</span></dd><dt>items</dt><dd><dl id="ref-84e0eebe414405098e1f"><dt>$ref</dt><dd><span id="ref-ab5fb35d9a0f63261889"><a href="#ref-77f198467fb7df41a02d">#/components/schemas/CartCheckoutItem</a></span></dd></dl></dd></dl></dd><dt>totalAmount</dt><dd><dl id="ref-3adf94da81049a4c3b6f"><dt>type</dt><dd><span id="ref-c0c94184b04e4e1c2af2">integer</span></dd><dt>format</dt><dd><span id="ref-1d14ce85014e1ffbff3e">int64</span></dd><dt>minimum</dt><dd><span id="ref-65bade71034bff354f9c">1</span></dd></dl></dd><dt>couponId</dt><dd><dl id="ref-eead661b09c76ed67297"><dt>type</dt><dd><ol id="ref-aa0f985ad0fc6504ec43"><li><span id="ref-6c59e691c215a8309b69">string</span></li><li><span id="ref-5cbd657c6e3a9591a085">null</span></li></ol></dd><dt>maxLength</dt><dd><span id="ref-664e73e5d92316cc0f7b">64</span></dd></dl></dd><dt>discountAmount</dt><dd><dl id="ref-a94df2c08dd04f491567"><dt>type</dt><dd><span id="ref-13c11a8d38efb7c74f6f">integer</span></dd><dt>format</dt><dd><span id="ref-2cd3dc448089e886fadc">int64</span></dd><dt>minimum</dt><dd><span id="ref-322f6e4a5bff931dc3ca">0</span></dd></dl></dd><dt>payableAmount</dt><dd><dl id="ref-b15f5cd2a789bd9c9b8d"><dt>type</dt><dd><span id="ref-3177c016cbe2fa87836d">integer</span></dd><dt>format</dt><dd><span id="ref-421d467ca02314287554">int64</span></dd><dt>minimum</dt><dd><span id="ref-5adb527e94fe69c2b2a2">0</span></dd></dl></dd></dl></dd></dl></dd><dt>CartCheckoutItem</dt><dd><dl id="ref-77f198467fb7df41a02d"><dt>type</dt><dd><span id="ref-3060b3197065712d6d4b">object</span></dd><dt>required</dt><dd><ol id="ref-391b27b0b5fd60b164c2"><li><span id="ref-0f23a770bd507fbdf9d1">itemId</span></li><li><span id="ref-833af5d46a781cb70dd0">version</span></li><li><span id="ref-3cbbd43e90eb1263afdf">productId</span></li><li><span id="ref-d30b23b8fa3e875f254f">productName</span></li><li><span id="ref-1e6a4aafcd24b779ee6f">quantity</span></li><li><span id="ref-9a5c3b6e8eab7424c45c">unitPrice</span></li><li><span id="ref-f4f11ae9498069495754">totalAmount</span></li><li><span id="ref-4e07647ca14c03efdf22">discountAmount</span></li><li><span id="ref-8de443267659dc040562">payableAmount</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-aae95b0c534f408ad34b"><dt>itemId</dt><dd><dl id="ref-4a001f79980b631bdb17"><dt>type</dt><dd><span id="ref-bc7b7666789cffc8eb31">integer</span></dd><dt>format</dt><dd><span id="ref-5681bdb403d36f425a24">int64</span></dd><dt>minimum</dt><dd><span id="ref-8ce765b6c317de2df7d4">1</span></dd></dl></dd><dt>version</dt><dd><dl id="ref-8e5205c47458ac906237"><dt>type</dt><dd><span id="ref-6d1c21a85535983d6b98">integer</span></dd><dt>format</dt><dd><span id="ref-3a9aefb995b6acba18ff">int64</span></dd><dt>minimum</dt><dd><span id="ref-d26c71740c8a2e91aec9">0</span></dd></dl></dd><dt>productId</dt><dd><dl id="ref-4c0b5460169881369db8"><dt>type</dt><dd><span id="ref-66d4fdd294d9fb63ae03">integer</span></dd><dt>format</dt><dd><span id="ref-908db13398095c7ed0fd">int64</span></dd><dt>minimum</dt><dd><span id="ref-bfd1470b7875dcbde0dd">1</span></dd></dl></dd><dt>productName</dt><dd><dl id="ref-8bd3bfea4ed66673b209"><dt>type</dt><dd><span id="ref-8ec0f885cf945fd98735">string</span></dd></dl></dd><dt>quantity</dt><dd><dl id="ref-b0f2948d116468b2aced"><dt>type</dt><dd><span id="ref-94e0aced8208819486f9">integer</span></dd><dt>format</dt><dd><span id="ref-6e97871be214034d85a7">int32</span></dd><dt>minimum</dt><dd><span id="ref-94889d5b0121469a306d">1</span></dd><dt>maximum</dt><dd><span id="ref-2a6d987c851c27b099fe">2147483647</span></dd></dl></dd><dt>unitPrice</dt><dd><dl id="ref-7b36d926cd595125263f"><dt>type</dt><dd><span id="ref-a0f2abe8c6eef5f3f2a8">integer</span></dd><dt>format</dt><dd><span id="ref-f44644649dd82cd35a07">int64</span></dd><dt>minimum</dt><dd><span id="ref-48ce51a64f084bf5e17d">1</span></dd></dl></dd><dt>totalAmount</dt><dd><dl id="ref-9c78d93983e62569dbac"><dt>type</dt><dd><span id="ref-aebf9f7af1f9d96696fe">integer</span></dd><dt>format</dt><dd><span id="ref-8bae239baa56a21d8d42">int64</span></dd><dt>minimum</dt><dd><span id="ref-cea4013395177da1b1a5">1</span></dd></dl></dd><dt>discountAmount</dt><dd><dl id="ref-c6d1e3c2f6665eb83e3b"><dt>type</dt><dd><span id="ref-cd0e2e30e78c8992e58f">integer</span></dd><dt>format</dt><dd><span id="ref-4da151fc5e10999dd6ee">int64</span></dd><dt>minimum</dt><dd><span id="ref-74738fbe25afd0dce917">0</span></dd></dl></dd><dt>payableAmount</dt><dd><dl id="ref-f373a203de95ff7acbd1"><dt>type</dt><dd><span id="ref-5bd2bbbce25826f9eb4e">integer</span></dd><dt>format</dt><dd><span id="ref-165e0d231d4671008790">int64</span></dd><dt>minimum</dt><dd><span id="ref-b55cc4b22d2946711ae8">0</span></dd></dl></dd></dl></dd></dl></dd><dt>CreateCartGroupRequest</dt><dd><dl id="ref-010c9f48df4949725e2c"><dt>type</dt><dd><span id="ref-0a517b20e8fad5e47040">object</span></dd><dt>required</dt><dd><ol id="ref-eaeb4288f124e3184f38"><li><span id="ref-35042b4033f44e3ca9d9">items</span></li><li><span id="ref-884828644e9fcac77f9b">buyerName</span></li><li><span id="ref-fe4fa6c4ab69fac24e4c">buyerPhone</span></li><li><span id="ref-ca424d2db4fac9f12be1">expectedTotalAmount</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-1ddcde2c27d4d54cd3d2"><dt>items</dt><dd><dl id="ref-0a9a788b9a50fff102e4"><dt>type</dt><dd><span id="ref-36429a59e5c87c74941f">array</span></dd><dt>minItems</dt><dd><span id="ref-538a7bf144aa5359691f">1</span></dd><dt>maxItems</dt><dd><span id="ref-9c32b98823c7a846eb17">100</span></dd><dt>items</dt><dd><dl id="ref-dbdf0a484ce2b2f262df"><dt>$ref</dt><dd><span id="ref-37cc8a5ff8d967409578"><a href="#ref-477ae88d5ab4d9d83150">#/components/schemas/CartSelection</a></span></dd></dl></dd></dl></dd><dt>buyerName</dt><dd><dl id="ref-1113be4125d501274dde"><dt>type</dt><dd><span id="ref-e2d4c75ee6f87d51fb11">string</span></dd><dt>minLength</dt><dd><span id="ref-6ac7338b8f74c6d42595">1</span></dd><dt>maxLength</dt><dd><span id="ref-b88cc30cb24c83e112e1">64</span></dd></dl></dd><dt>buyerPhone</dt><dd><dl id="ref-67a7c05fa5e883b90e0d"><dt>type</dt><dd><span id="ref-10b3cd2ce955ad068ff5">string</span></dd><dt>pattern</dt><dd><span id="ref-6dc82db01d5aa0a1bf3d">^[0-9-]{9,32}$</span></dd><dt>writeOnly</dt><dd><span id="ref-998ce2676a2c6bb210d3">true</span></dd></dl></dd><dt>expectedTotalAmount</dt><dd><dl id="ref-a5298bae7f5335c1d9f4"><dt>type</dt><dd><span id="ref-3d9f9db01ae6568a4aa4">integer</span></dd><dt>format</dt><dd><span id="ref-657bd7611f53097260e8">int64</span></dd><dt>minimum</dt><dd><span id="ref-21d9425db447cc2555cb">1</span></dd></dl></dd><dt>couponId</dt><dd><dl id="ref-25e732c687c9458fc331"><dt>type</dt><dd><ol id="ref-1b6b8cc93e94232fe02c"><li><span id="ref-cbb54220c9016db5d23b">string</span></li><li><span id="ref-934cd07c3607fa770313">null</span></li></ol></dd><dt>maxLength</dt><dd><span id="ref-3a78d80bc4182e525e03">64</span></dd></dl></dd></dl></dd></dl></dd><dt>PaymentGroup</dt><dd><dl id="ref-e83a98d1a84abd496967"><dt>type</dt><dd><span id="ref-f8cb3976a8b59d6a2ee2">object</span></dd><dt>required</dt><dd><ol id="ref-51e5a52814ec33f6b21b"><li><span id="ref-508e4e693620f9837652">groupNumber</span></li><li><span id="ref-b43baec5376d75724c4b">status</span></li><li><span id="ref-462d828079ba73af0991">totalAmount</span></li><li><span id="ref-69fae631418a2ff8257a">discountAmount</span></li><li><span id="ref-b27b4cb2891f33177368">payableAmount</span></li><li><span id="ref-33849b67eed634ab88fb">couponId</span></li><li><span id="ref-a1ccde52cc287c0d306c">expiresAt</span></li><li><span id="ref-1a252ef8e740875e1d8d">processingExpiresAt</span></li><li><span id="ref-52668d8bd7acc8404dc8">orders</span></li><li><span id="ref-2a6a888a9063d60405d3">paymentId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-0ea11ecd6359f5ad8009"><dt>groupNumber</dt><dd><dl id="ref-c0ffc36b81b5728d47b0"><dt>type</dt><dd><span id="ref-a659be956ad83b9f0e18">string</span></dd></dl></dd><dt>status</dt><dd><dl id="ref-cc545c68b54b025e6cac"><dt>type</dt><dd><span id="ref-d50f734291fade936a75">string</span></dd><dt>enum</dt><dd><ol id="ref-b185a21d7a54389ab4ff"><li><span id="ref-9a9e38ca2c7601bfdce1">PENDING_PAYMENT</span></li><li><span id="ref-601e684b9ce2b3434b29">PAYMENT_CONFIRMING</span></li><li><span id="ref-3e9c67c21f5a81cdf140">PAID</span></li><li><span id="ref-ec04b35eb53a276e4ee1">FAILED</span></li><li><span id="ref-709603f2809fb81a62ae">CANCELLED</span></li><li><span id="ref-2612437f9147f6ce3259">EXPIRED</span></li><li><span id="ref-5d5f08b3aad63089de19">REFUNDED</span></li><li><span id="ref-eb3ce120560df6f6e88e">PARTIALLY_REFUNDED</span></li></ol></dd></dl></dd><dt>totalAmount</dt><dd><dl id="ref-dbe8eb74a93a95dbf48f"><dt>type</dt><dd><span id="ref-6ea24c1c277abc15e847">integer</span></dd><dt>format</dt><dd><span id="ref-09176508322025154b1f">int64</span></dd><dt>minimum</dt><dd><span id="ref-a4674be422bc20100494">1</span></dd></dl></dd><dt>discountAmount</dt><dd><dl id="ref-432d502bd3018e09ba66"><dt>type</dt><dd><span id="ref-4d72087619df04fb085b">integer</span></dd><dt>format</dt><dd><span id="ref-3bb066279caef66b3fd1">int64</span></dd><dt>minimum</dt><dd><span id="ref-fad9d64599d5f9c831a4">0</span></dd></dl></dd><dt>payableAmount</dt><dd><dl id="ref-a1ed36064e34f2229777"><dt>type</dt><dd><span id="ref-ff9458849c0f8914cf71">integer</span></dd><dt>format</dt><dd><span id="ref-afd502ab731e34c09378">int64</span></dd><dt>minimum</dt><dd><span id="ref-7385a2357fc0bf47965f">0</span></dd></dl></dd><dt>couponId</dt><dd><dl id="ref-1efe91b7ed20570e9e6d"><dt>type</dt><dd><ol id="ref-5c765dee88fc2aae6604"><li><span id="ref-78171403cdf0543f88e0">string</span></li><li><span id="ref-54fb5f7dfd2256f5fca4">null</span></li></ol></dd><dt>maxLength</dt><dd><span id="ref-6be0119cac69755577f6">64</span></dd></dl></dd><dt>expiresAt</dt><dd><dl id="ref-fab4c5af2c7428a30c67"><dt>type</dt><dd><span id="ref-eaf29a2f461ef60d1286">string</span></dd><dt>format</dt><dd><span id="ref-7db62adef632ab878b83">date-time</span></dd></dl></dd><dt>processingExpiresAt</dt><dd><dl id="ref-db0147d9eda289dde808"><dt>type</dt><dd><ol id="ref-c9e62230a5e3e791c9ab"><li><span id="ref-5dc6447761a1c09da1eb">string</span></li><li><span id="ref-32522f58d54a8f8addc4">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-1e7c93963f45af5027f1">date-time</span></dd><dt>description</dt><dd><span id="ref-0f3aa7b8a303a51ba51b">첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.</span></dd></dl></dd><dt>orders</dt><dd><dl id="ref-c2b31304641523953601"><dt>type</dt><dd><span id="ref-2b97668685ca7bdee520">array</span></dd><dt>minItems</dt><dd><span id="ref-caefe2afa6f929c1958e">1</span></dd><dt>maxItems</dt><dd><span id="ref-4a57ff4d53a891515502">100</span></dd><dt>items</dt><dd><dl id="ref-c0a7568ee395c40598b1"><dt>$ref</dt><dd><span id="ref-ef40615fcd2aa6e4db70"><a href="#ref-ef5f8c41fc1ae15b6286">#/components/schemas/Order</a></span></dd></dl></dd></dl></dd><dt>paymentId</dt><dd><dl id="ref-1c385bb24ed3f84c6a57"><dt>type</dt><dd><ol id="ref-6a5a0d5f2cf55df31730"><li><span id="ref-b1848927f7a6e8b81e29">integer</span></li><li><span id="ref-2e64dae1f27a53040d9d">null</span></li></ol></dd><dt>format</dt><dd><span id="ref-1c6bc9f1ae280d8980c6">int64</span></dd><dt>minimum</dt><dd><span id="ref-35030ce7f9cf9a722f4f">1</span></dd></dl></dd></dl></dd><dt>description</dt><dd><span id="ref-e93d63fbdb0eaf7818ea">기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가 없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미 생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. 새 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다. V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 신규 내부 주문서 공개 결제/수량환불 및 새 Payment 생성·승인·환불 이벤트 연동은 미완이다.</span></dd></dl></dd></dl></dd><dt>responses</dt><dd><dl id="ref-db76f77630ca6c9b2a38"><dt>Unauthorized</dt><dd><dl id="ref-5a009e12fb3297ed2386"><dt>description</dt><dd><span id="ref-e146c781b40c1fa900b0">인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.</span></dd><dt>content</dt><dd><dl id="ref-d1ab3f3ed452d6a70030"><dt>application/json</dt><dd><dl id="ref-ee660cc661b377c9f420"><dt>schema</dt><dd><dl id="ref-b5e80adac1806ef68bc4"><dt>$ref</dt><dd><span id="ref-a2a010f8d1a33d1c1977"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-f23b12015a73f41aa84e"><dt>unauthorized</dt><dd><dl id="ref-b45f3cf109301093cc1a"><dt>value</dt><dd><dl id="ref-52a340b5d6c3d1c99459"><dt>success</dt><dd><span id="ref-d6dc9e1c21ed656e7b0b">false</span></dd><dt>data</dt><dd><span id="ref-b8407a69878d7ba3e8a0">null</span></dd><dt>error</dt><dd><dl id="ref-cf44d93324e89d755797"><dt>code</dt><dd><span id="ref-4dc178332e8c346457d1">UNAUTHORIZED</span></dd><dt>message</dt><dd><span id="ref-36aa2b307bfa62887b48">인증이 필요합니다.</span></dd><dt>requestId</dt><dd><span id="ref-3e359fdab875a9a3cf47">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>Forbidden</dt><dd><dl id="ref-b6e16ecde6980fdabdac"><dt>description</dt><dd><span id="ref-13170cec9301765b9fe0">검증된 주체의 권한 부족 또는 비활성 개발 API</span></dd><dt>content</dt><dd><dl id="ref-ae0dc753ec7480ce8a51"><dt>application/json</dt><dd><dl id="ref-4f3e05a3ea06bf1cf5d1"><dt>schema</dt><dd><dl id="ref-a4a87832296822ef2a04"><dt>$ref</dt><dd><span id="ref-0e000364e88881348abc"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-f5f6d445322b4f38d4fb"><dt>forbidden</dt><dd><dl id="ref-655ae17540ccd41d4bf8"><dt>value</dt><dd><dl id="ref-503f6d155fa78daf15d0"><dt>success</dt><dd><span id="ref-fe7520ca9622daa35995">false</span></dd><dt>data</dt><dd><span id="ref-89eee87bb700ff6aa89a">null</span></dd><dt>error</dt><dd><dl id="ref-d343286917d6f432a5f6"><dt>code</dt><dd><span id="ref-581a509f0d030291c123">FORBIDDEN</span></dd><dt>message</dt><dd><span id="ref-e7e35dbd874a5af040d8">권한이 없습니다.</span></dd><dt>requestId</dt><dd><span id="ref-fb11994dbf9465e19024">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>AuthUnavailable</dt><dd><dl id="ref-469418366e92c8ee1161"><dt>description</dt><dd><span id="ref-a14035b9bce064905964">JWT 세션 상태를 확인할 Member 또는 회원 저장소가 일시적으로 불가하여 요청을 허용하지 않음.</span></dd><dt>content</dt><dd><dl id="ref-5779ade54a6e4b2c1a79"><dt>application/json</dt><dd><dl id="ref-e240c190d22837bb07f2"><dt>schema</dt><dd><dl id="ref-874b468025730d60d0e8"><dt>$ref</dt><dd><span id="ref-b5cfd6341db46523e55b"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-47b721428a84dde2af84"><dt>authUnavailable</dt><dd><dl id="ref-178d0411aa262b4b6d93"><dt>value</dt><dd><dl id="ref-ffd05a37d0199e009726"><dt>success</dt><dd><span id="ref-4aa1a3b2e334171c2caf">false</span></dd><dt>data</dt><dd><span id="ref-4e7c6c1fb660b4498968">null</span></dd><dt>error</dt><dd><dl id="ref-bdf7ebaefde6195ae8cf"><dt>code</dt><dd><span id="ref-67147bcb33d6feb753df">SERVICE_UNAVAILABLE</span></dd><dt>message</dt><dd><span id="ref-8195a50572fa6903d8d8">인증 상태를 확인할 수 없습니다.</span></dd><dt>requestId</dt><dd><span id="ref-49c20015e57ca1f7d478">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>BadRequest</dt><dd><dl id="ref-2ad2a4d5777dc1a67fc6"><dt>description</dt><dd><span id="ref-0a9d37a1d57be355a840">요청 값·형식 또는 금액 범위 오류</span></dd><dt>content</dt><dd><dl id="ref-f2d823f80a51d70fb741"><dt>application/json</dt><dd><dl id="ref-910786fc8f5d5d1eadf2"><dt>schema</dt><dd><dl id="ref-f5a25dfe34a8c39aa37e"><dt>$ref</dt><dd><span id="ref-ac39b0f73fe431971d34"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-4f0e52cf133b2c576ad0"><dt>invalidRequest</dt><dd><dl id="ref-9537de9e537aa1beddee"><dt>value</dt><dd><dl id="ref-f145362f63a1f4a42a93"><dt>success</dt><dd><span id="ref-8c0522888d4bd0b7159a">false</span></dd><dt>data</dt><dd><span id="ref-ecbc9968078943212083">null</span></dd><dt>error</dt><dd><dl id="ref-d379130d064713273306"><dt>code</dt><dd><span id="ref-571d1c158f1cb02f69e8">INVALID_REQUEST</span></dd><dt>message</dt><dd><span id="ref-71e87d6fdcece2076287">잘못된 요청입니다.</span></dd><dt>requestId</dt><dd><span id="ref-3ec3d266dc658704bbce">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>NotFound</dt><dd><dl id="ref-38cac4281c9b6cb6ed12"><dt>description</dt><dd><span id="ref-49d95eb6f5706d060521">대상이 없거나 다른 회원 소유. SELLER도 동일한 본인 조건 적용.</span></dd><dt>content</dt><dd><dl id="ref-0995a362efa56eb53d07"><dt>application/json</dt><dd><dl id="ref-82561db2022f6262122d"><dt>schema</dt><dd><dl id="ref-853e013a71cca4ea73c8"><dt>$ref</dt><dd><span id="ref-927c0f248bef093c40f5"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-7361958f16952fc70166"><dt>notFound</dt><dd><dl id="ref-7fe2710c99d81a97482f"><dt>value</dt><dd><dl id="ref-1b58c299c4f531a1f101"><dt>success</dt><dd><span id="ref-0a2896b648ae01d574fa">false</span></dd><dt>data</dt><dd><span id="ref-d1ecd31e127db92c6b6c">null</span></dd><dt>error</dt><dd><dl id="ref-b96d1ed9c0524349839a"><dt>code</dt><dd><span id="ref-4a36a030685a1c69e7e9">NOT_FOUND</span></dd><dt>message</dt><dd><span id="ref-ddd9551fd483687a5e02">대상을 찾을 수 없습니다.</span></dd><dt>requestId</dt><dd><span id="ref-d9abcc5f08d931e1d195">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>Conflict</dt><dd><dl id="ref-bea1ae7746c6e1639c13"><dt>description</dt><dd><span id="ref-0b7db6cdad846b19baf8">중복·상태·동시 수정·멱등키 입력 충돌</span></dd><dt>content</dt><dd><dl id="ref-9cda3a8f2986064e91db"><dt>application/json</dt><dd><dl id="ref-1a883a71f27f81a9fb68"><dt>schema</dt><dd><dl id="ref-0673c98ab3f26451b568"><dt>$ref</dt><dd><span id="ref-fd450e9fe118ed3a4944"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-b65bd3d9238172eb2ab2"><dt>conflict</dt><dd><dl id="ref-6fe9b20ab4864104d10d"><dt>value</dt><dd><dl id="ref-c073ac947aad00170a93"><dt>success</dt><dd><span id="ref-faacb7996225f6009e84">false</span></dd><dt>data</dt><dd><span id="ref-d58f4147b467fedb6555">null</span></dd><dt>error</dt><dd><dl id="ref-e4de15d99378b2538aab"><dt>code</dt><dd><span id="ref-02c5b642999c590a5ad1">CONFLICT</span></dd><dt>message</dt><dd><span id="ref-90afee30cb1a18d845d3">요청이 현재 상태와 충돌합니다.</span></dd><dt>requestId</dt><dd><span id="ref-2e54507c90ecbb5f93ac">request-001</span></dd></dl></dd></dl></dd></dl></dd><dt>insufficientStock</dt><dd><dl id="ref-b6cfedf38384436273f6"><dt>value</dt><dd><dl id="ref-1e4e043eecbd22b47f55"><dt>success</dt><dd><span id="ref-67fbbf83937cc9a660dd">false</span></dd><dt>data</dt><dd><span id="ref-caa0e846be271d8ae88b">null</span></dd><dt>error</dt><dd><dl id="ref-ea3e0aca7a44fb55f553"><dt>code</dt><dd><span id="ref-f15506987dde8d6c2770">CONFLICT</span></dd><dt>message</dt><dd><span id="ref-daa3b30735e34c6b45d9">재고가 부족합니다.</span></dd><dt>requestId</dt><dd><span id="ref-c53aa16e0a735b19e290">request-001</span></dd></dl></dd></dl></dd></dl></dd><dt>amountChanged</dt><dd><dl id="ref-934061a9938391451a24"><dt>value</dt><dd><dl id="ref-c819b98a3189cafd8baa"><dt>success</dt><dd><span id="ref-dd3e066a18fdf2339742">false</span></dd><dt>data</dt><dd><span id="ref-dbe43bcf4febbfeb72fe">null</span></dd><dt>error</dt><dd><dl id="ref-10e583f208852227181c"><dt>code</dt><dd><span id="ref-472e6c686bcb6b9fbd24">CONFLICT</span></dd><dt>message</dt><dd><span id="ref-da9d2a82d3de2430c095">주문 금액이 변경되었습니다.</span></dd><dt>requestId</dt><dd><span id="ref-e1a9861bc440cf41c009">request-001</span></dd></dl></dd></dl></dd></dl></dd><dt>duplicateCartItem</dt><dd><dl id="ref-60a34a724c8e4865d5af"><dt>value</dt><dd><dl id="ref-2aa87c3f79b187ad0e27"><dt>success</dt><dd><span id="ref-2d5b51158c92f0a70e15">false</span></dd><dt>data</dt><dd><span id="ref-6213423fb3f561ce83ff">null</span></dd><dt>error</dt><dd><dl id="ref-a168ef480458c08a1308"><dt>code</dt><dd><span id="ref-02f8376704b87f8d1320">CONFLICT</span></dd><dt>message</dt><dd><span id="ref-9340dfef0c03ed01e38e">이미 장바구니에 있는 상품입니다. 수량을 변경해 주세요.</span></dd><dt>requestId</dt><dd><span id="ref-4e468ac4cad5b18d900c">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>ShoppingUnavailable</dt><dd><dl id="ref-935f275cad4526b79178"><dt>description</dt><dd><span id="ref-993f51aeeca95f5cbf69">Shopping HTTP 오류·타임아웃·응답 계약 위반은 SHOPPING_UNAVAILABLE. Member 세션 인증 상태 확인 장애는 SERVICE_UNAVAILABLE. 확인된 상품 미존재 404와 구분한다.</span></dd><dt>content</dt><dd><dl id="ref-a312e06ee6ba3cbf4a45"><dt>application/json</dt><dd><dl id="ref-aae68a6debd1733822f9"><dt>schema</dt><dd><dl id="ref-dd618dc37eb6f3f75252"><dt>$ref</dt><dd><span id="ref-040640b15cafbf83b38b"><a href="#ref-5092b8a1173457a6c861">#/components/schemas/ErrorEnvelope</a></span></dd></dl></dd><dt>examples</dt><dd><dl id="ref-bc2aa8e239f1f6509fe8"><dt>shoppingUnavailable</dt><dd><dl id="ref-1cfd62e787eb9b4c6113"><dt>value</dt><dd><dl id="ref-f8eb81112829bb539cc2"><dt>success</dt><dd><span id="ref-b084bfcfbfb824a4e07a">false</span></dd><dt>data</dt><dd><span id="ref-8bf53503fa13362cd6ce">null</span></dd><dt>error</dt><dd><dl id="ref-2decdc4658e04cc3842d"><dt>code</dt><dd><span id="ref-ae3c37fdf3594e81163b">SHOPPING_UNAVAILABLE</span></dd><dt>message</dt><dd><span id="ref-9c918c7b5bae34c953da">상품 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</span></dd><dt>requestId</dt><dd><span id="ref-05f0c6b8010b39ee0566">request-001</span></dd></dl></dd></dl></dd></dl></dd><dt>authUnavailable</dt><dd><dl id="ref-36c7dc6a4cf298ee1614"><dt>value</dt><dd><dl id="ref-0261dc4a578847d5a810"><dt>success</dt><dd><span id="ref-a0e2fd6495a91f1a9da6">false</span></dd><dt>data</dt><dd><span id="ref-2183d2d66ed0bd08309d">null</span></dd><dt>error</dt><dd><dl id="ref-305ed6a681e3a8163ca9"><dt>code</dt><dd><span id="ref-64f4229fd71048a7db79">SERVICE_UNAVAILABLE</span></dd><dt>message</dt><dd><span id="ref-ff3151d695608464caa8">인증 상태를 확인할 수 없습니다.</span></dd><dt>requestId</dt><dd><span id="ref-cfc8ce23f891d0a6dfc1">request-001</span></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>parameters</dt><dd><dl id="ref-b42bb8b668e6b5bb524b"><dt>ItemId</dt><dd><dl id="ref-c5afa3cf0bebce806d1f"><dt>name</dt><dd><span id="ref-81890f50e62982cb7bb0">itemId</span></dd><dt>in</dt><dd><span id="ref-4001a00fb4c6df23b088">path</span></dd><dt>required</dt><dd><span id="ref-28df2d7dae501ad7c459">true</span></dd><dt>schema</dt><dd><dl id="ref-c6d8478d2cfb92ac1008"><dt>type</dt><dd><span id="ref-957e3a47899e4d37dcf1">integer</span></dd><dt>format</dt><dd><span id="ref-9c6ae9e54a7bd58c13a5">int64</span></dd><dt>minimum</dt><dd><span id="ref-bbb1d4436ca076683f86">1</span></dd></dl></dd></dl></dd><dt>RequiredIdempotencyKey</dt><dd><dl id="ref-4d1c7ac33bfe5acaf339"><dt>name</dt><dd><span id="ref-0c975ea954d8350f0cd7">X-Idempotency-Key</span></dd><dt>in</dt><dd><span id="ref-68b4d7398d99b623f272">header</span></dd><dt>required</dt><dd><span id="ref-1a7cd9bfd86d5915a4f2">true</span></dd><dt>schema</dt><dd><dl id="ref-6679da3b48e251fd3d9d"><dt>type</dt><dd><span id="ref-eeeb826fba42d1e4962d">string</span></dd><dt>minLength</dt><dd><span id="ref-6d342f205d7d54cc86ae">1</span></dd><dt>maxLength</dt><dd><span id="ref-0b1aea0ccb179850b0cc">64</span></dd></dl></dd><dt>description</dt><dd><span id="ref-61a1f0e53895f6b75fef">회원별 요청 식별자. 동일 키·입력 재전송은 카트 변경·삭제 뒤에도 기존 결과로 연결한다. 다른 입력은 409이며 재전송 HTTP 상태는 각 API의 응답 정의를 따른다.</span></dd></dl></dd></dl></dd><dt>securitySchemes</dt><dd><dl id="ref-a0d0777c5c8578e8e4fe"><dt>BearerAuth</dt><dd><dl id="ref-d1e634afe7d40b3493e3"><dt>$ref</dt><dd><span id="ref-f378654b6724eab6ce97"><a href="#ref-795437853176cab69da1">./common.yaml#/components/securitySchemes/BearerAuth</a></span></dd></dl></dd><dt>ServiceToken</dt><dd><dl id="ref-d8226c97a0201d65a982"><dt>type</dt><dd><span id="ref-919e9a50e45974f1fd18">apiKey</span></dd><dt>in</dt><dd><span id="ref-871f3c4d97d3415bb14d">header</span></dd><dt>name</dt><dd><span id="ref-b446f805a09e3b7cf11a">X-Service-Token</span></dd><dt>description</dt><dd><span id="ref-72d057d1fb26fdd27303">대상 서비스가 설정한 opaque token으로 호출 서비스 신원을 판정한다. 사용자 JWT와 분리한다.</span></dd></dl></dd></dl></dd></dl></dd></dl></details><details><summary>common.yaml</summary><dl id="ref-33388d16e5b1c46f9ce2"><dt>components</dt><dd><dl id="ref-076d1657772e80178394"><dt>schemas</dt><dd><dl id="ref-7816620e5c23a958fad4"><dt>ApiError</dt><dd><dl id="ref-2845906e170daf47b047"><dt>type</dt><dd><span id="ref-dd5749f58f7847735c54">object</span></dd><dt>required</dt><dd><ol id="ref-9d9718416681e4dbd73c"><li><span id="ref-b300c1e2abca548f8ffa">code</span></li><li><span id="ref-7ef509204a3bc03c869c">message</span></li><li><span id="ref-d047563a6adacb5888bd">requestId</span></li></ol></dd><dt>properties</dt><dd><dl id="ref-adad3b792d60d486e2a6"><dt>code</dt><dd><dl id="ref-632820c7c178af53a1ba"><dt>type</dt><dd><span id="ref-099d9a201c7fa17f072a">string</span></dd></dl></dd><dt>message</dt><dd><dl id="ref-43021fa7b2aab2f488f9"><dt>type</dt><dd><span id="ref-b0668d5e157b523d539b">string</span></dd></dl></dd><dt>requestId</dt><dd><dl id="ref-6b932cdbe7673137ed44"><dt>type</dt><dd><ol id="ref-142afa636f72850fe0cf"><li><span id="ref-941dd7edf4daf444a97b">string</span></li><li><span id="ref-f8a870dcfd57fd9ab125">null</span></li></ol></dd></dl></dd></dl></dd></dl></dd></dl></dd><dt>securitySchemes</dt><dd><dl id="ref-06fc765b45bbd6d41209"><dt>BearerAuth</dt><dd><dl id="ref-795437853176cab69da1"><dt>type</dt><dd><span id="ref-2839761e8f648a7cb70f">http</span></dd><dt>scheme</dt><dd><span id="ref-b68e0a3011182ec9094b">bearer</span></dd><dt>bearerFormat</dt><dd><span id="ref-f1269c521b1d3e664df5">JWT</span></dd><dt>description</dt><dd><span id="ref-8d301cdf8ae491df1baa">Member RS256 JWT. sub와 sid는 canonical UUID, iss=shoppinglive-member, aud=shoppinglive-api, exp/iat/jti 필수; USER/SELLER. 로컬 서명 검증 후 Member 권위 저장소의 세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.</span></dd></dl></dd></dl></dd></dl></dd></dl></details><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+const operations=[...document.querySelectorAll('.operation')];
+const search=document.querySelector('#search');
+function filter(){const q=search.value.toLowerCase();operations.forEach(n=>n.hidden=!n.textContent.toLowerCase().includes(q));document.querySelector('#count').textContent=`${operations.filter(n=>!n.hidden).length} / ${operations.length}개 API`;}
+search.addEventListener('input',filter);filter();
+document.querySelector('#expand').onclick=()=>operations.filter(n=>!n.hidden).forEach(n=>n.open=true);
+document.querySelector('#collapse').onclick=()=>operations.forEach(n=>n.open=false);
+function reveal(){const id=decodeURIComponent(location.hash.slice(1));if(!id)return;const target=document.getElementById(id);if(!target)return;let n=target;while(n){if(n.tagName==='DETAILS')n.open=true;n=n.parentElement;}if(target.classList.contains('operation')){search.value='';filter();}target.scrollIntoView();}
+window.addEventListener('hashchange',reveal);reveal();
+</script></body></html>

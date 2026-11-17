@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Member</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="overview.md">MD 원본</a><a href="../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#문서">문서</a></li>
+<li><a href="#원본갱신">원본·갱신</a></li>
+<li><a href="#member-갱신-토큰접근-세션">Member 갱신 토큰·접근 세션</a><ul>
+<li><a href="#범위와-불변조건">범위와 불변조건</a></li>
+<li><a href="#전이">전이</a></li>
+<li><a href="#구현과-검증-근거">구현과 검증 근거</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Member</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 900" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="로그인 성공" data-target="활성 묶음·미사용 토큰"><title>로그인 성공 → 활성 묶음·미사용 토큰: refresh_families와 해시 토큰을 생성하고 JWT에 세션 ID를 넣는다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="미사용 토큰" data-target="사용된 토큰"><title>미사용 토큰 → 사용된 토큰: 회원·family 잠금 후 used_at을 기록하고 같은 family에 다음 토큰을 발급한다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="사용된 토큰 재사용" data-target="보안 폐기"><title>사용된 토큰 재사용 → 보안 폐기: 실제 저장 토큰 재사용이면 family의 revoked_at·security_revoked_at을 기록한 뒤 401을 응답한다.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="활성 묶음" data-target="일반 폐기"><title>활성 묶음 → 일반 폐기: 로그아웃은 revoked_at만 기록한다. 이미 발급된 접근 JWT를 즉시 만료시키지 않는다.</title><path class="connector" d="M350,417 L405,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="412.0">4</text></g><g class="edge-row" data-source="활성 묶음" data-target="갱신 만료"><title>활성 묶음 → 갱신 만료: expires_at 경과로 refresh를 거절한다. 접근 JWT의 만료는 별도로 검사한다.</title><path class="connector" d="M350,417 L780,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="412.0">5</text></g><g class="edge-row" data-source="회원 활성" data-target="탈퇴·전체 보안 폐기"><title>회원 활성 → 탈퇴·전체 보안 폐기: 비밀번호 확인 후 withdrawn_at과 모든 family의 보안 폐기를 같은 트랜잭션에 기록한다.</title><path class="connector" d="M350,587 L405,587" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="582.0">6</text></g><g class="edge-row" data-source="접근 세션" data-target="접근 거절"><title>접근 세션 → 접근 거절: security_revoked_at 또는 withdrawn_at이 있거나 세션 소유권이 맞지 않으면 활성 확인에 실패한다.</title><path class="connector" d="M940,630 L190,715" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="667.5">7</text></g><g><title>로그인 성공</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">로그인 성공</tspan></text></g><g><title>활성 묶음·미사용 토큰</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">활성 묶음·미사용 토큰</tspan></text></g><g><title>미사용 토큰</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">미사용 토큰</tspan></text></g><g><title>사용된 토큰</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">사용된 토큰</tspan></text></g><g><title>사용된 토큰 재사용</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">사용된 토큰 재사용</tspan></text></g><g><title>보안 폐기</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">보안 폐기</tspan></text></g><g><title>활성 묶음</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">활성 묶음</tspan></text></g><g><title>일반 폐기</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">일반 폐기</tspan></text></g><g><title>갱신 만료</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">갱신 만료</tspan></text></g><g><title>회원 활성</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">회원 활성</tspan></text></g><g><title>탈퇴·전체 보안 폐기</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">탈퇴·전체 보안 폐기</tspan></text></g><g><title>접근 세션</title><rect x="780" y="545" width="320" height="85" rx="5"/><text x="940" y="573" text-anchor="middle"><tspan x="940" dy="0">접근 세션</tspan></text></g><g><title>접근 거절</title><rect x="30" y="715" width="320" height="85" rx="5"/><text x="190" y="743" text-anchor="middle"><tspan x="190" dy="0">접근 거절</tspan></text></g></svg></div></section><p>책임: 회원·로그인·접근 토큰·갱신 토큰 묶음·세션 확인.</p>
+<p>접근 JWT의 만료와 refresh family의 만료·일반 폐기·보안 폐기는 서로 다른 조건이다.</p>
+<p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 계약·마이그레이션·주요 상태 변경 코드. 현재 #330 문서 변경은 미커밋이며 업무 코드는 변경하지 않았다. 운영 환경 검증 자료와 구분한다.</p>
+<h2 id="문서">문서</h2>
+<ul>
+<li><a href="api.html">API HTML</a> · <a href="../../../../contracts/api/member-service.yaml">계약 YAML</a></li>
+<li><a href="erd.html">DB ERD 설명</a> · <a href="erd.html">관계도</a></li>
+<li><a href="overview.html">갱신 토큰·접근 세션</a> · <a href="overview.html">시각 자료</a></li>
+</ul>
+<h2 id="원본갱신">원본·갱신</h2>
+<p><a href="../../../../services/member-service/src/main/java">구현</a> · <a href="../../../../services/member-service/src/main/resources/db">마이그레이션</a> · <a href="../../../../ARCHITECTURE.md">서비스 경계</a></p>
+<p>API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거·조건·실패 경로를 확인하고 HTML도 재생성한다. MD에 없는 전이를 시각 자료에만 추가하지 않는다.</p>
+<h2 id="member-갱신-토큰접근-세션">Member 갱신 토큰·접근 세션</h2>
+<p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
+<p><a href="overview.html">시각 자료</a></p>
+<h3 id="범위와-불변조건">범위와 불변조건</h3>
+<p>고정 enum이 아니라 토큰 used_at·family 시각·회원 상태로 설명한 수명 주기다. 없는 토큰으로 임의 family를 폐기하지 않는다. 일반 로그아웃·refresh 만료만으로 기존 접근 JWT 유효 기간을 줄이지 않는 실제 구현에 유의한다.</p>
+<h3 id="전이">전이</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>출발</th>
+<th>도착</th>
+<th>조건·부수 효과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>로그인 성공</td>
+<td>활성 묶음·미사용 토큰</td>
+<td>refresh_families와 해시 토큰을 생성하고 JWT에 세션 ID를 넣는다.</td>
+</tr>
+<tr>
+<td>미사용 토큰</td>
+<td>사용된 토큰</td>
+<td>회원·family 잠금 후 used_at을 기록하고 같은 family에 다음 토큰을 발급한다.</td>
+</tr>
+<tr>
+<td>사용된 토큰 재사용</td>
+<td>보안 폐기</td>
+<td>실제 저장 토큰 재사용이면 family의 revoked_at·security_revoked_at을 기록한 뒤 401을 응답한다.</td>
+</tr>
+<tr>
+<td>활성 묶음</td>
+<td>일반 폐기</td>
+<td>로그아웃은 revoked_at만 기록한다. 이미 발급된 접근 JWT를 즉시 만료시키지 않는다.</td>
+</tr>
+<tr>
+<td>활성 묶음</td>
+<td>갱신 만료</td>
+<td>expires_at 경과로 refresh를 거절한다. 접근 JWT의 만료는 별도로 검사한다.</td>
+</tr>
+<tr>
+<td>회원 활성</td>
+<td>탈퇴·전체 보안 폐기</td>
+<td>비밀번호 확인 후 withdrawn_at과 모든 family의 보안 폐기를 같은 트랜잭션에 기록한다.</td>
+</tr>
+<tr>
+<td>접근 세션</td>
+<td>접근 거절</td>
+<td>security_revoked_at 또는 withdrawn_at이 있거나 세션 소유권이 맞지 않으면 활성 확인에 실패한다.</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="구현과-검증-근거">구현과 검증 근거</h3>
+<ul>
+<li><a href="../../../../services/member-service/src/main/java/com/shoppinglive/member/auth/service/MemberSessionService.java">MemberSessionService.java</a></li>
+<li><a href="../../../../services/member-service/src/main/java/com/shoppinglive/member/auth/repository/RefreshSessionRepository.java">RefreshSessionRepository.java</a></li>
+<li><a href="../../../../services/member-service/src/main/java/com/shoppinglive/member/auth/service/DatabaseAccessSessionVerifier.java">DatabaseAccessSessionVerifier.java</a></li>
+</ul>
+<p>관련 기존 테스트: <a href="../../../../services/member-service/src/integrationTest/java/com/shoppinglive/member/auth/controller/MemberSessionTest.java">MemberSessionTest.java</a> · <a href="../../../../services/member-service/src/integrationTest/java/com/shoppinglive/member/auth/controller/MemberSessionPostgresTest.java">MemberSessionPostgresTest.java</a>.</p>
+<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>6bd7392a0d8f804bf4840fb44297f10a4dea4e9bd997ac7be1063093b53fb33c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

@@ -99,6 +99,7 @@ class OrderCheckoutApiTest
                 COUPON_ID,
                 MEMBER_A,
                 Timestamp.from(now));
+        prepareLegacyTradeFixtures();
     }
 
     @AfterEach
@@ -273,7 +274,7 @@ class OrderCheckoutApiTest
             checkout("?productId=" + PRODUCT_ID + "&quantity=2").andExpect(status().isOk());
         }
 
-        SalesStock stock = salesStockRepository.findById(salesId).orElseThrow();
+        SalesStock stock = legacyStock(salesId);
         assertThat(stock.getAvailable()).isEqualTo(5);
         assertThat(stock.getReserved()).isZero();
     }
