@@ -15,7 +15,7 @@
 <li><a href="#바뀌는-점">바뀌는 점</a></li>
 <li><a href="#문서-갱신">문서 갱신</a></li>
 <li><a href="#commercecore-테스트-정리">CommerceCore 테스트 정리</a><ul>
-<li><a href="#지운-테스트-파일-16개-메서드-86개">지운 테스트 파일 (16개, 메서드 86개)</a></li>
+<li><a href="#지운-테스트-파일-15개-삭제--notificationeventpostgrestest-일부-남김-메서드-82개-삭제">지운 테스트 파일 (15개 삭제 + NotificationEventPostgresTest 일부 남김, 메서드 82개 삭제)</a></li>
 <li><a href="#일부만-지운-주문-테스트-9개-파일">일부만 지운 주문 테스트 (9개 파일)</a></li>
 </ul>
 </li>
@@ -280,8 +280,8 @@
 <li>dev 병합으로 들어온 PostgreSQL 기반 클래스 <code>OrderSheetPostgresSupport</code>: <code>refundDriver</code>·<code>paymentServer</code> 주입, Payment DB 행 정리, <code>PAYMENT_TEST_POSTGRES_URL</code> 전제를 뺀다. <code>CommerceCoreSecurityTestSupport</code>의 쓰이지 않는 fixture 주입 필드도 뺀다</li>
 </ul>
 <p><strong>"복구할 회귀"로 표시한 항목은 주문 연동에서 새 Payment 계약으로 다시 만든다.</strong> 지운 파일 16개의 메서드는 모두 복구할 회귀다. "되살림"은 리뷰 뒤 결제 없이 성립하는 부분만 다시 넣은 것이다.</p>
-<h3 id="지운-테스트-파일-16개-메서드-86개">지운 테스트 파일 (16개, 메서드 86개)</h3>
-<p>2026-11-17 dev 병합(#361·#363·#365·#314)에서 이 파일들에 메서드 2개가 더해졌다(아래 "dev 병합 때 추가"). dev 정리로 먼저 사라진 테스트는 없다.</p>
+<h3 id="지운-테스트-파일-15개-삭제--notificationeventpostgrestest-일부-남김-메서드-82개-삭제">지운 테스트 파일 (15개 삭제 + <code>NotificationEventPostgresTest</code> 일부 남김, 메서드 82개 삭제)</h3>
+<p>2026-11-17 dev 병합(#361·#363·#365·#314)에서 이 파일들에 메서드 2개가 더해졌다(아래 "dev 병합 때 추가"). dev 정리로 먼저 사라진 테스트는 없다. 병합 리뷰 뒤 <code>NotificationEventPostgresTest</code>에서 결제와 무관한 4개(묶음 생성·취소·만료 이벤트, 쿠폰 수령, Outbox 재전송)는 옛 Payment 필드만 빼고 되살렸다(표의 "되살림").</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -324,7 +324,7 @@
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
 <td><code>cancellationAndExpiryRollbackTogetherWithEvents</code></td>
-<td>취소·만료 이벤트 기록 실패는 주문 종료와 재고 복구도 롤백한다</td>
+<td><strong>되살림(지우지 않음)</strong> — 취소·만료 이벤트 기록 실패는 주문 종료와 재고 복구도 롤백한다</td>
 </tr>
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
@@ -334,7 +334,7 @@
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
 <td><code>recordsCreationOnceForSingleAndCartOrders</code></td>
-<td>단건과 장바구니 생성·재요청은 실제 생성마다 이벤트 한 건만 기록한다</td>
+<td><strong>되살림(지우지 않음)</strong> — 단건과 장바구니 생성·재요청은 실제 생성마다 이벤트 한 건만 기록한다</td>
 </tr>
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
@@ -364,12 +364,12 @@
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
 <td><code>concurrentCouponClaimsAndRollbackKeepOneEventPerReceipt</code></td>
-<td>동시 쿠폰 수령은 회원 쿠폰과 발급 이벤트를 한 번만 기록하고 마지막 수량 소진도 유지한다</td>
+<td><strong>되살림(지우지 않음)</strong> — 동시 쿠폰 수령은 회원 쿠폰과 발급 이벤트를 한 번만 기록하고 마지막 수량 소진도 유지한다</td>
 </tr>
 <tr>
 <td><code>NotificationEventPostgresTest</code></td>
 <td><code>unavailableBrokerRetainsEventAndRecoveryDeliversSameEnvelope</code></td>
-<td>Kafka 미도달 시 보류하고 복구 후 같은 eventId와 JSON을 실제 브로커에 보낸다</td>
+<td><strong>되살림(지우지 않음)</strong> — Kafka 미도달 시 보류하고 복구 후 같은 eventId와 JSON을 실제 브로커에 보낸다</td>
 </tr>
 <tr>
 <td><code>PaymentDelayReconcilerTest</code></td>
@@ -885,10 +885,10 @@
 </tr>
 <tr>
 <td><code>LegacyOrderSellerSnapshotPostgresTest</code>(dev 병합 때 추가)</td>
-<td><code>preservesSellerAfterDeletion</code></td>
-<td>삭제</td>
-<td>구 API 주문의 상품 삭제 뒤 판매자 환불 조회(옛 Payment로 결제·환불 실행)</td>
-<td>복구할 회귀</td>
+<td><code>preservesSellerAfterDeletion</code> → <code>preservesSellerSnapshotAfterDeletion</code></td>
+<td>이름 변경</td>
+<td>결제와 환불 실행 뒤 판매자 환불 조회·재고 복구. 생성 때 판매자 스냅샷 저장과 상품 삭제 뒤 주문 행 불변은 되살림</td>
+<td>복구할 회귀 · 되살림</td>
 </tr>
 <tr>
 <td></td>
@@ -952,6 +952,6 @@
 <h2 id="미결정">미결정</h2>
 <p>결정(2026-11-15, 사용자 동의): 쓰지 않는 의존성 두 줄은 이 PR에서 지운다.</p>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/343#issuecomment-6892067416">#343 조율 댓글</a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>7d541ef40ebc669b4248ca334b71b111510911242cae27727a34325820e28ef4</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/343#issuecomment-6892067416">#343 조율 댓글</a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>1dc8450c27f6380f306e774584df4e1af9f056c718e5195558d8d4cf1b3cccb1</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

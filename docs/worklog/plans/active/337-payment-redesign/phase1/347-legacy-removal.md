@@ -113,9 +113,9 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 
 **"복구할 회귀"로 표시한 항목은 주문 연동에서 새 Payment 계약으로 다시 만든다.** 지운 파일 16개의 메서드는 모두 복구할 회귀다. "되살림"은 리뷰 뒤 결제 없이 성립하는 부분만 다시 넣은 것이다.
 
-### 지운 테스트 파일 (16개, 메서드 86개)
+### 지운 테스트 파일 (15개 삭제 + `NotificationEventPostgresTest` 일부 남김, 메서드 82개 삭제)
 
-2026-11-17 dev 병합(#361·#363·#365·#314)에서 이 파일들에 메서드 2개가 더해졌다(아래 "dev 병합 때 추가"). dev 정리로 먼저 사라진 테스트는 없다.
+2026-11-17 dev 병합(#361·#363·#365·#314)에서 이 파일들에 메서드 2개가 더해졌다(아래 "dev 병합 때 추가"). dev 정리로 먼저 사라진 테스트는 없다. 병합 리뷰 뒤 `NotificationEventPostgresTest`에서 결제와 무관한 4개(묶음 생성·취소·만료 이벤트, 쿠폰 수령, Outbox 재전송)는 옛 Payment 필드만 빼고 되살렸다(표의 "되살림").
 
 | 파일 | 메서드 | 검사하던 것 |
 |---|---|---|
@@ -125,16 +125,16 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 | `DurableMockRefundGatewayPostgresTest` | `persistedSuccessSurvivesLostResponseAndRetry` | 성공 응답 유실 후 재시도해도 저장된 성공 결과를 유지한다 |
 | `DurableMockRefundGatewayPostgresTest` | `missingResultCanBeRetriedWithoutInventingAnOutcome` | 결과가 없으면 결과를 임의로 만들지 않고 재시도를 허용한다 |
 | `DurableMockRefundGatewayPostgresTest` | `replayRejectsAnAmountDifferentFromThePersistedRequest` | 재요청 금액이 저장된 요청과 다르면 거절한다 |
-| `NotificationEventPostgresTest` | `cancellationAndExpiryRollbackTogetherWithEvents` | 취소·만료 이벤트 기록 실패는 주문 종료와 재고 복구도 롤백한다 |
+| `NotificationEventPostgresTest` | `cancellationAndExpiryRollbackTogetherWithEvents` | **되살림(지우지 않음)** — 취소·만료 이벤트 기록 실패는 주문 종료와 재고 복구도 롤백한다 |
 | `NotificationEventPostgresTest` | `staleLeaseAndConcurrentRecoveryDoNotDuplicatePaymentEvents` | 실행 권한을 잃은 결제는 발행하지 않고 동시 복구는 성공 이벤트 한 건만 기록한다 |
-| `NotificationEventPostgresTest` | `recordsCreationOnceForSingleAndCartOrders` | 단건과 장바구니 생성·재요청은 실제 생성마다 이벤트 한 건만 기록한다 |
+| `NotificationEventPostgresTest` | `recordsCreationOnceForSingleAndCartOrders` | **되살림(지우지 않음)** — 단건과 장바구니 생성·재요청은 실제 생성마다 이벤트 한 건만 기록한다 |
 | `NotificationEventPostgresTest` | `unknownThenSuccessRecordsOnlyOneConfirmedResult` | 미확정 결제에는 결과 이벤트가 없고 복구 성공을 중복 발행하지 않는다 |
 | `NotificationEventPostgresTest` | `recordsFailureCancellationAndExpiryOnceEach` | 실패·취소·만료의 실제 전이에만 이벤트를 한 건씩 기록한다 |
 | `NotificationEventPostgresTest` | `zeroPaymentPublishesOnceWithDiscountedAmounts` | 전액 할인 결제도 성공 이벤트 한 건과 0원 결제액을 기록한다 |
 | `NotificationEventPostgresTest` | `partialRefundsPublishPerSuccessfulRequestWithCumulativeAmount` | 부분 환불 요청마다 금액과 성공 누적액을 기록하고 재실행은 발행하지 않는다 |
 | `NotificationEventPostgresTest` | `outboxFailureRollsBackBusinessChangesAndAllowsRecovery` | 이벤트 기록 이후 오류가 나면 생성·결제·환불 상태와 Outbox를 함께 롤백한다 |
-| `NotificationEventPostgresTest` | `concurrentCouponClaimsAndRollbackKeepOneEventPerReceipt` | 동시 쿠폰 수령은 회원 쿠폰과 발급 이벤트를 한 번만 기록하고 마지막 수량 소진도 유지한다 |
-| `NotificationEventPostgresTest` | `unavailableBrokerRetainsEventAndRecoveryDeliversSameEnvelope` | Kafka 미도달 시 보류하고 복구 후 같은 eventId와 JSON을 실제 브로커에 보낸다 |
+| `NotificationEventPostgresTest` | `concurrentCouponClaimsAndRollbackKeepOneEventPerReceipt` | **되살림(지우지 않음)** — 동시 쿠폰 수령은 회원 쿠폰과 발급 이벤트를 한 번만 기록하고 마지막 수량 소진도 유지한다 |
+| `NotificationEventPostgresTest` | `unavailableBrokerRetainsEventAndRecoveryDeliversSameEnvelope` | **되살림(지우지 않음)** — Kafka 미도달 시 보류하고 복구 후 같은 eventId와 JSON을 실제 브로커에 보낸다 |
 | `PaymentDelayReconcilerTest` | `confirmsOverdueSuccessfulPaymentAsPaid` | 지연된 INSTANT_SUCCESS 결제는 PAID로 확정한다 |
 | `PaymentDelayReconcilerTest` | `unknownAttemptIsRecoveredAndLateUnknownCannotOverwriteConfirmedSuccess` | 미확정 결제를 복구하고 늦게 도착한 미확정 결과가 확정 성공을 덮지 못한다 |
 | `PaymentDelayReconcilerTest` | `confirmsOverdueFailedPaymentAndRestoresStock` | 지연된 INSTANT_FAIL 결제는 FAILED로 확정하고 재고를 복구한다 |
@@ -233,7 +233,7 @@ PostgreSQL 테스트를 모두 지우면 CI가 고르는 `postgresTest`·`migrat
 | `CartOrderIntegrationTest` | `cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay` → `cartDoesNotReserveAndReplayReturnsSameOrder` | 이름 변경 | 결제 성공 뒤 PAID와 선택 장바구니 항목 삭제. 재고 미예약·재전송 멱등·다른 금액 재사용 거절은 남김 | 복구할 회귀 |
 | `MemberCommerceCoreApiTest` | `cartOrderPaymentAndHistoryUseSameMemberAndPreserveParentPaymentOwnership` → `cartOrderPaymentStartAndHistoryUseSameMemberAndPreserveParentPaymentOwnership` | 이름 변경 | 결제 완료(PAID) 대기, 결제 상세 SUCCESS, 결제 뒤 장바구니 0건, 같은 회원 두 번째 주문. 상위 결제 소유권 404(다른 회원의 주문으로)·이력(1건)·재고 7은 되살림 | 복구할 회귀 · 되살림 |
 | `OrderCheckoutApiTest` | 없음 | 정리 줄만 | — | — |
-| `LegacyOrderSellerSnapshotPostgresTest`(dev 병합 때 추가) | `preservesSellerAfterDeletion` | 삭제 | 구 API 주문의 상품 삭제 뒤 판매자 환불 조회(옛 Payment로 결제·환불 실행) | 복구할 회귀 |
+| `LegacyOrderSellerSnapshotPostgresTest`(dev 병합 때 추가) | `preservesSellerAfterDeletion` → `preservesSellerSnapshotAfterDeletion` | 이름 변경 | 결제와 환불 실행 뒤 판매자 환불 조회·재고 복구. 생성 때 판매자 스냅샷 저장과 상품 삭제 뒤 주문 행 불변은 되살림 | 복구할 회귀 · 되살림 |
 | | `recoversLocalRestockAfterMoneyRefundSucceeded` | 삭제 | 환불 금전 성공 뒤 재고 상한 롤백과 같은 원문 수렴 | 복구할 회귀 |
 | | `reservedOrdersSurviveProductClosure` → `reservedOrdersKeepDeadlineAndReservationAfterProductClosure` | 이름 변경 | 상품 중지·삭제 뒤 기존 주문 결제 성공(재고 소진). 신규 주문 차단·기한·선점 유지는 남김 | 복구할 회귀 |
 | `OrderLegacySkuPostgresTest`(dev 병합 때 추가) | `legacySkuOnlyPaymentAndRefundRemainIdempotent` | 삭제 | Sales 이력 없는 SKU 주문의 결제 후 환불 수량 복구 한 번 | 복구할 회귀 |
