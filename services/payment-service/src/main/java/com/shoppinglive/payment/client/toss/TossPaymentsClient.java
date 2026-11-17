@@ -2,6 +2,7 @@ package com.shoppinglive.payment.client.toss;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.io.JsonEOFException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.http.HttpConnectTimeoutException;
@@ -193,21 +194,30 @@ public class TossPaymentsClient {
         return new TossResult.Declined(code, error.message(), statusCode);
     }
 
-    /** 본문이 비었거나 JSON으로 읽지 못하면 null이다. 읽는 중 I/O 오류(타임아웃·끊김)면 {@link IncompleteBody}다. */
+    /**
+     * 본문이 비었거나 JSON으로 읽지 못하면 null이다. 읽는 중 I/O 오류(타임아웃·끊김)나 JSON이 중간에서 끝나면 {@link IncompleteBody}다.
+     */
     private static <T> T readOrNull(ConvertibleClientHttpResponse response, Class<T> type) {
         try {
             return response.bodyTo(type);
         } catch (RestClientException exception) {
-            for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
-                if (cause instanceof JsonProcessingException) {
-                    return null; // 본문은 받았고 JSON이 아니다
-                }
-                if (cause instanceof IOException) {
-                    throw new IncompleteBody();
-                }
+            if (incomplete(exception)) {
+                throw new IncompleteBody();
             }
-            return null;
+            return null; // 본문은 다 받았고 JSON이 아니다
         }
+    }
+
+    /** JSON이 중간에서 끝났거나(EOF) JSON 오류가 아닌 I/O 오류(읽기 타임아웃·연결 끊김)가 원인이면 본문을 끝까지 받지 못한 것이다. */
+    private static boolean incomplete(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof JsonEOFException
+                    || (cause instanceof IOException
+                            && !(cause instanceof JsonProcessingException))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static final class IncompleteBody extends RuntimeException {

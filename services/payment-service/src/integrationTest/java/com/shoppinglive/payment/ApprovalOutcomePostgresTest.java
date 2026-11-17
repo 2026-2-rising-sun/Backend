@@ -127,6 +127,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
                         org.mockito.ArgumentMatchers.eq("cancel-" + c.pgOrderId()));
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:SUCCESS");
+        assertThat(httpStatuses(c.orderRef())).containsExactly(200, 200);
         assertThat(journals(c.orderRef())).isZero();
         assertThat(outboxRows(c.orderRef())).isEmpty();
     }
@@ -145,6 +146,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
 
         assertThat(status(c.orderRef())).isEqualTo("CANCELED");
         assertThat(pgCalls(c.orderRef())).containsExactly("CONFIRM:SUCCESS", "CANCEL:UNKNOWN");
+        assertThat(httpStatuses(c.orderRef())).as("취소 응답 없음").containsExactly(200, null);
         assertThat(journals(c.orderRef())).isZero();
     }
 

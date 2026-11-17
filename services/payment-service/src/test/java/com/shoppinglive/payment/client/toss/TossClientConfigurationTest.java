@@ -152,6 +152,38 @@ class TossClientConfigurationTest {
     }
 
     @Test
+    @DisplayName("PAY-CONFIRM-12 4xx 본문 중간에 끊기면 Unknown이고 HTTP 상태를 남기지 않는다")
+    void clientErrorBodyCutHasNoHttpStatus() throws Exception {
+        String head =
+                "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: 200\r\n\r\n";
+        try (RawServer server = RawServer.respond(head + "{\"code\":\"REJ", Duration.ZERO)) {
+            TossResult result =
+                    clientFor(server, SECRET, Duration.ofSeconds(5))
+                            .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
+
+            assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("PAY-CONFIRM-12 연결은 정상 종료됐지만 JSON이 중간에서 끝나면 HTTP 상태를 남기지 않는다")
+    void truncatedJsonHasNoHttpStatus() throws Exception {
+        String head =
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                        + PARTIAL_BODY.length()
+                        + "\r\n\r\n";
+        try (RawServer server = RawServer.respond(head + PARTIAL_BODY, Duration.ZERO)) {
+            TossResult result =
+                    clientFor(server, SECRET, Duration.ofSeconds(5))
+                            .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
+
+            assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
+        }
+    }
+
+    @Test
     @DisplayName("PAY-PG-03 응답 본문 중간에 연결이 끊기면 Unknown")
     void responseCutMidBodyIsUnknown() throws Exception {
         try (RawServer server =

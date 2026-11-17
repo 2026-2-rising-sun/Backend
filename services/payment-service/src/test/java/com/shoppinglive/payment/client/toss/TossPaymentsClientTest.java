@@ -312,6 +312,8 @@ class TossPaymentsClientTest {
         respond(HttpStatus.CONFLICT, error("IDEMPOTENT_REQUEST_PROCESSING"));
         server.expect(requestTo(BASE + "/v1/payments/confirm"))
                 .andRespond(withSuccess(payment("IN_PROGRESS", ""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
 
         assertThat(confirm())
                 .isInstanceOf(TossResult.Success.class)
@@ -334,6 +336,11 @@ class TossPaymentsClientTest {
                 .extracting(TossResult::httpStatus)
                 .isEqualTo(409);
         assertThat(confirm())
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(200);
+        assertThat(confirm())
+                .as("본문은 다 받았고 JSON이 아님")
                 .isInstanceOf(TossResult.Unknown.class)
                 .extracting(TossResult::httpStatus)
                 .isEqualTo(200);

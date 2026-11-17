@@ -151,7 +151,7 @@ UPDATE payment
 | `NotSent`(첫 호출) | 같은 변경 | pg_call `NOT_SENT` | 503 `PG_UNAVAILABLE` |
 | `Unknown`, 또는 재호출 뒤 `Success`가 아닌 모든 결과 | `UNKNOWN`, `next_check_at = now() + 10s`, `check_deadline_at = now() + 30m` · `WHERE status = 'APPROVING'` | 첫 호출 pg_call은 `UNKNOWN` 유지. 재호출 pg_call에는 그 호출의 결과(`DECLINED`·`NOT_SENT`·`UNKNOWN`)를 남긴다 | 202 `{paymentId, status: PENDING}` |
 
-- **pg_call `http_status`**(2026-11-17 추가): 토스 응답을 받은 호출은 그 HTTP 상태(성공 200, 거절 4xx, 5xx, 200인데 기대 상태가 아님 등)를 남긴다. 응답을 받지 못했거나(연결 실패·읽기 타임아웃·데드라인·키 미설정) 본문을 끝까지 받지 못하면 NULL이다. `TossResult.httpStatus()`가 이 값을 나르고 분류 규칙은 바뀌지 않는다. 첫 호출이 불명이면 재호출 전에 그 행의 `http_status`만 채우고 결과는 `UNKNOWN`으로 둔다. CONFIRM·CANCEL과 `applyDone`(QUERY의 DONE 포함)이 이 규칙을 따른다.
+- **pg_call `http_status`**(2026-11-17 추가): 토스 응답을 받은 호출은 그 HTTP 상태(성공 200, 거절 4xx, 5xx, 200인데 기대 상태가 아님 등)를 남긴다. 응답을 받지 못했거나(연결 실패·읽기 타임아웃·데드라인·키 미설정) 본문을 끝까지 받지 못하면(연결 끊김, JSON이 중간에서 끝남) NULL이다. `TossResult.httpStatus()`가 이 값을 나르고 분류 규칙은 바뀌지 않는다. 첫 호출이 불명이면 재호출 전에 그 행의 `http_status`만 채우고 결과는 `UNKNOWN`으로 둔다. 이 브랜치에서는 CONFIRM·CANCEL 기록과 `applyDone`(성공이면 200)이 이 규칙을 따른다. QUERY의 나머지 결과 기록은 #349 조회기가 같은 규칙으로 남긴다.
 - 응답 검증(PAY-CONFIRM-06): `status = DONE`, `orderId = pg_order_id`, `totalAmount = amount`, `paymentKey = 보낸 값`. 하나라도 다르면 실패다.
 - **CREATED로 되돌릴 때 `pg_order_id`를 NULL로 비운다.** 같은 pgOrderId로 다시 승인하면 멱등 키 `confirm-{pg_order_id}`가 재사용되어 토스가 첫 거절 응답을 돌려줄 수 있다. 비워 두면 그 요청은 409 `STALE_CHECKOUT`이 되고, Commerce는 `POST …/checkouts`로 새 결제창을 연다(PAY-CONFIRM-08 "새 결제창으로 다시 승인").
 - `applyDone`의 조건부 UPDATE가 **0행이면 다시 읽는다.** APPROVED면 이미 반영된 것이므로 끝낸다(분개·outbox 없음, 중복 없음). 그 밖의 상태(CREATED·CANCELED 등)면 토스에서는 승인됐는데 우리는 다른 상태라는 뜻이다. ERROR 로그를 남기고 아래 보상 취소로 보낸다. 돈만 빠진 채 끝나는 경로를 남기지 않는다.
