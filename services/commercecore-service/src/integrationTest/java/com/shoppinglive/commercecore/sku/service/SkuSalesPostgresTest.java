@@ -122,4 +122,56 @@ class SkuSalesPostgresTest extends SkuSalesIntegrationTest {
         assertThat(current.available()).isZero();
         assertThat(current.reserved()).isEqualTo(5);
     }
+
+    @Test
+    @DisplayName("가격 변경과 주문 예약이 경합해도 가격·재고와 이벤트 버전을 모두 보존한다")
+    void concurrentPriceChangeAndReservationPreserveBothChanges() throws Exception {
+        var sku = register(5);
+        sales.changeStatus(sku.skuId(), SalesStatus.ON_SALE, "seller");
+        lifecycle.changeSaleState(product.getId(), true, 0L, "seller");
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var changePrice =
+                    executor.submit(
+                            () -> {
+                                start.await();
+                                return sales.changePrice(sku.skuId(), 2000, "seller");
+                            });
+            var reserve =
+                    executor.submit(
+                            () -> {
+                                start.await();
+                                return tx.execute(
+                                        t -> {
+                                            trading.lockForNewOrder(List.of(product.getId()));
+                                            var locked =
+                                                    skus.lockForOrder(List.of(sku.skuId()))
+                                                            .getFirst();
+                                            skus.reserve(sku.skuId(), 2);
+                                            return locked.price();
+                                        });
+                            });
+            start.countDown();
+            assertThat(changePrice.get(30, TimeUnit.SECONDS).price()).isEqualTo(2000);
+            assertThat(reserve.get(30, TimeUnit.SECONDS)).isIn(1000L, 2000L);
+        }
+        var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
+        assertThat(current.price()).isEqualTo(2000);
+        assertThat(current.available()).isEqualTo(3);
+        assertThat(current.reserved()).isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT snapshot_version FROM sku WHERE id=?",
+                                Long.class,
+                                sku.skuId()))
+                .isEqualTo(4);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM event_outbox WHERE topic=? AND message_key=?",
+                                Long.class,
+                                com.shoppinglive.commercecore.sales.event.SalesInfoEventContract
+                                        .TOPIC_NAME,
+                                sku.skuId().toString()))
+                .isEqualTo(4);
+    }
 }

@@ -97,7 +97,41 @@ class SalesRegistrationApiTest
                 .andExpect(jsonPath("$.productId").value(REGISTERED_PRODUCT_ID))
                 .andExpect(jsonPath("$.price").value(15_000))
                 .andExpect(jsonPath("$.status").value("READY"))
-                .andExpect(jsonPath("$.id").isNumber());
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.version").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("가격·상태 변경은 버전 없이 변경된 판매정보를 반환한다")
+    void changesPriceAndStatusWithoutVersionInResponse() throws Exception {
+        var response =
+                register(body(REGISTERED_PRODUCT_ID, 15_000, 10))
+                        .andExpect(status().isCreated())
+                        .andReturn()
+                        .getResponse();
+        long id = objectMapper.readTree(response.getContentAsString()).get("id").asLong();
+        mockMvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                                        "/v1/sales/{id}/price", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"price\":16000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.price").value(16000))
+                .andExpect(jsonPath("$.status").value("READY"))
+                .andExpect(jsonPath("$.version").doesNotExist());
+        mockMvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch(
+                                        "/v1/sales/{id}/status", id)
+                                .header("Authorization", sellerBearer())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"status\":\"ON_SALE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.price").value(16000))
+                .andExpect(jsonPath("$.status").value("ON_SALE"))
+                .andExpect(jsonPath("$.version").doesNotExist());
     }
 
     @DisplayName("없는 상품을 판매 등록하면 404로 응답한다")

@@ -10,8 +10,7 @@ public record SkuView(
         long price,
         int available,
         int reserved,
-        SkuSaleStatus saleStatus,
-        long version) {
+        SkuSaleStatus saleStatus) {
 
     /** 기존 외부 enum을 유지하면서 판매 중인 0재고만 품절로 표시한다. */
     public SalesStatus status() {

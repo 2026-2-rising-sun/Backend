@@ -13,3 +13,5 @@ Order 별도 후속 [#345 동시 환불](https://github.com/2026-2-rising-sun/Ba
 사용자는 CommerceCore 구현 범위의 dev 병합을 승인했다. 실제 SDK/PG·환불 실행·UNKNOWN 중단 통지·과거 미확정 거래 대사는 서비스 공동 후속이며 이번 Core 병합의 선행조건으로 확대하지 않는다. 전체 후속 계획은 active에 남기고 completed331은 이전 범위의 역사 기록으로 유지한다.
 
 - [#340 구매 SKU 장바구니 정리](active/340-cart-sku-cleanup/README.md): 로컬 구현·검증과 외부 FigJam 잔여.
+
+- [#371 SKU 일반 버전 제거](completed/371-sku-version/README.md): 구현·계약·실제 DB/브로커 로컬 검증 완료.

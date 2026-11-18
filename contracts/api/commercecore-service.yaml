@@ -1437,7 +1437,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Sales"}
               examples:
-                created: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "READY", "version": 0}}
+                created: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "READY"}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -1450,7 +1450,7 @@ paths:
       tags: ["Seller Sales"]
       summary: "판매가 변경"
       operationId: "changeSalesPrice"
-      description: "본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 version은 SKU 버전, 클라이언트 expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404."
+      description: "본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 클라이언트 expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404."
       requestBody:
         required: true
         content:
@@ -1465,7 +1465,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Sales"}
               examples:
-                updated: {"value": {"id": 1, "productId": 1, "price": 16000, "status": "READY", "version": 1}}
+                updated: {"value": {"id": 1, "productId": 1, "price": 16000, "status": "READY"}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -1543,7 +1543,7 @@ paths:
             application/json:
               schema: {"$ref": "#/components/schemas/Sales"}
               examples:
-                updated: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "ON_SALE", "version": 1}}
+                updated: {"value": {"id": 1, "productId": 1, "price": 15000, "status": "ON_SALE"}}
         "400": {"$ref": "#/components/responses/BadRequest"}
         "401": {"$ref": "#/components/responses/Unauthorized"}
         "403": {"$ref": "#/components/responses/Forbidden"}
@@ -3158,13 +3158,12 @@ components:
       enum: ["READY", "ON_SALE", "SOLD_OUT", "PRIVATE"]
     Sales:
       type: "object"
-      required: ["id", "productId", "price", "status", "version"]
+      required: ["id", "productId", "price", "status"]
       properties:
         id: {"type": "integer", "format": "int64", "minimum": 1}
         productId: {"type": "integer", "format": "int64", "minimum": 1}
         price: {"type": "integer", "format": "int64", "minimum": 1}
         status: {"$ref": "#/components/schemas/SalesStatus"}
-        version: {"type": "integer", "format": "int64", "minimum": 0}
     SalesStock:
       type: "object"
       required: ["salesInfoId", "available", "reserved"]

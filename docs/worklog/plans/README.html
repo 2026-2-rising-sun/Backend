@@ -13,7 +13,12 @@
 <p>Order 별도 후속 <a href="https://github.com/2026-2-rising-sun/Backend/issues/345">#345 동시 환불</a>과 이전 <a href="https://github.com/2026-2-rising-sun/Backend/issues/346">#346 보류 작업 공간</a>은 이번에 재개하거나 병합하지 않는다. 현재 Core의 준비/승인 기한 분리 구현은 <a href="active/331-order-audit-fixes/processing-deadline.html">최신 계획</a>에 기록하며, 보류 작업의 전체 승인·운영 검증과 구분한다.</p>
 <p>사용자는 CommerceCore 구현 범위의 dev 병합을 승인했다. 실제 SDK/PG·환불 실행·UNKNOWN 중단 통지·과거 미확정 거래 대사는 서비스 공동 후속이며 이번 Core 병합의 선행조건으로 확대하지 않는다. 전체 후속 계획은 active에 남기고 completed331은 이전 범위의 역사 기록으로 유지한다.</p>
 <ul>
-<li><a href="active/340-cart-sku-cleanup/README.html">#340 구매 SKU 장바구니 정리</a>: 로컬 구현·검증과 외부 FigJam 잔여.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>b1d70d086e370e7bd8cce6780a4186cd649e44be150e8a12383a13f800f69b79</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<li>
+<p><a href="active/340-cart-sku-cleanup/README.html">#340 구매 SKU 장바구니 정리</a>: 로컬 구현·검증과 외부 FigJam 잔여.</p>
+</li>
+<li>
+<p><a href="completed/371-sku-version/README.html">#371 SKU 일반 버전 제거</a>: 구현·계약·실제 DB/브로커 로컬 검증 완료.</p>
+</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>8dd3f9fb4cbc19ad832ac6600f322bea0dadfa44d10fd93db71ac39f2e4df302</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
