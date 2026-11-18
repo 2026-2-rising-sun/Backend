@@ -242,7 +242,7 @@ payload:
 ```
 
 - `contracts/events/payment-execution-results.yaml`의 `PaymentExecutionResolved`를 `PaymentApproved`로 **교체**한다. 메시지마다 `examples`를 둔다.
-- 발행 객체로 만든 표본을 `build/contract-samples`에 남기는 직렬화 테스트가 계약 검사를 통과해야 한다(PAY-EVENT-02). 기존 `ExecutionEventContractTest`는 #347에서 지워지므로 `PaymentApprovedContractTest`를 새로 만든다(옛 테스트의 표본 저장 방식을 참고).
+- 발행 객체로 만든 표본을 `build/contract-samples`에 남기는 직렬화 테스트가 계약 검사를 통과해야 한다(PAY-EVENT-02). #347이 옛 DTO 없이 표본만 만드는 형태로 남긴 `ExecutionEventContractTest`를 지우고 `PaymentApprovedContractTest`를 새로 만든다(표본 저장 방식은 같다).
 - 발행 전 재시작 뒤 발행(EC 30)은 common-module `OutboxTransactionIntegrationTest`가 이미 검증한다.
 
 ## 테스트

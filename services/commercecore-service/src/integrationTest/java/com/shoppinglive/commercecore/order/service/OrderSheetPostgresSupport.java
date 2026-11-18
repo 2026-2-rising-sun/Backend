@@ -39,13 +39,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
         p.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 
-    @BeforeAll
-    static void requireIndependentPaymentDatabase() {
-        Assumptions.assumeTrue(
-                System.getenv("PAYMENT_TEST_POSTGRES_URL") != null,
-                "독립 Payment PostgreSQL 설정이 필요합니다.");
-    }
-
     @Autowired JdbcTemplate jdbc;
     @Autowired OrderSheetService sheets;
     @Autowired OrderSheetLifecycleService lifecycle;
@@ -55,8 +48,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
     @Autowired PaymentDispatcher dispatcher;
     @Autowired PaymentClient client;
     @Autowired PaymentResultHandler handler;
-    @Autowired RefundBoundaryTestDriver refundDriver;
-    @Autowired PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired MockMvc mvc;
 
     @BeforeEach
@@ -82,14 +73,6 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
                         "product",
                         "product_image",
                         "event_outbox")) jdbc.update("DELETE FROM " + table);
-        for (String table :
-                List.of(
-                        "mock_refund_result",
-                        "refund_execution",
-                        "mock_gateway_result",
-                        "payment_attempt",
-                        "event_outbox")) paymentServer.jdbc.update("DELETE FROM " + table);
-        paymentServer.reset();
         for (long product : List.of(101L, 102L))
             jdbc.update(
                     "INSERT INTO product(id,name,description,main_image_id,seller_id,category,sale_enabled,version,created_at,updated_at) VALUES (?,?,'설명',1,?,'FASHION',TRUE,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
@@ -114,7 +97,7 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
 
     void seedSku(long id, long product, long price, int available) {
         jdbc.update(
-                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,0,'ON_SALE',0,1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,0,'ON_SALE',1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 id,
                 product,
                 price,

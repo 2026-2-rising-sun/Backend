@@ -2,13 +2,6 @@ package com.shoppinglive.commercecore.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.shoppinglive.commercecore.cart.entity.CartItem;
 import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
@@ -18,9 +11,6 @@ import com.shoppinglive.commercecore.order.entity.*;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
-import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
@@ -30,9 +20,6 @@ import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.common.core.BusinessException;
-import com.shoppinglive.common.core.ErrorCode;
-import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
-import com.shoppinglive.payment.service.MockPaymentEngine;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +34,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,8 +44,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class PaymentGroupIntegrationTest
         extends com.shoppinglive.commercecore.payment.service.PaymentDatabaseTestSupport {
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired io.micrometer.core.instrument.MeterRegistry metrics;
     @Autowired MockMvc mvc;
     @Autowired PaymentGroupService service;
@@ -70,22 +54,12 @@ class PaymentGroupIntegrationTest
     @Autowired OrderService singleOrders;
     @Autowired PaymentService singlePayments;
     @Autowired OrderJpaRepository orders;
-    @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
     @MockitoSpyBean com.shoppinglive.commercecore.sku.service.SkuService skuCommands;
     @Autowired InMemoryProductLookupStub productLookup;
-    @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired JdbcTemplate jdbc;
 
-    @Autowired
-    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
-                    .BoundaryPaymentServer
-            paymentServer;
-
-    @Autowired com.shoppinglive.payment.service.DurableMockGateway gateway;
-    // 예약된 콜백과 경쟁하지 않도록 직접 결과를 확정하고 각 커밋 단계를 검증한다.
-    @Autowired MockPaymentEngine engine;
     private Long salesA;
     private Long salesB;
     private CartItem a;
@@ -96,7 +70,6 @@ class PaymentGroupIntegrationTest
     @BeforeEach
     void seed() {
         clean();
-        paymentServer.reset();
         productLookup.register(new ProductSnapshot(1L, "A", null));
         productLookup.register(new ProductSnapshot(2L, "B", null));
         productLookup.register(new ProductSnapshot(3L, "미선택", null));
@@ -114,11 +87,6 @@ class PaymentGroupIntegrationTest
 
     @AfterEach
     void clean() {
-        if (groups != null) {
-            groups.findAll().forEach(group -> scenarios.clear(group.getGroupNumber()));
-        }
-        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
-        payments.deleteAll();
         jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         groups.deleteAll();
@@ -244,7 +212,6 @@ class PaymentGroupIntegrationTest
     private void untouched() {
         assertThat(groups.count()).isZero();
         assertThat(orders.count()).isZero();
-        assertThat(payments.count()).isZero();
         assertThat(items.count()).isEqualTo(3);
         stock(salesA, 10, 0);
         stock(salesB, 10, 0);
@@ -310,20 +277,11 @@ class PaymentGroupIntegrationTest
                                         "coupon-order")
                                 .created())
                 .isFalse();
-        Timestamp elapsed = Timestamp.from(Instant.now().minusSeconds(1));
-        jdbc.update(
-                "UPDATE coupon_definition SET ends_at=?, expires_at=? WHERE id=?",
-                elapsed,
-                elapsed,
-                COUPON_ID);
-        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "coupon-payment");
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(couponStatus()).isEqualTo("USED");
     }
 
-    @DisplayName("전액 할인 묶음은 게이트웨이 없이 확정하고 쿠폰·재고·장바구니를 한 번만 반영한다")
+    @DisplayName("전액 할인 묶음은 0원 견적으로 생성하고 쿠폰을 예약한다")
     @Test
-    void fullyDiscountedGroupCompletesWithoutGatewayAndConsumesCouponStockAndCartOnce() {
+    void fullyDiscountedGroupIsCreatedWithZeroPayableAndReservedCoupon() {
         issueCoupon();
         jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
         jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
@@ -341,121 +299,11 @@ class PaymentGroupIntegrationTest
                 .extracting(order -> order.payableAmount())
                 .containsOnly(0L);
         assertThat(couponStatus()).isEqualTo("RESERVED");
-
-        var attempt = service.start(MEMBER_A, created.group().groupNumber(), "zero-payment");
-        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        var completed = service.get(MEMBER_A, created.group().groupNumber());
-        assertThat(completed.status()).isEqualTo(OrderStatus.PAID);
-        assertThat(completed.paymentId()).isEqualTo(attempt.getId());
-        assertThat(completed.orders())
-                .extracting(order -> order.status())
-                .containsOnly(OrderStatus.PAID);
-        assertThat(couponStatus()).isEqualTo("USED");
-        assertThat(cart.list(MEMBER_A))
-                .extracting(CartItem::getId)
-                .containsExactly(unselected.getId());
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
-        verify(engine, never())
-                .schedule(
-                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
-        assertThat(service.start(MEMBER_A, created.group().groupNumber(), "zero-payment").getId())
-                .isEqualTo(attempt.getId());
-        assertThat(payments.count()).isEqualTo(1);
     }
 
-    @DisplayName("0원 결제를 동시에 시작해도 완료된 결제 시도 하나를 반환한다")
+    @DisplayName("취소·만료 시 쿠폰 예약을 해제한다")
     @Test
-    void concurrentZeroPaymentStartsReturnOneCompletedAttempt() throws Exception {
-        issueCoupon();
-        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
-        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
-        var group =
-                service.create(
-                                MEMBER_A,
-                                selected(),
-                                "회원",
-                                "01012345678",
-                                25000,
-                                COUPON_ID,
-                                "zero-race-order")
-                        .group();
-        var attempts = new ConcurrentLinkedQueue<Long>();
-        var failures = new ConcurrentLinkedQueue<Throwable>();
-        var ready = new CountDownLatch(2);
-        var start = new CountDownLatch(1);
-        var done = new CountDownLatch(2);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            for (int i = 0; i < 2; i++) {
-                pool.submit(
-                        () -> {
-                            try {
-                                ready.countDown();
-                                start.await();
-                                attempts.add(
-                                        service.start(
-                                                        MEMBER_A,
-                                                        group.groupNumber(),
-                                                        "zero-race-payment")
-                                                .getId());
-                            } catch (Throwable failure) {
-                                failures.add(failure);
-                            } finally {
-                                done.countDown();
-                            }
-                        });
-            }
-            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
-        }
-        assertThat(failures).isEmpty();
-        assertThat(attempts).hasSize(2);
-        assertThat(attempts.stream().distinct().count()).isEqualTo(1);
-        assertThat(payments.count()).isEqualTo(1);
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
-        assertThat(couponStatus()).isEqualTo("USED");
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
-        verify(engine, never())
-                .schedule(
-                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
-    }
-
-    @DisplayName("0원 결제는 HTTP 200으로 완료 상태를 응답한다")
-    @Test
-    void zeroPaymentHttpResponseSignalsCompletionWithOk() throws Exception {
-        issueCoupon();
-        jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 25000L, COUPON_ID);
-        jdbc.update("INSERT INTO coupon_target(coupon_id,product_id) VALUES(?,2)", COUPON_ID);
-        var group =
-                service.create(
-                                MEMBER_A,
-                                selected(),
-                                "회원",
-                                "01012345678",
-                                25000,
-                                COUPON_ID,
-                                "zero-http-order")
-                        .group();
-
-        mvc.perform(
-                        post("/v1/payment-groups/{number}/payments", group.groupNumber())
-                                .header("Authorization", bearer(MEMBER_A))
-                                .header("X-Idempotency-Key", "zero-http-payment")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content("{}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("SUCCESS"));
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
-        verify(engine, never())
-                .schedule(
-                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
-    }
-
-    @DisplayName("취소·만료·확정 결제 실패 시 쿠폰 예약을 해제한다")
-    @Test
-    void couponReservationIsReleasedOnCancellationExpiryAndDefinitivePaymentFailure() {
+    void couponReservationIsReleasedOnCancellationAndExpiry() {
         issueCoupon();
         var cancelled =
                 service.create(
@@ -490,29 +338,13 @@ class PaymentGroupIntegrationTest
                 groupId);
         assertThat(service.expire(groupId)).isTrue();
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
-
-        var failedGroup =
-                service.create(
-                                MEMBER_A,
-                                selected(),
-                                "회원",
-                                "01012345678",
-                                25000,
-                                COUPON_ID,
-                                "coupon-failure")
-                        .group();
-        scenarios.set(failedGroup.groupNumber(), PaymentScenario.INSTANT_FAIL);
-        var attempt = service.start(MEMBER_A, failedGroup.groupNumber(), "coupon-failure-payment");
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
-    @DisplayName("단건 주문은 쿠폰 할인 스냅샷을 저장하고 결제 성공 후 쿠폰을 사용 처리한다")
+    @DisplayName("단건 주문은 쿠폰 할인 스냅샷을 저장하고 쿠폰을 예약한다")
     @Test
-    void singleOrderCouponIsReservedSnapshottedAndConsumedAfterPaymentSuccess() {
+    void singleOrderCouponIsReservedAndSnapshotted() {
         issueCoupon();
-        var created = singleCouponOrder("single-coupon-success");
-        var order = created.order();
+        var order = singleCouponOrder("single-coupon-success").order();
         assertThat(order.getTotalAmount()).isEqualTo(10000L);
         assertThat(order.getDiscountAmount()).isEqualTo(5000L);
         assertThat(order.getPayableAmount()).isEqualTo(5000L);
@@ -520,19 +352,11 @@ class PaymentGroupIntegrationTest
         assertThat(order.getPaymentGroup().getDiscountAmount()).isEqualTo(5000L);
         assertThat(order.getPaymentGroup().getPayableAmount()).isEqualTo(5000L);
         assertThat(couponStatus()).isEqualTo("RESERVED");
-
-        scenarios.set(order.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_SUCCESS);
-        var attempt = singlePayments.startPayment(order.getOrderNumber(), MEMBER_A);
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(couponStatus()).isEqualTo("USED");
-        assertThat(orders.findById(order.getId()).orElseThrow().getStatus())
-                .isEqualTo(OrderStatus.PAID);
-        stock(salesA, 9, 0);
     }
 
-    @DisplayName("단건 주문 취소·만료·확정 결제 실패 시 쿠폰 예약을 해제한다")
+    @DisplayName("단건 주문 취소·만료 시 쿠폰 예약을 해제한다")
     @Test
-    void singleOrderCouponReservationIsReleasedByCancellationExpiryAndDefinitiveFailure() {
+    void singleOrderCouponReservationIsReleasedByCancellationAndExpiry() {
         issueCoupon();
         var cancelled = singleCouponOrder("single-coupon-cancel").order();
         singleOrders.cancelBeforePayment(cancelled.getOrderNumber(), MEMBER_A);
@@ -546,32 +370,17 @@ class PaymentGroupIntegrationTest
                 groupId);
         assertThat(service.expire(groupId)).isTrue();
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
-
-        var failed = singleCouponOrder("single-coupon-failure").order();
-        scenarios.set(failed.getPaymentGroup().getGroupNumber(), PaymentScenario.INSTANT_FAIL);
-        var attempt = singlePayments.startPayment(failed.getOrderNumber(), MEMBER_A);
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         stock(salesA, 10, 0);
     }
 
-    @DisplayName("전액 할인 단건 주문은 게이트웨이 없이 확정하고 쿠폰을 사용 처리한다")
+    @DisplayName("전액 할인 단건 주문은 0원으로 생성하고 쿠폰을 예약한다")
     @Test
-    void singleOrderFullyDiscountedCouponCompletesWithoutGatewayAndConsumesCoupon() {
+    void singleOrderFullyDiscountedCouponIsCreatedWithZeroPayable() {
         issueCoupon();
         jdbc.update("UPDATE coupon_definition SET fixed_discount=? WHERE id=?", 10000L, COUPON_ID);
         var created = singleCouponOrder("single-coupon-zero").order();
         assertThat(created.getPayableAmount()).isZero();
         assertThat(couponStatus()).isEqualTo("RESERVED");
-
-        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
-        assertThat(attempt.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(couponStatus()).isEqualTo("USED");
-        assertThat(orders.findById(created.getId()).orElseThrow().getStatus())
-                .isEqualTo(OrderStatus.PAID);
-        verify(engine, never())
-                .schedule(
-                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
     }
 
     @DisplayName("단건 주문의 결제 결과가 미확정이면 쿠폰 예약을 유지한다")
@@ -579,8 +388,8 @@ class PaymentGroupIntegrationTest
     void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
         issueCoupon();
         var created = singleCouponOrder("single-coupon-pending").order();
-        scenarios.set(created.getPaymentGroup().getGroupNumber(), PaymentScenario.DELAYED_SUCCESS);
 
+        // Payment에 닿지 않아 결과가 없으므로 미확정 상태가 유지된다.
         var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
 
         assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
@@ -674,7 +483,6 @@ class PaymentGroupIntegrationTest
                 .isInstanceOf(BusinessException.class);
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(payments.count()).isZero();
         stock(salesA, 8, 2);
         stock(salesB, 9, 1);
     }
@@ -795,209 +603,6 @@ class PaymentGroupIntegrationTest
         stock(salesB, 9, 1);
     }
 
-    @DisplayName("결제 성공은 재고를 소진하고 수정되지 않은 선택 장바구니 항목만 삭제한다")
-    @Test
-    void onePaymentSuccessConsumesStockAndDeletesOnlyUneditedSelectedCartRows() {
-        var group = create("success").group();
-        cart.changeQuantity(MEMBER_A, a.getId(), 3);
-        var first = service.start(MEMBER_A, group.groupNumber(), "payment-key");
-        var replay = service.start(MEMBER_A, group.groupNumber(), "payment-key");
-        assertThat(replay.getId()).isEqualTo(first.getId());
-        assertThat(payments.count()).isEqualTo(1);
-        verify(engine, times(1))
-                .schedule(
-                        first.getId(),
-                        com.shoppinglive.payment.entity.PaymentScenario.INSTANT_SUCCESS);
-        assertThatThrownBy(() -> service.start(MEMBER_A, group.groupNumber(), "other-key"))
-                .isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> service.cancel(MEMBER_A, group.groupNumber()))
-                .isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> service.payment(MEMBER_B, group.groupNumber(), first.getId()))
-                .isInstanceOf(BusinessException.class);
-        assertThat(replay.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(dispatcher.dispatch(deliveries.byPayment(first.getId()))).isFalse();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(first.getId()))).isFalse();
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getStatus())
-                .containsOnly(OrderStatus.PAID);
-        assertThat(items.findAll())
-                .extracting(CartItem::getId)
-                .containsExactlyInAnyOrder(a.getId(), unselected.getId());
-        assertThat(items.findById(a.getId()).orElseThrow().getQuantity()).isEqualTo(3);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getQuantity())
-                .containsExactlyInAnyOrder(2, 1);
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
-    }
-
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(
-            value = PaymentScenario.class,
-            names = {"INSTANT_SUCCESS", "INSTANT_FAIL"})
-    void unconfirmedGatewayResultRetainsCouponCartAndStockUntilConfirmedOnce(
-            PaymentScenario finalScenario) throws Exception {
-        issueCoupon();
-        var group =
-                service.create(
-                                MEMBER_A,
-                                selected(),
-                                "회원",
-                                "01012345678",
-                                25000,
-                                COUPON_ID,
-                                "unknown-order")
-                        .group();
-        scenarios.set(group.groupNumber(), finalScenario);
-        var attempt = service.start(MEMBER_A, group.groupNumber(), "unknown-payment");
-        doReturn(com.shoppinglive.payment.entity.PaymentStatus.TIMEOUT)
-                .when(gateway)
-                .authorize(
-                        attempt.getId(),
-                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
-                                attempt.getScenario().name()));
-
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        var unknown = payments.findById(attempt.getId()).orElseThrow();
-        assertThat(unknown.getStatus())
-                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.UNKNOWN);
-        assertThat(unknown.getResolvedAt()).isNull();
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getStatus())
-                .containsOnly(OrderStatus.PAYMENT_CONFIRMING);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
-        assertThat(items.count()).isEqualTo(3);
-        stock(salesA, 8, 2);
-        stock(salesB, 9, 1);
-        mvc.perform(
-                        post("/v1/payment-groups/{number}/payments", group.groupNumber())
-                                .header("Authorization", bearer(MEMBER_A))
-                                .header("X-Idempotency-Key", "unknown-payment"))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.status").value("UNKNOWN"));
-
-        // 이후 확인된 최종 결과도 같은 결제 시도와 실제 영속 Mock 게이트웨이를 통해 반영한다.
-        org.mockito.Mockito.doCallRealMethod()
-                .when(gateway)
-                .authorize(
-                        attempt.getId(),
-                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(
-                                attempt.getScenario().name()));
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
-                attempt.getId());
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(
-                        com.shoppinglive.payment.entity.PaymentStatus.valueOf(
-                                com.shoppinglive.payment.entity.PaymentScenario.valueOf(
-                                                finalScenario.name())
-                                        .getOutcome()
-                                        .name()));
-        boolean success = finalScenario == PaymentScenario.INSTANT_SUCCESS;
-        assertThat(couponStatus()).isEqualTo(success ? "USED" : "AVAILABLE");
-        assertThat(items.count()).isEqualTo(success ? 1 : 3);
-        stock(salesA, success ? 8 : 10, 0);
-        stock(salesB, success ? 9 : 10, 0);
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
-                                Integer.class,
-                                attempt.getId()))
-                .isEqualTo(1);
-    }
-
-    @DisplayName("결제 실패는 전체 재고를 복구하고 장바구니를 유지하며 새 묶음을 허용한다")
-    @Test
-    void failedPaymentReturnsAllStockLeavesCartAndAllowsNewGroup() {
-        var group = create("failure").group();
-        scenarios.set(group.groupNumber(), PaymentScenario.INSTANT_FAIL);
-        var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-key");
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                .isEqualTo(OrderStatus.FAILED);
-        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.FAILED);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getStatus())
-                .containsOnly(OrderStatus.FAILED);
-        assertThat(items.count()).isEqualTo(3);
-        stock(salesA, 10, 0);
-        stock(salesB, 10, 0);
-        assertThat(create("new-group").created()).isTrue();
-    }
-
-    @DisplayName("승인 후 로컬 반영이 롤백되어도 재시도는 저장된 승인 하나를 사용한다")
-    @Test
-    void gatewayApprovalSurvivesLocalApplyRollbackAndRetryUsesOneRecordedApproval() {
-        var group = create("fault").group();
-        var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-key");
-        // A를 먼저 반영한 뒤 B를 잘못된 상태로 만들어 A의 재고 소비와 삭제 이후 트랜잭션을 실패시킨다.
-        jdbc.update("UPDATE sku SET reserved=0 WHERE id=?", salesB);
-        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
-                .isInstanceOf(IllegalStateException.class);
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
-                                Integer.class,
-                                attempt.getId()))
-                .isEqualTo(1);
-        Instant approval =
-                paymentServer
-                        .jdbc
-                        .queryForObject(
-                                "SELECT authorized_at FROM mock_gateway_result WHERE attempt_id=?",
-                                Timestamp.class,
-                                attempt.getId())
-                        .toInstant();
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT outcome FROM mock_gateway_result WHERE attempt_id=?",
-                                String.class,
-                                attempt.getId()))
-                .isEqualTo("SUCCESS");
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getStatus())
-                .containsOnly(OrderStatus.PAYMENT_CONFIRMING);
-        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
-        assertThat(items.count()).isEqualTo(3);
-        stock(salesA, 8, 2);
-        jdbc.update("UPDATE sku SET reserved=1 WHERE id=?", salesB);
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
-                attempt.getId());
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
-                                Integer.class,
-                                attempt.getId()))
-                .isEqualTo(1);
-        assertThat(
-                        paymentServer
-                                .jdbc
-                                .queryForObject(
-                                        "SELECT authorized_at FROM mock_gateway_result WHERE attempt_id=?",
-                                        Timestamp.class,
-                                        attempt.getId())
-                                .toInstant())
-                .isEqualTo(approval);
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
-        assertThat(items.findAll()).extracting(CartItem::getId).containsExactly(unselected.getId());
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
-    }
-
     @DisplayName("같은 키로 동시에 요청해도 결제 묶음과 재고 예약은 한 번만 생성한다")
     @Test
     void concurrentSameKeyCreatesOneGroupAndReservesOnce() throws Exception {
@@ -1092,148 +697,5 @@ class PaymentGroupIntegrationTest
             stock(salesA, 9, 1);
             stock(salesB, 10, 0);
         }
-    }
-
-    @DisplayName("결제 시작과 취소가 동시에 실행되면 상태 전이 하나만 커밋된다")
-    @Test
-    void concurrentStartAndCancelCommitExactlyOneTransition() throws Exception {
-        var group = create("start-cancel").group();
-        var accepted = new ConcurrentLinkedQueue<String>();
-        var failures = new ConcurrentLinkedQueue<Throwable>();
-        var ready = new CountDownLatch(2);
-        var start = new CountDownLatch(1);
-        var done = new CountDownLatch(2);
-        try (var pool = Executors.newFixedThreadPool(2)) {
-            pool.submit(
-                    () -> {
-                        try {
-                            ready.countDown();
-                            start.await();
-                            service.start(MEMBER_A, group.groupNumber(), "payment-race");
-                            accepted.add("start");
-                        } catch (Throwable failure) {
-                            failures.add(failure);
-                        } finally {
-                            done.countDown();
-                        }
-                    });
-            pool.submit(
-                    () -> {
-                        try {
-                            ready.countDown();
-                            start.await();
-                            service.cancel(MEMBER_A, group.groupNumber());
-                            accepted.add("cancel");
-                        } catch (Throwable failure) {
-                            failures.add(failure);
-                        } finally {
-                            done.countDown();
-                        }
-                    });
-            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
-        }
-        assertThat(accepted).hasSize(1);
-        assertThat(failures)
-                .hasSize(1)
-                .allSatisfy(
-                        failure -> {
-                            assertThat(failure).isInstanceOf(BusinessException.class);
-                            assertThat(((BusinessException) failure).errorCode())
-                                    .isEqualTo(ErrorCode.CONFLICT);
-                        });
-        assertThat(items.count()).isEqualTo(3);
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM mock_gateway_result", Integer.class))
-                .isZero();
-        if (accepted.contains("start")) {
-            assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                    .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
-            assertThat(orders.findAll())
-                    .extracting(order -> order.getStatus())
-                    .containsOnly(OrderStatus.PAYMENT_CONFIRMING);
-            assertThat(payments.count()).isEqualTo(1);
-            var attempt = payments.findAll().getFirst();
-            assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
-            verify(engine, times(1))
-                    .schedule(
-                            attempt.getId(),
-                            com.shoppinglive.payment.entity.PaymentScenario.INSTANT_SUCCESS);
-            stock(salesA, 8, 2);
-            stock(salesB, 9, 1);
-        } else {
-            assertThat(service.get(MEMBER_A, group.groupNumber()).status())
-                    .isEqualTo(OrderStatus.CANCELLED);
-            assertThat(orders.findAll())
-                    .extracting(order -> order.getStatus())
-                    .containsOnly(OrderStatus.CANCELLED);
-            assertThat(payments.count()).isZero();
-            stock(salesA, 10, 0);
-            stock(salesB, 10, 0);
-            service.cancel(MEMBER_A, group.groupNumber());
-            stock(salesA, 10, 0);
-            stock(salesB, 10, 0);
-        }
-    }
-
-    @DisplayName("결과를 동시에 반영해도 승인과 전체 상품 재고 소진은 한 번만 처리한다")
-    @Test
-    void concurrentResolveRecordsOneApprovalAndConsumesEveryProductOnce() throws Exception {
-        var group = create("resolve-race").group();
-        var attempt = service.start(MEMBER_A, group.groupNumber(), "payment-race");
-        var results = new ConcurrentLinkedQueue<Boolean>();
-        var failures = new ConcurrentLinkedQueue<Throwable>();
-        var ready = new CountDownLatch(4);
-        var start = new CountDownLatch(1);
-        var done = new CountDownLatch(4);
-        try (var pool = Executors.newFixedThreadPool(4)) {
-            for (int i = 0; i < 4; i++) {
-                pool.submit(
-                        () -> {
-                            try {
-                                ready.countDown();
-                                start.await();
-                                results.add(
-                                        dispatcher.dispatch(deliveries.byPayment(attempt.getId())));
-                            } catch (Throwable failure) {
-                                failures.add(failure);
-                            } finally {
-                                done.countDown();
-                            }
-                        });
-            }
-            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
-        }
-        assertThat(failures).isEmpty();
-        assertThat(results).containsExactlyInAnyOrder(true, false, false, false);
-        assertThat(service.get(MEMBER_A, group.groupNumber()).status()).isEqualTo(OrderStatus.PAID);
-        assertThat(orders.findAll())
-                .extracting(order -> order.getStatus())
-                .containsOnly(OrderStatus.PAID);
-        assertThat(payments.count()).isEqualTo(1);
-        assertThat(payments.findById(attempt.getId()).orElseThrow().getStatus())
-                .isEqualTo(com.shoppinglive.payment.entity.PaymentStatus.SUCCESS);
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM mock_gateway_result WHERE attempt_id=?",
-                                Integer.class,
-                                attempt.getId()))
-                .isEqualTo(1);
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT outcome FROM mock_gateway_result WHERE attempt_id=?",
-                                String.class,
-                                attempt.getId()))
-                .isEqualTo("SUCCESS");
-        assertThat(items.findAll()).extracting(CartItem::getId).containsExactly(unselected.getId());
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
-        assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-        stock(salesA, 8, 0);
-        stock(salesB, 9, 0);
     }
 }

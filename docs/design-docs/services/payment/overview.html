@@ -6,7 +6,7 @@
 </style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="overview.md">MD 원본</a><a href="../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
 <ul>
 <li><a href="#새-설계-결제-재설계">새 설계 (결제 재설계)</a></li>
-<li><a href="#현재-코드-mock-교체-예정">현재 코드 (Mock, 교체 예정)</a></li>
+<li><a href="#현재-코드-mock-삭제됨">현재 코드 (Mock 삭제됨)</a></li>
 <li><a href="#원본갱신">원본·갱신</a></li>
 <li><a href="#payment-결제-실행">Payment 결제 실행</a><ul>
 <li><a href="#범위와-불변조건">범위와 불변조건</a></li>
@@ -59,21 +59,19 @@
 </tr>
 </tbody>
 </table></div>
-<h2 id="현재-코드-mock-교체-예정">현재 코드 (Mock, 교체 예정)</h2>
-<p>공개 브라우저 API는 Core가 소유한다. 내부 ServiceToken 계약을 사용한다. 실제 PG 운영 연동은 이번 문서의 증거가 아니다.</p>
-<p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 계약·마이그레이션·주요 상태 변경 코드. 현재 #330 문서 변경은 미커밋이며 업무 코드는 변경하지 않았다. 운영 환경 검증 자료와 구분한다.</p>
+<h2 id="현재-코드-mock-삭제됨">현재 코드 (Mock 삭제됨)</h2>
+<p>기존 Mock 결제·환불 코드와 내부 API는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a>에서 지웠다. 서비스는 컨트롤러 없이 기동하고, 모든 <code>/v1/internal/**</code> 요청은 서비스 토큰 검사 뒤 403이다. 새 결제 API는 #348에서 연다. 테이블(V1–V3)은 남아 있고 #348의 V4 마이그레이션에서 지운다. 결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.</p>
+<p>아래 "Payment 결제 실행"·"Payment 환불 실행"과 ERD는 지운 Mock 구현의 기록이다. 기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 계약·마이그레이션·주요 상태 변경 코드.</p>
 <ul>
-<li><a href="api.html">API HTML</a> · <a href="../../../../contracts/api/payment-service.yaml">계약 YAML</a></li>
+<li><a href="api.html">API HTML</a>(지금은 경로 없음) · <a href="../../../../contracts/api/payment-service.yaml">계약 YAML</a></li>
 <li><a href="erd.html">DB ERD 설명</a> · <a href="erd.html">관계도</a></li>
-<li><a href="overview.html">결제 실행</a> · <a href="overview.html">시각 자료</a></li>
-<li><a href="overview.html">환불 실행</a> · <a href="overview.html">시각 자료</a></li>
 <li>서비스 간 흐름: <a href="../../flows/order-payment.html">주문·결제</a> · <a href="../../flows/refund.html">환불</a></li>
 </ul>
 <h2 id="원본갱신">원본·갱신</h2>
 <p><a href="../../../../services/payment-service/src/main/java">구현</a> · <a href="../../../../services/payment-service/src/main/resources/db">마이그레이션</a> · <a href="../../../../ARCHITECTURE.md">서비스 경계</a></p>
 <p>API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거·조건·실패 경로를 확인하고 HTML도 재생성한다. MD에 없는 전이를 시각 자료에만 추가하지 않는다.</p>
 <h2 id="payment-결제-실행">Payment 결제 실행</h2>
-<p><strong>교체 예정:</strong> 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 <a href="overview.html">Payment 도메인 홈</a>에 있다.</p>
+<p><strong>코드 삭제됨:</strong> 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다.</p>
 <p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
 <p><a href="overview.html">시각 자료</a></p>
 <h3 id="범위와-불변조건">범위와 불변조건</h3>
@@ -132,15 +130,15 @@
 </table></div>
 <h3 id="구현과-검증-근거">구현과 검증 근거</h3>
 <ul>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentService.java">PaymentService.java</a></li>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentRecoveryStore.java">PaymentRecoveryStore.java</a></li>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentAttempt.java">PaymentAttempt.java</a></li>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentStatus.java">PaymentStatus.java</a></li>
+<li><code>PaymentService.java</code>(#347에서 삭제)</li>
+<li><code>PaymentRecoveryStore.java</code>(#347에서 삭제)</li>
+<li><code>PaymentAttempt.java</code>(#347에서 삭제)</li>
+<li><code>PaymentStatus.java</code>(#347에서 삭제)</li>
 </ul>
-<p>관련 기존 테스트: <a href="../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentBoundaryPostgresTest.java">PaymentBoundaryPostgresTest.java</a> · <a href="../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentRecoveryStorePostgresTest.java">PaymentRecoveryStorePostgresTest.java</a>.</p>
+<p>관련 기존 테스트: <code>PaymentBoundaryPostgresTest.java</code>(#347에서 삭제) · <code>PaymentRecoveryStorePostgresTest.java</code>(#347에서 삭제).</p>
 <p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p>
 <h2 id="payment-환불-실행">Payment 환불 실행</h2>
-<p><strong>교체 예정:</strong> 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 <a href="overview.html">Payment 도메인 홈</a>에 있다.</p>
+<p><strong>코드 삭제됨:</strong> 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다.</p>
 <p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
 <p><a href="overview.html">시각 자료</a></p>
 <h3 id="범위와-불변조건_1">범위와 불변조건</h3>
@@ -194,11 +192,11 @@
 </table></div>
 <h3 id="구현과-검증-근거_1">구현과 검증 근거</h3>
 <ul>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundExecutionService.java">RefundExecutionService.java</a></li>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundRecoveryStore.java">RefundRecoveryStore.java</a></li>
-<li><a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundOutcomeService.java">RefundOutcomeService.java</a></li>
+<li><code>RefundExecutionService.java</code>(#347에서 삭제)</li>
+<li><code>RefundRecoveryStore.java</code>(#347에서 삭제)</li>
+<li><code>RefundOutcomeService.java</code>(#347에서 삭제)</li>
 </ul>
-<p>관련 기존 테스트: <a href="../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/RefundRecoveryStorePostgresTest.java">RefundRecoveryStorePostgresTest.java</a> · <a href="../../../../services/payment-service/src/test/java/com/shoppinglive/payment/service/RefundMockEngineTest.java">RefundMockEngineTest.java</a>.</p>
-<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>73dcb1852a3334d0e0cb17b206d372b6c4001a48fa24eb72c7e2264fd0f2aed5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>관련 기존 테스트: <code>RefundRecoveryStorePostgresTest.java</code>(#347에서 삭제) · <code>RefundMockEngineTest.java</code>(#347에서 삭제).</p>
+<p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>d0b53caa360b821965d7ef35729a19534745be6ba0982e7da02544348aa5caff</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

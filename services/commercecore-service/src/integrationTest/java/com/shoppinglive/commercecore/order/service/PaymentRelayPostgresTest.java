@@ -144,6 +144,154 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         return new Approved(paymentId, number, remoteCreate.amount(), Instant.now());
     }
 
+    long cartRow(String member, long sku, int quantity) {
+        return jdbc.queryForObject(
+                "INSERT INTO cart_item(member_id,product_id,sku_id,quantity,version,created_at,updated_at) SELECT ?,product_id,id,?,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM sku WHERE id=? RETURNING id",
+                Long.class,
+                member,
+                quantity,
+                sku);
+    }
+
+    String createCartRelay(long cart) {
+        return relay.create(
+                        MEMBER_A,
+                        "cart-cleanup",
+                        new RelayOrderRequest(
+                                null,
+                                List.of(
+                                        new com.shoppinglive.commercecore.cart.dto.CartSelection(
+                                                cart, 0L)),
+                                "구매자",
+                                "01012345678",
+                                6000L,
+                                COUPON,
+                                501L))
+                .number();
+    }
+
+    boolean cartExists(long id) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM cart_item WHERE id=?", Integer.class, id)
+                == 1;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"unchanged", "quantity", "readded"})
+    @DisplayName("최초 승인은 구매 SKU의 변경·재추가 행을 정리하고 다른 SKU·회원과 성공 후 재담기를 보존한다")
+    void cleansPurchasedSkuOnce(String edit) {
+        long selected = cartRow(MEMBER_A, 501, 2);
+        long otherSku = cartRow(MEMBER_A, 503, 3);
+        long otherProduct = cartRow(MEMBER_A, 502, 1);
+        long otherMember = cartRow(MEMBER_B, 501, 4);
+        String number = createCartRelay(selected);
+        prepare(number);
+        accept(number);
+        long current = selected;
+        if (edit.equals("quantity"))
+            jdbc.update("UPDATE cart_item SET quantity=7,version=version+1 WHERE id=?", selected);
+        if (edit.equals("readded")) {
+            jdbc.update("DELETE FROM cart_item WHERE id=?", selected);
+            current = cartRow(MEMBER_A, 501, 8);
+        }
+        var approved = fact(number);
+        assertThat(relay.approved(approved)).isTrue();
+        assertThat(cartExists(current)).isFalse();
+        assertThat(cartExists(otherSku)).isTrue();
+        assertThat(cartExists(otherProduct)).isTrue();
+        assertThat(cartExists(otherMember)).isTrue();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT source_cart_item_id,source_cart_item_version FROM orders WHERE payment_group_id=?",
+                                id(number)))
+                .containsEntry("source_cart_item_id", selected)
+                .containsEntry("source_cart_item_version", 0L);
+        long readded = cartRow(MEMBER_A, 501, 5);
+        assertThat(relay.approved(approved)).isFalse();
+        assertThat(cartExists(readded)).isTrue();
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(18);
+        assertThat(couponStatus()).isEqualTo("USED");
+    }
+
+    @Test
+    @DisplayName("직접 구매 성공은 같은 회원의 동일 SKU 장바구니를 보존한다")
+    void directPurchaseKeepsCart() {
+        long cart = cartRow(MEMBER_A, 501, 2);
+        String number = createRelay("direct", false).number();
+        prepare(number);
+        accept(number);
+        assertThat(relay.approved(fact(number))).isTrue();
+        assertThat(cartExists(cart)).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"declined", "cancelled", "expired", "late"})
+    @DisplayName("결제 실패·취소·만료와 만료 후 늦은 승인은 장바구니를 정리하지 않는다")
+    void unsuccessfulOrdersKeepCart(String outcome) {
+        long cart = cartRow(MEMBER_A, 501, 2);
+        String number = createCartRelay(cart);
+        if (outcome.equals("cancelled")) lifecycle.cancel(MEMBER_A, number);
+        else if (outcome.equals("expired")) {
+            makeExpired(sheets.get(MEMBER_A, number));
+            assertThat(lifecycle.expire(id(number))).isTrue();
+        } else {
+            prepare(number);
+            var delivery = accept(number);
+            if (outcome.equals("declined")) relay.declined(delivery, Map.of("status", "DECLINED"));
+            else {
+                expiry(number);
+                assertThat(relay.approved(fact(number))).isTrue();
+            }
+        }
+        assertThat(cartExists(cart)).isTrue();
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("성공 알림 저장 실패는 Cart 삭제·주문·재고·쿠폰·승인 멱등표식을 롤백하고 재시도한다")
+    void rollsBackCartCleanupAndRetriesApproval() {
+        long cart = cartRow(MEMBER_A, 501, 2);
+        String number = createCartRelay(cart);
+        prepare(number);
+        accept(number);
+        EventOutbox target =
+                org.springframework.test.util.AopTestUtils.getUltimateTargetObject(outbox);
+        doThrow(new IllegalStateException("성공 알림 저장 실패"))
+                .when(target)
+                .append(
+                        eq(
+                                com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher
+                                        .TOPIC),
+                        any());
+        var approved = fact(number);
+        assertThatThrownBy(() -> relay.approved(approved))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(cartExists(cart)).isTrue();
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT status FROM orders WHERE payment_group_id=?",
+                                String.class,
+                                id(number)))
+                .containsOnly("PAYMENT_CONFIRMING");
+        assertThat(reserved(501)).isEqualTo(2);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(relayStore.binding(id(number)).approvedAt()).isNull();
+        doCallRealMethod()
+                .when(target)
+                .append(
+                        eq(
+                                com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher
+                                        .TOPIC),
+                        any());
+        assertThat(relay.approved(approved)).isTrue();
+        assertThat(cartExists(cart)).isFalse();
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("USED");
+    }
+
     @Test
     @DisplayName("준비는 판매자별 할인후 금액과 설정 수수료를 보존하고 PENDING과 원래600초 기한을 유지한다")
     void preparationPreservesPendingAndImmutableSellerSnapshot() throws Exception {

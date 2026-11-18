@@ -612,7 +612,7 @@ record Line(Account account, long debit, long credit, String sellerId) {}
 </code></pre>
 <ul>
 <li><code>contracts/events/payment-execution-results.yaml</code>의 <code>PaymentExecutionResolved</code>를 <code>PaymentApproved</code>로 <strong>교체</strong>한다. 메시지마다 <code>examples</code>를 둔다.</li>
-<li>발행 객체로 만든 표본을 <code>build/contract-samples</code>에 남기는 직렬화 테스트가 계약 검사를 통과해야 한다(PAY-EVENT-02). 기존 <code>ExecutionEventContractTest</code>는 #347에서 지워지므로 <code>PaymentApprovedContractTest</code>를 새로 만든다(옛 테스트의 표본 저장 방식을 참고).</li>
+<li>발행 객체로 만든 표본을 <code>build/contract-samples</code>에 남기는 직렬화 테스트가 계약 검사를 통과해야 한다(PAY-EVENT-02). #347이 옛 DTO 없이 표본만 만드는 형태로 남긴 <code>ExecutionEventContractTest</code>를 지우고 <code>PaymentApprovedContractTest</code>를 새로 만든다(표본 저장 방식은 같다).</li>
 <li>발행 전 재시작 뒤 발행(EC 30)은 common-module <code>OutboxTransactionIntegrationTest</code>가 이미 검증한다.</li>
 </ul>
 <h2 id="테스트">테스트</h2>
@@ -770,6 +770,6 @@ record Line(Account account, long debit, long credit, String sellerId) {}
 <li>옛 이벤트는 호환을 깨고 지운다(위 "바뀌는 점" 아래 문단).</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>5bb40cb7b54b58f57ff09f0ab1c4ac4936fe46b07f7dbaf71d75dd34bab66148</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>5fc3c2b6947eae158362b35945419c2b84c713d7ac02ea388c863dd8c59e22dd</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

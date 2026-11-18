@@ -20,8 +20,8 @@
 - [ ] 실제 Payment 환불 요청 소비·성공/실패 결과 생산과 UNKNOWN 복구중단 조회/통지를 확정하고 연결한다.
 - [ ] 과거 확인중 NULL 기한·미확정 승인/환불/종료 행을 원래 Payment 결과와 대사해 운영 재개 조건을 확정한다. 복제 DB 구조/데이터 보존은 금전 처리 재개 증거가 아니다.
 - [ ] 실제 위젯 설정/키·customerKey 공급과 원격 SDK/실 PG를 검증한다. 이번 Core 병합의 필수조건으로 확대하지 않는다.
-- [ ] 사용자 수량환불·동시환불은 #345, 공개 다중 SKU/옵션은 #340 보류를 유지한다.
+- [ ] 사용자 수량환불·동시환불은 #345, 공개 다중 SKU/옵션은 별도 보류를 유지한다.
 
 ## 기존 Mock 기준과 Payment 목표 설계
 
-기존 Mock 설명은 결제 재설계(#337)에서 교체할 예정이며 새 Payment 설계 원본은 [Payment 도메인 홈](../../services/payment/overview.md)이다. 이전 동일 키/원문 연결·유효 확인중 예약 유지·중복 결과 방지 기준은 위 Core 조건으로 검증 범위를 명시했다. [이전 보존 기록](../../../worklog/plans/completed/331-order-module/verification.md)을 최신 실제 PG/환불 실행 완료로 재사용하지 않는다. Payment 소유 원문·계약은 이 작업에서 임의 변경하지 않는다.
+기존 Mock 설명은 결제 재설계(#337)에서 교체할 예정이며 새 Payment 설계 원본은 [Payment 도메인 홈](../../services/payment/overview.md)이다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 기존 결제·환불 호출은 403을 받는다. 이전 동일 키/원문 연결·유효 확인중 예약 유지·중복 결과 방지 기준은 위 Core 조건으로 검증 범위를 명시했다. [이전 보존 기록](../../../worklog/plans/completed/331-order-module/verification.md)을 최신 실제 PG/환불 실행 완료로 재사용하지 않는다. Payment 소유 원문·계약은 이 작업에서 임의 변경하지 않는다.

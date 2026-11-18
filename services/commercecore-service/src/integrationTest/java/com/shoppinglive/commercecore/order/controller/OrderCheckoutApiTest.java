@@ -65,8 +65,6 @@ class OrderCheckoutApiTest
 
     @Autowired private com.shoppinglive.commercecore.order.repository.PaymentGroupRepository groups;
 
-    @Autowired private com.shoppinglive.payment.repository.PaymentAttemptJpaRepository payments;
-
     private static final String COUPON_ID = "44444444-4444-4444-8444-444444444444";
 
     @BeforeEach
@@ -106,7 +104,6 @@ class OrderCheckoutApiTest
 
     @AfterEach
     void tearDown() {
-        payments.deleteAll();
         orders.deleteAll();
         groups.deleteAll();
         jdbc.update("DELETE FROM member_coupon WHERE coupon_id=?", COUPON_ID);

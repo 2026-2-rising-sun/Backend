@@ -6,7 +6,6 @@ import com.shoppinglive.commercecore.cart.service.CartService;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
@@ -15,14 +14,12 @@ import com.shoppinglive.commercecore.sales.entity.SalesStock;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
-import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
-import com.shoppinglive.payment.service.MockPaymentEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+/** 옛 Payment 서버 없이 Core 주문·결제 묶음 상태만 준비한다. 결제·환불을 끝내는 도우미는 #347에서 지웠다. */
 public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport {
     private static final String CORE_SCHEMA =
             "core_refund_" + java.util.UUID.randomUUID().toString().replace("-", "");
@@ -54,22 +51,18 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
     @Autowired protected CartService cart;
     @Autowired protected CartItemRepository cartItems;
     @Autowired protected OrderJpaRepository orders;
-    @Autowired protected PaymentAttemptJpaRepository attempts;
     @Autowired protected SalesJpaRepository sales;
     @Autowired protected SalesStockJpaRepository stocks;
     @Autowired protected InMemoryProductLookupStub productLookup;
     @Autowired protected JdbcTemplate jdbc;
-    @Autowired protected PaymentClientTestConfiguration.BoundaryPaymentServer paymentServer;
     @Autowired protected PaymentDeliveryStore deliveries;
     @Autowired protected PaymentDispatcher dispatcher;
-    @MockitoBean protected MockPaymentEngine engine;
     protected CartItem a;
     protected CartItem b;
 
     @BeforeEach
     void seedRefundFixtures() {
         cleanRefundFixtures();
-        paymentServer.reset();
         productLookup.register(new ProductSnapshot(81001L, "A", null, SELLER));
         productLookup.register(new ProductSnapshot(81002L, "B", null, SELLER_B));
         Long salesA = sales.saveAndFlush(new Sales(81001L, 10000L, SalesStatus.ON_SALE)).getId();
@@ -88,15 +81,9 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         }
         jdbc.update("DELETE FROM late_approval_refund");
         jdbc.update("DELETE FROM event_outbox");
-        paymentServer.jdbc.update("DELETE FROM mock_refund_result");
-        paymentServer.jdbc.update("DELETE FROM refund_execution");
         jdbc.update("DELETE FROM payment_delivery_request");
         jdbc.update("DELETE FROM refund_target_order");
         jdbc.update("DELETE FROM refund_request");
-        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
-        if (attempts != null) {
-            attempts.deleteAll();
-        }
         if (orders != null) {
             orders.deleteAll();
         }
@@ -119,102 +106,5 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
         if (productLookup != null) {
             productLookup.clear();
         }
-    }
-
-    protected PaymentGroupService.GroupResponse createAndPay() {
-        var created =
-                paymentGroups
-                        .create(
-                                MEMBER_A,
-                                java.util.List.of(
-                                        new PaymentGroupService.Selection(
-                                                a.getId(), a.getVersion()),
-                                        new PaymentGroupService.Selection(
-                                                b.getId(), b.getVersion())),
-                                "구매자",
-                                "01012345678",
-                                25000L,
-                                "refund-order")
-                        .group();
-        var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-payment");
-        if (attempt.getStatus() != PaymentStatus.SUCCESS) {
-            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
-        }
-        return paymentGroups.get(MEMBER_A, created.groupNumber());
-    }
-
-    protected void submitRefund(long id) {
-        var delivery = deliveries.byRefund(id);
-        paymentClient.refund(
-                deliveries.read(
-                        delivery.command(),
-                        com.shoppinglive.commercecore.payment.dto.RefundCommand.class));
-    }
-
-    @Autowired protected PaymentClient paymentClient;
-
-    protected void makeRefundDue(long requestId) {
-        paymentServer.jdbc.update(
-                "UPDATE refund_execution SET next_action_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
-                requestId);
-    }
-
-    protected PaymentGroupService.GroupResponse createAndPayWithCoupon() {
-        return createAndPayWithCoupon(1000);
-    }
-
-    protected PaymentGroupService.GroupResponse createAndPayWithCoupon(long discount) {
-        var now = java.time.Instant.now();
-        jdbc.update(
-                """
-            INSERT INTO coupon_definition(id,seller_id,name,fixed_discount,issuance_limit,issued_count,
-                starts_at,ends_at,expires_at,created_at)
-            VALUES (?,?,?,?,1,1,?,?,?,?)
-            """,
-                REFUND_COUPON,
-                SELLER,
-                "환불 테스트 쿠폰",
-                discount,
-                java.sql.Timestamp.from(now.minusSeconds(60)),
-                java.sql.Timestamp.from(now.plusSeconds(3600)),
-                java.sql.Timestamp.from(now.plusSeconds(7200)),
-                java.sql.Timestamp.from(now));
-        jdbc.update(
-                "INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)",
-                REFUND_COUPON,
-                81001L);
-        jdbc.update(
-                "INSERT INTO coupon_target(coupon_id,product_id) VALUES (?,?)",
-                REFUND_COUPON,
-                81002L);
-        jdbc.update(
-                """
-            INSERT INTO member_coupon(id,coupon_id,member_id,status,claimed_at)
-            VALUES (?,?,?,'AVAILABLE',?)
-            """,
-                java.util.UUID.randomUUID().toString(),
-                REFUND_COUPON,
-                MEMBER_A,
-                java.sql.Timestamp.from(now));
-        var created =
-                paymentGroups
-                        .create(
-                                MEMBER_A,
-                                java.util.List.of(
-                                        new PaymentGroupService.Selection(
-                                                a.getId(), a.getVersion()),
-                                        new PaymentGroupService.Selection(
-                                                b.getId(), b.getVersion())),
-                                "구매자",
-                                "01012345678",
-                                25000L,
-                                REFUND_COUPON,
-                                "refund-coupon-order")
-                        .group();
-        var attempt = paymentGroups.start(MEMBER_A, created.groupNumber(), "refund-coupon-payment");
-        if (attempt.getStatus() != PaymentStatus.SUCCESS) {
-            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
-        }
-        return paymentGroups.get(MEMBER_A, created.groupNumber());
     }
 }

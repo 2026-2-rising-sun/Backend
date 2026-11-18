@@ -23,12 +23,13 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     @Query("select c from CartItem c where c.id = :id and c.memberId = :memberId")
     Optional<CartItem> lockOwned(@Param("id") Long id, @Param("memberId") String memberId);
 
-    @Modifying(flushAutomatically = true)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
-            "delete from CartItem c where c.id = :id and c.memberId = :memberId"
-                    + " and c.version = :version")
-    int deletePurchased(
-            @Param("id") Long id,
-            @Param("memberId") String memberId,
-            @Param("version") Long version);
+            "select c from CartItem c where c.memberId = :memberId and c.skuId in :skuIds order by c.id")
+    List<CartItem> lockPurchasedSkus(
+            @Param("memberId") String memberId, @Param("skuIds") List<Long> skuIds);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from CartItem c where c.memberId = :memberId and c.skuId in :skuIds")
+    int deletePurchasedSkus(@Param("memberId") String memberId, @Param("skuIds") List<Long> skuIds);
 }

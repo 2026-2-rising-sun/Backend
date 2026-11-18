@@ -24,7 +24,7 @@ import org.springframework.web.client.ResourceAccessException;
 class OrderProcessingDeadlinePostgresTest extends RefundTestSupport {
     @MockitoSpyBean OrderTimeSource time;
 
-    @MockitoSpyBean(name = "boundaryPaymentClient")
+    @MockitoSpyBean(name = "paymentClient")
     PaymentClient client;
 
     @MockitoSpyBean LateApprovalRefundStore lateRefunds;

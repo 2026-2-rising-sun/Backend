@@ -86,35 +86,6 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("Sales 이력 없는 SKU 주문도 결제 후 환불 성공 수량을 한 번만 복구한다")
-    void legacySkuOnlyPaymentAndRefundRemainIdempotent() {
-        jdbc.update("DELETE FROM sales_stock WHERE sales_info_id=501");
-        jdbc.update("DELETE FROM sales_info WHERE id=501");
-        var order = legacy("sku-refund");
-        var number = order.getPaymentGroup().getGroupNumber();
-        var payment = legacyGroups.start(MEMBER_A, number, "sku-payment");
-        paymentServer
-                .context
-                .getBean(com.shoppinglive.payment.service.PaymentService.class)
-                .resolvePayment(payment.paymentId());
-        dispatcher.payment(payment.paymentId());
-        assertThat(reserved(501)).isZero();
-        assertThat(available(501)).isEqualTo(18);
-        var refund = legacyRefunds.request(MEMBER_A, number, "sku-refund", List.of()).refund();
-        assertThat(refund.refundAmount()).isEqualTo(8000);
-        refundDriver.execute(refund.id());
-        refundDriver.execute(refund.id());
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(reserved(501)).isZero();
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT status FROM orders WHERE id=?",
-                                String.class,
-                                order.getId()))
-                .isEqualTo("REFUNDED");
-    }
-
-    @Test
     @DisplayName("구 productId 주문은 SKU가 여러 개면 임의 옵션을 선택하지 않는다")
     void legacyApiRejectsAmbiguousSku() {
         jdbc.update("UPDATE sku SET product_id=101 WHERE id=502");
@@ -124,30 +95,6 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
                 .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
         assertThat(available(501)).isEqualTo(20);
         assertThat(reserved(501)).isZero();
-    }
-
-    @Test
-    @DisplayName("기존 주문 결제 성공은 판매 중지 뒤에도 같은 SKU 예약만 한 번 소진한다")
-    void legacySuccessDoesNotRevalidateSale() {
-        var order = legacy("paid");
-        jdbc.update("UPDATE product SET sale_enabled=FALSE WHERE id=101");
-        jdbc.update("UPDATE sku SET sale_status='PRIVATE' WHERE id=501");
-        var payment =
-                legacyGroups.start(MEMBER_A, order.getPaymentGroup().getGroupNumber(), "payment");
-        paymentServer
-                .context
-                .getBean(com.shoppinglive.payment.service.PaymentService.class)
-                .resolvePayment(payment.paymentId());
-        dispatcher.payment(payment.paymentId());
-        dispatcher.payment(payment.paymentId());
-        assertThat(available(501)).isEqualTo(18);
-        assertThat(reserved(501)).isZero();
-        assertThat(
-                        legacyGroups
-                                .get(MEMBER_A, order.getPaymentGroup().getGroupNumber())
-                                .status()
-                                .name())
-                .isEqualTo("PAID");
     }
 
     @Test

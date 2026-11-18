@@ -21,7 +21,6 @@ import com.shoppinglive.commercecore.sku.dto.SkuView;
 import com.shoppinglive.commercecore.sku.entity.SkuSaleStatus;
 import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
-import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -39,14 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Sql("classpath:cart/sku-fixture.sql")
 class CartOrderIntegrationTest
         extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
-
-    @Autowired
-    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
-                    .BoundaryPaymentServer
-            paymentServer;
-
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     private static final String MEMBER_A = "11111111-1111-4111-8111-111111111111";
     private static final String MEMBER_B = "22222222-2222-4222-8222-222222222222";
@@ -54,13 +45,11 @@ class CartOrderIntegrationTest
     @Autowired CartItemRepository items;
     @Autowired OrderCreationService creation;
     @Autowired OrderJpaRepository orders;
-    @Autowired PaymentAttemptJpaRepository payments;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
     @Autowired SkuService skus;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired TransactionTemplate transaction;
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentService paymentService;
     private Long salesId;
     private final java.util.List<Long> skuFixtures = new java.util.ArrayList<>();
 
@@ -79,15 +68,13 @@ class CartOrderIntegrationTest
         skuFixtures.add(salesId);
         skuFixtures.add(1_000_000_000L + salesId);
         jdbc.update(
-                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,1,1000,10,0,'ON_SALE',0,1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(?,2,1000,0,0,'READY',0,1,'다른 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,1,1000,10,0,'ON_SALE',1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(?,2,1000,0,0,'READY',1,'다른 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 salesId,
                 1_000_000_000L + salesId);
     }
 
     @AfterEach
     void clean() {
-        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
-        payments.deleteAll();
         jdbc.update("DELETE FROM payment_delivery_request");
         orders.deleteAll();
         items.deleteAll();
@@ -109,9 +96,9 @@ class CartOrderIntegrationTest
         return new CartOrderCommand("회원", "01012345678", amount);
     }
 
-    @DisplayName("장바구니는 재고를 예약하지 않고 결제 성공 시 선택 항목만 멱등하게 삭제한다")
+    @DisplayName("장바구니는 재고를 예약하지 않고 같은 키 재전송은 같은 주문을 돌려준다")
     @Test
-    void cartDoesNotReserveAndSuccessfulPaymentDeletesOnlySelectedItemWithReplay() {
+    void cartDoesNotReserveAndReplayReturnsSameOrder() {
         var selected = cart.add(MEMBER_A, 1L, 2);
         var other = cart.add(MEMBER_A, 2L, 1);
         assertThat(skuSnapshot().reserved()).isZero();
@@ -125,23 +112,6 @@ class CartOrderIntegrationTest
         assertThat(replay.order().getId()).isEqualTo(first.order().getId());
         assertThat(orders.count()).isEqualTo(1);
         assertThat(skuSnapshot().reserved()).isEqualTo(2);
-        var payment = paymentService.startPayment(first.order().getOrderNumber(), MEMBER_A);
-        org.awaitility.Awaitility.await()
-                .atMost(java.time.Duration.ofSeconds(10))
-                .untilAsserted(
-                        () -> {
-                            dispatcher.dispatch(deliveries.byPayment(payment.paymentId()));
-                            assertThat(
-                                            orders.findById(first.order().getId())
-                                                    .orElseThrow()
-                                                    .getStatus())
-                                    .isEqualTo(
-                                            com.shoppinglive.commercecore.order.entity.OrderStatus
-                                                    .PAID);
-                            assertThat(items.findAll())
-                                    .extracting(item -> item.getId())
-                                    .containsExactly(other.getId());
-                        });
         assertThatThrownBy(
                         () ->
                                 creation.createFromCart(

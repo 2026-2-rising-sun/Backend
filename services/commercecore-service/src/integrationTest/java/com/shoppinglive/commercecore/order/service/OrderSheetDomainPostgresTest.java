@@ -187,10 +187,6 @@ class OrderSheetDomainPostgresTest extends OrderSheetPostgresSupport {
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM payment_delivery_request", Integer.class))
                 .isZero();
-        assertThat(
-                        paymentServer.jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM payment_attempt", Integer.class))
-                .isZero();
         assertThat(jdbc.queryForObject("SELECT to_regclass('order_payment_closure')", String.class))
                 .isNull();
     }

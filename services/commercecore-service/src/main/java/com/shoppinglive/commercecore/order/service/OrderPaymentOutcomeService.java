@@ -1,6 +1,6 @@
 package com.shoppinglive.commercecore.order.service;
 
-import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartSelectionPort;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
@@ -32,7 +32,7 @@ public class OrderPaymentOutcomeService {
     private final LateApprovalRefundStore lateRefunds;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final CartItemRepository cart;
+    private final CartSelectionPort cart;
     private final SkuService skus;
     private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
@@ -48,7 +48,7 @@ public class OrderPaymentOutcomeService {
             LateApprovalRefundStore lateRefunds,
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
-            CartItemRepository cart,
+            CartSelectionPort cart,
             SkuService skus,
             PaymentDeliveryStore payments,
             PurchaseGuard guard,
@@ -108,12 +108,15 @@ public class OrderPaymentOutcomeService {
                     if (g.getStatus() != OrderStatus.PAYMENT_CONFIRMING)
                         throw conflict("결제 결과 대상 주문의 상태가 다릅니다.");
                     List<Order> children = orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
-                    // 생성 때와 동일하게 장바구니를 재고보다 먼저 잠그고, 재고는 판매 ID 오름차순으로 잠근다.
-                    for (Order child : children) {
-                        if (child.getSourceCartItemId() != null) {
-                            cart.lockOwned(child.getSourceCartItemId(), g.getMemberId());
-                        }
-                    }
+                    var purchasedSkus =
+                            children.stream()
+                                    .filter(child -> child.getSourceCartItemId() != null)
+                                    .map(Order::getTradeSkuId)
+                                    .distinct()
+                                    .toList();
+                    // Cart 현재 행을 ID순으로 잠근 뒤 SKU 재고를 잠그는 순서를 유지한다.
+                    if (!purchasedSkus.isEmpty())
+                        cart.lockForCompletion(g.getMemberId(), purchasedSkus);
                     OrderStatus finalStatus =
                             result.status() == PaymentStatus.SUCCESS
                                     ? OrderStatus.PAID
@@ -134,19 +137,12 @@ public class OrderPaymentOutcomeService {
                         }
                         if (result.status() == PaymentStatus.SUCCESS) {
                             skus.consume(child.getTradeSkuId(), child.getQuantity());
-
-                            if (child.getSourceCartItemId() != null
-                                    && child.getSourceCartItemVersion() != null) {
-                                jdbc.update(
-                                        "DELETE FROM cart_item WHERE id=? AND member_id=? AND version=?",
-                                        child.getSourceCartItemId(),
-                                        g.getMemberId(),
-                                        child.getSourceCartItemVersion());
-                            }
                         } else {
                             restore(child);
                         }
                     }
+                    if (result.status() == PaymentStatus.SUCCESS && !purchasedSkus.isEmpty())
+                        cart.deletePurchased(g.getMemberId(), purchasedSkus);
                     g.transition(finalStatus);
                     groups.saveAndFlush(g);
                     payments.record(delivery, result, result.status().name());
@@ -182,6 +178,9 @@ public class OrderPaymentOutcomeService {
                     }
                     var order = orders.findById(p.orderId()).orElseThrow();
                     boolean success = p.status() == PaymentStatus.SUCCESS;
+                    boolean fromCart = order.getSourceCartItemId() != null;
+                    if (success && fromCart)
+                        cart.lockForCompletion(order.getMemberId(), List.of(order.getTradeSkuId()));
                     if (orders.transitionStatus(
                                     order.getId(),
                                     "PAYMENT_CONFIRMING",
@@ -189,6 +188,9 @@ public class OrderPaymentOutcomeService {
                             != 1) throw new IllegalStateException("단건 결제 주문 상태가 다릅니다.");
                     if (success) {
                         skus.consume(order.getTradeSkuId(), order.getQuantity());
+                        if (fromCart)
+                            cart.deletePurchased(
+                                    order.getMemberId(), List.of(order.getTradeSkuId()));
                     } else skus.release(order.getTradeSkuId(), order.getQuantity());
                     payments.record(current, p, p.status().name());
                     return true;

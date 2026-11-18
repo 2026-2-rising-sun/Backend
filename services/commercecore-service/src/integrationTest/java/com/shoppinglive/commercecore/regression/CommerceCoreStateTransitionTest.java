@@ -12,16 +12,12 @@ import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.order.service.OrderExpirationScheduler;
 import com.shoppinglive.commercecore.order.service.OrderService;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
-import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
 import com.shoppinglive.commercecore.sales.repository.SalesJpaRepository;
 import com.shoppinglive.commercecore.sales.repository.SalesStockJpaRepository;
 import com.shoppinglive.commercecore.sku.service.SkuSalesService;
-import com.shoppinglive.payment.repository.PaymentAttemptJpaRepository;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +38,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 class CommerceCoreStateTransitionTest
         extends com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport {
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired OrderExpirationScheduler expiration;
@@ -51,22 +46,13 @@ class CommerceCoreStateTransitionTest
     @Autowired
     com.shoppinglive.commercecore.order.service.PaymentGroupExpirationScheduler groupExpiration;
 
-    @Autowired PaymentService payments;
-    @Autowired com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry scenarios;
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
     @Autowired SkuSalesService sales;
     @Autowired OrderJpaRepository orderRepository;
-    @Autowired PaymentAttemptJpaRepository paymentRepository;
     @Autowired SalesJpaRepository salesRepository;
     @Autowired SalesStockJpaRepository stockRepository;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired TransactionTemplate transaction;
     @Autowired JdbcTemplate jdbc;
-
-    @Autowired
-    com.shoppinglive.commercecore.payment.service.PaymentClientTestConfiguration
-                    .BoundaryPaymentServer
-            paymentServer;
 
     @Autowired MockMvc mvc;
     private Long salesId;
@@ -84,8 +70,6 @@ class CommerceCoreStateTransitionTest
 
     @AfterEach
     void clean() {
-        paymentServer.jdbc.update("DELETE FROM mock_gateway_result");
-        paymentRepository.deleteAll();
         jdbc.update("DELETE FROM payment_delivery_request");
         orderRepository.deleteAll();
         stockRepository.deleteAll();
@@ -120,19 +104,13 @@ class CommerceCoreStateTransitionTest
                         order.getPaymentGroup().getId());
                 groupExpiration.run();
             }
-            case "fail" -> {
-                scenarios.set(order.getOrderNumber(), PaymentScenario.INSTANT_FAIL);
-                var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
-                assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isTrue();
-                assertThat(dispatcher.dispatch(deliveries.byPayment(attempt.getId()))).isFalse();
-            }
             default -> throw new IllegalArgumentException(path);
         }
     }
 
     @DisplayName("마지막 예약 재고를 복구하면 다시 주문할 수 있다")
     @ParameterizedTest
-    @ValueSource(strings = {"cancel", "expire", "fail"})
+    @ValueSource(strings = {"cancel", "expire"})
     void allowsNewOrderAfterRestoringLastReservedItem(String path) {
         Order order = create();
         assertThat(legacySku(salesId).status()).isEqualTo(SalesStatus.SOLD_OUT);
@@ -144,7 +122,7 @@ class CommerceCoreStateTransitionTest
 
     @DisplayName("재고를 복구해도 판매자가 지정한 비공개 상태를 유지한다")
     @ParameterizedTest
-    @ValueSource(strings = {"cancel", "expire", "fail"})
+    @ValueSource(strings = {"cancel", "expire"})
     void preservesPrivateStatusWhenRestoringStock(String path) {
         Order order = create();
         sales.changeStatus(salesId, SalesStatus.PRIVATE, SELLER);
@@ -170,29 +148,6 @@ class CommerceCoreStateTransitionTest
         assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(legacyStock(salesId).getAvailable()).isZero();
-    }
-
-    @DisplayName("결제의 재고 처리에 실패하면 결제·주문 확정도 롤백한다")
-    @ParameterizedTest
-    @EnumSource(
-            value = PaymentScenario.class,
-            names = {"INSTANT_SUCCESS", "INSTANT_FAIL"})
-    void rollsBackPaymentAndOrderConfirmationWhenStockUpdateFails(PaymentScenario scenario) {
-        Order order = create();
-        scenarios.set(order.getOrderNumber(), scenario);
-        var attempt = payments.startPayment(order.getOrderNumber(), MEMBER_A);
-        jdbc.update("UPDATE sku SET reserved = 0 WHERE id = ?", salesId);
-        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(attempt.getId())))
-                .isInstanceOf(IllegalStateException.class);
-        assertThat(deliveries.payment(attempt.getId()).status())
-                .isEqualTo(PaymentStatus.PROCESSING);
-        assertThat(paymentRepository.findById(attempt.getId()).orElseThrow().getStatus().name())
-                .isEqualTo(
-                        com.shoppinglive.payment.entity.PaymentScenario.valueOf(scenario.name())
-                                .getOutcome()
-                                .name());
-        assertThat(orderRepository.findById(order.getId()).orElseThrow().getStatus())
-                .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
     }
 
     @DisplayName("0재고 SKU는 수동 상태를 ON_SALE로 저장하고 외부에는 SOLD_OUT을 반환한다")
