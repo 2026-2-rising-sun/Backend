@@ -1,6 +1,6 @@
 # #348 결제 생성·결제창·조회 내부 API
 
-상태: 설계 확정(2026-11-15)
+상태: 구현 완료(2026-11-16), 병합 대기. 설계 확정은 2026-11-15
 이슈: [#348](https://github.com/2026-2-rising-sun/Backend/issues/348) · Phase 문서: [Phase 1 결제 1차](../phase1-payment.md)
 
 ## 개요

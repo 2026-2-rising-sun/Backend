@@ -2,7 +2,7 @@
 
 책임: 결제·환불 실행, PG(토스) 연동, 원장, 결과 Outbox.
 
-결제 재설계(#337)가 진행 중이다. **새 설계**가 목표이고, **현재 코드** 문서는 재설계 PR에서 코드와 함께 교체한다.
+결제 재설계(#337)가 진행 중이다. 결제 1차(결제 생성·승인·결과 불명 복구·만료)는 구현했고, 환불부터는 **새 설계**에만 있다. **현재 코드** 절은 지금 코드에 있는 것만 적는다.
 
 ## 새 설계 (결제 재설계)
 
@@ -15,18 +15,16 @@
 | 결제 1차 상세 | [결제 1차 계획](../../../worklog/plans/active/337-payment-redesign/phase1-payment.md) · [작은 판단](../../../worklog/plans/active/337-payment-redesign/decision.md) |
 | 에이전트 주의점 | [Payment 작업 주의점](../../../../services/payment-service/AGENTS.md) |
 
-## 현재 코드 (결제 재설계 구현 중)
+## 현재 코드 (결제 1차)
 
 결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 토스 결제 클라이언트(승인·조회·취소, 결과 4분류)와 승인 처리 서비스(`ApprovalService`·`PaymentOutcomeService`)가 있다. 승인 처리는 검증·APPROVING 전환을 커밋한 뒤 트랜잭션 밖에서 토스를 부르고, 결과를 상태·pg_call·승인 분개·`PaymentApproved` outbox에 한 트랜잭션으로 반영한다. 승인 API(`ApprovalController`)는 검증·APPROVING 전환 뒤 토스 호출·반영을 가상 스레드에 넘기고 최대 8초(`payment.approval.response-wait`)만 기다려, 넘으면 202 PENDING으로 답한다. 결과 불명 복구·만료 스케줄러 3개(`ApprovingSweeper`: APPROVING 3분 정체 → UNKNOWN, `UnknownPaymentPoller`: UNKNOWN을 토스에 조회해 확정·마감 30분 뒤 ERROR 로그, `PaymentExpiryJob`: 만료된 CREATED → CANCELED)가 `payment.recovery.enabled`(기본 켜짐)일 때 돈다. 분산 락은 없고 조건부 UPDATE로 한 번만 반영한다(#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
 
 - API: [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml). `X-Service-Token`(commercecore)만 허용하고, 허용 목록(`/v1/internal/payments`, `…/{orderRef}`, `…/{orderRef}/checkouts`, `…/{orderRef}/approval`) 밖의 `/v1/internal/**`는 403이다.
 - 결제 키는 `orderRef`다. 같은 orderRef 생성은 `INSERT … ON CONFLICT DO NOTHING`의 영향 행 수로 판단하고, 결제창은 `CREATED`·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 [#348 설계서](../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.md#api).
 - DB: [ERD 설명](erd.md) · [관계도](erd.html)
-- 결과 이벤트: [계약 YAML](../../../../contracts/events/payment-execution-results.yaml). `PaymentApproved`(키 orderRef)로 교체했다(호환 깨짐). CommerceCore 소비자는 아직 옛 `PaymentExecutionResolved`를 기다리므로 주문 연동(Phase 2) 전까지 통합 환경 결제는 동작하지 않는다.
+- 결과 이벤트: [계약 YAML](../../../../contracts/events/payment-execution-results.yaml). `PaymentApproved`(키 orderRef)로 교체했다(호환 깨짐). CommerceCore는 주문서 결제 중계(`/v1/order-sheets`, `HttpPaymentRelayClient`)로 새 내부 API를 부르고 `PaymentApproved`를 소비한다. 옛 `HttpPaymentClient` 경로는 #347에서 지운 API를 부르므로 동작하지 않는다.
 
-아래 문서는 지운 Mock 구현의 기록이다. 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`.
-
-- 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)
+- 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)(환불 흐름은 Mock 구현 기록이고 새 환불 구현 때 교체한다)
 
 ## 원본·갱신
 
@@ -38,9 +36,9 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 <!-- visual: relations -->
 
-결제 재설계(#337)의 `payment.status`다. 이 문서는 지금 코드에 있는 전이만 적는다. 환불(Phase 3)은 [목표 설계](design.html#states)에 있다.
+결제 재설계(#337)의 `payment.status`다. 이 문서는 지금 코드에 있는 전이만 적는다. 환불은 [목표 설계](design.html#states)에 있다.
 
-기준: `feat/#349-payment-recovery`의 코드(결제 생성·결제창 #348, 승인 처리·승인 API #338, 결과 불명 복구·만료 #349).
+기준: 결제 1차 코드(결제 생성·결제창 #348, 승인 처리·승인 API #338, 결과 불명 복구·만료 #349).
 
 [시각 자료](overview.html)
 
@@ -83,36 +81,4 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 ## Payment 환불 실행
 
-<!-- visual: relations -->
-
-**코드 삭제됨:** 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다.
-
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
-
-[시각 자료](overview.html)
-
-### 범위와 불변조건
-
-payment.refunds.execution-enabled=false일 때 양수·0원 모두 접수만 하고 자동 실행·확정을 하지 않는다. 원결제→환불 실행 순서로 잠그고 PROCESSING/UNKNOWN/SUCCESS 합계로 한도를 검사한다. lease를 잃은 worker의 늦은 결과 쓰기는 허용하지 않는다.
-
-### 전이
-
-| 출발 | 도착 | 조건·부수 효과 |
-|---|---|---|
-| 신규 | PROCESSING | 동일 requestId·coreRefundRequestId 원문 확인과 성공한 원결제·누적 환불 한도 검증 후 접수한다. |
-| PROCESSING | UNKNOWN | 제공자 결과 유실·미확정. 다음 조회·lease 상태를 기록한다. |
-| UNKNOWN | UNKNOWN | 재호출 예산이 끝나도 결과 조회를 계속한다. |
-| PROCESSING | SUCCESS | 실행 활성 상태의 0원은 제공자만 생략한다. 유효 lease·원결제 잠금 검증 후 결과 Outbox와 함께 확정한다. |
-| UNKNOWN | SUCCESS | 영속된 제공자 결과를 조회해 확정한다. |
-| PROCESSING | FAILED | 제공자 확정 실패를 반영한다. |
-| UNKNOWN | FAILED | 조회로 확정된 실패를 반영한다. |
-
-### 구현과 검증 근거
-
-- `RefundExecutionService.java`(#347에서 삭제)
-- `RefundRecoveryStore.java`(#347에서 삭제)
-- `RefundOutcomeService.java`(#347에서 삭제)
-
-관련 기존 테스트: `RefundRecoveryStorePostgresTest.java`(#347에서 삭제) · `RefundMockEngineTest.java`(#347에서 삭제).
-
-테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
+환불 실행 코드는 없다. Mock 환불 코드는 #347에서, 테이블(`refund_execution`·`mock_refund_result`)은 V4 마이그레이션에서 지웠다. 새 환불은 아직 구현하지 않았고 목표는 [환불 요구사항](requirements/refund.md)과 [목표 설계](design.html#states)에 있다. 지운 Mock 구현은 `e5a1b66bf3b06a971b1242dd02bd623e717c2902`에서 볼 수 있다.

@@ -20,7 +20,7 @@
 <li><a href="#참고">참고</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#349 결과 불명 복구와 만료</h1><p>상태: 구현(2026-11-16). 구현하며 바뀐 점은 각 절에 "(구현)"으로 적었다
+</div></aside><main id="content"><h1>#349 결과 불명 복구와 만료</h1><p>상태: 구현 완료(2026-11-16), 병합 대기. 구현하며 바뀐 점은 각 절에 "(구현)"으로 적었다
 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/349">#349</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a> · 스키마: <a href="348-create-api.html#db-v4__payment_coresql">#348 설계</a> · 승인 반영: <a href="338-approval-ledger.html#2-승인-처리">#338 설계</a></p>
 <h2 id="개요">개요</h2>
 <p>끝나면 <strong>결과를 모르는 결제(UNKNOWN)와 승인 중에 멈춘 결제(APPROVING)가 스스로 확정</strong>되고, 만료 시각이 지난 결제는 스스로 닫힌다. 사람이 손대는 경우는 조회 마감(30분)이 지난 결제뿐이고, 그때는 ERROR 로그가 남는다. 승인 반영은 #338의 <code>applyDone</code>을 그대로 쓴다.</p>
@@ -430,6 +430,6 @@
 <li>토스 조회가 <code>CANCELED</code>(전액)면 CANCELED로 닫는다. <code>PARTIAL_CANCELED</code>는 사람이 확인한다.</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f6"><code>#f6</code></a>·<a href="../../../../../design-docs/services/payment/design.html#states"><code>#states</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>d7acafd972f49866b6fc13a71e522c0f616e2075e7ee04af3609dd58b392fed6</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f6"><code>#f6</code></a>·<a href="../../../../../design-docs/services/payment/design.html#states"><code>#states</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>6068ff674831b16a103469673e61b328b5fff9fc2091cc48abe3eecdf81099e6</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

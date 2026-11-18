@@ -10,7 +10,7 @@
 |---|---|---|
 | Member | 회원·자격증명·접근/갱신 세션 | 다른 서비스는 Member의 세션 확인 계약을 사용한다. |
 | CommerceCore | 상품·이미지·판매·재고·쿠폰·장바구니·주문·결제/환불 접수와 결과 반영 | 거래 정책과 재고·쿠폰 보상은 Core 책임이다. |
-| Payment | 결제·환불 실행·Mock PG·UNKNOWN 복구·결과 Outbox | Core의 영속 전달 ID를 사용하되 독립 DB를 소유한다. |
+| Payment | 결제 생성·토스 승인·UNKNOWN 복구·만료·원장 분개·결과 Outbox(환불은 재설계 중) | Core의 영속 전달 ID를 사용하되 독립 DB를 소유한다. |
 | Catalog | 공개 상품·판매·쿠폰 조회 사본 | 원본 변경 주체는 Core다. 이벤트 사본과 HTTP 대조/대체 경로를 구분한다. |
 | Live | 방송·상품 연결·프로모션·채팅·좋아요·시청 연결 | Redis Pub/Sub은 Live 인스턴스 간 SSE 전달에 사용한다. |
 | Notification | 알림·구독·이벤트 중복 방지·방송/판매 조회 상태 | 소비한 이벤트로 본인 알림함을 구성한다. |
@@ -34,7 +34,7 @@
 
 각 서비스의 PostgreSQL 스키마는 Flyway와 엔티티가 설명한다. Payment는 `db/payment-migration/`, 다른 서비스는 `db/migration/`를 사용한다. Outbox는 DB 상태와 발행 요청을 같은 트랜잭션에 저장하지만 브로커 전달·소비 반영까지 한 번에 보장하는 것은 아니다.
 
-결제·환불 제공자는 현재 Mock 구현이다. UNKNOWN은 확정 실패와 구분하고 조회·lease·재시도로 복구한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
+결제 PG는 토스페이먼츠다(테스트 키로 확인). 환불 실행은 재설계 중이라 지금 코드에 없다. UNKNOWN은 확정 실패와 구분하고 토스 조회로 복구한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
 
 ## Order 처리 기한 후속
 

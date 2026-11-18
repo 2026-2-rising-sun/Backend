@@ -33,7 +33,7 @@
 <li><a href="#참고">참고</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#348 결제 생성·결제창·조회 내부 API</h1><p>상태: 설계 확정(2026-11-15)
+</div></aside><main id="content"><h1>#348 결제 생성·결제창·조회 내부 API</h1><p>상태: 구현 완료(2026-11-16), 병합 대기. 설계 확정은 2026-11-15
 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/348">#348</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a></p>
 <h2 id="개요">개요</h2>
 <p>끝나면 Commerce가 내부 API로 <strong>결제를 만들고, 결제창을 다시 열고, 상태를 조회</strong>할 수 있다. 같은 요청을 다시 보내도 결제는 1건이다. 이 이슈가 만드는 V4 스키마와 결제 키 규칙을 #338·#349가 그대로 쓴다. <strong>스키마의 원본은 이 문서다.</strong> 컬럼을 바꿀 일이 생기면 이 문서를 먼저 고친다.</p>
@@ -666,6 +666,6 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 </ol>
 <p>용어: "결제창(checkout)"은 테이블이 아니다. <code>payment</code> 행의 <code>checkout_seq</code>·<code>pg_order_id</code>로 표현하는 토스 결제창 회차다.</p>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>5db84b10a8218f6d85fc0b4f7415851037274d7a49a1fec261d75a5d0d7d2b0f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>387ca4b4490cad279aedc52f66c448d7f994da3a98a4844f92672721e04af448</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

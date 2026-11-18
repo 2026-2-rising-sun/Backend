@@ -75,6 +75,8 @@
 <li><a href="#338-결제-승인-처리와-paymentapproved-발행">#338 결제 승인 처리와 PaymentApproved 발행</a></li>
 <li><a href="#338-결제-승인-api와-8초-대기">#338 결제 승인 API와 8초 대기</a></li>
 <li><a href="#349-결제-결과-복구와-만료-스케줄러-추가">#349 결제 결과 복구와 만료 스케줄러 추가</a></li>
+<li><a href="#338-토스-샌드박스-확인-도구와-실제-키-테스트">#338 토스 샌드박스 확인 도구와 실제 키 테스트</a></li>
+<li><a href="#337-결제-1차-문서-마감">#337 결제 1차 문서 마감</a></li>
 </ul>
 </li>
 </ul>
@@ -592,6 +594,22 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-approval-api' --external</code>(임시 PostgreSQL 16) 통과. Payment test 50, integrationTest 75, postgresTest 53, 스킵 0. <code>--base origin/dev --external</code>은 무관한 Core Kafka 2건·notification 3건 스킵과 다른 서비스 postgresTest 미실행으로 incomplete, Payment test·integrationTest·postgresTest·migrationTest(9)는 통과, event-samples 수동 실행 통과. 종료 시나리오(생성→승인, 거절→재결제→승인, 불명→조회 DONE, 분개 차변 = 대변)를 <code>MockRestServiceServer</code>로 확인했다. 독립 리뷰 지적 9건 중 5건 반영(마감 시각 마지막 조회, 부분 취소 로그 1번, CANCELED 0행 로그, 로그 단언, 예외 뒤 재조회 테스트).</li>
 <li>미실행·한계: 실제 토스 테스트 키 조회, 여러 실제 인스턴스 배포, 스케줄러 실측 부하. 첫 PR 기준 검사에서 Payment 단위 테스트 1건이 한 번 실패했고 이후 6번 재실행에서 재현되지 않아 이름을 확인하지 못했다.</li>
 <li>다음 작업: 결제 1차 종료 처리(요구사항 완료 표시·계획 이동)와 주문 연동(Phase 2).</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>5e48c679079d00ec47b8c34c7006fdbc8cde320b98849928c336708324877281</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="338-토스-샌드박스-확인-도구와-실제-키-테스트">#338 토스 샌드박스 확인 도구와 실제 키 테스트</h2>
+<p>관련 작업: <a href="../../services/payment-service/local/README.md">Payment 로컬 도구</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/366">PR #366</a></p>
+<ul>
+<li>변경·판단(2026-11-17): 수동 검증에 쓴 도구를 <code>services/payment-service/local/</code>로 옮겼다(가짜 토스 WireMock 매핑, IntelliJ <code>payment.http</code>, 토스 결제창 테스트 페이지). 실제 토스 테스트 키로만 도는 <code>TossSandboxTest</code>(<code>@Tag("toss-sandbox")</code>, <code>test_sk_</code> 키가 없으면 건너뜀)와 <code>tossSandboxTest</code> 작업을 추가했다. 일반 <code>integrationTest</code>와 CI에서는 제외한다. 우리 설정 문제(401 등) ERROR 로그는 토스 클라이언트 PR #353에 있다.</li>
+<li>검증: 로컬 payment-service(local 프로필)와 가짜 토스로 성공·거절·거절 뒤 성공·12초 지연·5xx 뒤 조회 승인·금액 불일치 보상 취소·결제창 회차 변경을 확인했다. 실제 토스 테스트 키로 결제창 인증 → 승인 API 200 APPROVED를 확인했다. <code>tossSandboxTest</code>로 잘못된 키 401 → 보내지 않음, 없는 paymentKey 승인 404 <code>NOT_FOUND_PAYMENT_SESSION</code> → 거절, 조회 404 <code>NOT_FOUND_PAYMENT</code> → 거절을 확인했다. PR CI 통과.</li>
+<li>미실행·한계: 실제 토스의 5xx·타임아웃·부분 취소는 만들 수 없어 가짜 토스로만 확인했다. 위젯 키(<code>test_gck_</code>)를 시크릿 키 자리에 넣으면 401 → 503 <code>PG_UNAVAILABLE</code>이 된다. 키는 API 개별 연동 키(<code>test_sk_</code>·<code>test_ck_</code>)를 쓴다.</li>
+<li>다음 작업: 결제 1차 PR 병합(<a href="plans/active/337-payment-redesign/README.html#스택-pr">스택 PR 순서</a>), 주문 연동 남은 일.</li>
+</ul>
+<h2 id="337-결제-1차-문서-마감">#337 결제 1차 문서 마감</h2>
+<p>관련 작업: <a href="plans/active/337-payment-redesign/phase1-payment.html#종료-검증">결제 1차 종료 검증</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/366">PR #366</a></p>
+<ul>
+<li>변경·판단(2026-11-18): 문서와 코드를 전수 대조해 고쳤다. 결제 요구사항을 <code>완료</code>로(PAY-PG-01–04 체크), 원장은 환불 분개가 남아 <code>진행 중</code>으로 바꿨다. 계획·이슈 설계서 상태를 구현 완료·병합 대기로, 스택 PR 병합 방식을 merge commit으로 고쳤다. Payment 모듈 문서의 틀린 문장(CommerceCore가 옛 이벤트만 소비한다)과 지운 Mock 환불 절을 고치고, ERD에 빠진 열·인덱스를 채웠다. 목표 설계 DDL의 쉼표 오류와 저장소 문서의 Mock PG 표현을 고쳤다. 목표 설계 상단의 "구현 전" 안내는 환불까지 끝난 뒤 지운다.</li>
+<li>검증: <code>scripts/render_design_docs.py --check</code>, <code>scripts/render-api-docs.sh --check</code>, <code>scripts/check_docs.py</code>. 코드 변경 없음.</li>
+<li>미실행·한계: HTML 화면은 열어 보지 않았다. CommerceCore 문서(<code>commercecore/erd.md</code>의 <code>payment_attempt</code> 참조 등)는 담당 범위라 고치지 않았다.</li>
+<li>다음 작업: #337 이슈 본문 로드맵 갱신, 결제 1차 PR 병합.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>837405af2df3077414f4869a529d68b92f8af87435cca1ad5dcb71764cc2784c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

@@ -1,6 +1,6 @@
 # #338 토스 결제 승인과 원장 분개
 
-상태: 설계 확정(2026-11-15)
+상태: 구현 완료(2026-11-16), 병합 대기. 설계 확정은 2026-11-15
 이슈: [#338](https://github.com/2026-2-rising-sun/Backend/issues/338) · Phase 문서: [Phase 1 결제 1차](../phase1-payment.md) · 스키마: [#348 설계](348-create-api.md#db-v4__payment_coresql)
 
 ## 개요
