@@ -121,6 +121,60 @@ class SkuMigrationPostgresTest {
                 });
     }
 
+    @Test
+    @DisplayName("일반 SKU 버전 제거는 거래 값·이벤트 버전·기존 Sales 버전을 보존한다")
+    void dropsOnlyUnusedSkuVersion() throws Exception {
+        withSchema(
+                connection -> {
+                    try (var sql = connection.createStatement()) {
+                        sql.executeUpdate(
+                                """
+                                INSERT INTO sales_info(id,product_id,price,status,version,snapshot_version,
+                                    product_name_snapshot,created_at,updated_at)
+                                VALUES(9001,51,19000,'PRIVATE',7,10,'상품 A',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                                """);
+                        sql.executeUpdate(
+                                """
+                                INSERT INTO sales_stock(sales_info_id,available,reserved,created_at,updated_at)
+                                VALUES(9001,5,2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                                """);
+                        migrate(connection, "V102__sku.sql");
+                        sql.execute("CREATE TEMP TABLE sku_before AS SELECT * FROM sku");
+                        migrate(connection, "V107__drop_sku_version.sql");
+                        try (var rows =
+                                sql.executeQuery(
+                                        "SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='sku' AND column_name='version'")) {
+                            assertThat(rows.next()).isTrue();
+                            assertThat(rows.getInt(1)).isZero();
+                        }
+                        try (var rows =
+                                sql.executeQuery(
+                                        "SELECT to_jsonb(s)=to_jsonb(b)-'version' AS preserved FROM sku s JOIN sku_before b USING(id)")) {
+                            assertThat(rows.next()).isTrue();
+                            assertThat(rows.getBoolean("preserved")).isTrue();
+                            assertThat(rows.next()).isFalse();
+                        }
+                        try (var rows =
+                                sql.executeQuery("SELECT version FROM sales_info WHERE id=9001")) {
+                            assertThat(rows.next()).isTrue();
+                            assertThat(rows.getLong(1)).isEqualTo(7);
+                        }
+                        try (var rows =
+                                sql.executeQuery(
+                                        """
+                                INSERT INTO sku(product_id,price,available,reserved,sale_status,
+                                    product_name_snapshot,created_at,updated_at)
+                                VALUES(51,20000,0,0,'READY','새 SKU',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                                RETURNING id,snapshot_version
+                                """)) {
+                            assertThat(rows.next()).isTrue();
+                            assertThat(rows.getLong("id")).isGreaterThan(9001);
+                            assertThat(rows.getLong("snapshot_version")).isEqualTo(1);
+                        }
+                    }
+                });
+    }
+
     private void withSchema(SqlWork work) throws Exception {
         try (Connection connection =
                 DriverManager.getConnection(

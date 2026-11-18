@@ -7,6 +7,7 @@
 <ul>
 <li><a href="#내부-포트">내부 포트</a></li>
 <li><a href="#api와-이행-상태">API와 이행 상태</a></li>
+<li><a href="#일반-버전-제거와-동시성-제어">일반 버전 제거와 동시성 제어</a></li>
 <li><a href="#단일값-호환과-미완료-흐름">단일값 호환과 미완료 흐름</a></li>
 <li><a href="#sku-판매-상태와-수량-변화">SKU 판매 상태와 수량 변화</a><ul>
 <li><a href="#전이">전이</a></li>
@@ -41,6 +42,10 @@
 <h2 id="api와-이행-상태">API와 이행 상태</h2>
 <p>기존 <code>/v1/sales</code> REST 경로는 SkuSalesService를 통해 SKU·Outbox만 쓴다. Product 본인·미삭제 검증과 잠금 뒤 가격·수량·상태를 변경하며 전체 중지 중에도 준비할 수 있다. 단일 상품 등록은 Product 행 배타 잠금으로 중복 생성을 직렬화한다. 조회·거래 내부 포트는 SKU 원본을 사용한다. 기존 SalesService/RegistrationService와 Sales 테이블은 선행 브랜치의 Order 호환·이력 경로로 남아 있으며 Order #331이 최종 거래 연결을 통합한다. 이 중간 브랜치를 독립 배포하지 않는다. Core API 최종 편집자는 Order이고 SKU 담당이 실제 변경 조각을 제공한다. Catalog API 판매/SKU 구간은 SKU가 맡는다.</p>
 <p>V102는 기존 Sales ID·가격·재고·버전을 SKU로 복사하는 확장 단계다. 소비자 연결 전에 이 중간 상태를 독립 배포하거나 두 원본에 병행 쓰지 않는다. V102/V3 번호와 Product→SKU→Cart→Order 순서는 코디네이터 기술 조정이며 사용자 개별 번호 정책이 아니다. 대표가·최저가·합산 재고·새 가격 정렬·SKU별 방송 노출은 미결정이다.</p>
+<h2 id="일반-버전-제거와-동시성-제어">일반 버전 제거와 동시성 제어</h2>
+<p>SKU의 일반 <code>version</code>은 수정 요청과 비교하지 않는 값이므로 V107에서 제거한다. <code>SkuView</code>와 판매 등록·가격 변경·상태 변경 응답에도 이 필드를 반환하지 않는다. Product의 <code>@Version</code>과 상품 수정 요청의 버전, Cart·기존 Sales의 버전은 유지한다.</p>
+<p>가격·상태·수량 변경은 <code>SkuEventTracker.watch()</code>의 SKU 행 잠금과 필드별 조건부 UPDATE로 보호한다. 신규 주문의 Product→SKU 잠금 순서와 활성 쓰기 트랜잭션 요구는 유지한다. 이벤트 최신성 판별용 <code>snapshotVersion</code>은 별개이며, 최종 표시 가격·available·상태 변경 때 증가한다. Catalog의 <code>product_sales.version</code>은 이 이벤트 버전을 저장하므로 제거하지 않는다.</p>
+<p>판매 응답의 필드 제거는 외부 계약 변경이다. 조사한 Frontend <code>e2748d7</code>은 판매 변경 응답을 사용하지 않고 상품을 다시 조회한다. Catalog·Live의 판매 일괄 조회 DTO에도 일반 SKU 버전은 없다. 저장소 밖 소비자와 실제 배포본은 별도 확인 대상이다. 구 애플리케이션은 <code>sku.version</code>을 읽고 쓰므로 컬럼 삭제 시 구 인스턴스를 함께 실행하지 않는다. 이번 변경은 배포 실행을 포함하지 않는다.</p>
 <h2 id="단일값-호환과-미완료-흐름">단일값 호환과 미완료 흐름</h2>
 <p>상품 페이지를 먼저 자른 뒤 productIds를 모아 SKU를 한 번에 읽는다. 상태 필터는 Product 페이지 계산 전에 EXISTS로 적용해 SKU 수가 상품 total/offset을 늘리지 않는다. 기존 단일 SKU는 최신 가격·available·품절 파생 표시를 반환한다. 복수 SKU를 기존 단일 응답으로 읽으면 Core409/Catalog503이며 첫 SKU·최저가·합산재고를 임의 선택하지 않는다.</p>
 <p>판매자 내부 listSkus는 본인·미삭제 상품의0..N개를 제공한다. 판매자의 다중 SKU 생성/조회 HTTP·고객 옵션 선택·상품별 공개 skus[]·Live 다중 SKU 노출은 아직 구현되지 않았다. 옵션 JSON 저장/중복/전파 상세와 대표 가격 정책은 사용자 후속 결정 사항이다. <a href="../../../../worklog/plans/active/334-sku-module/api-changes.html">실제 API 조각</a>과 <a href="../../../../worklog/plans/active/334-sku-module/README.html">검증 결과</a>를 함께 본다.</p>
@@ -223,6 +228,6 @@
 <li><a href="../../../../worklog/plans/active/334-sku-module/README.html">실행 계획·결과</a></li>
 </ul>
 <p>기존 SalesService/RegistrationService·테이블은 이 브랜치의 전환 전 Order 호환·이력용이다. 판매 HTTP와 Product 판매 조회는 이 경로를 사용하지 않는다. 최종 Order/Cart 통합·실제 브로커 검증은 후행 PR에서 확인하며 이 중간 브랜치를 독립 배포하지 않는다.</p>
-<p>통합 감사 기준은 <a href="https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8">Order <code>5048413b</code></a>이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 예약 해제 공간과 환불 복구 상한은 <a href="overview.html#정수-범위와-남은-제한">SKU 수량 상세</a>를 따른다.</p><p class="muted fingerprint">MD SHA-256: <code>b424ac15c9d5087d437c366aa5d98ec5accae1dd1d55c0924803bc4be137eb39</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>통합 감사 기준은 <a href="https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8">Order <code>5048413b</code></a>이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 예약 해제 공간과 환불 복구 상한은 <a href="overview.html#정수-범위와-남은-제한">SKU 수량 상세</a>를 따른다.</p><p class="muted fingerprint">MD SHA-256: <code>7ba1b11fe46673aefb51ccbeabdf40be18dd6b4e68441f60ee6fa4ccacfe5ef1</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

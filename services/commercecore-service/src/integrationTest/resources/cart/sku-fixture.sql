@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS sku (
     available INTEGER NOT NULL CHECK (available >= 0),
     reserved INTEGER NOT NULL CHECK (reserved >= 0),
     sale_status VARCHAR(32) NOT NULL CHECK (sale_status IN ('READY','ON_SALE','PRIVATE')),
-    version BIGINT NOT NULL DEFAULT 0,
     snapshot_version BIGINT NOT NULL DEFAULT 1 CHECK (snapshot_version > 0),
     product_name_snapshot VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
