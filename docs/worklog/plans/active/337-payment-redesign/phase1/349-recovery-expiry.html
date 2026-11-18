@@ -20,7 +20,7 @@
 <li><a href="#참고">참고</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#349 결과 불명 복구와 만료</h1><p>상태: 설계 확정(2026-11-15)
+</div></aside><main id="content"><h1>#349 결과 불명 복구와 만료</h1><p>상태: 구현(2026-11-16). 구현하며 바뀐 점은 각 절에 "(구현)"으로 적었다
 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/349">#349</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a> · 스키마: <a href="348-create-api.html#db-v4__payment_coresql">#348 설계</a> · 승인 반영: <a href="338-approval-ledger.html#2-승인-처리">#338 설계</a></p>
 <h2 id="개요">개요</h2>
 <p>끝나면 <strong>결과를 모르는 결제(UNKNOWN)와 승인 중에 멈춘 결제(APPROVING)가 스스로 확정</strong>되고, 만료 시각이 지난 결제는 스스로 닫힌다. 사람이 손대는 경우는 조회 마감(30분)이 지난 결제뿐이고, 그때는 ERROR 로그가 남는다. 승인 반영은 #338의 <code>applyDone</code>을 그대로 쓴다.</p>
@@ -57,9 +57,9 @@
                   UnknownPaymentPoller  @Scheduled  UNKNOWN 조회 → applyDone / CREATED / 다음 조회
                   PaymentExpiryJob      @Scheduled  CREATED 만료 → CANCELED
 </code></pre>
-<p><code>@EnableScheduling</code>은 <code>payment.recovery.enabled</code>(기본 <code>true</code>)가 켜졌을 때만 등록한다. 통합 테스트는 <code>false</code>로 두고 메서드를 직접 부른다.</p>
+<p><code>@Scheduled</code> 메서드 3개를 가진 <code>RecoveryScheduler</code>는 <code>payment.recovery.enabled</code>(기본 <code>true</code>)가 켜졌을 때만 등록한다. 작업 빈 3개는 항상 있고, 통합 테스트는 <code>application-test.yml</code>에서 <code>false</code>로 두고 메서드를 직접 부른다. (구현) <code>@EnableScheduling</code>은 outbox 릴레이가 쓰므로 애플리케이션에 그대로 두고 스케줄러 빈만 조건부로 했다. 조회기가 토스를 최대 60초 기다려도 다른 작업이 밀리지 않게 <code>spring.task.scheduling.pool.size</code>를 4로 했다.</p>
 <h2 id="설정-제안-이름">설정 (제안 이름)</h2>
-<p><code>Duration</code> 설정은 SQL에 초 단위 숫자로 넘기고 <code>(:seconds * interval '1 second')</code>로 쓴다. 이 SQL은 PostgreSQL 전용이며 테스트도 <code>@Tag("postgres")</code>다.</p>
+<p><code>Duration</code> 설정은 SQL에 초 단위 숫자로 넘기고 <code>:seconds * INTERVAL '1' SECOND</code>로 쓴다(승인 쪽 <code>markUnknown</code>이 H2 테스트에서도 돌아 표준 표기를 쓴다). (구현) 승인 결과 불명(<code>markUnknown</code>)의 조회 마감도 <code>check-deadline</code> 설정을 쓴다. 다음 조회 간격이 <code>t0 = check_deadline_at − check-deadline</code>으로 계산되기 때문이다. 이 SQL은 PostgreSQL 전용이며 테스트도 <code>@Tag("postgres")</code>다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -156,15 +156,15 @@
 <tbody>
 <tr>
 <td>1</td>
-<td>결제를 다시 읽는다. UNKNOWN이 아니면 건너뛴다(다른 인스턴스가 먼저 처리함)</td>
+<td>마감 시각의 마지막 조회까지 끝났으면 <strong>조회를 멈춘다</strong>: <code>UPDATE … SET next_check_at = NULL WHERE id AND status = 'UNKNOWN' AND next_check_at &lt;= now() AND next_check_at &gt; check_deadline_at</code>. 1행일 때만 ERROR 로그 1번. 끝 (PAY-RECOVER-04)</td>
 </tr>
 <tr>
 <td>2</td>
-<td><code>check_deadline_at</code> &lt; now()면 <strong>조회를 멈춘다</strong>: <code>next_check_at = NULL</code>(조회 대상에서 빠짐) + ERROR 로그 1번. 끝 (PAY-RECOVER-04)</td>
+<td><strong>다음 조회를 먼저 예약해 이번 조회를 선점한다</strong>(아래 "다음 조회 예약" UPDATE에 <code>AND next_check_at &lt;= now() AND next_check_at &lt;= check_deadline_at</code>). 0행이면 UNKNOWN이 아니거나 다른 인스턴스가 먼저 집었으므로 건너뛴다</td>
 </tr>
 <tr>
 <td>3</td>
-<td>pg_call(kind=QUERY, outcome=UNKNOWN) INSERT, 커밋</td>
+<td>같은 트랜잭션에서 pg_call(kind=QUERY, outcome=UNKNOWN) INSERT, 커밋</td>
 </tr>
 <tr>
 <td>4</td>
@@ -202,7 +202,7 @@
 </tr>
 <tr>
 <td><code>Success</code>, 그 밖의 상태(<code>IN_PROGRESS</code>, <code>READY</code>, <code>WAITING_FOR_DEPOSIT</code> 등)</td>
-<td>UNKNOWN 유지, 다음 조회 예약</td>
+<td>UNKNOWN 유지(다음 조회는 2에서 예약함). <code>pg_status</code>에 토스 상태를 남긴다(마감 로그의 <code>lastPgStatus</code>)</td>
 <td>PAY-RECOVER-03</td>
 </tr>
 <tr>
@@ -217,7 +217,7 @@
 </tr>
 <tr>
 <td><code>Declined</code> · <code>NotSent</code> · <code>Unknown</code></td>
-<td>UNKNOWN 유지, 다음 조회 예약. pg_call에 결과 기록</td>
+<td>UNKNOWN 유지(다음 조회는 2에서 예약함). pg_call에 결과 기록</td>
 <td></td>
 </tr>
 </tbody>
@@ -258,11 +258,16 @@
 </tr>
 </tbody>
 </table></div>
-<pre><code class="language-sql">UPDATE payment SET next_check_at = LEAST(:next, check_deadline_at), updated_at = now()
- WHERE id = :id AND status = 'UNKNOWN';
+<pre><code class="language-sql">UPDATE payment SET next_check_at = CASE WHEN now() &gt;= check_deadline_at THEN check_deadline_at + INTERVAL '1' SECOND
+                                       ELSE LEAST(now() + CASE … END, check_deadline_at) END, updated_at = now()
+ WHERE id = :id AND status = 'UNKNOWN' AND next_check_at &lt;= now() AND next_check_at &lt;= check_deadline_at;
 </code></pre>
+<p>(구현, 리뷰 반영) 다음 조회가 마감에 맞춰지면 그 시각의 조회를 <strong>마지막 조회</strong>로 한 번 한다. 마감이 지난 뒤 하는 조회는 다음 시각을 마감 + 1초로 두고, 다음 차례에 1이 멈추며 그 조회 결과를 <code>lastPgStatus</code>로 남긴다. 서버가 오래 멈춰 예약된 조회가 마감 뒤로 밀린 경우도 마지막으로 한 번 조회한다. 처음 구현은 마감 시각 조회를 하지 않고 멈춰 <code>lastPgStatus</code>가 몇 분 전 값이었다.</p>
+<p><code>t0</code>는 저장하지 않고 <code>check_deadline_at − check-deadline 설정</code>으로 계산한다. 그래서 <code>check-deadline</code>을 바꾸면 이미 UNKNOWN인 결제의 <strong>간격 선택만</strong> 달라진다(마감은 행에 저장된 값이라 그대로다). 운영 중에 바꿀 일이 생기면 기존 UNKNOWN이 모두 닫힌 뒤 바꾼다.</p>
+<p>(구현) <code>:next</code>를 Java에서 만들지 않고 <code>CASE</code>로 DB <code>now()</code>에서 고른다. 시계가 DB 하나라 테스트는 시각 컬럼을 과거 값으로 넣어 만든다(<code>Clock</code> 주입 없음). 예약을 토스 호출 <strong>전에</strong> 하므로 조회 중 서버가 죽거나 예외가 나도 같은 결제를 곧바로 다시 집지 않는다.</p>
 <p>다음 조회는 마감을 넘기지 않는다(마감 로그가 늦게 찍히지 않게). 스위퍼가 UNKNOWN으로 옮긴 결제는 <code>next_check_at = now()</code>로 바로 조회한다. 이미 3분 넘게 멈춘 결제라 10초를 더 기다릴 이유가 없다(PAY-CONFIRM-10의 10초는 승인 직후 UNKNOWN에만 적용).</p>
 <p><strong>마감까지 IN_PROGRESS로 남는 경우</strong>: ①을 커밋하고 토스를 부르기 전에 서버가 죽으면 토스 상태는 IN_PROGRESS로 남는다. 인증 유효 시간이 지나면 토스가 EXPIRED로 바꾸므로 보통 조회 중에 CREATED로 돌아간다. 마감(30분)까지 바뀌지 않으면 UNKNOWN에 그대로 두고 ERROR 로그로 사람이 확인한다. 자동으로 CREATED로 돌리지 않는다(돈이 나갔는지 모른다).</p>
+<p><code>PARTIAL_CANCELED</code> 사람 확인 로그는 <code>pg_status</code>가 바뀔 때만 남긴다(같은 결과가 조회마다 와도 1번). (구현, 리뷰 반영)</p>
 <p><strong>조회 마감 로그 형식</strong>(ERROR, 한 줄):</p>
 <pre><code class="language-text">payment.recovery.deadline paymentId=1001 orderRef=OD-20261110-K7Q2M9XA pgOrderId=OD-20261110-K7Q2M9XA-1 lastPgStatus=IN_PROGRESS
 </code></pre>
@@ -294,7 +299,7 @@
 </tr>
 <tr>
 <td>조회기 2개가 같은 결제</td>
-<td>토스 조회가 1번 더 갈 수 있다(감수). 반영은 <code>WHERE status = 'UNKNOWN'</code>과 원장 UNIQUE로 1번</td>
+<td>(구현) 2의 선점 UPDATE로 한 조회 차례에 한 곳만 토스를 부른다. 조회가 다음 차례까지 길어져 두 조회가 겹쳐도 반영은 <code>WHERE status = 'UNKNOWN'</code>·<code>applyDone</code> 0행 재확인으로 1번</td>
 </tr>
 <tr>
 <td>조회기 DONE과 승인 ③ 반영이 동시</td>
@@ -323,7 +328,7 @@
 </tr>
 <tr>
 <td>PAY-RECOVER-02</td>
-<td><code>UnknownPaymentPollerTest</code>: DONE → APPROVED·분개 1·outbox 1, 주문 닫힘 여부와 무관</td>
+<td><code>UnknownPaymentPollerPostgresTest</code>: DONE → APPROVED·분개 1·outbox 1, 주문 닫힘 여부와 무관</td>
 <td><code>@Tag("postgres")</code></td>
 </tr>
 <tr>
@@ -344,6 +349,16 @@
 <tr>
 <td>PAY-EXPIRE-01</td>
 <td><code>PaymentExpiryPostgresTest</code>: 만료 → CANCELED, 승인 시작과 동시에 → 한쪽만</td>
+<td><code>@Tag("postgres")</code></td>
+</tr>
+<tr>
+<td>스케줄러 등록</td>
+<td><code>RecoverySchedulerTest</code>: 기본값으로 3개 등록, <code>enabled=false</code>면 없음</td>
+<td>단위</td>
+</tr>
+<tr>
+<td>Phase 1 종료 시나리오</td>
+<td><code>PaymentScenarioPostgresTest</code>: 실제 토스 클라이언트 + <code>MockRestServiceServer</code>로 생성→승인, 거절→재결제→승인, 불명→조회 DONE, 분개 차변 = 대변</td>
 <td><code>@Tag("postgres")</code></td>
 </tr>
 </tbody>
@@ -415,6 +430,6 @@
 <li>토스 조회가 <code>CANCELED</code>(전액)면 CANCELED로 닫는다. <code>PARTIAL_CANCELED</code>는 사람이 확인한다.</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f6"><code>#f6</code></a>·<a href="../../../../../design-docs/services/payment/design.html#states"><code>#states</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>d8864166aedceec90e4321a438c085108a5ceab3f2bfa1cce85c6e22e70127e2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">ADR 0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f6"><code>#f6</code></a>·<a href="../../../../../design-docs/services/payment/design.html#states"><code>#states</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>d7acafd972f49866b6fc13a71e522c0f616e2075e7ee04af3609dd58b392fed6</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

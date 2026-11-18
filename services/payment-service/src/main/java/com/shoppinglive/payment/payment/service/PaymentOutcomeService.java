@@ -42,6 +42,7 @@ public class PaymentOutcomeService {
     private final EventOutbox outbox;
     private final TossPaymentsClient toss;
     private final TransactionTemplate tx;
+    private final RecoveryProperties recovery;
 
     public PaymentOutcomeService(
             PaymentRepository payments,
@@ -49,13 +50,15 @@ public class PaymentOutcomeService {
             LedgerService ledger,
             EventOutbox outbox,
             TossPaymentsClient toss,
-            TransactionTemplate tx) {
+            TransactionTemplate tx,
+            RecoveryProperties recovery) {
         this.payments = payments;
         this.pgCalls = pgCalls;
         this.ledger = ledger;
         this.outbox = outbox;
         this.toss = toss;
         this.tx = tx;
+        this.recovery = recovery;
     }
 
     /** 호출 하나의 결과를 기록만 한다(상태는 바꾸지 않는다). 재호출 전에 첫 불명 호출의 HTTP 상태를 남길 때 쓴다. */
@@ -141,7 +144,7 @@ public class PaymentOutcomeService {
     @Transactional
     public void applyUnknown(long paymentId, long pgCallId, TossResult last) {
         record(pgCallId, last);
-        if (payments.markUnknown(paymentId) == 0) {
+        if (payments.markUnknown(paymentId, recovery.checkDeadline().toSeconds()) == 0) {
             log.warn("APPROVING이 아니어서 UNKNOWN으로 바꾸지 않았다: paymentId={}", paymentId);
         }
     }
@@ -200,6 +203,48 @@ public class PaymentOutcomeService {
                     result);
         }
         return true;
+    }
+
+    /**
+     * 결과 불명 조회의 DONE이 아닌 결과를 반영한다(PAY-RECOVER-03). DONE은 호출자가 {@link #applyDone}으로 반영한다. 다음 조회 시각은
+     * 조회기가 토스를 부르기 전에 이미 예약했으므로, UNKNOWN을 유지하는 결과는 마지막 토스 상태만 남긴다. 모든 변경은 {@code WHERE status =
+     * 'UNKNOWN'}이다.
+     */
+    @Transactional
+    public void applyQuery(long paymentId, long pgCallId, TossResult result) {
+        record(pgCallId, result);
+        if (!(result instanceof TossResult.Success success)) {
+            return; // 거절·보내지 않음·불명: UNKNOWN 유지
+        }
+        String pgStatus = success.payment().status();
+        if (pgStatus == null) {
+            return; // 상태를 읽지 못했으면 다음 조회까지 UNKNOWN 유지
+        }
+        switch (pgStatus) {
+            case "ABORTED", "EXPIRED" -> {
+                if (payments.revertUnknownToCreated(paymentId, pgStatus) == 0) {
+                    log.warn("UNKNOWN이 아니어서 CREATED로 되돌리지 않았다: paymentId={}", paymentId);
+                }
+            }
+            case "CANCELED" -> {
+                // 돈이 모두 돌아갔다(토스에서 직접 취소했거나 보상 취소 응답을 잃음). UNKNOWN은 분개가 없어 쓰지 않는다
+                if (payments.cancelUnknown(paymentId) == 1) {
+                    log.warn("결과 불명 결제가 토스에서 전액 취소돼 CANCELED로 닫았다: paymentId={}", paymentId);
+                } else {
+                    log.warn("UNKNOWN이 아니어서 CANCELED로 닫지 않았다: paymentId={}", paymentId);
+                }
+            }
+            default -> {
+                // 상태가 바뀔 때만 1행이라 PARTIAL_CANCELED 사람 확인 로그가 조회마다 반복되지 않는다
+                if (payments.updateUnknownPgStatus(paymentId, pgStatus) == 1
+                        && "PARTIAL_CANCELED".equals(pgStatus)) {
+                    log.error(
+                            "[사람 확인 필요] 결과 불명 결제가 토스에서 부분 취소 상태다: paymentId={}, pgStatus={}",
+                            paymentId,
+                            pgStatus);
+                }
+            }
+        }
     }
 
     private void revertToCreated(long paymentId) {
