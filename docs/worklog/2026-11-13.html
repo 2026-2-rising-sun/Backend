@@ -574,6 +574,6 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-ledger' --external</code>(임시 PostgreSQL 16) 실패 0. Payment test 46, integrationTest 63, postgresTest 23(동시 승인 8건·승인 반영 8스레드 경합·outbox 실패 롤백·보상 취소 실패 포함), 스킵 0. 결과는 incomplete: 이 변경과 무관한 Core Kafka 2건·notification 3건 조건부 스킵 때문에 event-samples가 자동 실행되지 않아 수동 실행으로 표본 27건 통과. 독립 리뷰 지적 8건 중 2건 반영(보상 취소 CANCELED 선점·사람 확인 로그, 멱등 키 중복), 1건 설명(APPROVING 정체는 #349 스위퍼).</li>
 <li>미실행·한계: 승인 HTTP 엔드포인트·8초 대기(다음 PR), 실제 토스 테스트 키 호출, CommerceCore 소비자 연동(Phase 2).</li>
 <li>다음 작업: 승인 API와 8초 대기.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>a8de3e63fc343cb4949116f267c0d131d2efcf390c53706c32c344d6666ed642</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>35633c41b1b6bfc8fd93ebbf59cdeeca4754ce2ea87210a88fc1ef62315ebbc7</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
