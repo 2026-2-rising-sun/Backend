@@ -170,7 +170,7 @@ class TossPaymentsClientTest {
     void otherClientErrorsAreDeclined(int status, String code) {
         respond(HttpStatus.valueOf(status), error(code));
 
-        assertThat(confirm()).isEqualTo(new TossResult.Declined(code, "메시지 " + code));
+        assertThat(confirm()).isEqualTo(new TossResult.Declined(code, "메시지 " + code, status));
     }
 
     @ParameterizedTest(name = "{0} {1}")
@@ -261,7 +261,7 @@ class TossPaymentsClientTest {
         assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                 .isEqualTo(
                         new TossResult.Declined(
-                                "ALREADY_CANCELED_PAYMENT", "메시지 ALREADY_CANCELED_PAYMENT"));
+                                "ALREADY_CANCELED_PAYMENT", "메시지 ALREADY_CANCELED_PAYMENT", 400));
         assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                 .isInstanceOf(TossResult.Unknown.class);
         server.verify();
@@ -282,7 +282,8 @@ class TossPaymentsClientTest {
                                 .body(error("FAILED_PAYMENT_INTERNAL_SYSTEM_PROCESSING")));
 
         assertThat(client.getPayment("pk-1"))
-                .isEqualTo(new TossResult.Declined("NOT_FOUND_PAYMENT", "메시지 NOT_FOUND_PAYMENT"));
+                .isEqualTo(
+                        new TossResult.Declined("NOT_FOUND_PAYMENT", "메시지 NOT_FOUND_PAYMENT", 404));
         assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.Unknown.class);
         server.verify();
     }
@@ -298,6 +299,71 @@ class TossPaymentsClientTest {
                                 .body(payment("DONE", "")));
 
         assertThat(confirm()).isInstanceOf(TossResult.Unknown.class);
+    }
+
+    @Test
+    @DisplayName("PAY-CONFIRM-12 토스 응답을 받으면 그 HTTP 상태를 결과에 담는다(분류는 그대로)")
+    void resultCarriesHttpStatusOfReceivedResponse() {
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withSuccess(payment("DONE", ""), MediaType.APPLICATION_JSON));
+        respond(HttpStatus.FORBIDDEN, error("REJECT_CARD_PAYMENT"));
+        respond(HttpStatus.INTERNAL_SERVER_ERROR, error("FAILED_INTERNAL_SYSTEM_PROCESSING"));
+        respond(HttpStatus.UNAUTHORIZED, error("UNAUTHORIZED_KEY"));
+        respond(HttpStatus.CONFLICT, error("IDEMPOTENT_REQUEST_PROCESSING"));
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withSuccess(payment("IN_PROGRESS", ""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withSuccess("not-json", MediaType.APPLICATION_JSON));
+
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Success.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(200);
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Declined.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(403);
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(500);
+        assertThat(confirm())
+                .isInstanceOf(TossResult.NotSent.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(401);
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(409);
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(200);
+        assertThat(confirm())
+                .as("본문은 다 받았고 JSON이 아님")
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isEqualTo(200);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("PAY-CONFIRM-12 응답을 받지 못한 예외(연결 실패·끊김)는 HTTP 상태가 없다")
+    void exceptionsHaveNoHttpStatus() {
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(
+                        withException(new HttpConnectTimeoutException("HTTP connect timed out")));
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withException(new IOException("Connection reset")));
+
+        assertThat(confirm())
+                .isInstanceOf(TossResult.NotSent.class)
+                .extracting(TossResult::httpStatus)
+                .isNull();
+        assertThat(confirm())
+                .isInstanceOf(TossResult.Unknown.class)
+                .extracting(TossResult::httpStatus)
+                .isNull();
     }
 
     private TossResult confirm() {

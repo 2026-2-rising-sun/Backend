@@ -55,7 +55,9 @@ class TossClientConfigurationTest {
             TossPaymentsClient client = clientFor(server, " ", Duration.ofMillis(300));
 
             assertThat(client.confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
-                    .isInstanceOf(TossResult.NotSent.class);
+                    .isInstanceOf(TossResult.NotSent.class)
+                    .extracting(TossResult::httpStatus)
+                    .isNull();
             assertThat(client.getPayment("pk-1")).isInstanceOf(TossResult.NotSent.class);
             assertThat(client.cancel("pk-1", "사유", "cancel-pg-order-1"))
                     .isInstanceOf(TossResult.NotSent.class);
@@ -113,7 +115,9 @@ class TossClientConfigurationTest {
         assertThat(
                         clientFor("http://127.0.0.1:" + closedPort, SECRET, Duration.ofSeconds(1))
                                 .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1"))
-                .isInstanceOf(TossResult.NotSent.class);
+                .isInstanceOf(TossResult.NotSent.class)
+                .extracting(TossResult::httpStatus)
+                .isNull();
     }
 
     @Test
@@ -125,6 +129,7 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
         }
     }
 
@@ -140,8 +145,41 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).as("데드라인 초과는 응답 없음").isNull();
             assertThat(Duration.ofNanos(System.nanoTime() - startedAt))
                     .isLessThan(Duration.ofSeconds(3));
+        }
+    }
+
+    @Test
+    @DisplayName("PAY-CONFIRM-12 4xx 본문 중간에 끊기면 Unknown이고 HTTP 상태를 남기지 않는다")
+    void clientErrorBodyCutHasNoHttpStatus() throws Exception {
+        String head =
+                "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: 200\r\n\r\n";
+        try (RawServer server = RawServer.respond(head + "{\"code\":\"REJ", Duration.ZERO)) {
+            TossResult result =
+                    clientFor(server, SECRET, Duration.ofSeconds(5))
+                            .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
+
+            assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
+        }
+    }
+
+    @Test
+    @DisplayName("PAY-CONFIRM-12 연결은 정상 종료됐지만 JSON이 중간에서 끝나면 HTTP 상태를 남기지 않는다")
+    void truncatedJsonHasNoHttpStatus() throws Exception {
+        String head =
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                        + PARTIAL_BODY.length()
+                        + "\r\n\r\n";
+        try (RawServer server = RawServer.respond(head + PARTIAL_BODY, Duration.ZERO)) {
+            TossResult result =
+                    clientFor(server, SECRET, Duration.ofSeconds(5))
+                            .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
+
+            assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).isNull();
         }
     }
 
@@ -155,6 +193,7 @@ class TossClientConfigurationTest {
                             .confirm("pk-1", "pg-order-1", 15000, "confirm-pg-order-1");
 
             assertThat(result).isInstanceOf(TossResult.Unknown.class);
+            assertThat(result.httpStatus()).as("본문 끊김은 응답 없음").isNull();
         }
     }
 

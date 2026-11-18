@@ -47,15 +47,15 @@
 - [ ] **PAY-CONFIRM-01** 결제가 없으면 404, pgOrderId가 경로의 orderRef 것이 아니면 400 `ORDER_ID_MISMATCH`(제안), 구매자가 다르면 403 `BUYER_MISMATCH`, 금액이 다르면 400 `AMOUNT_MISMATCH`. 토스를 부르지 않는다. (EC 11, 12)
 - [ ] **PAY-CONFIRM-02** pgOrderId가 현재 pg_order_id가 아니면 409 `STALE_CHECKOUT`(제안). 토스를 부르지 않는다. (EC 10)
 - [ ] **PAY-CONFIRM-03** expires_at이 지났으면 409 `PAYMENT_CLOSED`. 토스를 부르지 않는다. (EC 17)
-- [ ] **PAY-CONFIRM-04** 검증을 통과하면 CREATED→APPROVING으로 바꾸고 pg_payment_key를 저장한 뒤 멱등 키 `confirm-{pg_order_id}`로 토스 승인을 부른다. (EC 23)
+- [x] **PAY-CONFIRM-04** 검증을 통과하면 CREATED→APPROVING으로 바꾸고 pg_payment_key를 저장한 뒤 멱등 키 `confirm-{pg_order_id}`로 토스 승인을 부른다. (EC 23)
 - [ ] **PAY-CONFIRM-05** 같은 결제에 승인 요청이 동시에 와도 토스 호출은 1번이다. 나머지는 처리 중이면 202, 이미 승인됐으면 200. (EC 13, 14)
-- [ ] **PAY-CONFIRM-06** 토스가 성공하고 응답의 status=DONE, orderId, totalAmount, paymentKey가 모두 맞으면 한 트랜잭션에서 APPROVED, 승인 분개([LED-APPROVE-01](ledger.md)), `PaymentApproved` 이벤트를 기록한다(200).
+- [x] **PAY-CONFIRM-06** 토스가 성공하고 응답의 status=DONE, orderId, totalAmount, paymentKey가 모두 맞으면 한 트랜잭션에서 APPROVED, 승인 분개([LED-APPROVE-01](ledger.md)), `PaymentApproved` 이벤트를 기록한다(200).
 - [ ] **PAY-CONFIRM-07** 토스는 성공했는데 응답 값이 하나라도 다르면 APPROVED로 바꾸지 않고 전액 취소(멱등 키 `cancel-{pg_order_id}`) 후 CANCELED, 알림(ERROR 로그). 409 `PAYMENT_CLOSED`. 취소 결과가 불명이어도 CANCELED로 두고 거래 대사가 다시 잡는다(감수, EC 25·38).
 - [ ] **PAY-CONFIRM-08** 토스가 거절하면 CREATED로 돌아가고 422 `DECLINED {code, message}`. 새 결제창으로 다시 승인할 수 있다. (EC 15, 16)
 - [ ] **PAY-CONFIRM-09** 요청이 토스에 가지 않았으면(연결 실패) CREATED로 돌아가고 503 `PG_UNAVAILABLE`(제안).
 - [ ] **PAY-CONFIRM-10** 결과를 모르면 같은 멱등 키로 1번 더 부르고, 그래도 모르면 UNKNOWN(첫 조회 10초 뒤, 조회 마감 30분 뒤)으로 두고 202. (EC 21)
 - [ ] **PAY-CONFIRM-11** 토스 응답을 8초 안에 받지 못하면 202를 먼저 돌려주고 처리는 계속한다. 그동안 결제는 APPROVING이고, 결과가 나오면 PAY-CONFIRM-06–10과 같이 반영한다. 이후 거절되면 CREATED, 승인되면 이벤트가 나간다. (EC 18, 19)
-- [ ] **PAY-CONFIRM-12** 토스 호출마다 호출 기록(pg_call)을 1행 남긴다.
+- [x] **PAY-CONFIRM-12** 토스 호출마다 호출 기록(pg_call)을 1행 남긴다.
 
 ## PG 응답 분류
 
@@ -75,8 +75,8 @@
 
 ## 결과 이벤트
 
-- [ ] **PAY-EVENT-01** `PaymentApproved {paymentId, orderRef, amount, approvedAt}`를 `payment.execution-results.v1`에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module `OutboxTransactionIntegrationTest`가 검증한다.
-- [ ] **PAY-EVENT-02** 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.
+- [x] **PAY-EVENT-01** `PaymentApproved {paymentId, orderRef, amount, approvedAt}`를 `payment.execution-results.v1`에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module `OutboxTransactionIntegrationTest`가 검증한다.
+- [x] **PAY-EVENT-02** 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.
 
 ## 범위 밖
 
