@@ -16,7 +16,7 @@ CommerceCore Order·새 Payment 계약 중계와 기존 legacy 실행 동작을 
 
 ### 2. 생성과 금액
 
-새 API는 UUID 구매자, 직접 SKU 또는 Cart ID/version, 예상 실결제액, 선택 SKU 쿠폰 한 장을 받는다. 회원 guard→Cart 출처→Product ID 공유잠금→SKU ID 쓰기잠금 순으로 생성·선점·쿠폰 예약을 같은 TX에 저장한다. 동일 키/원문은 기존 스냅샷을 반환하며 다른 입력은409다. 옵션 공급은 #340 보류로 null이다.
+새 API는 UUID 구매자, 직접 SKU 또는 Cart ID/version, 예상 실결제액, 선택 SKU 쿠폰 한 장을 받는다. 회원 guard→Cart 출처→Product ID 공유잠금→SKU ID 쓰기잠금 순으로 생성·선점·쿠폰 예약을 같은 TX에 저장한다. 동일 키/원문은 기존 스냅샷을 반환하며 다른 입력은409다. 옵션 공급은 별도 보류로 null이며 #340 Cart 성공 정리와 별개다.
 
 판매자별 총액에서 해당 SKU 쿠폰 할인을 빼고 양수 금액을 합산한다. seller_id 순으로 `{orderRef}-S1` 번호를 발급하며 팀원 설정 `commerce.commission-rate`를 생성 시 seller_order에 보존한다. 임의 숫자 기본값은 없다. 설정 누락·잘못된 금액은 전체 TX를 rollback한다. 새 Payment가 양수 금액만 받는 제약은 새 API에만 적용하며 legacy 0원 경로를 제거하지 않는다.
 
@@ -28,7 +28,7 @@ CommerceCore Order·새 Payment 계약 중계와 기존 legacy 실행 동작을 
 
 ### 4. 결과·만료·늦은 승인
 
-회원 guard와 묶음 잠금 뒤 DB시각으로 판정한다. 유효 PROCESSING 승인→PAID와 재고 차감·쿠폰 사용·같은 Cart ID/version 제거, 확정 실패→FAILED와 선점 반환이다. 정확 경계는 먼저 EXPIRED와 해제다. 만료는 Payment 실패 확정이 아니다.
+회원 guard와 묶음 잠금 뒤 DB시각으로 판정한다. 유효 PROCESSING 승인→PAID와 재고 차감·쿠폰 사용·Cart 출처가 있는 구매 SKU의 본인 Cart 행 전체 제거, 확정 실패→FAILED와 선점 반환이다. 정확 경계는 먼저 EXPIRED와 해제다. 만료는 Payment 실패 확정이 아니다.
 
 종료 뒤 승인은 주문을 되살리지 않는다. `payment_relay_refund(REQUESTED)`와 `RefundRequested(LATE_APPROVAL, late-{paymentId})` outbox를 같은 TX에 한 번 저장한다. 중복 HTTP/Kafka 승인은 다시 재고를 변경하거나 환불요청을 만들지 않는다. RefundSucceeded/RefundFailed는 원문 금액·판매자 번호·요청키를 검증해 환불 상태만 확정한다. Kafka 발행 성공은 환불 완료가 아니다. Payment에 취소/만료를 통지하는 별도 계약은 없다.
 
@@ -54,7 +54,7 @@ Payment 소유 구현·DTO·V4·계약을 새로 확장하지 않는다. 최신 
 
 ### 9. 직접 합의와 구분하는 구현 선택
 
-회원당 활성1건과 Payment 결과확정부터168h 미만 환불은 기존dev 제약이며 이번에 새로 직접 승인받은 정책으로 표시하지 않는다. Cart 담기 판매조건·0재고 판매시작·상품 전체중지 공개노출은 미답변이다. #340/#345/#346·공개 다중SKU/대표가/가격순·옵션은 후속/보류다. 실제 결제제공자·운영·배포·전체 정책 수용을 검증 완료로 표시하지 않는다.
+회원당 활성1건과 Payment 결과확정부터168h 미만 환불은 기존dev 제약이며 이번에 새로 직접 승인받은 정책으로 표시하지 않는다. Cart 담기 판매조건·0재고 판매시작·상품 전체중지 공개노출은 미답변이다. #340 Cart 성공 정리는 회원+SKU 기준으로 반영한다. #345/#346·공개 다중SKU/대표가/가격순·옵션은 후속/보류다. 실제 결제제공자·운영·배포·전체 정책 수용을 검증 완료로 표시하지 않는다.
 
 ## Order 로컬 도메인 상태와 기존 공개 호환
 
@@ -236,3 +236,7 @@ commercecore.refunds.execution-enabled가 꺼져 있으면 REFUND 전달을 하�
 ### 2026-11-16 현재 PR 경계
 
 새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
+
+## #340 Cart 출처와 성공 정리
+
+Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환불 계약의 식별 자료로 보존한다. 성공 삭제에는 회원 ID + 해당 주문항목의 SKU만 사용하므로 결제 중 수량 변경·삭제 후 재추가도 정리한다. 같은 상품의 다른 SKU·다른 회원·직접 구매의 Cart는 보존한다. 기존 terminal 결과/승인 사실 및 상태 전이로 최초 성공만 반영하며 중복 성공 이후 재담기는 보존한다. 실패·취소·만료·늦은 승인에서는 Cart를 정리하지 않는다. Cart→SKU 잠금 순서와 상태·재고·쿠폰·알림의 원자성은 유지한다. [Cart 결정](../cart/overview.md#2026-11-18-340-성공-정리-결정).
