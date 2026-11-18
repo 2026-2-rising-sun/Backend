@@ -79,7 +79,7 @@ class CartOrderIntegrationTest
         skuFixtures.add(salesId);
         skuFixtures.add(1_000_000_000L + salesId);
         jdbc.update(
-                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,1,1000,10,0,'ON_SALE',0,1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(?,2,1000,0,0,'READY',0,1,'다른 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,1,1000,10,0,'ON_SALE',1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(?,2,1000,0,0,'READY',1,'다른 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 salesId,
                 1_000_000_000L + salesId);
     }
