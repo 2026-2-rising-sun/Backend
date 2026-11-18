@@ -10,7 +10,7 @@
 
 ![6개 서비스의 책임과 독립 데이터베이스](docs/assets/architecture/backend-architecture.png)
 
-각 서비스는 자신의 데이터를 소유하고 API와 이벤트로 협력합니다. 상품 원본·이미지·판매·재고·쿠폰·장바구니·주문과 환불 접수 정책은 CommerceCore가, 공개 상품·판매·쿠폰 사본은 Catalog가, 결제·환불 실행과 Mock PG·결과 복구는 Payment가 담당합니다. 공통 응답, 인증 검증, 요청 추적, JPA 감사와 Outbox 구현은 `common-module`에서 공유합니다.
+각 서비스는 자신의 데이터를 소유하고 API와 이벤트로 협력합니다. 상품 원본·이미지·판매·재고·쿠폰·장바구니·주문과 환불 접수 정책은 CommerceCore가, 공개 상품·판매·쿠폰 사본은 Catalog가, 결제·환불 실행과 토스 연동·결과 복구는 Payment가 담당합니다. 공통 응답, 인증 검증, 요청 추적, JPA 감사와 Outbox 구현은 `common-module`에서 공유합니다.
 
 ## 서비스 간 통신
 
@@ -32,11 +32,11 @@
 | [Member](services/member-service) | 회원·인증·세션 | 회원가입, 로그인, JWT 발급, Refresh Token 교체, 로그아웃, 회원정보 수정·탈퇴, 세션 폐기·확인 |
 | [Catalog](services/catalog-service) | 상품·판매·쿠폰 공개 사본 | 상품 검색·목록·상세·구매 진입 확인, 상품·판매·쿠폰 이벤트 수신과 버전 사본 |
 | [CommerceCore](services/commercecore-service) | 상품·이미지·거래 원본 | 상품·이미지·판매자 관리, 판매·재고·장바구니·주문·쿠폰, 공개 결제 facade, 환불 접수와 결과 멱등 반영 |
-| [Payment](services/payment-service) | 결제·환불 실행 | Mock PG, 0원 실행 기록, UNKNOWN·lease·재시도 복구, 누적 환불 한도와 결과 Outbox |
+| [Payment](services/payment-service) | 결제·환불 실행 | 토스 승인, UNKNOWN 조회 복구·만료, 복식 원장 분개, 결과 Outbox. 환불은 재설계 중 |
 | [Live](services/live-service) | 방송·실시간 참여 | 방송 등록·시작·종료, 방송 상품 연결·정렬, 프로모션 생성·열기·닫기, 채팅, 회원별 좋아요, SSE |
 | [Notification](services/notification-service) | 내 알림함 | 커서 기반 알림 목록, 안 읽은 알림 개수, 본인 알림 읽음 처리 |
 
-결제·환불은 현재 Mock 제공자로 구현되어 있습니다. Live는 로컬 IVS stub과 AWS IVS 조회 어댑터를 제공하며, 실제 PG·방송 플랫폼의 운영 연동과는 구분합니다. Notification은 이벤트 수신과 중복 방지로 알림을 생성하고 본인 알림함 API를 제공합니다.
+결제는 토스페이먼츠로 승인합니다(테스트 키로 확인). 환불 실행은 재설계 중이라 아직 없습니다. Live는 로컬 IVS stub과 AWS IVS 조회 어댑터를 제공하며, 실제 PG·방송 플랫폼의 운영 연동과는 구분합니다. Notification은 이벤트 수신과 중복 방지로 알림을 생성하고 본인 알림함 API를 제공합니다.
 
 ## 기술 스택
 
@@ -61,7 +61,7 @@
 
 ### 결제·환불의 불확실한 결과 재확인
 
-CommerceCore는 영속 전달 요청을 저장한 뒤 Payment 내부 HTTP API에 같은 요청 ID로 재전달합니다. Payment는 독립 DB에 실행 결과와 Outbox를 저장하며, Core는 결과 선도착과 중복 수신에도 주문·재고를 한 번 적용합니다. 결과가 확정되지 않은 경우 기존 UNKNOWN 재조회 규칙을 유지합니다. 환불 접수와 실행·결과 반영을 분리하며, 주문·재고·쿠폰 상태도 처리 결과에 맞춰 갱신합니다.
+CommerceCore는 주문서 결제를 Payment 내부 HTTP API(결제 생성·결제창·승인)로 중계합니다. Payment는 토스 승인 결과를 독립 DB에 저장하고 `PaymentApproved`를 Outbox로 발행하며, Core는 중복 수신에도 주문·재고를 한 번 적용합니다. 결과를 모르면 Payment가 토스를 다시 조회해 확정합니다. 환불 접수와 실행·결과 반영을 분리하며, 주문·재고·쿠폰 상태도 처리 결과에 맞춰 갱신합니다.
 
 ### JWT와 서버 세션 상태를 함께 확인하는 인증
 

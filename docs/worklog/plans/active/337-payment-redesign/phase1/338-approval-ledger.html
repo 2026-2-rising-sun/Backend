@@ -32,7 +32,7 @@
 <li><a href="#참고">참고</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#338 토스 결제 승인과 원장 분개</h1><p>상태: 설계 확정(2026-11-15)
+</div></aside><main id="content"><h1>#338 토스 결제 승인과 원장 분개</h1><p>상태: 구현 완료(2026-11-16), 병합 대기. 설계 확정은 2026-11-15
 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/338">#338</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a> · 스키마: <a href="348-create-api.html#db-v4__payment_coresql">#348 설계</a></p>
 <h2 id="개요">개요</h2>
 <p>끝나면 Commerce가 중계한 승인 요청을 Payment가 검증하고, <strong>토스 승인을 한 번만 호출</strong>하고, 결과를 상태·원장·이벤트에 <strong>한 트랜잭션으로</strong> 남긴다. 토스 응답이 8초 안에 없으면 202를 먼저 돌려주고 처리는 계속한다. 결과를 모르면 UNKNOWN으로 두고 #349가 확정한다. 이 이슈의 "승인 반영" 함수(<code>applyDone</code>)를 #349가 그대로 쓴다.</p>
@@ -772,6 +772,6 @@ record Line(LedgerAccount account, long debit, long credit, String sellerId) {}
 <li>옛 이벤트는 호환을 깨고 지운다(위 "바뀌는 점" 아래 문단).</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>837acaf210cf5a91649b74ae1a300519e485856c3285fade774448023fb5a858</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>bfd27b6eb4c5708c6fd8a68c5135d2c9c56f12d8a6bf89485cabcc8f822a0e27</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

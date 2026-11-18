@@ -1,12 +1,14 @@
 # 결제 수용 기준
 
-상태: 초안
+상태: 완료
 검증: [결제 재설계 실행 계획](../../../../worklog/plans/active/337-payment-redesign/README.md)
+검증 방식: 혼합
+근거: [결제 1차 워크로그](../../../../worklog/2026-11-13.md#338-토스-샌드박스-확인-도구와-실제-키-테스트) · [결제 1차 종료 검증](../../../../worklog/plans/active/337-payment-redesign/phase1-payment.md#종료-검증)
 
 결제 생성·결제창·승인·결과 불명 복구·만료를 다룬다. 환불은 [환불](refund.md), 분개는 [원장](ledger.md)에 있다.
 
 - 설계 근거: [Payment 목표 설계](../design.html) — `#f1`–`#f6`, `#api`, `#states`, `#toss`, `#mapping`. `EC n`은 그 문서 `#edge` 표의 번호다.
-- 지금 코드가 아니라 **교체할 목표 동작**이다. 현재 구현의 기준은 [주문·결제](../../../flows/requirements/order-payment.md)에 있고, 교체 PR에서 함께 정리한다([ADR 0337-2](../../../../adr/0337-2-payment-replacement.md)).
+- 결제 1차(PR #352–#359)에서 구현했다. 자동 테스트(`@DisplayName`의 ID)와 실제 토스 테스트 키 확인(#366)이 검증이다. Commerce 쪽 기준은 [주문·결제](../../../flows/requirements/order-payment.md)에 있다([ADR 0337-2](../../../../adr/0337-2-payment-replacement.md)).
 - ID는 바꾸지 않는다. 테스트 `@DisplayName`에 ID를 넣는다. 예: `"[PAY-CREATE-03] 같은 orderRef에 금액이 다르면 거절한다"`.
 - `(제안)` 표시 오류 코드는 원본에 없어 새로 정한 값이다.
 
@@ -59,10 +61,10 @@
 
 ## PG 응답 분류
 
-- [ ] **PAY-PG-01** 연결 타임아웃(3초)·연결 거부, 그리고 우리 설정 문제나 호출 제한으로 토스가 처리하지 않은 응답(401, 429, 400 `INVALID_API_KEY`, 403 중 `INCORRECT_BASIC_AUTH_FORMAT`·`API_KEY_ACCESS_DENIED`)은 "보내지 않음"이다. 401·429는 본문 code와 관계없다. 시크릿 키가 설정되지 않았으면 서비스는 기동하되 토스를 호출하지 않고 "보내지 않음"으로 돌려준다. 구매자에게 카드 거절로 보이지 않게 한다. 그 밖의 403(카드 거절 등)은 "거절"이다.
-- [ ] **PAY-PG-02** 그 밖의 4xx는 "거절"이다. 단 `ALREADY_PROCESSED_PAYMENT`·`ALREADY_PROCESSING_REQUEST`·`FORBIDDEN_CONSECUTIVE_REQUEST`(연속 요청 제한)·409 `IDEMPOTENT_REQUEST_PROCESSING`(같은 멱등 키 요청이 처리 중)은 "불명"이다. 409는 [토스 멱등 키 문서](https://docs.tosspayments.com/reference/using-api/idempotency-key)가 이전 멱등 요청이 처리 중이니 다시 요청해 응답을 확인하라고 안내한다(2026-11-15 확인).
-- [ ] **PAY-PG-03** 읽기 타임아웃·응답 중 끊김·5xx·분류하지 못한 예외는 "불명"이다(애매하면 불명).
-- [ ] **PAY-PG-04** 승인·조회·취소 모두 Basic 인증과 `Idempotency-Key`(승인·취소)를 보내고, 읽기 타임아웃은 60초다.
+- [x] **PAY-PG-01** 연결 타임아웃(3초)·연결 거부, 그리고 우리 설정 문제나 호출 제한으로 토스가 처리하지 않은 응답(401, 429, 400 `INVALID_API_KEY`, 403 중 `INCORRECT_BASIC_AUTH_FORMAT`·`API_KEY_ACCESS_DENIED`)은 "보내지 않음"이다. 401·429는 본문 code와 관계없다. 시크릿 키가 설정되지 않았으면 서비스는 기동하되 토스를 호출하지 않고 "보내지 않음"으로 돌려준다. 구매자에게 카드 거절로 보이지 않게 한다. 그 밖의 403(카드 거절 등)은 "거절"이다.
+- [x] **PAY-PG-02** 그 밖의 4xx는 "거절"이다. 단 `ALREADY_PROCESSED_PAYMENT`·`ALREADY_PROCESSING_REQUEST`·`FORBIDDEN_CONSECUTIVE_REQUEST`(연속 요청 제한)·409 `IDEMPOTENT_REQUEST_PROCESSING`(같은 멱등 키 요청이 처리 중)은 "불명"이다. 409는 [토스 멱등 키 문서](https://docs.tosspayments.com/reference/using-api/idempotency-key)가 이전 멱등 요청이 처리 중이니 다시 요청해 응답을 확인하라고 안내한다(2026-11-15 확인).
+- [x] **PAY-PG-03** 읽기 타임아웃·응답 중 끊김·5xx·분류하지 못한 예외는 "불명"이다(애매하면 불명).
+- [x] **PAY-PG-04** 승인·조회·취소 모두 Basic 인증과 `Idempotency-Key`(승인·취소)를 보내고, 읽기 타임아웃은 60초다.
 
 ## 결과 불명 복구 · 만료
 

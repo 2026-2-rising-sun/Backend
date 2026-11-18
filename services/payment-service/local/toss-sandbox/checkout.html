@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>토스 테스트 결제창</title>
+<!-- 로컬 검증용: 결제창을 열어 테스트 paymentKey를 받는다. 승인은 Payment API로 따로 한다. serve.sh로 띄운다. -->
+<script src="https://js.tosspayments.com/v2/standard"></script>
+<p>pgOrderId <input id="orderId" size="40"> 금액 <input id="amount" value="30000" size="8"></p>
+<button id="pay">카드 결제</button>
+<p id="err"></p>
+<script>
+  orderId.value = new URLSearchParams(location.search).get('orderId') || '';
+  pay.onclick = async () => {
+    // serve.sh가 .env에서 만든다(gitignore)
+    const config = await fetch('config.json').then((r) => (r.ok ? r.json() : null));
+    if (!config) {
+      err.textContent = 'config.json이 없다. serve.sh로 띄웠는지 확인한다.';
+      return;
+    }
+    const payment = TossPayments(config.clientKey).payment({ customerKey: TossPayments.ANONYMOUS });
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: { currency: 'KRW', value: Number(amount.value) },
+      orderId: orderId.value,
+      orderName: '로컬 검증 주문',
+      successUrl: location.origin + '/success.html',
+      failUrl: location.origin + '/success.html',
+    });
+  };
+</script>

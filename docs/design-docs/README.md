@@ -15,7 +15,7 @@
 | 서비스 | 책임과 문서 |
 |---|---|
 | [CommerceCore](services/commercecore/overview.md) | Product·SKU·Cart·Order·Coupon 원본과 모듈별 ERD·API |
-| [Payment](services/payment/overview.md) | 결제·환불 실행. 현재 Mock 구현과 재설계 목표 구분 |
+| [Payment](services/payment/overview.md) | 결제·환불 실행. 결제 1차 현재 코드와 재설계 목표 구분 |
 | [Catalog](services/catalog/overview.md) | 공개 조회 사본 |
 | [Member](services/member/overview.md) | 회원·인증·세션 |
 | [Live](services/live/overview.md) | 방송·채팅·실시간 전달 |

@@ -31,8 +31,8 @@
 <td>Core가 저장하는 재전달 가능한 원문과 결과 사본.</td>
 </tr>
 <tr>
-<td>결제 실행 payment_attempt</td>
-<td>Payment가 소유하는 제공자 실행·결과·복구 원본.</td>
+<td>결제 payment</td>
+<td>Payment가 소유하는 결제 1건(주문 참조 <code>order_ref</code>)의 상태·토스 키·복구 원본. PG 호출 기록은 <code>pg_call</code>.</td>
 </tr>
 <tr>
 <td>환불 접수 / 실행</td>
@@ -56,6 +56,6 @@
 </tr>
 </tbody>
 </table></div>
-<p><a href="README.html">모듈 문서</a>와 실제 계약·구현에서 해당 용어를 함께 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>fec62b1663a4ff68029e07f71576d07a1d6f34a369c729d785fce34381f13268</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="README.html">모듈 문서</a>와 실제 계약·구현에서 해당 용어를 함께 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>d14de7ec8bde563ac17e19807dd8a6552f92ac8fc1bbf8ac75a366bc1f757605</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

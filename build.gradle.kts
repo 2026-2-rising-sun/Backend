@@ -76,7 +76,7 @@ subprojects {
             group = "verification"
             testClassesDirs = integrationSources.output.classesDirs
             classpath = integrationSources.runtimeClasspath
-            useJUnitPlatform { excludeTags("postgres", "redis") }
+            useJUnitPlatform { excludeTags("postgres", "redis", "toss-sandbox") }
             dependsOn(tasks.named("testClasses"))
             shouldRunAfter(tasks.named("test"))
             if (project.name in setOf("member-service", "notification-service")) {
@@ -127,6 +127,10 @@ subprojects {
         registerExternalTest("migrationTest", "postgres & migration", postgresEnabled)
         if (prefix in setOf("CATALOG", "COMMERCECORE", "PAYMENT", "LIVE")) {
             registerExternalTest("postgresTest", "postgres & !migration", postgresEnabled)
+        }
+        if (prefix == "PAYMENT") {
+            // 실제 토스 API를 부른다. CI에서 돌지 않게 integrationTest에서 뺀 태그다
+            registerExternalTest("tossSandboxTest", "toss-sandbox") { true }
         }
         registerExternalTest("redisTest", "redis") { System.getenv("${prefix}_REDIS_TEST") == "1" }
     }

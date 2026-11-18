@@ -52,9 +52,27 @@ spring:
   config:
     activate:
       on-profile: local
+    # 로컬 비밀값은 services/payment-service/.env에서 읽는다(bootRun은 모듈 폴더, IDE는 저장소 루트에서 실행할 수 있어 두 경로). 없으면 무시. 형식은 .env.example.
+    import: optional:file:.env[.properties],optional:file:services/payment-service/.env[.properties]
   datasource:
     url: ${PAYMENT_DB_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:56432}/payment}
     username: ${PAYMENT_DB_USER:${POSTGRES_USER:msa}}
     password: ${PAYMENT_DB_PASSWORD:${POSTGRES_PASSWORD:msa-local-only}}
   kafka:
     bootstrap-servers: ${PAYMENT_KAFKA_SERVERS:localhost:${KAFKA_PORT:59092}}
+payment:
+  toss:
+    # 기본은 가짜 토스(Infra local/docker-compose.yml의 toss-mock). 실제 토스는 toss-real 프로필을 함께 켠다.
+    base-url: http://localhost:59080
+    secret-key: local-mock-secret
+
+---
+# 실제 토스 테스트 환경. --spring.profiles.active=local,toss-real 로 켜고 .env에 test_sk_ 키를 둔다.
+spring:
+  config:
+    activate:
+      on-profile: toss-real
+payment:
+  toss:
+    base-url: ${PAYMENT_TOSS_BASE_URL:https://api.tosspayments.com}
+    secret-key: ${PAYMENT_TOSS_SECRET_KEY:}

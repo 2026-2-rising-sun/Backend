@@ -22,7 +22,7 @@
 <li><a href="#인계">인계</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Phase 1 상세 설계 확정(2026-11-15 사용자 동의). 구현 착수 준비
+</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Phase 1 구현·검증 완료, PR #352–#359·#366 병합 대기(2026-11-18). Phase 2는 CommerceCore에서 대부분 구현
 관련 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/337">#337 재설계</a>(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: <a href="../../../../design-docs/services/payment/requirements/payment.html">결제</a> · <a href="../../../../design-docs/services/payment/requirements/ledger.html">원장</a> · <a href="../../../../design-docs/services/payment/requirements/refund.html">환불</a>
 관련 결정: <a href="../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../adr/0337-2-payment-replacement.html">0337-2</a> · <a href="../../../../adr/0337-3-payment-result-delivery.html">0337-3</a> · <a href="../../../../adr/0337-4-ledger-double-entry.html">0337-4</a> · <a href="../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a>
@@ -61,35 +61,35 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <td>기존 코드 삭제</td>
 <td>#347</td>
 <td>—</td>
-<td>대기</td>
+<td>구현 완료, 병합 대기 (PR #352)</td>
 </tr>
 <tr>
 <td></td>
 <td>결제 생성·결제창·조회 API</td>
 <td>#348</td>
 <td>PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH</td>
-<td>대기</td>
+<td>구현 완료, 병합 대기 (PR #354·#355)</td>
 </tr>
 <tr>
 <td></td>
 <td>토스 승인과 원장 분개</td>
 <td>#338</td>
 <td>PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01</td>
-<td>대기</td>
+<td>구현 완료, 병합 대기 (PR #353·#356–#358, 토스 샌드박스 확인 #366)</td>
 </tr>
 <tr>
 <td></td>
 <td>결과 불명 복구와 만료</td>
 <td>#349</td>
 <td>PAY-RECOVER·EXPIRE</td>
-<td>대기</td>
+<td>구현 완료, 병합 대기 (PR #359)</td>
 </tr>
 <tr>
 <td><strong>2 주문 연동</strong></td>
 <td>Commerce가 새 결제 API·이벤트를 쓴다</td>
-<td>착수 때</td>
-<td>착수 때 Commerce 요구사항 작성. #331 담당과 범위 조율</td>
-<td>대기</td>
+<td>#343·#365(CommerceCore)</td>
+<td>CommerceCore 문서(<a href="../../../../design-docs/flows/order-payment.html">주문·결제 흐름</a>)</td>
+<td>진행 중 — 주문서 결제 중계·<code>PaymentApproved</code> 소비는 dev에 있음. 남은 일: 옛 <code>HttpPaymentClient</code>·<code>PaymentExecutionResolved</code> 소비 경로 정리, 토스 결제창 → Commerce → Payment 수동 확인</td>
 </tr>
 <tr>
 <td><strong>3 환불</strong></td>
@@ -165,12 +165,14 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <h3 id="스택-pr">스택 PR</h3>
 <ul>
 <li>PR base는 바로 앞 PR 브랜치, 첫 PR은 <code>dev</code>. 브랜치는 <code>&lt;type&gt;/#&lt;그 PR의 하위 이슈&gt;-&lt;slug&gt;</code>(PR 블록의 이슈).</li>
-<li>앞 PR이 squash 병합되면 다음 PR을 옮긴다. base만 바꾸면 CI가 다시 돌지 않으므로 푸시한다.</li>
+<li>스택은 아래 PR부터 <strong>merge commit</strong>("Create a merge commit")으로 병합한다. squash·rebase 병합은 쓰지 않는다. 자식 브랜치가 부모 커밋을 그대로 가지고 있어 rebase·강제 푸시가 필요 없다.</li>
+<li>저장소는 병합 뒤 브랜치를 지우지 않아(<code>delete_branch_on_merge: false</code>) 자식 PR의 base가 자동으로 바뀌지 않는다. 부모가 병합되면 자식 base를 <code>dev</code>로 바꾼 뒤 병합한다.</li>
 </ul>
-<pre><code class="language-bash">git fetch origin &amp;&amp; git rebase --onto origin/dev &lt;앞-PR-브랜치의-병합-전-끝-커밋&gt; &lt;내-브랜치&gt;
+<pre><code class="language-bash">gh pr edit &lt;내-PR&gt; --base dev &amp;&amp; gh pr ready &lt;내-PR&gt;
 </code></pre>
-<pre><code class="language-bash">gh pr edit &lt;내-PR&gt; --base dev &amp;&amp; git push --force-with-lease
-</code></pre>
+<ul>
+<li>Phase 1 순서: #352·#353(둘 다 base dev) → #354 → #355 → #356 → #357 → #358 → #359 → #366.</li>
+</ul>
 <h3 id="다른-세션에-넘길-때">다른 세션에 넘길 때</h3>
 <pre><code class="language-text">작업: 결제 재설계 Phase 1 PR&lt;n&gt; &lt;제목&gt;
 읽을 것: docs/worklog/plans/active/337-payment-redesign/phase1/&lt;이슈&gt;-*.md 의 &quot;PR 나누기&quot;에서 PR&lt;n&gt; 줄, 설계서가 가리키는 요구사항 ID
@@ -213,7 +215,7 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <tr>
 <td>새 생성·승인 API 호출, <code>PaymentApproved</code> 소비</td>
 <td>Phase 2 주문 연동. <a href="https://github.com/2026-2-rising-sun/Backend/issues/331">#331</a>의 Order 구조 위에서 진행하고, 겹치는 결제 흐름은 이 설계를 따른다</td>
-<td>Phase 1 직후. Phase 1 PR0 병합부터 Phase 2 완료까지 통합 개발 환경의 결제는 동작하지 않는다</td>
+<td>CommerceCore #343·#365로 dev에 들어갔다. 주문서 결제 중계(<code>HttpPaymentRelayClient</code>)는 새 API를 부른다. 옛 <code>HttpPaymentClient</code> 경로는 #347(PR #352) 병합 뒤 지운 API를 불러 동작하지 않는다</td>
 </tr>
 <tr>
 <td><code>RefundRequested</code> 발행, 환불 API 호출</td>
@@ -230,10 +232,10 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <p>Payment 쪽 검증은 Commerce 없이 끝나게 만든다.</p>
 <h2 id="인계">인계</h2>
 <ul>
-<li>완료: Payment 목표 설계 HTML, 요구사항 초안 3개, ADR 0337-1–5 채택, 이 계획.</li>
-<li>남은 일: 큰 그림 확정(이 README) → Phase 1 상세 설계(이슈별) → Phase 1 구현(기존 코드 삭제·토스 클라이언트부터).</li>
-<li>조율: <a href="https://github.com/2026-2-rising-sun/Backend/pull/343">#343</a>(Order)이 기존 Payment 코드·<code>V4</code>·<code>contracts/api/payment-service.yaml</code>을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·<code>payment_order_control</code>·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 <code>V4</code>를 그대로 쓴다. 남은 채 병합되면 <code>V5</code>로 옮기고 그 테이블도 함께 지운다. 답을 기다리지 않고 기존 코드 삭제를 먼저 진행하며, 충돌은 그 PR이 맞춘다(2026-11-15 결정).</li>
+<li>완료: Payment 목표 설계 HTML, 요구사항 3개, ADR 0337-1–5 채택, 이 계획, Phase 1 구현(PR #352–#359)과 토스 샌드박스 확인 도구(#366). 결과는 <a href="phase1-payment.html#종료-검증">Phase 1 문서</a>에 있다.</li>
+<li>남은 일: Phase 1 PR 병합(위 "스택 PR" 순서) → Phase 2 남은 일(로드맵 표) → Phase 3 환불.</li>
+<li>조율: <a href="https://github.com/2026-2-rising-sun/Backend/pull/343">#343</a>(Order)이 기존 Payment 코드·<code>V4</code>·<code>contracts/api/payment-service.yaml</code>을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·<code>payment_order_control</code>·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 <code>V4</code>를 그대로 쓴다. 남은 채 병합되면 <code>V5</code>로 옮기고 그 테이블도 함께 지운다. 답을 기다리지 않고 기존 코드 삭제를 먼저 진행하며, 충돌은 그 PR이 맞춘다(2026-11-15 결정). 결과: #343은 Payment 스키마를 바꾸지 않고 병합됐고 Phase 1 스키마는 <code>V4</code>를 그대로 쓴다.</li>
 <li>결제 재설계가 끝나면 <code>design-docs/services/payment/design.html</code> 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>621d86e2b4cb515061a202eec3627ad7dd9bd909c685ae65a3514d4efe3c0e41</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>7a48238224dcd1a43fe435955b141645414c8f29192e2853e49304a58bf947d0</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

@@ -24,7 +24,7 @@
 <li><a href="#참고">참고</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#347 기존 Mock 결제 코드 제거</h1><p>상태: 설계 확정(2026-11-15) · #343을 기다리지 않는다. #343이 먼저 병합되면 아래 표대로 바꾼다
+</div></aside><main id="content"><h1>#347 기존 Mock 결제 코드 제거</h1><p>상태: 구현 완료(2026-11-15), 병합 대기. #343은 Payment 스키마를 바꾸지 않고 먼저 병합됐다
 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/347">#347</a> · Phase 문서: <a href="../phase1-payment.html">Phase 1 결제 1차</a></p>
 <h2 id="개요">개요</h2>
 <p>끝나면 payment-service에 <strong>기존 Mock 결제·환불 코드와 그 API가 없고</strong>, 서비스는 컨트롤러 없이 기동한다. 새 코드(#348 이후)가 이름·경로·테이블에서 옛 코드와 섞이지 않게 하는 것이 목적이다. 기존 테이블은 이 PR에서 지우지 않는다. 테이블은 #348의 V4가 지운다(마이그레이션 번호를 하나로 모으기 위해).</p>
@@ -952,6 +952,6 @@
 <h2 id="미결정">미결정</h2>
 <p>결정(2026-11-15, 사용자 동의): 쓰지 않는 의존성 두 줄은 이 PR에서 지운다.</p>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/343#issuecomment-6892067416">#343 조율 댓글</a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>1dc8450c27f6380f306e774584df4e1af9f056c718e5195558d8d4cf1b3cccb1</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../adr/0337-2-payment-replacement.html">ADR 0337-2</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/343#issuecomment-6892067416">#343 조율 댓글</a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>bec9b2dc128121cadb620e9d855e2ca7f5ea6d7de255669546b38965b5991a24</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

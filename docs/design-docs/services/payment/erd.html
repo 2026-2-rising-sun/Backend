@@ -26,7 +26,7 @@
 <tbody>
 <tr>
 <td>payment</td>
-<td>PK id; UQ order_ref(6–50자), pg_order_id, pg_payment_key; buyer_id; amount &gt; 0; refunded_amount 0–amount; status 7개; expires_at; checkout_seq</td>
+<td>PK id; UQ order_ref(6–50자), pg_order_id(지금 결제창 회차 <code>{orderRef}-{checkout_seq}</code>), pg_payment_key; buyer_id; amount &gt; 0; refunded_amount 0–amount; status 7개; expires_at; pg_provider; checkout_seq; pg_status(마지막 토스 상태); partial_cancelable; approved_at; approving_at(정체 판단); next_check_at·check_deadline_at(불명 조회 예약·마감); created_at/updated_at</td>
 <td><a href="../../../../services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql">V4</a></td>
 </tr>
 <tr>
@@ -36,17 +36,17 @@
 </tr>
 <tr>
 <td>pg_call</td>
-<td>PK id; FK payment_id; kind CONFIRM·QUERY·CANCEL; idempotency_key; outcome SUCCESS·DECLINED·NOT_SENT·UNKNOWN; requested_at/responded_at</td>
+<td>PK id; FK payment_id; kind CONFIRM·QUERY·CANCEL; pg_order_id; idempotency_key; outcome SUCCESS·DECLINED·NOT_SENT·UNKNOWN(호출 전 UNKNOWN으로 넣고 응답 뒤 채움); http_status; result_code(토스 오류 코드); requested_at/responded_at</td>
 <td><a href="../../../../services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql">V4</a></td>
 </tr>
 <tr>
 <td>ledger_journal</td>
-<td>PK id; UQ (ref_type, ref_id); created_at</td>
+<td>PK id; ref_type PAYMENT_APPROVED·REFUND_SUCCEEDED·PURCHASE_CONFIRMED·SETTLEMENT_REVERSED·PAYOUT_COMPLETED(지금 코드는 PAYMENT_APPROVED만 쓴다); ref_id; UQ (ref_type, ref_id); created_at</td>
 <td><a href="../../../../services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql">V4</a></td>
 </tr>
 <tr>
 <td>ledger_entry</td>
-<td>PK id; FK journal_id; account 4개; debit/credit 한쪽만 &gt; 0; seller_id(SELLER_PAYABLE이면 필수)</td>
+<td>PK id; FK journal_id; account PG_CUSTODY·BUYER_DEPOSIT·SELLER_PAYABLE·COMMISSION_REVENUE; debit/credit 한쪽만 &gt; 0; seller_id(SELLER_PAYABLE이면 필수)</td>
 <td><a href="../../../../services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql">V4</a></td>
 </tr>
 <tr>
@@ -98,6 +98,7 @@
 <li>상태·금액 규칙은 DB CHECK가 막는다: <code>ck_payment_status</code>(7개 상태), <code>ck_payment_refunded</code>(0 ≤ refunded_amount ≤ amount), <code>ck_ledger_side</code>(차변·대변 한쪽만 양수), <code>ck_ledger_seller</code>(판매자 미지급금 줄에 판매자 ID).</li>
 <li>같은 사건의 분개는 <code>uq_ledger_journal_ref</code>로 1번만 남는다. 중복 감지는 <code>ON CONFLICT DO NOTHING</code>의 영향 행 수로 한다.</li>
 <li>부분 인덱스: <code>ix_payment_check</code>(UNKNOWN의 next_check_at), <code>ix_payment_approving</code>(APPROVING의 approving_at), <code>ix_payment_expiry</code>(CREATED의 expires_at).</li>
+<li>일반 인덱스: <code>ix_psa_payment</code>(payment_id), <code>ix_pg_call_payment</code>(payment_id, id), <code>ix_ledger_entry_journal</code>(journal_id), <code>ix_ledger_entry_account</code>(account, seller_id).</li>
 <li>상태 변경은 이전 상태 조건부 UPDATE로만 한다. 엔티티에는 상태 setter가 없다.</li>
 </ul>
 <h2 id="원본과-매핑">원본과 매핑</h2>
@@ -108,6 +109,6 @@
 <li><a href="../../../../services/payment-service/src/main/resources/db/payment-migration/V4__payment_core.sql">V4__payment_core.sql</a></li>
 </ul>
 <p>JPA 매핑: <a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/payment/entity/">payment/entity</a>(<code>Payment</code>·<code>PaymentSellerAmount</code>·<code>PgCall</code>), <a href="../../../../services/payment-service/src/main/java/com/shoppinglive/payment/ledger/entity/">ledger/entity</a>(<code>LedgerJournal</code>·<code>LedgerEntry</code>). <code>ddl-auto: validate</code>라 매핑이 DDL과 다르면 기동이 실패한다. <code>event_outbox</code>는 common-module <code>OutboxMessage</code>(JPA)와 <code>OutboxLeaseStore</code>(JDBC)가 쓴다.</p>
-<p>상태·제약을 변경할 때 이 문서와 HTML을 재생성하고 실제 DB 검증 여부를 별도로 기록한다.</p><p class="muted fingerprint">MD SHA-256: <code>36f77016dfbe2a7da38dec07bad225dd0bb2804ab05bc82edf9f1f2d3c1c06d2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>상태·제약을 변경할 때 이 문서와 HTML을 재생성하고 실제 DB 검증 여부를 별도로 기록한다.</p><p class="muted fingerprint">MD SHA-256: <code>8b190d5627cb7e36d4487193aaa6536432272076d0c6a9eaca40e0bf84fa4f38</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

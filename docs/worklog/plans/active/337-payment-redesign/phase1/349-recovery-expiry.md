@@ -1,6 +1,6 @@
 # #349 결과 불명 복구와 만료
 
-상태: 구현(2026-11-16). 구현하며 바뀐 점은 각 절에 "(구현)"으로 적었다
+상태: 구현 완료(2026-11-16), 병합 대기. 구현하며 바뀐 점은 각 절에 "(구현)"으로 적었다
 이슈: [#349](https://github.com/2026-2-rising-sun/Backend/issues/349) · Phase 문서: [Phase 1 결제 1차](../phase1-payment.md) · 스키마: [#348 설계](348-create-api.md#db-v4__payment_coresql) · 승인 반영: [#338 설계](338-approval-ledger.md#2-승인-처리)
 
 ## 개요

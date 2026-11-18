@@ -30,3 +30,6 @@ build/
 
 .venv-api/
 __pycache__/
+
+# Payment 로컬 결제창 페이지가 .env에서 만드는 설정(토스 클라이언트 키).
+services/payment-service/local/toss-sandbox/config.json
