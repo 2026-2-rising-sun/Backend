@@ -54,8 +54,9 @@ class OrderCheckoutServiceTest {
                                 available,
                                 0,
                                 com.shoppinglive.commercecore.sku.entity.SkuSaleStatus.valueOf(
-                                        status == SalesStatus.SOLD_OUT ? "ON_SALE" : status.name()),
-                                0));
+                                        status == SalesStatus.SOLD_OUT
+                                                ? "ON_SALE"
+                                                : status.name())));
     }
 
     private void productExists() {

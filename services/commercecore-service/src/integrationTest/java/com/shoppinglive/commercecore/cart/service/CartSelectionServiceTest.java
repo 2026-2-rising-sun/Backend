@@ -116,28 +116,27 @@ class CartSelectionServiceTest {
     }
 
     @Test
-    @DisplayName("성공 정리는 원본 버전만 삭제하고 변경 항목과 선택하지 않은 항목을 유지한다")
-    void deletesOnlyUnchangedPurchasedSelections() {
+    @DisplayName("성공 정리는 수량 변경·재추가된 구매 SKU를 삭제하고 같은 상품의 다른 SKU를 보존한다")
+    void deletesPurchasedSkusIncludingEditedAndReaddedRows() {
         CartItem first = add(1L, 2);
         CartItem changed = add(2L, 5);
-        CartItem unselected = add(3L, 8);
-        var purchased = List.of(selection(first), selection(changed));
+        CartItem unselected = items.saveAndFlush(new CartItem(MEMBER_A, 1L, 103L, 8));
+        var purchased = List.of(first.getSkuId(), changed.getSkuId());
         changed.changeQuantity(6);
         items.saveAndFlush(changed);
+        items.delete(first);
+        items.flush();
+        CartItem readded = add(1L, 4);
         entityManager.clear();
 
-        selections.lockForCompletion(MEMBER_A, List.of(changed.getId(), first.getId()));
-        assertThat(selections.deletePurchased(MEMBER_A, purchased)).isEqualTo(1);
+        selections.lockForCompletion(MEMBER_A, purchased.reversed());
+        assertThat(selections.deletePurchased(MEMBER_A, purchased)).isEqualTo(2);
         entityManager.clear();
         assertThat(items.findById(first.getId())).isEmpty();
-        assertThat(items.findById(changed.getId()).orElseThrow().getQuantity()).isEqualTo(6);
+        assertThat(items.findById(changed.getId())).isEmpty();
+        assertThat(items.findById(readded.getId())).isEmpty();
         assertThat(items.findById(unselected.getId()).orElseThrow().getQuantity()).isEqualTo(8);
-
-        CartItem readded = add(1L, 4);
-        selections.lockForCompletion(MEMBER_A, List.of(first.getId(), changed.getId()));
         assertThat(selections.deletePurchased(MEMBER_A, purchased)).isZero();
-        entityManager.clear();
-        assertThat(items.findById(readded.getId()).orElseThrow().getQuantity()).isEqualTo(4);
     }
 
     @Test
@@ -145,8 +144,8 @@ class CartSelectionServiceTest {
     void neverDeletesAnotherMembersItem() {
         CartItem item = add(1L, 2);
 
-        selections.lockForCompletion(MEMBER_B, List.of(item.getId()));
-        assertThat(selections.deletePurchased(MEMBER_B, List.of(selection(item)))).isZero();
+        selections.lockForCompletion(MEMBER_B, List.of(item.getSkuId()));
+        assertThat(selections.deletePurchased(MEMBER_B, List.of(item.getSkuId()))).isZero();
         assertThat(items.existsById(item.getId())).isTrue();
     }
 
@@ -157,7 +156,7 @@ class CartSelectionServiceTest {
         var input = List.of(new CartSelection(1L, 0L));
         assertThatThrownBy(() -> selections.lockOwned(MEMBER_A, input))
                 .isInstanceOf(IllegalTransactionStateException.class);
-        assertThatThrownBy(() -> selections.deletePurchased(MEMBER_A, input))
+        assertThatThrownBy(() -> selections.deletePurchased(MEMBER_A, List.of(101L)))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 

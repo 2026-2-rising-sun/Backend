@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>2026-11-18 #371 SKU 일반 버전 제거</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-18-sku-version.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#시작과-변경">시작과 변경</a></li>
+<li><a href="#소비자와-리뷰">소비자와 리뷰</a></li>
+<li><a href="#검증-진행">검증 진행</a></li>
+<li><a href="#최종-회귀와-결과">최종 회귀와 결과</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>2026-11-18 #371 SKU 일반 버전 제거</h1><p><a href="plans/completed/371-sku-version/README.html">실행 계획</a> · <a href="../design-docs/services/commercecore/sku/overview.html">SKU 설계</a></p>
+<h2 id="시작과-변경">시작과 변경</h2>
+<p>브랜치 <code>refactor-commercecore-sku-version</code>, clean HEAD <code>0e0eae6dd92989fb70db532b045b349061d9eb31</code>에서 시작했다. fetch 후 origin/dev와 같은 커밋임을 확인했다. 사용자가 구현·푸시·PR·병합과 구간별 리뷰·검증을 요청했다.</p>
+<p>SKU 일반 version의 엔티티·조회 DTO·SQL·최신 fixture 참조와 판매 응답 필드를 제거했다. V107에서 sku.version만 삭제하며 V102 및 과거 단계 마이그레이션 테스트는 보존했다. Product·Cart·기존 Sales·Catalog 사본의 버전과 이벤트 snapshotVersion은 유지한다. 계약 YAML과 API/설계 MD·HTML을 갱신했다.</p>
+<h2 id="소비자와-리뷰">소비자와 리뷰</h2>
+<ul>
+<li>구현 리뷰: 가격·수량·상태 SQL에서 일반 버전 증가만 제거했다. 조건식·updated_at·트랜잭션·행 잠금·Product→SKU 순서·이벤트 추적 코드는 유지했다.</li>
+<li>계약 리뷰: 판매 등록·가격·상태 응답에서 version만 제거한다. 로컬 Frontend <code>e2748d7</code>의 sellerProducts.ts는 변경 응답을 사용하지 않고 재조회한다. Catalog·Live 조회 DTO에도 일반 버전이 없다. 다른 배포본·저장소 밖 소비자는 확인하지 않았다.</li>
+<li>마이그레이션 리뷰: V102가 만든 행의 version을 제외한 모든 값을 JSONB로 대조한다. 기존 Sales 버전·이벤트 버전·identity 신규 발급을 검증한다. 구 애플리케이션과 컬럼 삭제의 동시 운영은 지원하지 않으며 실제 배포는 수행하지 않는다.</li>
+</ul>
+<h2 id="검증-진행">검증 진행</h2>
+<p>Java 21과 이 작업 전용 Docker PostgreSQL 16, Kafka 4.0.0을 사용한다. 공용 DB나 기존 사용자 컨테이너는 변경하지 않는다. 테스트별 H2·Mock·PostgreSQL·Kafka 증거는 구분한다.</p>
+<p>첫 단위 186건·대상 통합 30건은 통과했다. 새 PostgreSQL 경합 테스트의 Outbox 전체 건수 기대가 Product 이벤트까지 포함해 1건 실패했다. SKU 판매 토픽과 키로 범위를 한정한 뒤 대상 PostgreSQL 25건·마이그레이션 7건은 실패·스킵 없이 통과했다.</p>
+<p>기본 하네스 검사는 단위 186건·전체 통합 313건 중 외부 Kafka 2건 스킵 때문에 incomplete였다. 선택된 PostgreSQL은 별도 명령으로 실행하고, 격리 Kafka를 준비해 전체 통합을 다시 실행한다. 아래 최종 결과는 해당 미실행·스킵을 실제 격리 환경 실행으로 보완한 결과다.</p>
+<p>Orca 브라우저에서 생성 SKU 개요/API HTML을 열었다. 390×844 화면에서 가로 넘침과 깨진 내부 앵커가 없고 변경 설명·목차·API 탐색이 표시되는 것을 확인했다. 캡처는 임시 폴더에만 두었다.</p>
+<h2 id="최종-회귀와-결과">최종 회귀와 결과</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>환경·검사</th>
+<th style="text-align: right;">테스트 수</th>
+<th>실패·오류·스킵</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CommerceCore 단위</td>
+<td style="text-align: right;">186</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>CommerceCore 전체 통합, 외부 Kafka 연결</td>
+<td style="text-align: right;">313</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>CommerceCore 실제 PostgreSQL 업무</td>
+<td style="text-align: right;">206</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>CommerceCore 실제 PostgreSQL 마이그레이션</td>
+<td style="text-align: right;">27</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>Catalog 통합, EmbeddedKafka 포함</td>
+<td style="text-align: right;">100</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>Catalog 실제 PostgreSQL 업무</td>
+<td style="text-align: right;">11</td>
+<td>0·0·0</td>
+</tr>
+<tr>
+<td>Catalog 실제 PostgreSQL 마이그레이션</td>
+<td style="text-align: right;">3</td>
+<td>0·0·0</td>
+</tr>
+</tbody>
+</table></div>
+<p>실행 명령은 <code>./gradlew :services:commercecore-service:test</code>, <code>:services:commercecore-service:integrationTest</code>, 두 서비스의 <code>postgresTest</code>·<code>migrationTest</code>, <code>:services:catalog-service:integrationTest</code>다. 외부 Kafka를 연결한 CommerceCore 전체 통합은 <code>--rerun-tasks --max-workers=2</code>로 다시 실행했다. XML별 합계를 확인한다. 실제 PostgreSQL에서 과거 이행·최신 스키마 validate·초과 판매 방지·보충/해제 경합·가격 변경/예약 경합·환불 복구·Outbox 실패 롤백을 확인했다. Catalog 중복·역순/동시 최초 이벤트 검증도 포함한다.</p>
+<p>이벤트 계약 8개·예시 23개·현재 CommerceCore 직렬화 표본 23개가 통과했다. 실제 외부 Kafka 검증은 판매 API→Outbox→브로커 수신과 별도 직렬화기 수신 경로이며, Catalog 전체 경로는 별도의 EmbeddedKafka/DB 검사다. 운영 브로커·실제 PG·프로덕션 배포를 검증한 것은 아니다.</p>
+<p>최종 코드·계약 자체 리뷰에서 일반 버전 제거 외의 업무 조건 변경이 없고, 기존 마이그레이션과 이벤트 계약 원문이 보존되는 것을 확인했다. 생성 API의 다른 모듈 문서 변경은 계약 입력 지문 갱신이다. 저장소 밖 소비자·구 배포본 영향과 구 인스턴스 종료를 포함한 실제 배포 절차는 후속 확인 사항이다. PR 게시 후 최신 HEAD·CI·리뷰 스레드를 재확인하고 같은 HEAD를 조건으로 병합한다.</p>
+<p>최종 <code>scripts/verify.py --base origin/dev --external</code>은 격리 PostgreSQL·Payment fixture DB·Kafka를 지정해 전체 passed였다. 문서/API 생성 최신성·API 구조·이벤트 계약/표본·CommerceCore build·마이그레이션·PostgreSQL 업무 검사가 모두 통과했다. 기본 실행의 incomplete 결과는 이 최종 실행으로 보완했다. 기록 갱신 후 문서 검사와 생성 최신성을 다시 확인했다.</p><p class="muted fingerprint">MD SHA-256: <code>afc08259c1d57d80a996fe98ff4339b02c332f8657bcc245098d8f8ddd797b87</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

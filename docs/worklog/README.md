@@ -8,6 +8,10 @@
 - [2026-11-16](2026-11-16.md)
 - [2026-11-17](2026-11-17.md)
 
+- [2026-11-18 #340 구매 SKU 정리](2026-11-18-cart-sku-cleanup.md)
+
 [진행·완료 계획](plans/README.md) · [과거 하네스 구축 근거](archive/330-document-harness/design.md)
 
 - [2026-11-17 이벤트 YAML 별칭 PR 통합](2026-11-17-event-yaml-preview.md): #314의 최신 계약 보존·별칭 제거 상태 확인과 충돌 해결.
+
+- [2026-11-18 #371 SKU 일반 버전 제거](2026-11-18-sku-version.md)

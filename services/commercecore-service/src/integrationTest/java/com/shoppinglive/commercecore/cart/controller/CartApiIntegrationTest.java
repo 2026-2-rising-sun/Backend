@@ -47,7 +47,7 @@ class CartApiIntegrationTest extends CommerceCoreSecurityTestSupport {
         for (long id : List.of(10101L, 10102L, 10103L)) {
             long product = id == 10103L ? 502L : 501L;
             jdbc.update(
-                    "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,?,1000,10,0,'ON_SALE',0,1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                    "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,?,1000,10,0,'ON_SALE',1,'상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                     id,
                     product);
         }

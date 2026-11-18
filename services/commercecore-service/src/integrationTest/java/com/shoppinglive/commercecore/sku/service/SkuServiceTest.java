@@ -58,7 +58,7 @@ class SkuServiceTest {
                   product_id BIGINT NOT NULL, price BIGINT NOT NULL CHECK(price>0),
                   available INT NOT NULL CHECK(available>=0), reserved INT NOT NULL CHECK(reserved>=0),
                   sale_status VARCHAR(32) NOT NULL CHECK(sale_status IN ('READY','ON_SALE','PRIVATE')),
-                  version BIGINT NOT NULL, snapshot_version BIGINT NOT NULL,
+                  snapshot_version BIGINT NOT NULL,
                   product_name_snapshot VARCHAR(255) NOT NULL,
                   created_at TIMESTAMP WITH TIME ZONE NOT NULL, updated_at TIMESTAMP WITH TIME ZONE NOT NULL)
                 """);
