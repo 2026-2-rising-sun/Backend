@@ -65,16 +65,16 @@
 </ul>
 <h2 id="생성--결제창--조회">생성 · 결제창 · 조회</h2>
 <ul>
-<li>[ ] <strong>PAY-CREATE-01</strong> 새 orderRef로 생성하면 CREATED 결제와 판매자별 금액을 저장하고 첫 pgOrderId <code>{orderRef}-1</code>을 준다(201).</li>
-<li>[ ] <strong>PAY-CREATE-02</strong> 같은 orderRef·금액·구매자로 다시 생성하면 기존 결제가 CREATED(만료 전)·APPROVING·UNKNOWN·APPROVED일 때 그 결제를 현재 상태로 돌려준다(200). 동시 요청도 결제 1건이다. (EC 1, 7)</li>
-<li>[ ] <strong>PAY-CREATE-03</strong> 같은 orderRef에 금액이나 구매자가 다르면 409 <code>AMOUNT_CONFLICT</code>. (EC 8)</li>
-<li>[ ] <strong>PAY-CREATE-04</strong> 판매자별 금액 합이 amount와 다르면 400 <code>SUM_MISMATCH</code>.</li>
-<li>[ ] <strong>PAY-CREATE-05</strong> orderRef 형식이 틀리면 400 <code>INVALID_ORDER_REF</code>, expiresAt이 과거면 400 <code>INVALID_EXPIRES_AT</code>.</li>
-<li>[ ] <strong>PAY-CREATE-06</strong> 기존 결제가 CANCELED·PARTIALLY_REFUNDED·REFUNDED이거나 만료된 CREATED면 409 <code>PAYMENT_CLOSED</code>. 다시 사려면 Commerce가 주문을 새로 만든다.</li>
-<li>[ ] <strong>PAY-CHECKOUT-01</strong> CREATED이고 만료 전이면 checkout_seq를 올리고 새 pgOrderId를 준다. (EC 9)</li>
-<li>[ ] <strong>PAY-CHECKOUT-02</strong> CREATED가 아니거나 만료됐으면 409 <code>PAYMENT_CLOSED</code>, 결제가 없으면 404 <code>NOT_READY</code>.</li>
-<li>[ ] <strong>PAY-QUERY-01</strong> orderRef로 상태·금액·환불액·pgOrderId·승인 시각을 조회한다. 없으면 404.</li>
-<li>[ ] <strong>PAY-AUTH-01</strong> 내부 API는 <code>X-Service-Token</code>이 없거나 다르면 401.</li>
+<li>[x] <strong>PAY-CREATE-01</strong> 새 orderRef로 생성하면 CREATED 결제와 판매자별 금액을 저장하고 첫 pgOrderId <code>{orderRef}-1</code>을 준다(201).</li>
+<li>[x] <strong>PAY-CREATE-02</strong> 같은 orderRef·금액·구매자로 다시 생성하면 기존 결제가 CREATED(만료 전)·APPROVING·UNKNOWN·APPROVED일 때 그 결제를 현재 상태로 돌려준다(200). 동시 요청도 결제 1건이다. (EC 1, 7)</li>
+<li>[x] <strong>PAY-CREATE-03</strong> 같은 orderRef에 금액이나 구매자가 다르면 409 <code>AMOUNT_CONFLICT</code>. (EC 8)</li>
+<li>[x] <strong>PAY-CREATE-04</strong> 판매자별 금액 합이 amount와 다르면 400 <code>SUM_MISMATCH</code>.</li>
+<li>[x] <strong>PAY-CREATE-05</strong> orderRef 형식이 틀리면 400 <code>INVALID_ORDER_REF</code>, expiresAt이 과거면 400 <code>INVALID_EXPIRES_AT</code>.</li>
+<li>[x] <strong>PAY-CREATE-06</strong> 기존 결제가 CANCELED·PARTIALLY_REFUNDED·REFUNDED이거나 만료된 CREATED면 409 <code>PAYMENT_CLOSED</code>. 다시 사려면 Commerce가 주문을 새로 만든다.</li>
+<li>[x] <strong>PAY-CHECKOUT-01</strong> CREATED이고 만료 전이면 checkout_seq를 올리고 새 pgOrderId를 준다. (EC 9)</li>
+<li>[x] <strong>PAY-CHECKOUT-02</strong> CREATED가 아니거나 만료됐으면 409 <code>PAYMENT_CLOSED</code>, 결제가 없으면 404 <code>NOT_READY</code>.</li>
+<li>[x] <strong>PAY-QUERY-01</strong> orderRef로 상태·금액·환불액·pgOrderId·승인 시각을 조회한다. 없으면 404.</li>
+<li>[x] <strong>PAY-AUTH-01</strong> 내부 API는 <code>X-Service-Token</code>이 없거나 다르면 401.</li>
 </ul>
 <h2 id="승인">승인</h2>
 <p>입력은 경로의 orderRef, Commerce가 넘긴 buyerId, 브라우저 값 <code>{paymentKey, orderId, amount}</code>다. Commerce는 토스 orderId를 <code>pgOrderId</code>로 넘긴다. 결제는 경로의 orderRef로 찾고, pgOrderId의 마지막 <code>-</code> 앞부분이 orderRef와 같은지 확인한다(order_ref에도 <code>-</code>가 있다). 토스 호출은 DB 트랜잭션 밖에서 한다. 검증 실패가 여럿이면 아래 01→02→03 순서와 01 안의 순서(404 → 400 <code>ORDER_ID_MISMATCH</code> → 403 → 400 <code>AMOUNT_MISMATCH</code>)로 하나만 돌려준다.</p>
@@ -114,6 +114,6 @@
 <li>[ ] <strong>PAY-EVENT-02</strong> 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.</li>
 </ul>
 <h2 id="범위-밖">범위 밖</h2>
-<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>1d55d8a9f03bedefded237d5ccfdb9e182a54210d045c84bfba076103567e41d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>c4ef60f750c1b1c7ebbdbc81103833c81ddafb00d34f3da726859496f3efa75d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

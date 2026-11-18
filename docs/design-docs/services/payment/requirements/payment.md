@@ -29,16 +29,16 @@
 
 ## 생성 · 결제창 · 조회
 
-- [ ] **PAY-CREATE-01** 새 orderRef로 생성하면 CREATED 결제와 판매자별 금액을 저장하고 첫 pgOrderId `{orderRef}-1`을 준다(201).
-- [ ] **PAY-CREATE-02** 같은 orderRef·금액·구매자로 다시 생성하면 기존 결제가 CREATED(만료 전)·APPROVING·UNKNOWN·APPROVED일 때 그 결제를 현재 상태로 돌려준다(200). 동시 요청도 결제 1건이다. (EC 1, 7)
-- [ ] **PAY-CREATE-03** 같은 orderRef에 금액이나 구매자가 다르면 409 `AMOUNT_CONFLICT`. (EC 8)
-- [ ] **PAY-CREATE-04** 판매자별 금액 합이 amount와 다르면 400 `SUM_MISMATCH`.
-- [ ] **PAY-CREATE-05** orderRef 형식이 틀리면 400 `INVALID_ORDER_REF`, expiresAt이 과거면 400 `INVALID_EXPIRES_AT`.
-- [ ] **PAY-CREATE-06** 기존 결제가 CANCELED·PARTIALLY_REFUNDED·REFUNDED이거나 만료된 CREATED면 409 `PAYMENT_CLOSED`. 다시 사려면 Commerce가 주문을 새로 만든다.
-- [ ] **PAY-CHECKOUT-01** CREATED이고 만료 전이면 checkout_seq를 올리고 새 pgOrderId를 준다. (EC 9)
-- [ ] **PAY-CHECKOUT-02** CREATED가 아니거나 만료됐으면 409 `PAYMENT_CLOSED`, 결제가 없으면 404 `NOT_READY`.
-- [ ] **PAY-QUERY-01** orderRef로 상태·금액·환불액·pgOrderId·승인 시각을 조회한다. 없으면 404.
-- [ ] **PAY-AUTH-01** 내부 API는 `X-Service-Token`이 없거나 다르면 401.
+- [x] **PAY-CREATE-01** 새 orderRef로 생성하면 CREATED 결제와 판매자별 금액을 저장하고 첫 pgOrderId `{orderRef}-1`을 준다(201).
+- [x] **PAY-CREATE-02** 같은 orderRef·금액·구매자로 다시 생성하면 기존 결제가 CREATED(만료 전)·APPROVING·UNKNOWN·APPROVED일 때 그 결제를 현재 상태로 돌려준다(200). 동시 요청도 결제 1건이다. (EC 1, 7)
+- [x] **PAY-CREATE-03** 같은 orderRef에 금액이나 구매자가 다르면 409 `AMOUNT_CONFLICT`. (EC 8)
+- [x] **PAY-CREATE-04** 판매자별 금액 합이 amount와 다르면 400 `SUM_MISMATCH`.
+- [x] **PAY-CREATE-05** orderRef 형식이 틀리면 400 `INVALID_ORDER_REF`, expiresAt이 과거면 400 `INVALID_EXPIRES_AT`.
+- [x] **PAY-CREATE-06** 기존 결제가 CANCELED·PARTIALLY_REFUNDED·REFUNDED이거나 만료된 CREATED면 409 `PAYMENT_CLOSED`. 다시 사려면 Commerce가 주문을 새로 만든다.
+- [x] **PAY-CHECKOUT-01** CREATED이고 만료 전이면 checkout_seq를 올리고 새 pgOrderId를 준다. (EC 9)
+- [x] **PAY-CHECKOUT-02** CREATED가 아니거나 만료됐으면 409 `PAYMENT_CLOSED`, 결제가 없으면 404 `NOT_READY`.
+- [x] **PAY-QUERY-01** orderRef로 상태·금액·환불액·pgOrderId·승인 시각을 조회한다. 없으면 404.
+- [x] **PAY-AUTH-01** 내부 API는 `X-Service-Token`이 없거나 다르면 401.
 
 ## 승인
 

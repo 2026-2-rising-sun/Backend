@@ -353,7 +353,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 <tr>
 <td><code>expiresAt</code></td>
 <td>결제 만료 시각</td>
-<td>필수, ISO-8601 오프셋 포함. DB <code>now()</code> 이하면 400 <code>INVALID_EXPIRES_AT</code></td>
+<td>필수, ISO-8601 오프셋 포함. <strong>새 결제를 만들 때만</strong> DB <code>now()</code> 이하면 400 <code>INVALID_EXPIRES_AT</code>(같은 orderRef가 있으면 검사하지 않는다)</td>
 <td><code>2026-11-10T14:10:00+09:00</code></td>
 </tr>
 <tr>
@@ -431,7 +431,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 </tbody>
 </table></div>
 <ul>
-<li>비교는 <code>amount</code>·<code>buyerId</code>만 한다. <code>expiresAt</code>·<code>sellerAmounts</code>가 달라도 저장된 값을 유지하고 비교하지 않는다(미결정 1).</li>
+<li>비교는 <code>amount</code>·<code>buyerId</code>만 한다. <code>expiresAt</code>·<code>sellerAmounts</code>가 달라도 저장된 값을 유지하고 비교하지 않는다(미결정 1). 재시도 본문의 <code>expiresAt</code>이 이미 지났어도 기존 결제가 있으면 <code>INVALID_EXPIRES_AT</code>이 아니라 위 표로 응답한다(2026-11-16 결정, PAY-CREATE-02).</li>
 <li><strong>동시 생성</strong>(PAY-CREATE-02): <code>INSERT … ON CONFLICT DO NOTHING</code>(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태)의 영향 행 수로 판단한다. 0행이면 같은 트랜잭션에서 기존 행을 읽어 위 표로 응답한다. 예외를 잡는 방식은 쓰지 않는다(PostgreSQL은 UNIQUE 위반 시 트랜잭션 전체가 중단된다). <code>payment_seller_amount</code>는 INSERT가 1행일 때만 같은 트랜잭션에서 넣는다.</li>
 <li><code>sellerOrderNumber</code>가 다른 결제에 이미 있으면 UNIQUE 위반이다. 정상 Commerce라면 생기지 않는다. 400 <code>INVALID_REQUEST</code>로 응답하고 WARN 로그를 남긴다.</li>
 </ul>
@@ -529,7 +529,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 <tbody>
 <tr>
 <td>생성</td>
-<td>1개: 검증 → INSERT ON CONFLICT → (1행) 판매자 금액 INSERT / (0행) 읽기</td>
+<td>1개: 형식 검증 → 기존 행 읽기(있으면 위 표) → <code>expiresAt</code> 검증 → INSERT ON CONFLICT → (1행) 판매자 금액 INSERT / (0행) 다시 읽어 위 표</td>
 <td>없음</td>
 </tr>
 <tr>
@@ -666,6 +666,6 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 </ol>
 <p>용어: "결제창(checkout)"은 테이블이 아니다. <code>payment</code> 행의 <code>checkout_seq</code>·<code>pg_order_id</code>로 표현하는 토스 결제창 회차다.</p>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>98af4831b11706f6cc66cc32dae03c6a3b3a0927401d8020c24e679dd8d5e9aa</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>5db84b10a8218f6d85fc0b4f7415851037274d7a49a1fec261d75a5d0d7d2b0f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

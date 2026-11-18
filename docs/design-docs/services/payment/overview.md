@@ -15,14 +15,17 @@
 | 결제 1차 상세 | [결제 1차 계획](../../../worklog/plans/active/337-payment-redesign/phase1-payment.md) · [작은 판단](../../../worklog/plans/active/337-payment-redesign/decision.md) |
 | 에이전트 주의점 | [Payment 작업 주의점](../../../../services/payment-service/AGENTS.md) |
 
-## 현재 코드 (Mock 삭제됨)
+## 현재 코드 (결제 재설계 구현 중)
 
-기존 Mock 결제·환불 코드와 내부 API는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다. 서비스는 컨트롤러 없이 기동하고, 모든 `/v1/internal/**` 요청은 서비스 토큰 검사 뒤 403이다. 새 결제 API는 #348에서 연다. 테이블(V1–V3)은 남아 있고 #348의 V4 마이그레이션에서 지운다. 결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.
+결제 재설계의 V4 스키마와 Commerce용 내부 API 3개(결제 생성·결제창 다시 열기·조회)가 있다. 승인·토스 호출·원장 서비스·스케줄러는 아직 없다(#338·#349). 기존 Mock 결제·환불 코드는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다.
 
-아래 "Payment 결제 실행"·"Payment 환불 실행"과 ERD는 지운 Mock 구현의 기록이다. 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 계약·마이그레이션·주요 상태 변경 코드.
+- API: [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml). `X-Service-Token`(commercecore)만 허용하고, 허용 목록(`/v1/internal/payments`, `…/{orderRef}`, `…/{orderRef}/checkouts`, `…/{orderRef}/approval`) 밖의 `/v1/internal/**`는 403이다. 승인 경로는 컨트롤러가 없다(#338).
+- 결제 키는 `orderRef`다. 같은 orderRef 생성은 `INSERT … ON CONFLICT DO NOTHING`의 영향 행 수로 판단하고, 결제창은 `CREATED`·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 [#348 설계서](../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.md#api).
+- DB: [ERD 설명](erd.md) · [관계도](erd.html)
+- 결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.
 
-- [API HTML](api.html)(지금은 경로 없음) · [계약 YAML](../../../../contracts/api/payment-service.yaml)
-- [DB ERD 설명](erd.md) · [관계도](erd.html)
+아래 "Payment 결제 실행"·"Payment 환불 실행"은 지운 Mock 구현의 기록이다. 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`.
+
 - 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)
 
 ## 원본·갱신

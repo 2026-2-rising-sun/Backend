@@ -70,6 +70,7 @@
 <li><a href="#338-토스-결제-클라이언트">#338 토스 결제 클라이언트</a></li>
 <li><a href="#347-기존-mock-결제-코드-삭제">#347 기존 Mock 결제 코드 삭제</a></li>
 <li><a href="#348-결제-v4-스키마와-엔티티-추가">#348 결제 V4 스키마와 엔티티 추가</a></li>
+<li><a href="#348-결제-생성결제창조회-api-추가">#348 결제 생성·결제창·조회 API 추가</a></li>
 </ul>
 </li>
 </ul>
@@ -547,6 +548,14 @@
 <li>검증: <code>scripts/check.sh --base origin/refactor/#347-payment-legacy-removal --external</code>(임시 PostgreSQL 16) 통과. Payment test 1, integrationTest 5, migrationTest 9, postgresTest 3, 스킵 0. 독립 리뷰 지적 8건 중 2건 반영, 3건 설명.</li>
 <li>미실행·한계: 데이터가 있는 옛 테이블 위의 V4 적용, 운영 DB 적용, NOT NULL·부분 인덱스 개별 검사.</li>
 <li>다음 작업: 결제 생성·결제창·조회 내부 API.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>8736962e4b6d7c1c700b4f896866bbce44cb85fdab121eb5cd9edddf17fa6d4c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="348-결제-생성결제창조회-api-추가">#348 결제 생성·결제창·조회 API 추가</h2>
+<p>관련 작업: <a href="../worklog/plans/active/337-payment-redesign/phase1/348-create-api.html">결제 생성·조회 설계</a> · <a href="https://github.com/2026-2-rising-sun/Backend/pull/355">PR #355</a></p>
+<ul>
+<li>변경·판단(2026-11-16): 결제 생성·결제창 다시 열기·조회 내부 API와 <code>PaymentError</code>, 서비스 토큰 허용 목록 4개 경로를 만들었다. 같은 orderRef는 <code>ON CONFLICT DO NOTHING</code> 영향 행 수로, 결제창은 CREATED·만료 전 조건부 UPDATE로 판단한다. 계약 YAML을 다시 쓰고 <code>api.html</code>·모듈 README를 갱신했다. H2 테스트를 위해 엔티티 UNIQUE 컬럼에 <code>unique = true</code>를 달았다.</li>
+<li>검증: <code>scripts/check.sh --base 'origin/feat/#348-payment-core-schema' --external</code>(임시 PostgreSQL 16) 통과. Payment test 1, integrationTest 49, postgresTest 6(동시 생성·동시 결제창·판매자 번호 충돌 롤백 포함), migrationTest 9(별도 실행), 스킵 0. 독립 리뷰 지적 5건 중 4건 반영.</li>
+<li>미실행·한계: Commerce 실제 호출, 운영 DB, 부하. 같은 orderRef 재요청은 expiresAt을 검사하지 않도록 설계서 처리 순서를 고쳤다(2026-11-16 결정, PAY-CREATE-02).</li>
+<li>다음 작업: 원장 서비스(#338).</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>43806728ca0553ef7b7fa00fff5f9e4844fd563943d3e8a9ab85f36061d7fccd</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
