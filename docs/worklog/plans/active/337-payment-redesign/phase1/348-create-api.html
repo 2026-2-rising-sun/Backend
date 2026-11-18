@@ -163,7 +163,7 @@ CREATE TABLE ledger_entry (
 CREATE INDEX ix_ledger_entry_journal ON ledger_entry(journal_id);
 CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 </code></pre>
-<p>설계 HTML <code>#ddl</code>의 V4와 같다. 다른 점은 <code>pg_call</code> 주석 하나다. 호출 전에 행을 먼저 커밋해야 하므로(공통 규칙 "외부 호출") "추가만 한다"를 "응답 뒤 결과만 채운다"로 바꿨다.</p>
+<p>설계 HTML <code>#ddl</code>의 V4와 같다. <code>pg_call</code>은 호출 전에 행을 먼저 커밋해야 하므로(공통 규칙 "외부 호출") 추가만 하지 않고 응답 뒤 그 행의 결과만 채운다(#348 스키마 PR에서 HTML 주석도 맞춤).</p>
 <h3 id="payment-컬럼"><code>payment</code> 컬럼</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -666,6 +666,6 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 </ol>
 <p>용어: "결제창(checkout)"은 테이블이 아니다. <code>payment</code> 행의 <code>checkout_seq</code>·<code>pg_order_id</code>로 표현하는 토스 결제창 회차다.</p>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>603d11802bfa79c5e56640b148ea56016a73a9ecd1f630c50605764d2e01afbf</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · <a href="../../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../../design-docs/services/payment/design.html#ddl">목표 설계 <code>#ddl</code>·<code>#api</code></a> · <a href="../decision.html">decision.md</a></p><p class="muted fingerprint">MD SHA-256: <code>98af4831b11706f6cc66cc32dae03c6a3b3a0927401d8020c24e679dd8d5e9aa</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

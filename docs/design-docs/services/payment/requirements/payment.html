@@ -59,9 +59,9 @@
 </table></div>
 <h2 id="데이터-불변식">데이터 불변식</h2>
 <ul>
-<li>[ ] <strong>PAY-DATA-01</strong> order_ref는 6–50자이고 결제 1건에 하나다(UNIQUE).</li>
-<li>[ ] <strong>PAY-DATA-02</strong> refunded_amount는 0 이상 amount 이하다.</li>
-<li>[ ] <strong>PAY-DATA-03</strong> 상태는 CREATED·APPROVING·APPROVED·UNKNOWN·CANCELED·PARTIALLY_REFUNDED·REFUNDED 중 하나다.</li>
+<li>[x] <strong>PAY-DATA-01</strong> order_ref는 6–50자이고 결제 1건에 하나다(UNIQUE).</li>
+<li>[x] <strong>PAY-DATA-02</strong> refunded_amount는 0 이상 amount 이하다.</li>
+<li>[x] <strong>PAY-DATA-03</strong> 상태는 CREATED·APPROVING·APPROVED·UNKNOWN·CANCELED·PARTIALLY_REFUNDED·REFUNDED 중 하나다.</li>
 </ul>
 <h2 id="생성--결제창--조회">생성 · 결제창 · 조회</h2>
 <ul>
@@ -114,6 +114,6 @@
 <li>[ ] <strong>PAY-EVENT-02</strong> 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.</li>
 </ul>
 <h2 id="범위-밖">범위 밖</h2>
-<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>fbe8d6938265d2b33a5885d1cb0d4b8f7ef3c2a6accdaf360a10242081615650</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>1d55d8a9f03bedefded237d5ccfdb9e182a54210d045c84bfba076103567e41d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
