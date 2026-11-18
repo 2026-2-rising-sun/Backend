@@ -40,7 +40,7 @@ local 프로필 기본값이라 따로 켤 것이 없다. Infra/local의 `toss-m
 | S4 결과 불명 | `@ref = OD-LOCAL-UNKNOWN`, `pk-5xx`: 1 → 4 → 15초쯤 뒤 2 | 202 → UNKNOWN에서 조회로 APPROVED. `pg_call` CONFIRM·QUERY 2행 |
 | S5 응답 불일치 | `@ref = OD-LOCAL-MISMATCH`, `pk-mismatch`: 1 → 4 | 409 PAYMENT_CLOSED → CANCELED. `pg_call` CONFIRM·CANCEL, 분개 없음 |
 | S6 검증은 토스 전에 | `@ref = OD-LOCAL-VALID`, `pk-ok`: 1 → 4를 세 번 (`@pgOrderId = OTHER-1` / `@amount = 1` / `@approveBuyer = 00000000-0000-4000-8000-000000000000`), 마지막에 토큰 없는 5 | 400 ORDER_ID_MISMATCH · 400 AMOUNT_MISMATCH · 403 BUYER_MISMATCH · 401. `pg_call` 0행 |
-| S7 만료 | `@ref = OD-LOCAL-EXPIRE`, `@expiresInMinutes = 1`: 1 → 2분 뒤 2 → 3 | CANCELED → 409 PAYMENT_CLOSED (만료 검사는 1분 간격) |
+| S7 만료 | `@ref = OD-LOCAL-EXPIRE`, 1번 스크립트의 `minutes = 1`: 1 → 2분 뒤 2 → 3 | CANCELED → 409 PAYMENT_CLOSED (만료 검사는 1분 간격) |
 
 같은 시나리오를 다시 하려면 아래 초기화 SQL을 실행한다.
 

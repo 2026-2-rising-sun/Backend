@@ -5,10 +5,9 @@
 @token = local-payment-token-change-me-0123456789
 @buyer = 5c2e8f1a-0000-4000-8000-6d4c0b9e7a13
 @ref = OD-LOCAL-OK
-### 생성 금액. 판매자 금액은 20000 + (금액 - 20000)
+### 생성 금액 = 판매자1 20000 + 판매자2 @rest. 금액을 바꾸면 @rest도 바꾼다
 @total = 30000
-### 결제 만료까지 분
-@expiresInMinutes = 30
+@rest = 10000
 ### 승인 요청 값. 실제 토스는 success.html이 보여 주는 값을 넣는다
 @pgOrderId = {{ref}}-1
 @paymentKey = pk-ok
@@ -17,9 +16,9 @@
 
 ### 1. 결제 생성 (201, 같은 요청 다시 보내면 200)
 < {%
-  const total = Number(request.variables.get("total"));
-  request.variables.set("exp", new Date(Date.now() + Number(request.variables.get("expiresInMinutes")) * 60000).toISOString());
-  request.variables.set("rest", String(total - 20000));
+  // 결제 만료까지 분. 스크립트는 파일 변수(@...)를 읽지 못해 여기서 정한다. S7 만료는 1로 바꾼다
+  const minutes = 30;
+  request.variables.set("exp", new Date(Date.now() + minutes * 60000).toISOString());
 %}
 POST {{pay}}/v1/internal/payments
 X-Service-Token: {{token}}
