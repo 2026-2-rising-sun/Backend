@@ -31,7 +31,7 @@ Member local 프로필은 `user@local.test / user`, `seller@local.test / seller`
 | `COMMERCECORE_IMAGE_DIR` / `COMMERCECORE_IMAGE_PUBLIC_BASE_URL` | Core 이미지 저장 폴더 / 공개 `/api/commercecore` |
 | `CATALOG_MEMBER_SERVICE_TOKEN`, `COMMERCECORE_MEMBER_SERVICE_TOKEN` | 각 서비스 → Member 세션 확인 |
 
-내부 생성·조회는 Payment `/v1/internal/payments`, `/v1/internal/refunds`를 사용한다. 상품·Payment 결과는 실제 Kafka `localhost:59092`를 통해 전달한다. 기존 판매·쿠폰 토픽은 유지한다. 브라우저의 결제·환불 요청은 Core facade를 거친다.
+Payment 내부 API는 #347에서 지웠다(#348에서 새로 연다). 그사이 Core의 결제·환불 호출은 403을 받는다. Core `/v1/dev/payment-scenarios`(결제 시나리오 지정)도 Payment에 닿지 못해 실패한다. 상품·Payment 결과는 실제 Kafka `localhost:59092`를 통해 전달한다. 기존 판매·쿠폰 토픽은 유지한다. 브라우저의 결제·환불 요청은 Core facade를 거친다.
 
 Live의 실제 Redis 회귀는 실행 중인 앱의 Redis59679와 분리한다.
 

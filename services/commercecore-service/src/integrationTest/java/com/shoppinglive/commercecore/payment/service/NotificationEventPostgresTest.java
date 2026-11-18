@@ -10,14 +10,11 @@ import com.shoppinglive.commercecore.coupon.service.CouponClaimService;
 import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
-import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.EventOutbox;
 import com.shoppinglive.common.outbox.OutboxMessageRepository;
 import com.shoppinglive.common.outbox.OutboxProperties;
 import com.shoppinglive.common.outbox.OutboxRelay;
-import com.shoppinglive.payment.service.PaymentRecoveryStore;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -50,18 +47,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         partitions = 1,
         topics = {"commerce.payment-group.v1", "commerce.coupon-info.v1"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+/** 결제와 무관한 이벤트 기록 테스트만 남겼다. 옛 Payment로 결제·환불을 끝내던 테스트는 #347에서 지웠다. */
 class NotificationEventPostgresTest extends RefundTestSupport {
     private static final String SCHEMA =
             "notification_events_" + UUID.randomUUID().toString().replace("-", "");
     private static final String COUPON = "event-coupon";
     @Autowired ObjectMapper mapper;
-    @Autowired RefundIntakeService refunds;
-    @Autowired RefundQueryService queries;
-    @Autowired com.shoppinglive.commercecore.payment.service.RefundBoundaryTestDriver executions;
     @Autowired CouponClaimService coupons;
     @Autowired OrderCreationService singleCreation;
-    @Autowired DevPaymentScenarioRegistry scenarios;
-    @Autowired PaymentRecoveryStore recovery;
     @MockitoSpyBean EventOutbox eventOutbox;
     @Autowired OutboxMessageRepository outbox;
     @Autowired EmbeddedKafkaBroker broker;
@@ -153,48 +146,6 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         assertThat(events("OrderExpired")).hasSize(1);
     }
 
-    @Test
-    @DisplayName("실행 권한을 잃은 결제는 발행하지 않고 동시 복구는 성공 이벤트 한 건만 기록한다")
-    void staleLeaseAndConcurrentRecoveryDoNotDuplicatePaymentEvents() throws Exception {
-        var group = create("lease");
-        var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "lease-pay");
-        var stale = recovery.claim(payment.getId(), Duration.ofMinutes(1)).orElseThrow();
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET lease_token=? WHERE id=?",
-                UUID.randomUUID().toString(),
-                payment.getId());
-        assertThat(
-                        paymentServer
-                                .context
-                                .getBean(com.shoppinglive.payment.service.PaymentService.class)
-                                .resolveClaimed(stale))
-                .isFalse();
-        assertThat(events("PaymentSucceeded")).isEmpty();
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET lease_until=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
-                payment.getId());
-        var go = new CountDownLatch(1);
-        try (var pool = Executors.newFixedThreadPool(4)) {
-            var futures =
-                    java.util.stream.IntStream.range(0, 4)
-                            .mapToObj(
-                                    i ->
-                                            pool.submit(
-                                                    () -> {
-                                                        go.await();
-                                                        return dispatcher.dispatch(
-                                                                deliveries.byPayment(
-                                                                        payment.getId()));
-                                                    }))
-                            .toList();
-            go.countDown();
-            int resolved = 0;
-            for (var future : futures) if (future.get(15, TimeUnit.SECONDS)) resolved++;
-            assertThat(resolved).isEqualTo(1);
-        }
-        assertThat(events("PaymentSucceeded")).hasSize(1);
-    }
-
     private EventOutbox outboxTarget() {
         return org.springframework.test.util.AopTestUtils.getUltimateTargetObject(eventOutbox);
     }
@@ -252,158 +203,6 @@ class NotificationEventPostgresTest extends RefundTestSupport {
         singleCreation.create(command, "single-created");
         singleCreation.create(command, "single-created");
         assertThat(events("PaymentGroupCreated")).hasSize(2);
-    }
-
-    @Test
-    @DisplayName("미확정 결제에는 결과 이벤트가 없고 복구 성공을 중복 발행하지 않는다")
-    void unknownThenSuccessRecordsOnlyOneConfirmedResult() {
-        var group = create("unknown");
-        scenarios.set(group.groupNumber(), PaymentScenario.SUCCESS_RESPONSE_LOST);
-        var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "payment");
-        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isFalse();
-        assertThat(events("PaymentSucceeded")).isEmpty();
-        assertThat(events("PaymentFailed")).isEmpty();
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
-                payment.getId());
-        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
-        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isFalse();
-        assertThat(events("PaymentSucceeded"))
-                .singleElement()
-                .satisfies(
-                        event -> {
-                            assertThat(event.at("/payload/paidAmount").asLong()).isEqualTo(25000L);
-                            assertThat(event.at("/payload/paymentId").asLong())
-                                    .isEqualTo(payment.getId());
-                        });
-        assertThat(events("PaymentFailed")).isEmpty();
-    }
-
-    @Test
-    @DisplayName("실패·취소·만료의 실제 전이에만 이벤트를 한 건씩 기록한다")
-    void recordsFailureCancellationAndExpiryOnceEach() {
-        var failed = create("failed");
-        scenarios.set(failed.groupNumber(), PaymentScenario.INSTANT_FAIL);
-        var payment = paymentGroups.start(MEMBER_A, failed.groupNumber(), "failed-pay");
-        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
-        dispatcher.dispatch(deliveries.byPayment(payment.getId()));
-        assertThat(events("PaymentFailed"))
-                .singleElement()
-                .satisfies(
-                        event ->
-                                assertThat(event.at("/payload/failureCode").asText())
-                                        .isEqualTo("REJECTED"));
-        var cancelled = create("cancelled");
-        paymentGroups.cancel(MEMBER_A, cancelled.groupNumber());
-        paymentGroups.cancel(MEMBER_A, cancelled.groupNumber());
-        assertThat(events("OrderCancelled")).hasSize(1);
-        var expired = create("expired");
-        long id =
-                groups.findByGroupNumberAndMemberId(expired.groupNumber(), MEMBER_A)
-                        .orElseThrow()
-                        .getId();
-        assertThat(paymentGroups.expire(id)).isFalse();
-        jdbc.update(
-                "UPDATE payment_group SET expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
-                id);
-        assertThat(paymentGroups.expire(id)).isTrue();
-        assertThat(paymentGroups.expire(id)).isFalse();
-        assertThat(events("OrderExpired")).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("전액 할인 결제도 성공 이벤트 한 건과 0원 결제액을 기록한다")
-    void zeroPaymentPublishesOnceWithDiscountedAmounts() {
-        defineCoupon(25000, 2);
-        coupons.claim(MEMBER_A, COUPON);
-        var created =
-                paymentGroups
-                        .create(
-                                MEMBER_A,
-                                List.of(
-                                        new PaymentGroupService.Selection(
-                                                a.getId(), a.getVersion()),
-                                        new PaymentGroupService.Selection(
-                                                b.getId(), b.getVersion())),
-                                "구매자",
-                                "01012345678",
-                                25000L,
-                                COUPON,
-                                "zero")
-                        .group();
-        paymentGroups.start(MEMBER_A, created.groupNumber(), "zero-pay");
-        paymentGroups.start(MEMBER_A, created.groupNumber(), "zero-pay");
-        assertThat(events("PaymentSucceeded"))
-                .singleElement()
-                .satisfies(
-                        event -> {
-                            assertThat(event.at("/payload/paidAmount").asLong()).isZero();
-
-                            assertThat(event.at("/payload/orders/0/amount").asLong()).isZero();
-                        });
-    }
-
-    @Test
-    @DisplayName("부분 환불 요청마다 금액과 성공 누적액을 기록하고 재실행은 발행하지 않는다")
-    void partialRefundsPublishPerSuccessfulRequestWithCumulativeAmount() {
-        var group = createAndPayWithCoupon();
-        var first =
-                refunds.request(MEMBER_A, group.groupNumber(), "refund-a", List.of(a.getId()))
-                        .refund();
-        assertThat(executions.execute(first.id())).isTrue();
-        assertThat(executions.execute(first.id())).isFalse();
-        var firstEvent = events("RefundCompleted").getFirst();
-        assertThat(firstEvent.at("/payload/refundRequestId").asLong()).isEqualTo(first.id());
-        assertThat(firstEvent.at("/payload/refundedAmount").asLong())
-                .isEqualTo(first.refundAmount());
-        assertThat(firstEvent.at("/payload/cumulativeRefundAmount").asLong())
-                .isEqualTo(first.refundAmount());
-
-        var second =
-                refunds.request(MEMBER_A, group.groupNumber(), "refund-b", List.of(b.getId()))
-                        .refund();
-        assertThat(executions.execute(second.id())).isTrue();
-        assertThat(events("RefundCompleted")).hasSize(2);
-        var secondEvent = events("RefundCompleted").getLast();
-        assertThat(secondEvent.at("/payload/cumulativeRefundAmount").asLong())
-                .isEqualTo(group.payableAmount());
-    }
-
-    @Test
-    @DisplayName("이벤트 기록 이후 오류가 나면 생성·결제·환불 상태와 Outbox를 함께 롤백한다")
-    void outboxFailureRollsBackBusinessChangesAndAllowsRecovery() {
-        failAfterRecording("PaymentGroupCreated");
-        assertThatThrownBy(() -> create("rollback-created")).isInstanceOf(RuntimeException.class);
-        assertThat(groups.count()).isZero();
-        assertThat(orders.count()).isZero();
-        assertThat(events("PaymentGroupCreated")).isEmpty();
-        reset(outboxTarget());
-        var group = create("rollback-pay");
-        var payment = paymentGroups.start(MEMBER_A, group.groupNumber(), "payment");
-        failAfterRecording("PaymentSucceeded");
-        assertThatThrownBy(() -> dispatcher.dispatch(deliveries.byPayment(payment.getId())))
-                .isInstanceOf(RuntimeException.class);
-        assertThat(paymentGroups.get(MEMBER_A, group.groupNumber()).status().name())
-                .isEqualTo("PAYMENT_CONFIRMING");
-        assertThat(events("PaymentSucceeded")).isEmpty();
-        reset(outboxTarget());
-        paymentServer.jdbc.update(
-                "UPDATE payment_attempt SET scheduled_resolve_at=CURRENT_TIMESTAMP WHERE id=?",
-                payment.getId());
-        assertThat(dispatcher.dispatch(deliveries.byPayment(payment.getId()))).isTrue();
-        var request =
-                refunds.request(MEMBER_A, group.groupNumber(), "refund", List.of(a.getId()))
-                        .refund();
-        failAfterRecording("RefundCompleted");
-        assertThatThrownBy(() -> executions.execute(request.id()))
-                .isInstanceOf(RuntimeException.class);
-        assertThat(events("RefundCompleted")).isEmpty();
-        assertThat(queries.get(MEMBER_A, group.groupNumber(), request.id()).status().name())
-                .isEqualTo("PROCESSING");
-        reset(outboxTarget());
-        makeRefundDue(request.id());
-        assertThat(executions.execute(request.id())).isTrue();
-        assertThat(events("RefundCompleted")).hasSize(1);
     }
 
     @Test

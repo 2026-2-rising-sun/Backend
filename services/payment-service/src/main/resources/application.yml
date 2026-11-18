@@ -18,8 +18,6 @@ server:
   port: 8086
 payment:
   core-service-token: ${COMMERCECORE_PAYMENT_SERVICE_TOKEN}
-  refunds:
-    execution-enabled: true
 shoppinglive:
   outbox:
     relay:

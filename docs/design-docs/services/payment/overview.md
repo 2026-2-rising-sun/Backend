@@ -15,16 +15,14 @@
 | 결제 1차 상세 | [결제 1차 계획](../../../worklog/plans/active/337-payment-redesign/phase1-payment.md) · [작은 판단](../../../worklog/plans/active/337-payment-redesign/decision.md) |
 | 에이전트 주의점 | [Payment 작업 주의점](../../../../services/payment-service/AGENTS.md) |
 
-## 현재 코드 (Mock, 교체 예정)
+## 현재 코드 (Mock 삭제됨)
 
-공개 브라우저 API는 Core가 소유한다. 내부 ServiceToken 계약을 사용한다. 실제 PG 운영 연동은 이번 문서의 증거가 아니다.
+기존 Mock 결제·환불 코드와 내부 API는 [#347](https://github.com/2026-2-rising-sun/Backend/issues/347)에서 지웠다. 서비스는 컨트롤러 없이 기동하고, 모든 `/v1/internal/**` 요청은 서비스 토큰 검사 뒤 403이다. 새 결제 API는 #348에서 연다. 테이블(V1–V3)은 남아 있고 #348의 V4 마이그레이션에서 지운다. 결과 이벤트 계약 YAML은 CommerceCore 소비자가 쓰고 있어 그대로 둔다.
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 계약·마이그레이션·주요 상태 변경 코드. 현재 #330 문서 변경은 미커밋이며 업무 코드는 변경하지 않았다. 운영 환경 검증 자료와 구분한다.
+아래 "Payment 결제 실행"·"Payment 환불 실행"과 ERD는 지운 Mock 구현의 기록이다. 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 계약·마이그레이션·주요 상태 변경 코드.
 
-- [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml)
+- [API HTML](api.html)(지금은 경로 없음) · [계약 YAML](../../../../contracts/api/payment-service.yaml)
 - [DB ERD 설명](erd.md) · [관계도](erd.html)
-- [결제 실행](overview.md) · [시각 자료](overview.html)
-- [환불 실행](overview.md) · [시각 자료](overview.html)
 - 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)
 
 ## 원본·갱신
@@ -37,7 +35,7 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 <!-- visual: relations -->
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](overview.md)에 있다.
+**코드 삭제됨:** 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다.
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
 
@@ -62,12 +60,12 @@ PENDING은 미사용 호환 값, TIMEOUT은 과거 호환 terminal이다. 현재
 
 ### 구현과 검증 근거
 
-- [PaymentService.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentService.java)
-- [PaymentRecoveryStore.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/PaymentRecoveryStore.java)
-- [PaymentAttempt.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentAttempt.java)
-- [PaymentStatus.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/entity/PaymentStatus.java)
+- `PaymentService.java`(#347에서 삭제)
+- `PaymentRecoveryStore.java`(#347에서 삭제)
+- `PaymentAttempt.java`(#347에서 삭제)
+- `PaymentStatus.java`(#347에서 삭제)
 
-관련 기존 테스트: [PaymentBoundaryPostgresTest.java](../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentBoundaryPostgresTest.java) · [PaymentRecoveryStorePostgresTest.java](../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/PaymentRecoveryStorePostgresTest.java).
+관련 기존 테스트: `PaymentBoundaryPostgresTest.java`(#347에서 삭제) · `PaymentRecoveryStorePostgresTest.java`(#347에서 삭제).
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
@@ -75,7 +73,7 @@ PENDING은 미사용 호환 값, TIMEOUT은 과거 호환 terminal이다. 현재
 
 <!-- visual: relations -->
 
-**교체 예정:** 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 [Payment 도메인 홈](overview.md)에 있다.
+**코드 삭제됨:** 아래는 #347에서 지운 Mock 구현의 기록이다. 테이블은 아직 남아 있고 #348의 V4 마이그레이션에서 지운다.
 
 기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.
 
@@ -99,10 +97,10 @@ payment.refunds.execution-enabled=false일 때 양수·0원 모두 접수만 하
 
 ### 구현과 검증 근거
 
-- [RefundExecutionService.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundExecutionService.java)
-- [RefundRecoveryStore.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundRecoveryStore.java)
-- [RefundOutcomeService.java](../../../../services/payment-service/src/main/java/com/shoppinglive/payment/service/RefundOutcomeService.java)
+- `RefundExecutionService.java`(#347에서 삭제)
+- `RefundRecoveryStore.java`(#347에서 삭제)
+- `RefundOutcomeService.java`(#347에서 삭제)
 
-관련 기존 테스트: [RefundRecoveryStorePostgresTest.java](../../../../services/payment-service/src/integrationTest/java/com/shoppinglive/payment/service/RefundRecoveryStorePostgresTest.java) · [RefundMockEngineTest.java](../../../../services/payment-service/src/test/java/com/shoppinglive/payment/service/RefundMockEngineTest.java).
+관련 기존 테스트: `RefundRecoveryStorePostgresTest.java`(#347에서 삭제) · `RefundMockEngineTest.java`(#347에서 삭제).
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.

@@ -236,7 +236,7 @@
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/RefundOutcomeService.java">RefundOutcomeService.java</a></li>
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/repository/OrderJpaRepository.java">OrderJpaRepository.java</a></li>
 </ul>
-<p>관련 기존 테스트: <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java">PaymentGroupIntegrationTest.java</a> · <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentDeliveryBoundaryPostgresTest.java">PaymentDeliveryBoundaryPostgresTest.java</a>.</p>
+<p>관련 기존 테스트: <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/order/service/PaymentGroupIntegrationTest.java">PaymentGroupIntegrationTest.java</a> · <code>PaymentDeliveryBoundaryPostgresTest.java</code>(#347에서 삭제).</p>
 <p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p>
 <h3 id="2026-11-16-현재-pr-경계">2026-11-16 현재 PR 경계</h3>
 <p>새 공개 주문은 기본600초이고 첫 실행 접수에서 별도600초 처리 기한을 저장한다. 기존 생성 기한과 V105 이전 확인중 null 처리기한은 유지한다. 새 Payment의 준비 생성/인증 후 승인 중계는 미완이다. 늦은 승인의 REQUIRED는 환불 요청 전 기록이며 Kafka 발행/Payment 환불 완료가 아니다. <a href="../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 작업</a> · <a href="../../../../worklog/2026-11-16.html">현재 검증</a>. 전체설계 미충족·Draft·배포 불가다.</p>
@@ -299,7 +299,7 @@
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandler.java">PaymentResultHandler.java</a></li>
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/order/service/OrderPaymentOutcomeService.java">OrderPaymentOutcomeService.java</a></li>
 </ul>
-<p>관련 기존 테스트: <a href="../../../../../services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java">PaymentResultHandlerTest.java</a> · <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/PaymentDeliveryBoundaryPostgresTest.java">PaymentDeliveryBoundaryPostgresTest.java</a>.</p>
+<p>관련 기존 테스트: <a href="../../../../../services/commercecore-service/src/test/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandlerTest.java">PaymentResultHandlerTest.java</a> · <code>PaymentDeliveryBoundaryPostgresTest.java</code>(#347에서 삭제).</p>
 <p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p>
 <h3 id="2026-11-16-현재-pr-경계_1">2026-11-16 현재 PR 경계</h3>
 <p>새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. legacy 늦은 승인은 REQUIRED 기록이며 새 계약 경로는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 통합은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. <a href="../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 작업</a> · <a href="../../../../worklog/2026-11-16.html">새 검증</a>. 전체설계 미충족·Draft·배포 불가다.</p>
@@ -405,11 +405,11 @@
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/PaymentResultHandler.java">PaymentResultHandler.java</a></li>
 <li><a href="../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/PaymentDispatcher.java">PaymentDispatcher.java</a></li>
 </ul>
-<p>관련 기존 테스트: <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundDispatchDisabledPostgresTest.java">RefundDispatchDisabledPostgresTest.java</a> · <a href="../../../../../services/commercecore-service/src/integrationTest/java/com/shoppinglive/commercecore/payment/service/RefundExecutionPostgresTest.java">RefundExecutionPostgresTest.java</a>.</p>
+<p>관련 기존 테스트: <code>RefundDispatchDisabledPostgresTest.java</code>(#347에서 삭제) · <code>RefundExecutionPostgresTest.java</code>(#347에서 삭제).</p>
 <p>테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.</p>
 <h3 id="2026-11-16-현재-pr-경계_2">2026-11-16 현재 PR 경계</h3>
 <p>새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. <a href="../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 작업</a> · <a href="../../../../worklog/2026-11-16.html">새 검증</a>. 전체설계 미충족·Draft·배포 불가다.</p>
 <h2 id="340-cart-출처와-성공-정리">#340 Cart 출처와 성공 정리</h2>
-<p>Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환불 계약의 식별 자료로 보존한다. 성공 삭제에는 회원 ID + 해당 주문항목의 SKU만 사용하므로 결제 중 수량 변경·삭제 후 재추가도 정리한다. 같은 상품의 다른 SKU·다른 회원·직접 구매의 Cart는 보존한다. 기존 terminal 결과/승인 사실 및 상태 전이로 최초 성공만 반영하며 중복 성공 이후 재담기는 보존한다. 실패·취소·만료·늦은 승인에서는 Cart를 정리하지 않는다. Cart→SKU 잠금 순서와 상태·재고·쿠폰·알림의 원자성은 유지한다. <a href="../cart/overview.html#2026-11-18-340-성공-정리-결정">Cart 결정</a>.</p><p class="muted fingerprint">MD SHA-256: <code>fee1fb52f729b9f35f1beb75319ffc1b8a417212dbb23c65338dfec04f0f8110</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환불 계약의 식별 자료로 보존한다. 성공 삭제에는 회원 ID + 해당 주문항목의 SKU만 사용하므로 결제 중 수량 변경·삭제 후 재추가도 정리한다. 같은 상품의 다른 SKU·다른 회원·직접 구매의 Cart는 보존한다. 기존 terminal 결과/승인 사실 및 상태 전이로 최초 성공만 반영하며 중복 성공 이후 재담기는 보존한다. 실패·취소·만료·늦은 승인에서는 Cart를 정리하지 않는다. Cart→SKU 잠금 순서와 상태·재고·쿠폰·알림의 원자성은 유지한다. <a href="../cart/overview.html#2026-11-18-340-성공-정리-결정">Cart 결정</a>.</p><p class="muted fingerprint">MD SHA-256: <code>55923770376d14c772ae52190533aad32ab59137f74a5abe5a166a08524e968c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

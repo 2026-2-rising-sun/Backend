@@ -11,9 +11,6 @@ import com.shoppinglive.commercecore.order.dto.CreateOrderCommand;
 import com.shoppinglive.commercecore.order.service.OrderCreationService;
 import com.shoppinglive.commercecore.order.service.OrderService;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
-import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
-import com.shoppinglive.commercecore.payment.entity.PaymentScenario;
-import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.SalesStatus;
@@ -24,7 +21,6 @@ import com.shoppinglive.commercecore.sku.service.SkuSalesService;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import com.shoppinglive.common.events.EventEnvelope;
 import com.shoppinglive.common.outbox.EventOutbox;
-import com.shoppinglive.payment.service.MockPaymentEngine;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -47,23 +43,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore deliveries;
-    @Autowired com.shoppinglive.commercecore.payment.service.PaymentDispatcher dispatcher;
     @Autowired SkuSalesService registration;
     @Autowired SkuSalesService sales;
     @Autowired SkuEventTracker tracker;
     @Autowired OrderCreationService creation;
     @Autowired OrderService orders;
     @Autowired PaymentGroupService groups;
-    @Autowired PaymentService payments;
-    @Autowired DevPaymentScenarioRegistry scenarios;
     @Autowired CartService cart;
     @Autowired InMemoryProductLookupStub productLookup;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
     @Autowired PlatformTransactionManager manager;
     @MockitoSpyBean EventOutbox outbox;
-    @Autowired MockPaymentEngine engine;
     final List<EventEnvelope<SalesInfoSnapshot>> emitted = new CopyOnWriteArrayList<>();
     final List<Long> fixtureSales = new java.util.ArrayList<>();
 
@@ -95,11 +86,6 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
     @AfterEach
     void clean() {
         for (long id : fixtureSales) {
-            jdbc.queryForList(
-                            "SELECT order_number FROM orders WHERE COALESCE(sku_id,sales_info_id)=?",
-                            String.class,
-                            id)
-                    .forEach(scenarios::clear);
             jdbc.update(
                     "DELETE FROM payment_delivery_request WHERE order_id IN (SELECT id FROM orders WHERE COALESCE(sku_id,sales_info_id)=?)",
                     id);
@@ -211,37 +197,6 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                             assertThat(e.payload().status()).isEqualTo(SalesInfoStatus.ON_SALE);
                             assertThat(e.payload().snapshotVersion()).isEqualTo(4);
                         });
-    }
-
-    @DisplayName("결제 실패의 재고 복구는 이벤트에 반영하고 결제 성공은 payload를 변경하지 않는다")
-    @Test
-    void failedPaymentRestoresStockButSuccessfulPaymentDoesNotChangePayload() {
-        for (PaymentScenario scenario :
-                List.of(PaymentScenario.INSTANT_FAIL, PaymentScenario.INSTANT_SUCCESS)) {
-            long id = register(2);
-            sales.changeStatus(id, SalesStatus.ON_SALE, SELLER);
-            String member = member();
-            var order =
-                    creation.create(
-                                    new CreateOrderCommand(
-                                            product(id), 1, "구매자", "01012345678", member, 1000L),
-                                    "payment")
-                            .order();
-            scenarios.set(order.getOrderNumber(), scenario);
-            emitted.clear();
-            var attempt = payments.startPayment(order.getOrderNumber(), member);
-            dispatcher.dispatch(deliveries.byPayment(attempt.getId()));
-            if (scenario == PaymentScenario.INSTANT_FAIL) {
-                assertThat(emitted)
-                        .extracting(EventEnvelope::eventType)
-                        .containsExactly("InventoryChanged");
-                assertThat(emitted.getFirst().payload().available()).isEqualTo(2);
-                assertThat(version(id)).isEqualTo(4);
-            } else {
-                assertThat(emitted).isEmpty();
-                assertThat(version(id)).isEqualTo(3);
-            }
-        }
     }
 
     @DisplayName("여러 상품 예약과 만료 시 각 판매정보의 최종 스냅샷을 수집한다")
