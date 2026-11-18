@@ -1,5 +1,5 @@
 ### IntelliJ HTTP Client용. 줄 왼쪽 ▶ 버튼으로 하나씩 실행한다. 시나리오별 값은 README.md 표를 따른다.
-### 가짜 토스 paymentKey: pk-ok pk-decline pk-retry pk-slow pk-5xx pk-mismatch (toss-mock/mappings/toss.json)
+### 가짜 토스 paymentKey: pk-ok pk-decline pk-retry pk-slow pk-5xx pk-mismatch (Infra local/mocks/toss/mappings/toss.json)
 @pay = http://localhost:8086
 ### .env.example의 COMMERCECORE_PAYMENT_SERVICE_TOKEN 기본값. .env에서 바꿨으면 여기도 바꾼다.
 @token = local-payment-token-change-me-0123456789

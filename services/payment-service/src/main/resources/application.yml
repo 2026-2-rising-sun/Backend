@@ -62,7 +62,7 @@ spring:
     bootstrap-servers: ${PAYMENT_KAFKA_SERVERS:localhost:${KAFKA_PORT:59092}}
 payment:
   toss:
-    # 기본은 가짜 토스(scripts/local/msa-compose.yml의 toss-mock). 실제 토스는 toss-real 프로필을 함께 켠다.
+    # 기본은 가짜 토스(Infra local/docker-compose.yml의 toss-mock). 실제 토스는 toss-real 프로필을 함께 켠다.
     base-url: http://localhost:59080
     secret-key: local-mock-secret
 

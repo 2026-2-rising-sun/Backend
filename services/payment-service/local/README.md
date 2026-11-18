@@ -5,20 +5,20 @@ Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 
 | 파일 | 용도 |
 |---|---|
 | `payment.http` | IntelliJ HTTP Client 요청(생성·조회·결제창·승인). 위쪽 변수만 바꿔 시나리오를 돌린다 |
-| `toss-mock/mappings/toss.json` | 가짜 토스 응답. 정해진 `paymentKey`로 거절·지연·5xx·금액 불일치를 고르고, 그 밖의 키는 요청 값 그대로 승인한다 |
+| 가짜 토스 | Infra/local의 `toss-mock`(localhost:59080). 응답 정의는 Infra `local/mocks/toss/mappings`에 있다. 정해진 `paymentKey`로 거절·지연·5xx·금액 불일치를 고르고, 그 밖의 키는 요청 값 그대로 승인한다 |
 | `toss-sandbox/` | 실제 토스 결제창 페이지. `serve.sh`가 `.env`의 클라이언트 키로 띄운다 |
 
 명령은 저장소 루트에서 실행한다.
 
 ## 준비
 
-1. Infra/local 미들웨어(Postgres 5432 `shoppinglive-postgres`, Kafka 29092)와 가짜 토스(`toss-mock`, localhost:59080)를 띄운다. payment DB가 없으면 [Infra local README](https://github.com/2026-2-rising-sun/Infra/blob/main/local/README.md#서비스별-db-생성)대로 만든다. `down -v`는 다른 서비스 데이터까지 지우므로 쓰지 않는다.
+1. Infra 저장소에서 로컬 스택을 띄운다. Postgres 5432(`shoppinglive-postgres`), Kafka 29092, 가짜 토스 `toss-mock`(localhost:59080)이 함께 뜬다. 자세한 내용은 [Infra local README](https://github.com/2026-2-rising-sun/Infra/blob/main/local/README.md)에 있다. payment DB가 없으면 그 문서의 "서비스별 DB 생성"대로 만든다. `down -v`는 다른 서비스 데이터까지 지우므로 쓰지 않는다.
 
    ```bash
-   docker compose -f scripts/local/msa-compose.yml up -d --wait toss-mock
+   docker compose -f local/docker-compose.yml up -d   # Infra 저장소 루트에서
    ```
 
-   `scripts/local/msa-compose.yml` 전체를 쓰면 `up -d --wait`로 payment DB·Kafka·`toss-mock`이 함께 뜬다. 이때는 `.env`의 DB·Kafka 네 줄을 지운다.
+   `scripts/local/msa-compose.yml`(Postgres 56432, Kafka 59092)을 쓰면 `.env`의 DB·Kafka 네 줄을 지우고, 가짜 토스만 Infra에서 `docker compose -f local/docker-compose.yml up -d toss-mock`으로 띄운다.
 2. `cp services/payment-service/.env.example services/payment-service/.env` 후 DB 비밀번호를 채운다. 모드 B는 토스 키도 채운다. `.env`는 커밋하지 않는다.
 3. 앱을 띄운다. local 프로필이 `.env`를 읽는다. 실제 토스는 `--spring.profiles.active=local,toss-real`이다.
 
@@ -28,13 +28,7 @@ Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 
 
 ## 모드 A: 가짜 토스
 
-local 프로필 기본값이라 따로 켤 것이 없다. `toss-mock` 컨테이너가 떠 있어야 하고, 꺼져 있으면 승인은 503 `PG_UNAVAILABLE`이다. compose 없이 띄울 때는 아래 한 줄을 쓴다.
-
-```bash
-docker run -d --name toss-mock -p 127.0.0.1:59080:8080 -v "$(git rev-parse --show-toplevel)/services/payment-service/local/toss-mock:/home/wiremock" wiremock/wiremock:3.9.1 --disable-http2-plain
-```
-
-`--disable-http2-plain`이 없으면 JDK HttpClient가 보내는 h2c 업그레이드 요청의 본문을 WireMock이 비워 받는다. 실제 토스(https)에는 없는 문제다.
+local 프로필 기본값이라 따로 켤 것이 없다. Infra/local의 `toss-mock`이 떠 있어야 하고, 꺼져 있으면 승인은 503 `PG_UNAVAILABLE`이다.
 
 `payment.http`의 `@ref`·`@pgOrderId`·`@paymentKey` 등을 표대로 바꿔 요청을 보낸다. 기본값(`@pgOrderId = {{ref}}-1`, 금액 30000, 구매자 `@buyer`)과 다른 값만 적었다. stub 응답의 `orderId`가 표의 `pgOrderId`로 고정돼 있어 `@ref`를 바꾸면 S1~S5가 불일치로 바뀐다.
 
@@ -74,7 +68,7 @@ docker run -d --name toss-mock -p 127.0.0.1:59080:8080 -v "$(git rev-parse --sho
 ## DB 확인·초기화
 
 ```bash
-docker exec -it shoppinglive-postgres psql -U <POSTGRES_USER> -d payment   # msa-compose: docker compose -f scripts/local/msa-compose.yml exec postgres psql -U msa -d payment
+docker exec -it shoppinglive-postgres psql -U <POSTGRES_USER> -d payment
 ```
 
 ```sql
