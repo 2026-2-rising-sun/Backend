@@ -117,10 +117,10 @@ class PaymentEntityPersistenceTest {
                         new BigDecimal("0.0550")));
         pgCalls.save(
                 new PgCall(paymentId, PgCallKind.CONFIRM, "OD-20261110-CHILD001-1", "confirm-key"));
+        journals.insertIfAbsent(LedgerRefType.PAYMENT_APPROVED.name(), paymentId.toString());
         Long journalId =
-                journals.save(
-                                new LedgerJournal(
-                                        LedgerRefType.PAYMENT_APPROVED, paymentId.toString()))
+                journals.findByRefTypeAndRefId(LedgerRefType.PAYMENT_APPROVED, paymentId.toString())
+                        .orElseThrow()
                         .getId();
         entries.save(new LedgerEntry(journalId, LedgerAccount.PG_CUSTODY, 30000L, 0L, null));
         entries.save(new LedgerEntry(journalId, LedgerAccount.BUYER_DEPOSIT, 0L, 30000L, null));

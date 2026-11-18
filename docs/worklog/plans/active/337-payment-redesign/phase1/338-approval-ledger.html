@@ -47,7 +47,7 @@
 <tbody>
 <tr>
 <td>원장 서비스</td>
-<td>LED-01, LED-03–05, LED-APPROVE-01</td>
+<td>LED-01–05, LED-APPROVE-01(분개 내용은 승인 처리 PR에서 호출·검증)</td>
 </tr>
 <tr>
 <td>토스 클라이언트</td>
@@ -69,7 +69,7 @@
 payment/service      ApprovalService               ①검증·APPROVING → ②토스 → ③반영. 8초 대기
                      PaymentOutcomeService         ③반영 함수들: applyDone · applyDeclined · applyNotSent · applyUnknown · compensate
 client/toss          TossPaymentsClient            confirm · getPayment · cancel. 결과 분류(TossResult)
-ledger/service       LedgerService                 record(refType, refId, lines). 호출자 트랜잭션에 참여
+ledger/service       LedgerService                 record(refType, refId, lines) → boolean. 호출자 트랜잭션에 참여
 </code></pre>
 <h2 id="1-토스-클라이언트-clienttoss">1. 토스 클라이언트 (<code>client.toss</code>)</h2>
 <h3 id="설정-제안-이름">설정 (제안 이름)</h3>
@@ -510,14 +510,14 @@ ledger/service       LedgerService                 record(refType, refId, lines)
 </tbody>
 </table></div>
 <h2 id="3-원장-ledgerservice">3. 원장 (<code>ledger.service</code>)</h2>
-<pre><code class="language-java">// 호출자 트랜잭션 필수 (Propagation.MANDATORY, LED-04)
-void record(RefType refType, String refId, List&lt;Line&gt; lines)
-record Line(Account account, long debit, long credit, String sellerId) {}
+<pre><code class="language-java">// 호출자 트랜잭션 필수 (Propagation.MANDATORY, LED-04). 새로 기록하면 true, 이미 있으면 false
+boolean record(LedgerRefType refType, String refId, List&lt;Journal.Line&gt; lines)
+record Line(LedgerAccount account, long debit, long credit, String sellerId) {}
 </code></pre>
 <ul>
-<li><code>Journal.of(...)</code>가 줄 2개 이상, 각 줄 한쪽만 &gt; 0, 차변 합 = 대변 합을 검사한다. 어기면 <code>IllegalArgumentException</code>, 아무것도 저장하지 않는다(LED-01).</li>
-<li><code>INSERT INTO ledger_journal … ON CONFLICT DO NOTHING</code>(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태) → 0행이면 이미 기록된 사건이므로 줄을 넣지 않고 끝낸다(LED-03).</li>
-<li>수정·삭제 메서드를 만들지 않는다(LED-05).</li>
+<li><code>Journal</code>·<code>Journal.Line</code> 생성자가 줄 2개 이상, 각 줄 한쪽만 &gt; 0(음수 거절), <code>SELLER_PAYABLE</code> 줄의 판매자 ID(LED-02), 차변 합 = 대변 합(<code>Math.addExact</code>로 넘침 거절)을 검사한다. 어기면 <code>IllegalArgumentException</code>, DB에 닿기 전이라 아무것도 저장하지 않는다(LED-01).</li>
+<li><code>INSERT INTO ledger_journal … ON CONFLICT DO NOTHING</code>(충돌 대상 생략. H2 PostgreSQL 모드에서 확인된 형태) → 0행이면 이미 기록된 사건이므로 줄을 넣지 않고 false로 끝낸다(LED-03). H2 <code>create-drop</code>이 같은 UNIQUE를 만들도록 <code>LedgerJournal</code>에 <code>@UniqueConstraint</code>를 둔다.</li>
+<li>수정·삭제 메서드를 만들지 않는다. 원장 리포지토리는 <code>JpaRepository</code>가 아닌 <code>Repository</code>로 좁혀 삭제 메서드를 물려받지 않는다(LED-05).</li>
 </ul>
 <p><strong>결제 승인 분개</strong>(LED-APPROVE-01): 사건 키 (<code>PAYMENT_APPROVED</code>, <code>payment.id</code> 문자열)</p>
 <div class="table-wrap"><table>
@@ -626,9 +626,9 @@ record Line(Account account, long debit, long credit, String sellerId) {}
 </thead>
 <tbody>
 <tr>
-<td>LED-01, 03–05</td>
-<td><code>LedgerServiceTest</code></td>
-<td>통합(H2) + 중복은 <code>@Tag("postgres")</code></td>
+<td>LED-01–05</td>
+<td><code>JournalTest</code>(검사), <code>LedgerServiceTest</code>(H2 저장·롤백·메서드), <code>LedgerServicePostgresTest</code>(중복·동시 중복·롤백)</td>
+<td>단위 · 통합(H2) · <code>@Tag("postgres")</code></td>
 </tr>
 <tr>
 <td>LED-APPROVE-01</td>
@@ -770,6 +770,6 @@ record Line(Account account, long debit, long credit, String sellerId) {}
 <li>옛 이벤트는 호환을 깨고 지운다(위 "바뀌는 점" 아래 문단).</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>5fc3c2b6947eae158362b35945419c2b84c713d7ac02ea388c863dd8c59e22dd</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>f48a0d67122fb9058e8d152a488c510907be6abca68d25ffaf05e0d5e3e9893a</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
