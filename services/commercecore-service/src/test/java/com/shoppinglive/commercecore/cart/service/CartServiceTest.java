@@ -170,7 +170,7 @@ class CartServiceTest {
     }
 
     private SkuView sku(Long id, Long productId, long price, int available) {
-        return new SkuView(id, productId, price, available, 0, SkuSaleStatus.ON_SALE, 0);
+        return new SkuView(id, productId, price, available, 0, SkuSaleStatus.ON_SALE);
     }
 
     private ProductSnapshot product(Long id, boolean saleEnabled) {

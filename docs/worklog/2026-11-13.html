@@ -583,6 +583,6 @@
 <li>검증: <code>scripts/check.sh --base 'origin/feat/#338-payment-approval' --external</code>(임시 PostgreSQL 16) 통과. Payment test 48, integrationTest 75, postgresTest 27, 스킵 0. 토스 지연 → 202 → 뒤에서 APPROVED·CREATED·UNKNOWN 반영과 대기 중 DB 연결 0을 테스트로 확인했다. 독립 리뷰 지적 10건 중 4건 반영(대기 상한 검사, 테스트 타이밍, 종료 중 제출 거부, Error 로깅).</li>
 <li>미실행·한계: 검증 단계(①)가 DB 연결 대기로 늦어지면 8초를 넘길 수 있다(Hikari 기본 30초, 리뷰 부탁). 기본 8초 실측·실제 Tomcat 부하·실제 토스 키·Commerce 연동은 하지 않았다.</li>
 <li>다음 작업: 결과 불명 조회·정체 정리·만료(#349).</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7a206c5792636b22b72171197dbde8c9b91e46a657ecaa1fa9e0283223e50eae</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>5530246d8f5ef40c3db61a75834e0e02945400879d4288ca2b69b6ead5b2b390</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

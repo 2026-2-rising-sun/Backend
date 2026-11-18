@@ -12,8 +12,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class SkuRepository {
-    private static final String FIELDS =
-            "id, product_id, price, available, reserved, sale_status, version";
+    private static final String FIELDS = "id, product_id, price, available, reserved, sale_status";
     private static final RowMapper<SkuView> VIEW =
             (rs, row) ->
                     new SkuView(
@@ -22,8 +21,7 @@ public class SkuRepository {
                             rs.getLong("price"),
                             rs.getInt("available"),
                             rs.getInt("reserved"),
-                            SkuSaleStatus.valueOf(rs.getString("sale_status")),
-                            rs.getLong("version"));
+                            SkuSaleStatus.valueOf(rs.getString("sale_status")));
     private final NamedParameterJdbcTemplate jdbc;
 
     public SkuRepository(NamedParameterJdbcTemplate jdbc) {
@@ -60,9 +58,9 @@ public class SkuRepository {
         GeneratedKeyHolder key = new GeneratedKeyHolder();
         jdbc.update(
                 """
-                INSERT INTO sku(product_id,price,available,reserved,sale_status,version,
+                INSERT INTO sku(product_id,price,available,reserved,sale_status,
                     snapshot_version,product_name_snapshot,created_at,updated_at)
-                VALUES(:productId,:price,:available,0,'READY',0,1,:productName,
+                VALUES(:productId,:price,:available,0,'READY',1,:productName,
                     CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                 """,
                 new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
@@ -82,7 +80,7 @@ public class SkuRepository {
     public int changeStatus(Long id, SkuSaleStatus status) {
         return jdbc.update(
                 """
-                UPDATE sku SET sale_status=:status,version=version+1,updated_at=CURRENT_TIMESTAMP
+                UPDATE sku SET sale_status=:status,updated_at=CURRENT_TIMESTAMP
                 WHERE id=:id AND sale_status<>:status
                 """,
                 Map.of("id", id, "status", status.name()));
@@ -122,7 +120,7 @@ public class SkuRepository {
         return jdbc.update(
                 "UPDATE sku SET "
                         + assignment
-                        + ",version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=:id AND "
+                        + ",updated_at=CURRENT_TIMESTAMP WHERE id=:id AND "
                         + condition,
                 Map.of("id", id, "value", value));
     }
