@@ -19,12 +19,24 @@ Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 
    ```
 
    `scripts/local/msa-compose.yml`(Postgres 56432, Kafka 59092)을 쓰면 `.env`의 DB·Kafka 네 줄을 지우고, 가짜 토스만 Infra에서 `docker compose -f local/docker-compose.yml up -d toss-mock`으로 띄운다.
-2. `cp services/payment-service/.env.example services/payment-service/.env` 후 DB 비밀번호를 채운다. 모드 B는 토스 키도 채운다. `.env`는 커밋하지 않는다.
-3. 앱을 띄운다. local 프로필이 `.env`를 읽는다. 실제 토스는 `--spring.profiles.active=local,toss-real`이다.
+2. `cp services/payment-service/.env.example services/payment-service/.env` 후 `PAYMENT_DB_PASSWORD`를 Infra `local/.env`의 `POSTGRES_PASSWORD`와 같게 쓴다(다르면 `password authentication failed`). 모드 B는 토스 키도 채운다. `.env`는 커밋하지 않는다.
+3. 앱을 띄운다. 프로필이 토스 대상을 정한다. local 프로필이 `.env`를 읽는다.
+
+   | 모드 | 프로필 | 토스 |
+   |---|---|---|
+   | A | `local` | 가짜 토스(localhost:59080) |
+   | B | `local,toss-real` | 실제 토스 테스트 환경(`.env`의 `PAYMENT_TOSS_SECRET_KEY`) |
+
+   **IntelliJ:** Run → Edit Configurations → `+` → Spring Boot. Main class `com.shoppinglive.payment.PaymentServiceApplication`, JDK 21, **Active profiles**에 위 표의 값을 넣는다. 모드마다 설정을 하나씩 만들어 두면 편하다. 환경 변수는 비워 둔다(`.env`를 앱이 직접 읽는다).
+
+   **터미널:**
 
    ```bash
-   ./gradlew :services:payment-service:bootRun --args='--spring.profiles.active=local'
+   ./gradlew :services:payment-service:bootRun --args='--spring.profiles.active=local'            # 모드 A
+   ./gradlew :services:payment-service:bootRun --args='--spring.profiles.active=local,toss-real'  # 모드 B
    ```
+
+   기동 로그의 `The following 2 profiles are active: "local", "toss-real"`(모드 B) 또는 `"local"`(모드 A)로 확인한다. 모드를 바꾸면 앱을 다시 띄운다.
 
 ## 모드 A: 가짜 토스
 
@@ -46,13 +58,20 @@ local 프로필 기본값이라 따로 켤 것이 없다. Infra/local의 `toss-m
 
 ## 모드 B: 실제 토스 테스트 키
 
-앱을 `--spring.profiles.active=local,toss-real`로 띄운다. 키는 토스 개발자센터 > API 키 > **API 개별 연동 키**의 한 쌍을 쓴다. 시크릿 키는 `test_sk_`, 결제창 키는 같은 쌍의 `test_ck_`다. 결제위젯 키(`test_gck_`·`test_gsk_`)는 이 결제창에서 쓰지 못한다.
+앱을 프로필 `local,toss-real`로 다시 띄운다(위 3). 키는 토스 개발자센터 > API 키 > **API 개별 연동 키**의 한 쌍을 `.env`에 넣는다. 시크릿 키 `PAYMENT_TOSS_SECRET_KEY`는 `test_sk_`, 결제창 키 `PAYMENT_TOSS_CLIENT_KEY`는 같은 쌍의 `test_ck_`다. 결제위젯 키(`test_gck_`·`test_gsk_`)는 이 결제창에서 쓰지 못한다.
 
-1. `payment.http`에서 `@ref = OD-LOCAL-REAL`로 1(결제 생성)을 보낸다. 생성 전에 승인하면 404다.
-2. `services/payment-service/local/toss-sandbox/serve.sh`를 실행하고 `http://localhost:8095/checkout.html?orderId=OD-LOCAL-REAL-1`을 열어 테스트 카드로 결제한다.
-3. 성공 페이지가 보여 주는 `@pgOrderId`·`@paymentKey`·`@amount`를 `payment.http`에 넣고 4(승인)를 보낸다 → 200 APPROVED.
-4. 4를 다시 보낸다 → 200 APPROVED, `pg_call` 행이 늘지 않는다.
-5. 3(결제창 다시 열기)을 보낸다 → 409(이미 승인).
+1. `payment.http`에서 아직 쓰지 않은 `@ref`(예: `OD-LOCAL-REAL`)로 1(결제 생성)을 보낸다 → 201. 생성 전에 승인하면 404다.
+2. 결제창 페이지를 띄운다. 웹 서버라 계속 떠 있으므로 별도 터미널에서 실행하고 Ctrl+C로 끈다. 스크립트 위치 기준으로 `.env`를 읽어 어느 폴더에서 실행해도 된다.
+
+   ```bash
+   services/payment-service/local/toss-sandbox/serve.sh
+   ```
+
+   `http://localhost:8095/checkout.html?orderId=OD-LOCAL-REAL-1`을 열어 테스트 카드로 결제한다(금액 30000 = `@total`).
+3. 성공 페이지가 보여 주는 네 줄(`@ref`·`@pgOrderId`·`@paymentKey`·`@amount`)을 `payment.http` 위쪽 변수에 붙여 넣고 10분 안에 4(승인)를 보낸다 → 200 APPROVED.
+4. 실제 토스로 갔는지 확인한다. 토스 개발자센터 결제 내역에 주문번호가 **완료**로 보이고, 가짜 토스 기록에는 없어야 한다(`curl -s localhost:59080/__admin/requests | grep -c OD-LOCAL-REAL` → 0). 가짜 토스에 남았다면 프로필이 `local`만 켜진 것이다.
+5. 4를 다시 보낸다 → 200 APPROVED, `pg_call` 행이 늘지 않는다.
+6. 3(결제창 다시 열기)을 보낸다 → 409(이미 승인).
 
 취소·환불 API는 1차 범위 밖이다. 테스트 결제 취소는 개발자센터에서 한다.
 
@@ -60,6 +79,9 @@ local 프로필 기본값이라 따로 켤 것이 없다. Infra/local의 `toss-m
 
 - 시크릿 키를 결제위젯 키(`test_gsk_`)로 넣으면 토스가 키 오류로 답한다. API 개별 연동 키의 `test_sk_`를 쓴다.
 - 결제 생성(1) 전에 승인(4)을 보내면 404다.
+- 이미 승인한 `@ref`로 다시 하면 1은 200(기존 결제)이고 결제창·승인이 되지 않는다. 매번 새 `@ref`를 쓴다.
+- 프로필을 `local`만 켜고 실제 결제창에서 받은 paymentKey로 승인하면, 가짜 토스가 승인해 200이 나오지만 토스에는 승인되지 않은 채 남는다. 모드 B는 `local,toss-real`이다.
+- Infra `local/.env`의 `POSTGRES_MULTIPLE_DATABASES`가 예전 목록이면 새 볼륨에 payment DB가 생기지 않는다(`database "payment" does not exist`). Infra `local/.env.example`의 목록으로 바꾼다.
 - 예전 `.env`에 `PAYMENT_TOSS_BASE_URL=http://localhost:18080`이 남아 있으면 `toss-real`에서 그 주소로 가 모든 호출이 NotSent(503)다. 그 줄을 지운다. local 프로필에서는 읽지 않는다.
 - 결제창을 다시 열거나(3) 토스 호출이 NotSent로 끝난 뒤에는 `pgOrderId` 회차가 바뀐다. 이전 결제창에서 받은 인증은 쓰지 못하고, 새 회차로 결제창을 다시 연다.
 - 시나리오 stub(`pk-*`)은 `-1` 회차 orderId 기준이다(S2 `pk-retry`만 `-2`). 회차가 바뀐 채 승인하면 응답 불일치로 보상 취소가 일어난다. 그 밖의 paymentKey는 요청한 orderId·금액으로 승인한다.
