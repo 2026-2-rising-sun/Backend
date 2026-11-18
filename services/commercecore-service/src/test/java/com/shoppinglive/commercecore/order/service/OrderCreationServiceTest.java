@@ -137,8 +137,7 @@ class OrderCreationServiceTest {
                                                 .valueOf(
                                                         status == SalesStatus.SOLD_OUT
                                                                 ? "ON_SALE"
-                                                                : status.name()),
-                                        0)));
+                                                                : status.name()))));
     }
 
     /** 배정 성공 + 저장까지 이어지는 기본 경로를 구성한다. */
@@ -367,8 +366,7 @@ class OrderCreationServiceTest {
                                         10,
                                         0,
                                         com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
-                                                .ON_SALE,
-                                        1)));
+                                                .ON_SALE)));
         given(
                         orderRepository.findByMemberIdAndIdempotencyKey(
                                 "11111111-1111-4111-8111-111111111111", "key-1"))
@@ -398,8 +396,7 @@ class OrderCreationServiceTest {
                                         10,
                                         0,
                                         com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
-                                                .ON_SALE,
-                                        1)));
+                                                .ON_SALE)));
         given(
                         orderRepository.findByMemberIdAndIdempotencyKey(
                                 "11111111-1111-4111-8111-111111111111", "key-1"))
@@ -530,8 +527,7 @@ class OrderCreationServiceTest {
                                         10,
                                         0,
                                         com.shoppinglive.commercecore.sku.entity.SkuSaleStatus
-                                                .ON_SALE,
-                                        1)));
+                                                .ON_SALE)));
         given(transactionTemplate.execute(any()))
                 .willThrow(integrityViolation("23505", "uk_orders_member_idempotency"));
 

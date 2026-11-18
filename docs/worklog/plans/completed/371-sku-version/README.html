@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#371 SKU 일반 버전 제거</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="README.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#목표와-범위">목표와 범위</a></li>
+<li><a href="#단계와-리뷰">단계와 리뷰</a></li>
+<li><a href="#수용-기준">수용 기준</a></li>
+<li><a href="#결과와-후속">결과와 후속</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>#371 SKU 일반 버전 제거</h1><p><a href="https://github.com/2026-2-rising-sun/Backend/issues/371">이슈</a> · <a href="../../../2026-11-18-sku-version.html">작업 기록</a></p>
+<h2 id="목표와-범위">목표와 범위</h2>
+<p>수정 충돌 검증에 쓰지 않는 SKU 일반 version을 DB·모델·판매 응답에서 제거한다. Product→SKU 잠금 순서, 조건부 재고 갱신, snapshotVersion과 Outbox 원자성은 유지한다. 기존 Sales·Product·Cart·Coupon·Catalog 사본 버전은 제거하지 않는다.</p>
+<h2 id="단계와-리뷰">단계와 리뷰</h2>
+<ol>
+<li>모델·SQL·fixture 변경과 V107을 검토한다. 이전 마이그레이션의 원문과 과거 단계 검증은 보존한다.</li>
+<li>판매 응답·소비자·계약·생성 문서를 대조한다. 저장소 밖 소비자와 구 인스턴스 공존 제약을 기록한다.</li>
+<li>HTTP 회귀·전체 업무 회귀·PostgreSQL 마이그레이션/경합·Catalog 중복/역순·외부 Kafka를 실행한다. 실패를 수정하고 영향 구간을 다시 검사한다.</li>
+<li>최종 diff와 실제 검사 결과를 검토한 뒤 허용된 푸시·PR·CI 확인·병합으로 이어간다.</li>
+</ol>
+<h2 id="수용-기준">수용 기준</h2>
+<ul>
+<li>[x] 일반 SKU 버전만 제거하고 과거 데이터·ID 생성·이벤트 버전을 보존한다.</li>
+<li>[x] 판매 등록·가격·상태 변경 응답에 version이 없고 기존 필드는 유지된다.</li>
+<li>[x] 실제 PostgreSQL에서 재고 한도·경합·예약/소진/해제/복구와 Outbox 롤백이 유지된다.</li>
+<li>[x] Catalog 중복·역순 반영 방지와 외부 Kafka 전달을 확인한다.</li>
+<li>[x] 계약·설계·워크로그 생성과 검사, 대표 HTML 탐색·모바일 화면을 확인한다.</li>
+</ul>
+<p>배포는 범위 밖이다. 구 애플리케이션이 sku.version을 참조하므로 컬럼 삭제 시 구 인스턴스를 함께 실행하지 않는다. 저장소 밖 소비자 확인은 별도 과제다.</p>
+<h2 id="결과와-후속">결과와 후속</h2>
+<p>구현·소비자 조사·문서 및 로컬 회귀 846건을 완료했다. 결과와 초기 실패 수정 근거는 작업 기록에서 확인한다. 배포본·저장소 밖 소비자 확인과 실제 배포는 이번 범위 밖 후속이다. 푸시·PR의 CI/리뷰 상태는 게시된 PR에서 최종 확인한다.</p><p class="muted fingerprint">MD SHA-256: <code>d9929051c2476f8a52944e6829bd95985cfa188d697fdfb81faf97f312da878c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

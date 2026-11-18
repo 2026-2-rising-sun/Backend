@@ -19,6 +19,7 @@
 | payment_group | payment_relay_refund | late-{원결제ID}·REQUESTED→SUCCEEDED/FAILED. 환불 요청 outbox와 같은 TX |
 | payment_group | payment_delivery_request | PREPARE/APPROVAL 원문·고정 requestId. legacy PAYMENT/REFUND 전달기와 분리 |
 | 논리 OrderItem | orders | 1:N 항목, 생성당시SKU·상품명·수량·단가·할인·Cart출처 |
+| orders Cart 출처 | Cart ID/version | 생성 검증·선택 환불 계약 보존. #340 성공 삭제 조건은 회원+구매 SKU이며 Cart 삭제 뒤에도 출처 유지 |
 | orders | SKU | sku_id 우선, 과거 sales_info_id 호환. 가격·재고 현재원본 |
 | orders | Product 불변소유자 | 신규 seller_id_snapshot 보존, 과거NULL의새환불접수만삭제포함내부소유자조회 |
 | 환불계산 도메인 | OrderRefundAmounts | 단가×수량과잔여실결제액 상한. 신규실행어댑터없음 |

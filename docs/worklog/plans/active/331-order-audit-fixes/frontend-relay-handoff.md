@@ -47,7 +47,7 @@ SDK clientKey/customerKey·성공/실패 URL·결제 UI 설정은 Core 응답에
 
 ## 식별자와 복구 제약
 
-Cart GET 그룹 item의 `skuId`는 실제 주문 입력 원본이다. 직접 구매는 기존 GET `/v1/orders/checkout?productId={id}&quantity={n}` 응답의 **명시적인 `skuId`**를 사용한다. 서버는 Product→단일 SKU를 조회해 선택하며 기존 `salesId` 호환 필드도 유지한다. 두 필드는 이 단일 SKU 조회 결과를 가리킬 뿐 일반적인 상품ID/판매정보ID와 SKU ID의 동일성을 보장하지 않는다. 복수 SKU 상품409·삭제 상품404 정책은 유지한다. `orderable`, 할인 후 `payableAmount`와 쿠폰 견적을 확인하고, 생성 때 가격·재고·상품 판매 가능 여부를 다시 검증한다. 판매자 전용 API나 숨은 Cart 생성을 사용하지 않는다. #340 공개 다중SKU/옵션 정책은 재개하지 않는다.
+Cart GET 그룹 item의 `skuId`는 실제 주문 입력 원본이다. 직접 구매는 기존 GET `/v1/orders/checkout?productId={id}&quantity={n}` 응답의 **명시적인 `skuId`**를 사용한다. 서버는 Product→단일 SKU를 조회해 선택하며 기존 `salesId` 호환 필드도 유지한다. 두 필드는 이 단일 SKU 조회 결과를 가리킬 뿐 일반적인 상품ID/판매정보ID와 SKU ID의 동일성을 보장하지 않는다. 복수 SKU 상품409·삭제 상품404 정책은 유지한다. `orderable`, 할인 후 `payableAmount`와 쿠폰 견적을 확인하고, 생성 때 가격·재고·상품 판매 가능 여부를 다시 검증한다. 판매자 전용 API나 숨은 Cart 생성을 사용하지 않는다. 공개 다중SKU/옵션 정책은 재개하지 않는다.
 
 기존 조회는 GET `/v1/orders`, `/v1/orders/{orderNumber}`, `/v1/payment-groups/active`(200/없으면204), `/v1/payment-groups/{number}`다. 이는 legacy 소유 조회이며 새 policy1 주문서를 반환하지 않는다. 새 주문은 order-sheets GET과 **GET `/v1/order-sheets/active`**를 사용하고 번호를 종류와 함께 보존한다. 생성 전·응답 유실·재진입 시 두 종류의 active 조회로 기존 진행 주문을 회복하고 새 POST 중복 생성을 막는다. 새 active 조회는 서버 소유 기한에 도달한 주문을 한 번만 만료·해제하며 HTTP 결제 호출이나 기한 연장을 하지 않는다. 이전 내부 policy1/2에 새 Payment 연동 기록이 없으면409로 조정 필요를 알린다. 이를 없는 주문으로 해석해 새 주문을 만들지 않는다. 다른 구매자의 주문은 노출하지 않는다.
 

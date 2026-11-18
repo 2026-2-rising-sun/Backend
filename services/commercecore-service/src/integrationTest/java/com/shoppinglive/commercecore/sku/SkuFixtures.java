@@ -20,7 +20,7 @@ public final class SkuFixtures {
                 connection -> {
                     var statement =
                             connection.prepareStatement(
-                                    "INSERT INTO sku(product_id,price,sale_status,available,reserved,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,?,?,?,?,0,1,'테스트 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                                    "INSERT INTO sku(product_id,price,sale_status,available,reserved,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES(?,?,?,?,?,1,'테스트 상품',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                                     new String[] {"id"});
                     statement.setLong(1, productId);
                     statement.setLong(2, price);

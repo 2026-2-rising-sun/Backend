@@ -53,7 +53,7 @@ public class LegacyOrderTradeFixture {
             }
             String status = row.get("status").toString();
             jdbc.update(
-                    "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,version,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,?,?,0,1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                    "INSERT INTO sku(id,product_id,price,available,reserved,sale_status,snapshot_version,product_name_snapshot,created_at,updated_at) VALUES (?,?,?,?,?,?,1,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                     id,
                     product,
                     row.get("price"),
@@ -74,8 +74,7 @@ public class LegacyOrderTradeFixture {
                                 r.getLong("price"),
                                 r.getInt("available"),
                                 r.getInt("reserved"),
-                                SkuSaleStatus.valueOf(r.getString("sale_status")),
-                                r.getLong("version")),
+                                SkuSaleStatus.valueOf(r.getString("sale_status"))),
                 id);
     }
 }
