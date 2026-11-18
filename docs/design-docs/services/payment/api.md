@@ -6,7 +6,7 @@
 
 계약에 선언된 API입니다. 실제 응답·인증·외부 서비스 실행 결과는 워크로그에서 확인합니다.
 
-브라우저 공개 경로가 없는 결제 실행 서비스. Commerce(commercecore)만 X-Service-Token으로 부른다. 결제 1건의 업무 키는 Commerce가 준 orderRef이고, 토스 결제창 orderId는 `{orderRef}-{결제창 회차}`인 pgOrderId다. 이 서비스의 API는 토스를 부르지 않는다. 시간 판단(만료)은 Payment DB 시각으로 한다. 승인 API(`/v1/internal/payments/{orderRef}/approval`)는 경로만 허용돼 있고 #338에서 정의한다.
+브라우저 공개 경로가 없는 결제 실행 서비스. Commerce(commercecore)만 X-Service-Token으로 부른다. 결제 1건의 업무 키는 Commerce가 준 orderRef이고, 토스 결제창 orderId는 `{orderRef}-{결제창 회차}`인 pgOrderId다. 토스를 부르는 API는 승인 API 하나다. 시간 판단(만료)은 Payment DB 시각으로 한다.
 
 ## 공통 인증과 서버
 
@@ -484,6 +484,328 @@ responses:
 - url: http://localhost:8086
 ```
 
+## POST /v1/internal/payments/{orderRef}/approval
+
+결제 승인(토스 승인 호출)
+
+브라우저가 토스 결제창에서 받은 값으로 승인한다. 검사는 이 순서로 하고 처음 걸린 하나만 응답하며, 검사에 걸리면 토스를 부르지 않는다. (1) 결제 없음 404 PAYMENT_NOT_FOUND. (2) pgOrderId의 마지막 `-` 앞부분이 orderRef가 아니면 400 ORDER_ID_MISMATCH. (3) buyerId가 다르면 403 BUYER_MISMATCH. (4) amount가 다르면 400 AMOUNT_MISMATCH. (5) pgOrderId가 현재 결제창 것이 아니면(거절 뒤 비워진 경우 포함) 409 STALE_CHECKOUT. (6) 상태가 APPROVED면 200, APPROVING·UNKNOWN이면 202, CANCELED·PARTIALLY_REFUNDED·REFUNDED면 409 PAYMENT_CLOSED. (7) CREATED인데 만료됐으면 409 PAYMENT_CLOSED. 통과하면 APPROVING으로 바꾸고 멱등 키 `confirm-{pgOrderId}`로 토스 승인을 부른다. 같은 결제에 동시에 와도 토스 호출은 1번이고 나머지는 202다. 응답은 요청을 받은 때부터 최대 8초 안에 준다. 그 안에 결과가 없거나 결과를 모르면 202 PENDING을 주고 처리는 계속한다. 결과는 조회 API와 PaymentApproved 이벤트로 확인한다.
+
+**인증:** `[{"ServiceToken": []}]`
+**태그:** 없음
+
+### 요청 파라미터
+
+| 이름 | 위치 | 필수 | 타입 | 설명 |
+|---|---|---|---|---|
+| orderRef | path | 필수 | string | 결제 생성 때 준 주문 참조 |
+
+### 요청 본문
+
+본문: 필수
+
+**application/json**
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| buyerId | string | 필수 | Commerce가 로그인 토큰에서 꺼낸 구매자 | {&quot;format&quot;: &quot;uuid&quot;} |
+| paymentKey | string | 필수 | 브라우저가 받은 토스 paymentKey | {&quot;minLength&quot;: 1, &quot;maxLength&quot;: 200} |
+| pgOrderId | string | 필수 | 브라우저가 받은 토스 orderId(`{orderRef}-{결제창 회차}`) | {&quot;minLength&quot;: 1, &quot;maxLength&quot;: 64} |
+| amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+
+```json
+{
+  "buyerId": "5c2e8f1a-0000-4000-8000-6d4c0b9e7a13",
+  "paymentKey": "tgen_20261110140211abcd",
+  "pgOrderId": "OD-20261110-K7Q2M9XA-1",
+  "amount": 30000
+}
+```
+
+### 응답
+
+| 상태 코드 | 설명 |
+|---|---|
+| 200 | 승인됨. 이미 승인된 결제의 재요청도 같다. |
+| 202 | 처리 중. 8초 안에 토스 결과가 없었거나, 결과를 몰라 UNKNOWN이 됐거나, 이미 처리 중이다. Location의 조회 API나 이벤트로 결과를 확인한다. |
+| 400 | INVALID_REQUEST(형식, 다른 결제가 이미 쓴 paymentKey), ORDER_ID_MISMATCH, AMOUNT_MISMATCH |
+| 401 | UNAUTHORIZED. X-Service-Token이 없거나 다르다. |
+| 403 | BUYER_MISMATCH |
+| 404 | PAYMENT_NOT_FOUND |
+| 409 | STALE_CHECKOUT(예전 결제창. 결제창을 다시 연다), PAYMENT_CLOSED(만료·닫힘, 또는 토스 승인 응답이 맞지 않아 전액 취소함) |
+| 422 | DECLINED. 토스가 거절했다. 결제는 CREATED로 돌아가고 결제창이 비워진다. 결제창 API로 새 결제창을 열어 다시 승인한다. data.code·message는 토스 오류 코드·메시지다. |
+| 503 | PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제, 호출 제한). 결제는 CREATED로 돌아가고 결제창이 비워진다. |
+
+#### 200 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | object | 필수 |  | — |
+| data.paymentId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.status | string | 필수 | 200은 APPROVED, 202는 PENDING | {&quot;enum&quot;: &#91;&quot;APPROVED&quot;, &quot;PENDING&quot;&#93;} |
+| error | null | 필수 |  | — |
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": 1001,
+    "status": "APPROVED"
+  },
+  "error": null
+}
+```
+
+#### 202 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | object | 필수 |  | — |
+| data.paymentId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.status | string | 필수 | 200은 APPROVED, 202는 PENDING | {&quot;enum&quot;: &#91;&quot;APPROVED&quot;, &quot;PENDING&quot;&#93;} |
+| error | null | 필수 |  | — |
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": 1001,
+    "status": "PENDING"
+  },
+  "error": null
+}
+```
+
+#### 400 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 401 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 403 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 404 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 409 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "STALE_CHECKOUT",
+    "message": "예전 결제창의 승인 요청입니다. 결제창을 다시 열어 주세요.",
+    "requestId": "7f1c2b3a-0000-4000-8000-000000000001"
+  }
+}
+```
+
+#### 422 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | object | 필수 |  | — |
+| data.status | string | 필수 |  | — |
+| data.code | string | 필수 | 토스 오류 코드 | — |
+| data.message | string | 필수 | 토스 오류 메시지 | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+```json
+{
+  "success": false,
+  "data": {
+    "status": "DECLINED",
+    "code": "REJECT_CARD_PAYMENT",
+    "message": "한도초과 혹은 잔액부족으로 결제에 실패했습니다."
+  },
+  "error": {
+    "code": "DECLINED",
+    "message": "카드사에서 결제를 거절했습니다.",
+    "requestId": "7f1c2b3a-0000-4000-8000-000000000001"
+  }
+}
+```
+
+#### 503 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+### 계약 원문
+
+```yaml
+operationId: approvePayment
+summary: 결제 승인(토스 승인 호출)
+description: 브라우저가 토스 결제창에서 받은 값으로 승인한다. 검사는 이 순서로 하고 처음 걸린 하나만 응답하며, 검사에 걸리면 토스를
+  부르지 않는다. (1) 결제 없음 404 PAYMENT_NOT_FOUND. (2) pgOrderId의 마지막 `-` 앞부분이 orderRef가
+  아니면 400 ORDER_ID_MISMATCH. (3) buyerId가 다르면 403 BUYER_MISMATCH. (4) amount가 다르면
+  400 AMOUNT_MISMATCH. (5) pgOrderId가 현재 결제창 것이 아니면(거절 뒤 비워진 경우 포함) 409 STALE_CHECKOUT.
+  (6) 상태가 APPROVED면 200, APPROVING·UNKNOWN이면 202, CANCELED·PARTIALLY_REFUNDED·REFUNDED면
+  409 PAYMENT_CLOSED. (7) CREATED인데 만료됐으면 409 PAYMENT_CLOSED. 통과하면 APPROVING으로 바꾸고
+  멱등 키 `confirm-{pgOrderId}`로 토스 승인을 부른다. 같은 결제에 동시에 와도 토스 호출은 1번이고 나머지는 202다. 응답은
+  요청을 받은 때부터 최대 8초 안에 준다. 그 안에 결과가 없거나 결과를 모르면 202 PENDING을 주고 처리는 계속한다. 결과는 조회 API와
+  PaymentApproved 이벤트로 확인한다.
+parameters:
+- $ref: '#/components/parameters/OrderRef'
+requestBody:
+  required: true
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ApprovalRequest'
+      example:
+        buyerId: 5c2e8f1a-0000-4000-8000-6d4c0b9e7a13
+        paymentKey: tgen_20261110140211abcd
+        pgOrderId: OD-20261110-K7Q2M9XA-1
+        amount: 30000
+responses:
+  '200':
+    description: 승인됨. 이미 승인된 결제의 재요청도 같다.
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ApprovalEnvelope'
+        example:
+          success: true
+          data:
+            paymentId: 1001
+            status: APPROVED
+          error: null
+  '202':
+    description: 처리 중. 8초 안에 토스 결과가 없었거나, 결과를 몰라 UNKNOWN이 됐거나, 이미 처리 중이다. Location의
+      조회 API나 이벤트로 결과를 확인한다.
+    headers:
+      Location:
+        description: 결제 조회 경로 `/v1/internal/payments/{orderRef}`
+        schema:
+          type: string
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ApprovalEnvelope'
+        example:
+          success: true
+          data:
+            paymentId: 1001
+            status: PENDING
+          error: null
+  '400':
+    description: INVALID_REQUEST(형식, 다른 결제가 이미 쓴 paymentKey), ORDER_ID_MISMATCH, AMOUNT_MISMATCH
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    description: BUYER_MISMATCH
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '404':
+    description: PAYMENT_NOT_FOUND
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+  '409':
+    description: STALE_CHECKOUT(예전 결제창. 결제창을 다시 연다), PAYMENT_CLOSED(만료·닫힘, 또는 토스 승인
+      응답이 맞지 않아 전액 취소함)
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+        example:
+          success: false
+          data: null
+          error:
+            code: STALE_CHECKOUT
+            message: 예전 결제창의 승인 요청입니다. 결제창을 다시 열어 주세요.
+            requestId: 7f1c2b3a-0000-4000-8000-000000000001
+  '422':
+    description: DECLINED. 토스가 거절했다. 결제는 CREATED로 돌아가고 결제창이 비워진다. 결제창 API로 새 결제창을
+      열어 다시 승인한다. data.code·message는 토스 오류 코드·메시지다.
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/DeclinedEnvelope'
+        example:
+          success: false
+          data:
+            status: DECLINED
+            code: REJECT_CARD_PAYMENT
+            message: 한도초과 혹은 잔액부족으로 결제에 실패했습니다.
+          error:
+            code: DECLINED
+            message: 카드사에서 결제를 거절했습니다.
+            requestId: 7f1c2b3a-0000-4000-8000-000000000001
+  '503':
+    description: PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제, 호출 제한). 결제는 CREATED로
+      돌아가고 결제창이 비워진다.
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorEnvelope'
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8086
+```
+
 ## 전체 스키마 원본
 
 공통·순환 참조는 계약의 components 정의를 따릅니다.
@@ -709,6 +1031,91 @@ components:
         expiresAt:
           type: string
           format: date-time
+    ApprovalRequest:
+      type: object
+      required:
+      - buyerId
+      - paymentKey
+      - pgOrderId
+      - amount
+      properties:
+        buyerId:
+          type: string
+          format: uuid
+          description: Commerce가 로그인 토큰에서 꺼낸 구매자
+        paymentKey:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 브라우저가 받은 토스 paymentKey
+        pgOrderId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: 브라우저가 받은 토스 orderId(`{orderRef}-{결제창 회차}`)
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+    ApprovalEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/Approval'
+        error:
+          type: 'null'
+    Approval:
+      type: object
+      required:
+      - paymentId
+      - status
+      properties:
+        paymentId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+          - APPROVED
+          - PENDING
+          description: 200은 APPROVED, 202는 PENDING
+    DeclinedEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          $ref: '#/components/schemas/Declined'
+        error:
+          $ref: '#/components/schemas/ApiError'
+    Declined:
+      type: object
+      required:
+      - status
+      - code
+      - message
+      properties:
+        status:
+          type: string
+          const: DECLINED
+        code:
+          type: string
+          description: 토스 오류 코드
+        message:
+          type: string
+          description: 토스 오류 메시지
   responses:
     Unauthorized:
       description: UNAUTHORIZED. X-Service-Token이 없거나 다르다.
@@ -733,4 +1140,4 @@ components:
         허용 목록 밖의 /v1/internal 경로는 토큰이 맞아도 403이다.
 ```
 
-입력 SHA-256: `5224c60d2c4aefcef03ef97d8c253d0a16e53af597094d41c487be0c58566119`
+입력 SHA-256: `15d4bd4c6fd53f06e0af8af9403efa0f705fdf751c0c33dc587559f1cf61148e`

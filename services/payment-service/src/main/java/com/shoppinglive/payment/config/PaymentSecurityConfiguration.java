@@ -40,7 +40,6 @@ public class PaymentSecurityConfiguration {
                                                 "/v1/internal/payments",
                                                 "/v1/internal/payments/*",
                                                 "/v1/internal/payments/*/checkouts",
-                                                // 경로만 미리 허용한다. 승인 컨트롤러는 #338이 만든다.
                                                 "/v1/internal/payments/*/approval")
                                         .hasAuthority("SERVICE_commercecore")
                                         .anyRequest()
