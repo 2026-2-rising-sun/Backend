@@ -60,3 +60,19 @@ spring:
     password: ${PAYMENT_DB_PASSWORD:${POSTGRES_PASSWORD:msa-local-only}}
   kafka:
     bootstrap-servers: ${PAYMENT_KAFKA_SERVERS:localhost:${KAFKA_PORT:59092}}
+payment:
+  toss:
+    # 기본은 가짜 토스(scripts/local/msa-compose.yml의 toss-mock). 실제 토스는 toss-real 프로필을 함께 켠다.
+    base-url: http://localhost:59080
+    secret-key: local-mock-secret
+
+---
+# 실제 토스 테스트 환경. --spring.profiles.active=local,toss-real 로 켜고 .env에 test_sk_ 키를 둔다.
+spring:
+  config:
+    activate:
+      on-profile: toss-real
+payment:
+  toss:
+    base-url: ${PAYMENT_TOSS_BASE_URL:https://api.tosspayments.com}
+    secret-key: ${PAYMENT_TOSS_SECRET_KEY:}

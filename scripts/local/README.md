@@ -1,6 +1,6 @@
 # 분리 서비스를 로컬에서 연결하기
 
-`msa-compose.yml`은 기존 Kind/Infra 환경과 다른 이름·포트·DB를 사용한다. 빈 전용 볼륨에서 Catalog·CommerceCore·Payment 및 검증용 DB를 초기화한다. 앱 포트는 Member8081, Catalog8082, CommerceCore8083, Live8084, Notification8085, Payment8086이다.
+`msa-compose.yml`은 기존 Kind/Infra 환경과 다른 이름·포트·DB를 사용한다. 빈 전용 볼륨에서 Catalog·CommerceCore·Payment 및 검증용 DB를 초기화하고, Payment용 가짜 토스(`toss-mock`)를 함께 띄운다. 앱 포트는 Member8081, Catalog8082, CommerceCore8083, Live8084, Notification8085, Payment8086이다.
 
 ```sh
 docker compose -f scripts/local/msa-compose.yml up -d --wait
@@ -31,7 +31,7 @@ Member local 프로필은 `user@local.test / user`, `seller@local.test / seller`
 | `COMMERCECORE_IMAGE_DIR` / `COMMERCECORE_IMAGE_PUBLIC_BASE_URL` | Core 이미지 저장 폴더 / 공개 `/api/commercecore` |
 | `CATALOG_MEMBER_SERVICE_TOKEN`, `COMMERCECORE_MEMBER_SERVICE_TOKEN` | 각 서비스 → Member 세션 확인 |
 
-Payment 내부 API는 결제 생성·결제창·조회·승인만 연다(#348·#338). Core 주문서 결제 중계는 이 API를 쓴다. Core의 옛 결제·환불 호출(`HttpPaymentClient`)과 `/v1/dev/payment-scenarios`(결제 시나리오 지정)는 지운 API를 불러 403을 받는다. 로컬 토스 확인은 [Payment 로컬 도구](../../services/payment-service/local/README.md)를 따른다. 상품·Payment 결과는 실제 Kafka `localhost:59092`를 통해 전달한다. 기존 판매·쿠폰 토픽은 유지한다. 브라우저의 결제·환불 요청은 Core facade를 거친다.
+Payment 내부 API는 결제 생성·결제창·조회·승인만 연다(#348·#338). Core 주문서 결제 중계는 이 API를 쓴다. Core의 옛 결제·환불 호출(`HttpPaymentClient`)과 `/v1/dev/payment-scenarios`(결제 시나리오 지정)는 지운 API를 불러 403을 받는다. Payment local 프로필은 compose의 가짜 토스 `toss-mock`(localhost:59080)으로 승인한다. 실제 토스 테스트 환경은 `--spring.profiles.active=local,toss-real`과 `PAYMENT_TOSS_SECRET_KEY`로 켠다. 자세한 확인 방법은 [Payment 로컬 도구](../../services/payment-service/local/README.md)를 따른다. 상품·Payment 결과는 실제 Kafka `localhost:59092`를 통해 전달한다. 기존 판매·쿠폰 토픽은 유지한다. 브라우저의 결제·환불 요청은 Core facade를 거친다.
 
 Live의 실제 Redis 회귀는 실행 중인 앱의 Redis59679와 분리한다.
 

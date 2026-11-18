@@ -59,6 +59,13 @@
       "response": { "status": 200, "headers": { "Content-Type": "application/json" },
         "jsonBody": { "paymentKey": "pk-mismatch", "orderId": "OD-LOCAL-MISMATCH-1", "status": "CANCELED", "totalAmount": 1,
           "approvedAt": "2026-11-16T10:00:00+09:00", "isPartialCancelable": false } }
+    },
+    {
+      "name": "기본 승인 성공 (위 시나리오 키가 아닌 모든 paymentKey, 요청 값을 그대로 돌려준다)",
+      "priority": 10,
+      "request": { "method": "POST", "urlPath": "/v1/payments/confirm" },
+      "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "transformers": ["response-template"],
+        "body": "{\"paymentKey\": \"{{jsonPath request.body '$.paymentKey'}}\", \"orderId\": \"{{jsonPath request.body '$.orderId'}}\", \"status\": \"DONE\", \"totalAmount\": {{jsonPath request.body '$.amount'}}, \"approvedAt\": \"{{now timezone='Asia/Seoul' format=\"yyyy-MM-dd'T'HH:mm:ssXXX\"}}\", \"isPartialCancelable\": true}" }
     }
   ]
 }

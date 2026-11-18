@@ -1,26 +1,26 @@
 # Payment 로컬 수동 검증
 
-Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 승인을 직접 돌려 보는 도구다. 자동 테스트를 대신하지 않는다. 모드 A는 가짜 토스(WireMock)로 실패 경로를, 모드 B는 실제 토스 테스트 키로 결제창부터 승인까지를 본다.
+Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 승인을 직접 돌려 보는 도구다. 자동 테스트를 대신하지 않는다. 모드 A는 가짜 토스(WireMock, local 프로필 기본)로 실패 경로를, 모드 B는 실제 토스 테스트 키(`toss-real` 프로필)로 결제창부터 승인까지를 본다.
 
 | 파일 | 용도 |
 |---|---|
 | `payment.http` | IntelliJ HTTP Client 요청(생성·조회·결제창·승인). 위쪽 변수만 바꿔 시나리오를 돌린다 |
-| `toss-mock/mappings/toss.json` | 가짜 토스 응답. `paymentKey`로 성공·거절·지연·5xx·금액 불일치를 고른다 |
+| `toss-mock/mappings/toss.json` | 가짜 토스 응답. 정해진 `paymentKey`로 거절·지연·5xx·금액 불일치를 고르고, 그 밖의 키는 요청 값 그대로 승인한다 |
 | `toss-sandbox/` | 실제 토스 결제창 페이지. `serve.sh`가 `.env`의 클라이언트 키로 띄운다 |
 
 명령은 저장소 루트에서 실행한다.
 
 ## 준비
 
-1. Infra/local 미들웨어를 띄운다(Postgres 5432 `shoppinglive-postgres`, Kafka 29092). `down -v`는 다른 서비스 데이터까지 지우므로 쓰지 않는다.
-2. payment DB가 없으면 한 번 만든다. 계정은 Infra `local/.env`의 `POSTGRES_USER`다.
+1. Infra/local 미들웨어(Postgres 5432 `shoppinglive-postgres`, Kafka 29092)와 가짜 토스(`toss-mock`, localhost:59080)를 띄운다. payment DB가 없으면 [Infra local README](https://github.com/2026-2-rising-sun/Infra/blob/main/local/README.md#서비스별-db-생성)대로 만든다. `down -v`는 다른 서비스 데이터까지 지우므로 쓰지 않는다.
 
    ```bash
-   docker exec shoppinglive-postgres psql -U <POSTGRES_USER> -c "CREATE DATABASE payment;"
+   docker compose -f scripts/local/msa-compose.yml up -d --wait toss-mock
    ```
 
-3. `cp services/payment-service/.env.example services/payment-service/.env` 후 DB 비밀번호와 토스 키를 채운다. `.env`는 커밋하지 않는다.
-4. 앱을 띄운다. local 프로필이 `.env`를 읽는다.
+   `scripts/local/msa-compose.yml` 전체를 쓰면 `up -d --wait`로 payment DB·Kafka·`toss-mock`이 함께 뜬다. 이때는 `.env`의 DB·Kafka 네 줄을 지운다.
+2. `cp services/payment-service/.env.example services/payment-service/.env` 후 DB 비밀번호를 채운다. 모드 B는 토스 키도 채운다. `.env`는 커밋하지 않는다.
+3. 앱을 띄운다. local 프로필이 `.env`를 읽는다. 실제 토스는 `--spring.profiles.active=local,toss-real`이다.
 
    ```bash
    ./gradlew :services:payment-service:bootRun --args='--spring.profiles.active=local'
@@ -28,10 +28,10 @@ Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 
 
 ## 모드 A: 가짜 토스
 
-`.env`에서 `PAYMENT_TOSS_BASE_URL=http://localhost:18080` 줄의 주석을 풀고 앱을 다시 띄운다. 시크릿 키는 아무 `test_sk_` 값이어도 된다. 가짜 토스는 한 줄로 띄운다.
+local 프로필 기본값이라 따로 켤 것이 없다. `toss-mock` 컨테이너가 떠 있어야 하고, 꺼져 있으면 승인은 503 `PG_UNAVAILABLE`이다. compose 없이 띄울 때는 아래 한 줄을 쓴다.
 
 ```bash
-docker run -d --name toss-mock -p 127.0.0.1:18080:8080 -v "$(git rev-parse --show-toplevel)/services/payment-service/local/toss-mock:/home/wiremock" wiremock/wiremock:3.9.1 --disable-http2-plain
+docker run -d --name toss-mock -p 127.0.0.1:59080:8080 -v "$(git rev-parse --show-toplevel)/services/payment-service/local/toss-mock:/home/wiremock" wiremock/wiremock:3.9.1 --disable-http2-plain
 ```
 
 `--disable-http2-plain`이 없으면 JDK HttpClient가 보내는 h2c 업그레이드 요청의 본문을 WireMock이 비워 받는다. 실제 토스(https)에는 없는 문제다.
@@ -52,7 +52,7 @@ docker run -d --name toss-mock -p 127.0.0.1:18080:8080 -v "$(git rev-parse --sho
 
 ## 모드 B: 실제 토스 테스트 키
 
-`.env`의 `PAYMENT_TOSS_BASE_URL` 줄은 주석으로 둔다(실제 토스). 키는 토스 개발자센터 > API 키 > **API 개별 연동 키**의 한 쌍을 쓴다. 시크릿 키는 `test_sk_`, 결제창 키는 같은 쌍의 `test_ck_`다. 결제위젯 키(`test_gck_`·`test_gsk_`)는 이 결제창에서 쓰지 못한다.
+앱을 `--spring.profiles.active=local,toss-real`로 띄운다. 키는 토스 개발자센터 > API 키 > **API 개별 연동 키**의 한 쌍을 쓴다. 시크릿 키는 `test_sk_`, 결제창 키는 같은 쌍의 `test_ck_`다. 결제위젯 키(`test_gck_`·`test_gsk_`)는 이 결제창에서 쓰지 못한다.
 
 1. `payment.http`에서 `@ref = OD-LOCAL-REAL`로 1(결제 생성)을 보낸다. 생성 전에 승인하면 404다.
 2. `services/payment-service/local/toss-sandbox/serve.sh`를 실행하고 `http://localhost:8095/checkout.html?orderId=OD-LOCAL-REAL-1`을 열어 테스트 카드로 결제한다.
@@ -66,14 +66,15 @@ docker run -d --name toss-mock -p 127.0.0.1:18080:8080 -v "$(git rev-parse --sho
 
 - 시크릿 키를 결제위젯 키(`test_gsk_`)로 넣으면 토스가 키 오류로 답한다. API 개별 연동 키의 `test_sk_`를 쓴다.
 - 결제 생성(1) 전에 승인(4)을 보내면 404다.
+- 예전 `.env`에 `PAYMENT_TOSS_BASE_URL=http://localhost:18080`이 남아 있으면 `toss-real`에서 그 주소로 가 모든 호출이 NotSent(503)다. 그 줄을 지운다. local 프로필에서는 읽지 않는다.
 - 결제창을 다시 열거나(3) 토스 호출이 NotSent로 끝난 뒤에는 `pgOrderId` 회차가 바뀐다. 이전 결제창에서 받은 인증은 쓰지 못하고, 새 회차로 결제창을 다시 연다.
-- 가짜 토스 stub은 `-1` 회차 orderId 기준이다(S2 `pk-retry`만 `-2`). 회차가 바뀐 채 승인하면 응답 불일치로 보상 취소가 일어난다.
+- 시나리오 stub(`pk-*`)은 `-1` 회차 orderId 기준이다(S2 `pk-retry`만 `-2`). 회차가 바뀐 채 승인하면 응답 불일치로 보상 취소가 일어난다. 그 밖의 paymentKey는 요청한 orderId·금액으로 승인한다.
 - 결제창 인증 후 승인은 제한 시간(토스 문서 기준 10분) 안에 보낸다.
 
 ## DB 확인·초기화
 
 ```bash
-docker exec -it shoppinglive-postgres psql -U <POSTGRES_USER> -d payment
+docker exec -it shoppinglive-postgres psql -U <POSTGRES_USER> -d payment   # msa-compose: docker compose -f scripts/local/msa-compose.yml exec postgres psql -U msa -d payment
 ```
 
 ```sql
@@ -89,7 +90,7 @@ SELECT sum(debit), sum(credit) FROM ledger_entry;
 TRUNCATE payment, payment_seller_amount, pg_call, ledger_journal, ledger_entry, event_outbox RESTART IDENTITY CASCADE;
 ```
 
-가짜 토스 요청 기록은 `curl -X DELETE localhost:18080/__admin/requests`로 지운다. 끝나면 `docker rm -f toss-mock`.
+가짜 토스 요청 기록은 `curl -X DELETE localhost:59080/__admin/requests`로 지운다.
 
 ## 실제 토스 분류 확인 테스트(선택 실행)
 

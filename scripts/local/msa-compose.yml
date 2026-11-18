@@ -57,5 +57,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+  toss-mock:
+    # Payment local 프로필의 기본 토스 주소. 응답은 services/payment-service/local/toss-mock/mappings.
+    image: wiremock/wiremock:3.9.1
+    # JDK HttpClient의 h2c 업그레이드 요청 본문이 비지 않게 끈다.
+    command: ["--disable-http2-plain"]
+    ports:
+      - "127.0.0.1:59080:8080"
+    volumes:
+      - ../../services/payment-service/local/toss-mock:/home/wiremock:ro
 volumes:
   msa-postgres:

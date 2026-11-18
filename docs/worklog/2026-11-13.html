@@ -77,6 +77,7 @@
 <li><a href="#349-결제-결과-복구와-만료-스케줄러-추가">#349 결제 결과 복구와 만료 스케줄러 추가</a></li>
 <li><a href="#338-토스-샌드박스-확인-도구와-실제-키-테스트">#338 토스 샌드박스 확인 도구와 실제 키 테스트</a></li>
 <li><a href="#337-결제-1차-문서-마감">#337 결제 1차 문서 마감</a></li>
+<li><a href="#337-로컬-기본-가짜-토스와-실제-토스-전환-플래그">#337 로컬 기본 가짜 토스와 실제 토스 전환 플래그</a></li>
 </ul>
 </li>
 </ul>
@@ -610,6 +611,14 @@
 <li>검증: <code>scripts/render_design_docs.py --check</code>, <code>scripts/render-api-docs.sh --check</code>, <code>scripts/check_docs.py</code>. 코드 변경 없음.</li>
 <li>미실행·한계: HTML 화면은 열어 보지 않았다. CommerceCore 문서(<code>commercecore/erd.md</code>의 <code>payment_attempt</code> 참조 등)는 담당 범위라 고치지 않았다.</li>
 <li>다음 작업: #337 이슈 본문 로드맵 갱신, 결제 1차 PR 병합.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>837405af2df3077414f4869a529d68b92f8af87435cca1ad5dcb71764cc2784c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="337-로컬-기본-가짜-토스와-실제-토스-전환-플래그">#337 로컬 기본 가짜 토스와 실제 토스 전환 플래그</h2>
+<p>관련 작업: <a href="../../services/payment-service/local/README.md">Payment 로컬 도구</a> · <a href="https://github.com/2026-2-rising-sun/Infra/issues/53">Infra #53</a></p>
+<ul>
+<li>변경·판단(2026-11-18): 팀원이 결제를 따로 준비하지 않아도 로컬 승인이 되도록 local 프로필의 토스 주소를 가짜 토스(<code>localhost:59080</code>)와 더미 키로 바꿨다. 실제 토스는 <code>toss-real</code> 프로필을 함께 켤 때만 쓴다. 가짜 토스는 <code>scripts/local/msa-compose.yml</code>의 <code>toss-mock</code> 서비스로 띄운다(Infra/local 사용자는 이 서비스만 <code>up</code>). 시나리오 키가 아닌 paymentKey는 요청한 orderId·금액으로 승인하는 기본 stub을 추가했다. 기본 프로필(배포)의 토스 설정은 그대로다. Infra/local의 payment DB 누락은 Infra #53에서 다룬다.</li>
+<li>검증: msa-compose로 Postgres·Kafka·toss-mock을 띄우고 <code>.env</code> 없이 local 프로필로 기동했다. 임의 paymentKey 승인 → 200 APPROVED, <code>pg_call</code> CONFIRM SUCCESS 200. <code>pk-ok</code>·<code>pk-decline</code> stub은 기본 stub보다 먼저 맞는다. <code>local,toss-real</code>로 다시 띄워 같은 요청을 보내자 실제 토스가 404 <code>NOT_FOUND_PAYMENT_SESSION</code>으로 답해 422 DECLINED가 됐고, 가짜 토스에는 요청이 가지 않았다.</li>
+<li>미실행·한계: Frontend 결제창은 실제 토스 SDK라 테스트 클라이언트 키가 필요하다. 결제창 연동은 Frontend 이슈로 넘긴다. Infra의 kind 팀 환경에는 Payment가 없어 이 설정이 적용되지 않는다.</li>
+<li>다음 작업: Frontend 연동 이슈, 결제 1차 PR 병합.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>57186638ca0b995def61debdca6e22836aa4f9da21388e13f1fccb1114698125</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
