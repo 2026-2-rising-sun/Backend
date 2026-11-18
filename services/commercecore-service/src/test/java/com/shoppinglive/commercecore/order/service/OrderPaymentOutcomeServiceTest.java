@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import com.shoppinglive.commercecore.cart.repository.CartItemRepository;
+import com.shoppinglive.commercecore.cart.service.CartSelectionPort;
 import com.shoppinglive.commercecore.coupon.service.CouponReservationService;
 import com.shoppinglive.commercecore.order.entity.*;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
@@ -35,7 +35,7 @@ class OrderPaymentOutcomeServiceTest {
     @Mock LateApprovalRefundStore lateRefunds;
     @Mock PaymentGroupRepository groups;
     @Mock OrderJpaRepository orders;
-    @Mock CartItemRepository cart;
+    @Mock CartSelectionPort cart;
     @Mock SkuService skus;
     @Mock PaymentDeliveryStore payments;
     @Mock PurchaseGuard guard;
@@ -114,6 +114,36 @@ class OrderPaymentOutcomeServiceTest {
         verify(group)
                 .transition(
                         status == PaymentStatus.SUCCESS ? OrderStatus.PAID : OrderStatus.FAILED);
+        verify(payments).record(any(), eq(result), eq(status.name()));
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"true,SUCCESS", "false,SUCCESS", "true,FAILED"})
+    @DisplayName("묶음 없는 과거 단건도 Cart 출처가 있는 최초 성공만 SKU로 정리한다")
+    void cleansHistoricalSingleCartOrderOnlyOnSuccess(boolean fromCart, PaymentStatus status) {
+        Instant now = Instant.parse("2026-11-18T00:00:00Z");
+        var result =
+                new PaymentExecution(
+                        "single", 99L, 10L, null, "단건", 3000, null, status, now, now, now);
+        when(payments.get("single"))
+                .thenReturn(
+                        new PaymentDeliveryStore.Delivery(
+                                7L, "single", "PAYMENT", "{}", null, "PROCESSING"));
+        Order order = item(10L, 501L, 2);
+        when(order.getSourceCartItemId()).thenReturn(fromCart ? 100L : null);
+        if (status == PaymentStatus.SUCCESS && fromCart)
+            when(order.getMemberId()).thenReturn("구매자");
+        when(orders.findById(10L)).thenReturn(Optional.of(order));
+        when(orders.transitionStatus(any(), any(), any())).thenReturn(1);
+
+        assertThat(outcomes.apply(result)).isTrue();
+
+        if (status == PaymentStatus.SUCCESS && fromCart) {
+            var sequence = inOrder(cart, skus);
+            sequence.verify(cart).lockForCompletion("구매자", List.of(501L));
+            sequence.verify(skus).consume(501L, 2);
+            sequence.verify(cart).deletePurchased("구매자", List.of(501L));
+        } else verifyNoInteractions(cart);
         verify(payments).record(any(), eq(result), eq(status.name()));
     }
 

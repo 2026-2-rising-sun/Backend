@@ -164,11 +164,10 @@ class CartSelectionPostgresTest extends CartSelectionServiceTest {
                             () ->
                                     transaction.executeWithoutResult(
                                             status -> {
-                                                port.lockForCompletion(
-                                                        MEMBER, List.of(selected.itemId()));
+                                                port.lockForCompletion(MEMBER, List.of(1201L));
                                                 assertThat(
                                                                 port.deletePurchased(
-                                                                        MEMBER, List.of(selected)))
+                                                                        MEMBER, List.of(1201L)))
                                                         .isEqualTo(1);
                                                 throw new IllegalStateException("주문 결과 반영 실패");
                                             }))
@@ -182,8 +181,8 @@ class CartSelectionPostgresTest extends CartSelectionServiceTest {
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    @DisplayName("수량 변경 거래를 기다린 성공 정리는 이전 버전의 항목을 삭제하지 않는다")
-    void preservesQuantityChangeCommittedWhileCleanupWaits() throws Exception {
+    @DisplayName("수량 변경 거래를 기다린 성공 정리는 변경된 동일 SKU 행을 삭제한다")
+    void deletesQuantityChangeCommittedWhileCleanupWaits() throws Exception {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         CartSelection selected =
                 transaction.execute(
@@ -217,10 +216,8 @@ class CartSelectionPostgresTest extends CartSelectionServiceTest {
                             () ->
                                     transaction.execute(
                                             status -> {
-                                                port.lockForCompletion(
-                                                        MEMBER, List.of(selected.itemId()));
-                                                return port.deletePurchased(
-                                                        MEMBER, List.of(selected));
+                                                port.lockForCompletion(MEMBER, List.of(1301L));
+                                                return port.deletePurchased(MEMBER, List.of(1301L));
                                             }));
             JdbcTemplate jdbc = new JdbcTemplate(dataSource);
             Awaitility.await()
@@ -236,10 +233,8 @@ class CartSelectionPostgresTest extends CartSelectionServiceTest {
             assertThat(cleanup.isDone()).isFalse();
             commitChange.countDown();
             update.get(5, TimeUnit.SECONDS);
-            assertThat(cleanup.get(5, TimeUnit.SECONDS)).isZero();
-            CartItem remaining = cartItems.findById(selected.itemId()).orElseThrow();
-            assertThat(remaining.getQuantity()).isEqualTo(5);
-            assertThat(remaining.getVersion()).isEqualTo(selected.version() + 1);
+            assertThat(cleanup.get(5, TimeUnit.SECONDS)).isEqualTo(1);
+            assertThat(cartItems.findById(selected.itemId())).isEmpty();
         } finally {
             commitChange.countDown();
             executor.shutdownNow();

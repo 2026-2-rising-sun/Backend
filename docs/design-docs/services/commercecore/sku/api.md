@@ -219,7 +219,6 @@ SELLER 본인의 미삭제 Product를 잠금·검증하고 SKU를 READY/예약0�
 | productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;READY&quot;, &quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;, &quot;PRIVATE&quot;&#93;} |
-| version | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 
 #### 400 · application/json
 
@@ -322,7 +321,6 @@ responses:
               productId: 1
               price: 15000
               status: READY
-              version: 0
   '400':
     $ref: '#/components/responses/BadRequest'
   '401':
@@ -347,7 +345,7 @@ responses:
 
 판매가 변경
 
-본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 version은 SKU 버전, 클라이언트 expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404.
+본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 클라이언트 expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Seller Sales
@@ -394,7 +392,6 @@ responses:
 | productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;READY&quot;, &quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;, &quot;PRIVATE&quot;&#93;} |
-| version | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 
 #### 400 · application/json
 
@@ -469,8 +466,8 @@ tags:
 - Seller Sales
 summary: 판매가 변경
 operationId: changeSalesPrice
-description: 본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 version은 SKU 버전, 클라이언트
-  expected version은 없다. 기존 주문 단가 유지. 타인403, 없음·삭제404.
+description: 본인·미삭제 검사 뒤 SKU 행 잠금으로 가격 변경을 직렬화한다. 양의 KRW 가격이며 클라이언트 expected version은
+  없다. 기존 주문 단가 유지. 타인403, 없음·삭제404.
 requestBody:
   required: true
   content:
@@ -495,7 +492,6 @@ responses:
               productId: 1
               price: 16000
               status: READY
-              version: 1
   '400':
     $ref: '#/components/responses/BadRequest'
   '401':
@@ -873,7 +869,6 @@ responses:
 | productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;READY&quot;, &quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;, &quot;PRIVATE&quot;&#93;} |
-| version | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 
 #### 400 · application/json
 
@@ -974,7 +969,6 @@ responses:
               productId: 1
               price: 15000
               status: ON_SALE
-              version: 1
   '400':
     $ref: '#/components/responses/BadRequest'
   '401':
@@ -1197,7 +1191,6 @@ components:
       - productId
       - price
       - status
-      - version
       properties:
         id:
           type: integer
@@ -1213,10 +1206,6 @@ components:
           minimum: 1
         status:
           $ref: '#/components/schemas/SalesStatus'
-        version:
-          type: integer
-          format: int64
-          minimum: 0
     ChangePriceRequest:
       type: object
       required:
@@ -1316,4 +1305,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `6848661917bc2a2466ef759c83984ec57e78f444b76fac8a96d7ec7578edbd7b`
+입력 SHA-256: `f4c2038141f06220c4fb7196f6a6f220f26c6d12de94c76b10eb438b5ed3ece8`

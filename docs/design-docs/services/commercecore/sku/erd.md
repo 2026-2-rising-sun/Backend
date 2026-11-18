@@ -12,7 +12,7 @@
 
 | 테이블 | 키·필드 | 소유·현재 상태 |
 |---|---|---|
-| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, version, snapshot_version>0, product_name_snapshot, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 신규 READY·reserved=0. 생성·가격·수량·기존 단일 판매 API와 Product 조회 연결. |
+| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, snapshot_version>0, product_name_snapshot, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 신규 READY·reserved=0. 생성·가격·수량·기존 단일 판매 API와 Product 조회 연결. |
 | product_sales | sales_id BIGINT PK, product_id BIGINT, price, status, available, version, updated_at | Catalog 판매 사본. V3에서 product_id PK를 SKU 식별자인 sales_id PK로 전환. 기존 필드명·값 보존. |
 | product | id BIGINT, sale_enabled, 삭제 정보, 판매자·표현 정보 | Product 소유 목표. 신규 sale_enabled=false, 기존 값 보존. SKU가 이 상태를 중복 소유하지 않음. |
 | Order 항목 | sku_id BIGINT, 수량, 주문 당시 단가·상품 정보 | Order 소유 목표. PK·테이블 이행 상세는 Order 구현에 연결. 별도 재고 예약 테이블은 없음. |
@@ -34,12 +34,13 @@
 | 금액 | KRW 1원 단위 양의 정수 | price BIGINT, 1원 이상. 향후 환불/배분의 정밀도·잔여 원 규칙은 재검토. 가격 이력/예약 가격 추가 없음. |
 | 재고 | available>=0, reserved>=0, available+reserved<=2147483647 | 판매자 증감·환불 restock의 조건부 UPDATE가 BIGINT 합산으로 예약 해제 공간을 보존한다. 기존 두 INTEGER 열은 유지하며 새 업무상 수량한도를 정한 것이 아니다. |
 | 판매 의도 | READY/ON_SALE/PRIVATE | READY는 생성 전용. ON_SALE+available=0이면 외부 SOLD_OUT 표시. |
-| 이벤트 버전 | snapshot_version>0 | 최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. DB version과 구분. |
+| 이벤트 버전 | snapshot_version>0 | 최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. 일반 SKU version은 V107에서 제거한다. Catalog product_sales.version은 이 snapshot_version의 사본이며 유지한다. |
 | 이름 사본 | product_name_snapshot | 기존 sales-info 호환용 등록 시 이름 사본. 상품 표현정보의 원본은 Product. |
 | 조회 인덱스 | sku(product_id,id), product_sales(product_id,sales_id) | 상품별 SKU를 정렬 조회. 상품당 대표 가격·합산 재고는 저장하지 않음. |
 
 ## 근거와 검증 범위
 
+- [Core V107](../../../../../services/commercecore-service/src/main/resources/db/migration/V107__drop_sku_version.sql)
 - [Core V102](../../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql)
 - [Catalog V3](../../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql)
 - [SkuRepository](../../../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/sku/repository/SkuRepository.java)

@@ -62,27 +62,24 @@ public class CartSelectionService implements CartSelectionPort {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public void lockForCompletion(String memberId, List<Long> itemIds) {
-        String owner = owner(memberId);
-        if (itemIds == null || itemIds.isEmpty() || itemIds.size() > MAX_SELECTIONS) {
-            throw invalidSelection();
-        }
-        if (itemIds.stream().anyMatch(id -> id == null || id <= 0)
-                || new HashSet<>(itemIds).size() != itemIds.size()) {
-            throw invalidSelection();
-        }
-        itemIds.stream().sorted().forEach(id -> items.lockOwned(id, owner));
+    public void lockForCompletion(String memberId, List<Long> skuIds) {
+        items.lockPurchasedSkus(owner(memberId), completionSkus(skuIds));
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public int deletePurchased(String memberId, List<CartSelection> selections) {
-        String owner = owner(memberId);
-        int deleted = 0;
-        for (CartSelection selection : validated(selections)) {
-            deleted += items.deletePurchased(selection.itemId(), owner, selection.version());
+    public int deletePurchased(String memberId, List<Long> skuIds) {
+        return items.deletePurchasedSkus(owner(memberId), completionSkus(skuIds));
+    }
+
+    private List<Long> completionSkus(List<Long> skuIds) {
+        if (skuIds == null
+                || skuIds.isEmpty()
+                || skuIds.size() > MAX_SELECTIONS
+                || skuIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw invalidSelection();
         }
-        return deleted;
+        return skuIds.stream().distinct().sorted().toList();
     }
 
     private SelectedCartItem snapshot(CartItem item, CartSelection selection) {

@@ -27,8 +27,8 @@
 <tbody>
 <tr>
 <td>sku</td>
-<td>PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; version/snapshot_version; 이름 사본</td>
-<td><a href="../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql">V102</a>. FK 없는 SKU 원본. 기존 판매 HTTP·Product 판매 조회를 전환했고 실제 PostgreSQL 이행/업무를 검증했다. Cart SKU 조회·선택 포트와 Order 거래를 통합했으며 전체 회귀를 검증했다.</td>
+<td>PK id BIGINT; product_id 비유일; price; available/reserved; sale_status; snapshot_version; 이름 사본</td>
+<td><a href="../../../../services/commercecore-service/src/main/resources/db/migration/V102__sku.sql">V102</a>. <a href="../../../../services/commercecore-service/src/main/resources/db/migration/V107__drop_sku_version.sql">V107</a>에서 미사용 일반 version을 제거한다. FK 없는 SKU 원본. 기존 판매 HTTP·Product 판매 조회를 전환했고 실제 PostgreSQL 이행/업무를 검증했다. Cart SKU 조회·선택 포트와 Order 거래를 통합했으며 전체 회귀를 검증했다.</td>
 </tr>
 <tr>
 <td>sales_info</td>
@@ -238,6 +238,6 @@
 <h2 id="order-v104-상세">Order V104 상세</h2>
 <p>논리 Order=payment_group/OrderItem=orders 매핑과 수량 환불·종료 기록 관계는 <a href="order/erd.html">모듈 ERD</a>에 있다. 전체 관계도는 그 모듈 HTML을 사용한다. 이 페이지의 생성 HTML은 테이블/관계 요약이며 통합 ER 그림을 대체하지 않는다. 기존 PK·번호·당시 금액·Cart 출처·활성TTL을 유지한다.</p>
 <p>신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는policy0/신규기본600초이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.</p>
-<p>V105는 별도 처리기한 컬럼과 늦은 승인 환불 필요 기록을 추가한다. 기존 생성기한·상태·정책0/1/2 확인중 데이터의 null 처리기한은 보존한다. Payment DB/제어행/종료API는 수정하지 않는다. V106의 새 계약 중계는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 소비·결과 생산 검증은 미완이다.</p><p class="muted fingerprint">MD SHA-256: <code>f9dd4f01c84123a2bc5f764f5e4836316dfbd0e303df577f85c5f4c8356aa9bc</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>V105는 별도 처리기한 컬럼과 늦은 승인 환불 필요 기록을 추가한다. 기존 생성기한·상태·정책0/1/2 확인중 데이터의 null 처리기한은 보존한다. Payment DB/제어행/종료API는 수정하지 않는다. V106의 새 계약 중계는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 소비·결과 생산 검증은 미완이다.</p><p class="muted fingerprint">MD SHA-256: <code>eb8f61e6ae5bc361f7f8852d961741171527d498152b19b1a73e98894db25691</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

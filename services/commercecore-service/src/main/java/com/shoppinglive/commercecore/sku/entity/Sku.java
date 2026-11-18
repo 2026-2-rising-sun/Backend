@@ -31,9 +31,6 @@ public class Sku {
     private SkuSaleStatus saleStatus;
 
     @Column(nullable = false)
-    private long version;
-
-    @Column(nullable = false)
     private long snapshotVersion;
 
     @Column(nullable = false, length = 255)
