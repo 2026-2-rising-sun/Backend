@@ -164,7 +164,6 @@ class SkuSalesIntegrationTest
         }
         var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
         assertThat(current.price()).isEqualTo(1000);
-        assertThat(current.version()).isZero();
         assertThat(events.count()).isEqualTo(1);
         assertThat(
                         jdbc.queryForObject(

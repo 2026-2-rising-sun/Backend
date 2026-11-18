@@ -6962,4 +6962,4 @@ components:
       $ref: ./common.yaml#/components/securitySchemes/BearerAuth
 ```
 
-입력 SHA-256: `a3b7cd49f164faee3588b6255962c8a32eb8646666056d1e9d8e00caf0b63280`
+입력 SHA-256: `aa13fc5df687837e8860ff737db00b6012a26ae972db542a367222db74e3c30b`
