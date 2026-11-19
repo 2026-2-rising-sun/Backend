@@ -31,3 +31,7 @@ PostgreSQL 명령은 COMMERCECORE_TEST_POSTGRES_{URL,USER,PASSWORD}, CATALOG_TES
 새 등록의 릴레이 전달은 실제 PostgreSQL+EmbeddedKafka이며, Core→외부 브로커 기존 회귀와 구분한다. Catalog의 이벤트 순서·중복·부분 수신 검사는 소비 코드·실제 PostgreSQL 조회 경로에서 별도로 수행했다. 새 등록 API→외부 브로커→별도 Catalog 프로세스 전체 체인을 한 번에 실행한 증거는 아니다. S3·운영 배포·실제 사용자 프론트 등록은 실행하지 않았다.
 
 공통 검사 선택기가 공통 계약 변경으로 제안한 Live/Payment PostgreSQL 검사는 이번 변경 서비스 밖이어서 실행하지 않았다. 전체 일반 빌드와 Core/Catalog 실제 DB 검증을 이 외부 검사들의 성공으로 확대하지 않는다. API·이벤트 계약 변경이 있으며 프론트는 미수정이다. 초기 구현 완료 시점에는 커밋·푸시·PR·병합·배포 없이 작업 트리에 저장했다. 이후 사용자 승인으로 진행하는 PR 리뷰·CI·병합 결과는 GitHub 이력과 함께 확인한다.
+
+## PR #374 리뷰와 재검증
+
+[PR #374](https://github.com/2026-2-rising-sun/Backend/pull/374)에서 DB 원자성·멱등 요청 경합·파일 정리 잠금·Catalog 소비 호환성을 자체 리뷰했다. 가격과 초기 재고의 소수·숫자 문자열 입력도 실제 HTTP 경로에서 거절되는지 추가 확인했다. 공통 JsonTypePolicy가 이미 이를 400으로 거절하므로 구현을 중복 추가하지 않고 네 가지 입력의 회귀 검증을 보완했다. ProductBundleHttpTest 3건은 실패·오류·스킵 0으로 통과했다. CI·리뷰 상태와 최종 병합 커밋은 PR 이력에서 확인한다.

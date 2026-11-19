@@ -95,7 +95,15 @@ class ProductBundleHttpTest extends ProductSecuritySupport {
                                 .file(json("[]"))
                                 .header("Authorization", token))
                 .andExpect(status().isBadRequest());
-        for (String skus : List.of("[]", "[null]", "[{\"price\":0,\"initialStock\":-1}]"))
+        for (String skus :
+                List.of(
+                        "[]",
+                        "[null]",
+                        "[{\"price\":0,\"initialStock\":-1}]",
+                        "[{\"price\":100.5,\"initialStock\":0}]",
+                        "[{\"price\":100,\"initialStock\":1.5}]",
+                        "[{\"price\":\"100\",\"initialStock\":0}]",
+                        "[{\"price\":100,\"initialStock\":\"1\"}]"))
             mvc.perform(
                             multipart("/v1/seller/products/registrations")
                                     .file(json(skus))
