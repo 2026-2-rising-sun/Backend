@@ -55,19 +55,31 @@ public class SkuRepository {
     }
 
     public long create(Long productId, long price, int available, String productName) {
+        return create(productId, price, available, productName, SkuSaleStatus.READY, null);
+    }
+
+    public long create(
+            Long productId,
+            long price,
+            int available,
+            String productName,
+            SkuSaleStatus status,
+            String optionLabel) {
         GeneratedKeyHolder key = new GeneratedKeyHolder();
         jdbc.update(
                 """
                 INSERT INTO sku(product_id,price,available,reserved,sale_status,
-                    snapshot_version,product_name_snapshot,created_at,updated_at)
-                VALUES(:productId,:price,:available,0,'READY',1,:productName,
+                    snapshot_version,product_name_snapshot,option_label,created_at,updated_at)
+                VALUES(:productId,:price,:available,0,:status,1,:productName,:optionLabel,
                     CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                 """,
                 new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
                         .addValue("productId", productId)
                         .addValue("price", price)
                         .addValue("available", available)
-                        .addValue("productName", productName),
+                        .addValue("productName", productName)
+                        .addValue("status", status.name())
+                        .addValue("optionLabel", optionLabel),
                 key,
                 new String[] {"id"});
         return java.util.Objects.requireNonNull(key.getKey()).longValue();

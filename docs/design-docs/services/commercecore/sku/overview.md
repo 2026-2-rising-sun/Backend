@@ -54,6 +54,7 @@ SKU의 일반 `version`은 수정 요청과 비교하지 않는 값이므로 V10
 | 출발 | 도착 | 조건·수량 효과 |
 |---|---|---|
 | 신규 SKU | READY | price>0, 초기 available>=0, reserved=0. Product 존재·소유·미삭제 확인과 같은 트랜잭션. |
+| 신규·통합 등록 | ON_SALE | 상품·모든 SKU와 같은 트랜잭션. available 입력·reserved=0, 재고 0은 SOLD_OUT 표시. |
 | READY | ON_SALE | 판매자 판매 시작. available=0이면 저장 의도는 ON_SALE, 표시 상태는 SOLD_OUT. Product 전체 허용도 신규 구매 때 필요. |
 | READY | PRIVATE | 판매자 개별 중지. READY로 수동 복귀하는 전이는 없음. |
 | ON_SALE | PRIVATE | 판매자 개별 중지. Product 전체 스위치로 개별 상태를 덮어쓰지 않음. |
@@ -111,7 +112,8 @@ SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생
 
 | 출발 | 도착 | 조건·부수 효과 |
 |---|---|---|
-| 신규 | READY | 본인·미삭제 Product 검증 뒤 SKU 생성. available 입력·reserved=0. |
+| 신규·기존 분리 등록 | READY | 본인·미삭제 Product 검증 뒤 SKU 생성. available 입력·reserved=0. |
+| 신규·통합 등록 | ON_SALE | 상품·모든 SKU와 같은 트랜잭션. available 입력·reserved=0, 재고 0은 SOLD_OUT 표시. |
 | READY | ON_SALE | 판매자 시작. available=0이면 외부 SOLD_OUT 표시. |
 | READY | PRIVATE | 판매자 비공개 요청. |
 | ON_SALE | PRIVATE | 판매자 비공개. 예약과 기존 주문 상태는 변경하지 않는다. |
@@ -135,3 +137,7 @@ SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생
 기존 SalesService/RegistrationService·테이블은 이 브랜치의 전환 전 Order 호환·이력용이다. 판매 HTTP와 Product 판매 조회는 이 경로를 사용하지 않는다. 최종 Order/Cart 통합·실제 브로커 검증은 후행 PR에서 확인하며 이 중간 브랜치를 독립 배포하지 않는다.
 
 통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 예약 해제 공간과 환불 복구 상한은 [SKU 수량 상세](overview.md#정수-범위와-남은-제한)를 따른다.
+
+## 통합 등록의 최초 판매 상태 (#372)
+
+통합 등록 서비스는 활성 DB 트랜잭션에서 createOnSale을 호출한다. SKU를 처음부터 ON_SALE로 생성하고 reserved=0, available=입력 초기 재고, snapshot_version=1을 저장한다. registered 추적기가 최종 스냅샷을 같은 커밋의 Outbox에 남긴다. 기존 create와 단일 판매 API의 READY 생성은 그대로 유지한다. optionLabel은 등록 항목을 구분하는 선택적 표시명이며 구조화된 옵션 정의는 아니다. 다중 SKU에서는 비어 있지 않은 고유 표시명이 필수다.

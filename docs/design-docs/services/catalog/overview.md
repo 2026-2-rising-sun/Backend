@@ -52,3 +52,9 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 관련 기존 테스트: [ProductSalesRepositoryTest.java](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/sales/repository/ProductSalesRepositoryTest.java) · [ProductSalesBackfillTest.java](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/sales/service/ProductSalesBackfillTest.java).
 
 현재 전체 중지 중 공개 유지와 재고0 판매 시작 성공은 직접 사용자 답변 대기 중인 기술 동작이다. 이번 수정에서 바꾸거나 사용자 승인으로 재분류하지 않았다. 다중 SKU는 대표값 대신 상세·해당 목록 503이며 [ERD의 단일값 경계](erd.md#단일-sku-공개-호환)를 따른다. 실제 실행 여부는 [최신 워크로그](../../../worklog/2026-11-15-sku.md)에서 확인한다.
+
+## 통합 등록의 부분 수신 보호 (#372)
+
+Product snapshot의 선택적 initialSkuCount는 통합 등록 당시 SKU 수다. 기존 이벤트의 null/생략은 유지하고 새 이벤트는 1~100 정수만 허용한다. 상품 replica가 이를 보존하므로 최초 상품 이벤트보다 높은 버전이 먼저 도착해도 같다. 기존 단일 판매 목록·상세는 initialSkuCount>1인 상품을 SKU 사본이 1개만 도착해도 503으로 거절한다. 상품 이벤트가 없으면 상품을 공개하지 않으며, 단일 SKU 등록은 상품과 판매 사본이 모두 있을 때 기존 구매 조건을 적용한다. SKU snapshotVersion의 중복·역순 비교는 변경하지 않는다.
+
+이 보호는 다중 SKU 목록·옵션 구매 지원이 아니다. 기존 단일 판매 계약의 실패 동작을 유지하고 대표 가격·합산 재고를 임의로 만들지 않는다. 다중 SKU가 검색 조건에 포함되면 해당 목록 요청도 503이 될 수 있다.

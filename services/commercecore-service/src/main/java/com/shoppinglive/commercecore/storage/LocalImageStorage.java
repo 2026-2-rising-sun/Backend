@@ -52,7 +52,8 @@ public class LocalImageStorage implements ImageStorage {
         }
         Path temp = null;
         try {
-            temp = Files.createTempFile(root, ".upload-", ".tmp");
+            deleteIncompleteFiles(key);
+            temp = Files.createTempFile(root, temporaryFilePrefix(key), ".tmp");
             long written = Files.copy(content, temp, StandardCopyOption.REPLACE_EXISTING);
             if (written != size) {
                 throw new ImageStorageException(
@@ -83,8 +84,34 @@ public class LocalImageStorage implements ImageStorage {
     public void delete(String key) {
         try {
             Files.deleteIfExists(resolve(key));
+            deleteIncompleteFiles(key);
         } catch (IOException e) {
             throw new ImageStorageException("이미지 파일 삭제 실패: key=" + key, e);
+        }
+    }
+
+    private static String temporaryFilePrefix(String key) {
+        // 구분자 '.'은 Base64 URL 문자에 없으므로 다른 키의 접두사와 겹치지 않는다.
+        return ".upload-"
+                + java.util.Base64.getUrlEncoder()
+                        .withoutPadding()
+                        .encodeToString(key.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                + ".";
+    }
+
+    /** 통합 등록은 같은 키를 행 잠금으로 직렬화하므로 중단된 임시 파일만 여기에 남는다. */
+    private void deleteIncompleteFiles(String key) throws IOException {
+        try (var files = Files.list(root)) {
+            for (Path file :
+                    files.filter(
+                                    path ->
+                                            path.getFileName()
+                                                    .toString()
+                                                    .startsWith(temporaryFilePrefix(key)))
+                            .filter(path -> path.getFileName().toString().endsWith(".tmp"))
+                            .toList()) {
+                Files.deleteIfExists(file);
+            }
         }
     }
 

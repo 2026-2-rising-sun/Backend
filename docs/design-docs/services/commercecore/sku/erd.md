@@ -12,9 +12,9 @@
 
 | 테이블 | 키·필드 | 소유·현재 상태 |
 |---|---|---|
-| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, snapshot_version>0, product_name_snapshot, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 신규 READY·reserved=0. 생성·가격·수량·기존 단일 판매 API와 Product 조회 연결. |
+| sku | id BIGINT identity PK, product_id BIGINT, price BIGINT>0, available/reserved INTEGER>=0, sale_status, snapshot_version>0, product_name_snapshot, option_label, created_at/updated_at | SKU 원본. 상품별 여러 행 허용, FK 없음. 기존 생성 READY, 통합 등록 ON_SALE·reserved=0. 생성·가격·수량·기존 단일 판매 API와 Product 조회 연결. |
 | product_sales | sales_id BIGINT PK, product_id BIGINT, price, status, available, version, updated_at | Catalog 판매 사본. V3에서 product_id PK를 SKU 식별자인 sales_id PK로 전환. 기존 필드명·값 보존. |
-| product | id BIGINT, sale_enabled, 삭제 정보, 판매자·표현 정보 | Product 소유 목표. 신규 sale_enabled=false, 기존 값 보존. SKU가 이 상태를 중복 소유하지 않음. |
+| product | id BIGINT, sale_enabled, 삭제 정보, 판매자·표현 정보 | Product 소유 목표. 기존 JSON 등록 false, 통합 등록 true. 기존 값 보존. SKU가 이 상태를 중복 소유하지 않음. |
 | Order 항목 | sku_id BIGINT, 수량, 주문 당시 단가·상품 정보 | Order 소유 목표. PK·테이블 이행 상세는 Order 구현에 연결. 별도 재고 예약 테이블은 없음. |
 | sales_info / sales_stock | 기존 Sales ID·가격·상태와 별도 재고 | 기존 이력·Order 전환 전 호환 경로. V102의 입력이며 삭제하지 않음. 신규 SKU 원본과 병행 쓰는 운영 상태가 아님. |
 
@@ -48,3 +48,7 @@
 - [실행 계획과 실제 검증 기록](../../../../worklog/plans/active/334-sku-module/README.md)
 
 H2 업무 테스트와 Catalog H2 이행 테스트를 실제 PostgreSQL의 잠금·시퀀스·트랜잭션 DDL 증거로 확대하지 않는다. 기존 단일 SKU API는 새 원본으로 연결했다. 공개 다중 SKU·대표가·가격순·Live 다중 SKU 활성화는 보류다.
+
+## 통합 등록 표시명 (#372)
+
+V108은 sku.option_label VARCHAR(255)를 추가한다. 기존 SKU는 null이다. 신규 통합 등록은 SKU ID를 서버에서 발급하고 다중 SKU 표시명의 정규화·중복을 서비스에서 검증한다. 가격·재고·판매 상태와 같은 sku 행에 저장하며 이벤트 최신성은 기존 snapshot_version을 유지한다.

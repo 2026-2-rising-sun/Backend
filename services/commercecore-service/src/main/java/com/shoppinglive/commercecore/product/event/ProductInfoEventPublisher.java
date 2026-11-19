@@ -34,7 +34,8 @@ public class ProductInfoEventPublisher {
                         product.getCreatedAt(),
                         product.getUpdatedAt(),
                         product.isSaleEnabled(),
-                        product.getDeletedAt());
+                        product.getDeletedAt(),
+                        product.getInitialSkuCount());
         outbox.append(
                 TOPIC,
                 EventEnvelope.create(

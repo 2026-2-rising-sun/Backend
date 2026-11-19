@@ -16,4 +16,34 @@ public record ProductInfoChangedEvent(
         Instant createdAt,
         Instant updatedAt,
         boolean saleEnabled,
-        Instant deletedAt) {}
+        Instant deletedAt,
+        Integer initialSkuCount) {
+    public ProductInfoChangedEvent(
+            long productId,
+            String name,
+            String description,
+            ProductCategory category,
+            long mainImageId,
+            String mainImageUrl,
+            String sellerId,
+            long version,
+            Instant createdAt,
+            Instant updatedAt,
+            boolean saleEnabled,
+            Instant deletedAt) {
+        this(
+                productId,
+                name,
+                description,
+                category,
+                mainImageId,
+                mainImageUrl,
+                sellerId,
+                version,
+                createdAt,
+                updatedAt,
+                saleEnabled,
+                deletedAt,
+                null);
+    }
+}

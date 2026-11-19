@@ -13,6 +13,55 @@ import org.junit.jupiter.api.*;
 
 class ProductInfoEventContractTest {
     @Test
+    @DisplayName("통합 등록의 초기 SKU 수를 실제 상품 이벤트 직렬화 표본으로 내보낸다")
+    void exportsBundleSnapshot() throws Exception {
+        var mapper =
+                new ObjectMapper()
+                        .findAndRegisterModules()
+                        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        var time = Instant.parse("2026-11-19T00:00:00Z");
+        var payload =
+                new ProductInfoChangedEvent(
+                        7,
+                        "상품",
+                        "설명",
+                        null,
+                        10,
+                        "/api/commercecore/v1/product-images/10",
+                        "seller",
+                        0,
+                        time,
+                        time,
+                        true,
+                        null,
+                        2);
+        var envelope =
+                EventEnvelope.create(
+                        ProductInfoEventPublisher.EVENT_TYPE,
+                        1,
+                        "commercecore-service",
+                        "7",
+                        time,
+                        payload);
+        assertThat(
+                        mapper.readTree(mapper.writeValueAsBytes(envelope))
+                                .at("/payload/initialSkuCount")
+                                .asInt())
+                .isEqualTo(2);
+        var dir = Path.of("build/contract-samples");
+        Files.createDirectories(dir);
+        mapper.writeValue(
+                dir.resolve("PRODUCT_INFO_CHANGED_bundle.json").toFile(),
+                Map.of(
+                        "contract",
+                        "commerce-product-info.yaml",
+                        "message",
+                        "PRODUCT_INFO_CHANGED",
+                        "payload",
+                        envelope));
+    }
+
+    @Test
     @DisplayName("삭제 snapshot은 전체 false와 ISO 삭제 시각을 같은 상품 버전으로 직렬화한다")
     void exportsDeletedSnapshotWithoutChangingTheEnvelope() throws Exception {
         var mapper =

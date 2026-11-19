@@ -28,6 +28,175 @@ servers:
   description: dev 네임스페이스 내부 Service 주소
 ```
 
+## POST /v1/seller/products/registrations
+
+이미지·상품·초기 SKU 통합 등록
+
+대표 이미지 1개와 상품·1~100개 SKU를 한 번에 등록한다. Product는 saleEnabled=true, SKU는 ON_SALE·입력 가용 재고·예약 재고 0으로 최초 저장한다. 재고 0은 SOLD_OUT으로 응답한다. 이미지 메타데이터·상품·모든 SKU·Outbox·완료 응답은 같은 DB 트랜잭션으로 커밋한다. 판매자+멱등키 범위에서 정규화한 JSON, SKU 배열 순서, 이미지 바이트와 표시 파일명이 같은 재요청은 최초 201 결과를 재응답하고 다른 내용은 409이다. 동시 요청은 직렬화한다. 완료 기록은 만료시키지 않는다. 파일 저장은 DB와 원자적이지 않으며 실패 시 삭제를 시도한다. 중단·삭제 실패 파일은 복구 기록으로 정리한다. 다중 SKU의 optionLabel은 옵션 표시명이며 구조화된 옵션 조합·자동 생성은 지원하지 않는다. 기존 Catalog 단일 판매 조회는 다중 SKU를 503으로 거절하며 고객 다중 옵션 구매 UI는 별도 연계 범위다.
+
+**인증:** `[{"BearerAuth": []}]`
+**태그:** Seller Product
+
+### 요청 파라미터
+
+| 이름 | 위치 | 필수 | 타입 | 설명 |
+|---|---|---|---|---|
+| X-Idempotency-Key | header | 필수 | string |  |
+
+### 요청 본문
+
+본문: 필수
+
+**multipart/form-data**
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| request | object | 필수 |  | — |
+| request.name | string | 필수 | 앞뒤 공백 제거 후 1~100자 | — |
+| request.description | string | 필수 | 앞뒤 공백 제거 후 1~2000자 | — |
+| request.category | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 선택 | 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST. | {&quot;enum&quot;: &#91;&quot;FASHION&quot;, &quot;BEAUTY&quot;, &quot;FOOD&quot;, &quot;LIVING&quot;, &quot;DIGITAL&quot;, &quot;KIDS&quot;, &quot;ETC&quot;, null&#93;} |
+| request.skus | array | 필수 |  | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
+| request.skus&#91;&#93;.optionLabel | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 선택 | 단일 SKU는 생략 가능. 다중 SKU는 앞뒤 공백 제거 후 서로 다른 비어 있지 않은 표시명이 필수다. | {&quot;maxLength&quot;: 255} |
+| request.skus&#91;&#93;.price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| request.skus&#91;&#93;.initialStock | integer | 필수 |  | {&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 0, &quot;maximum&quot;: 2147483647} |
+| file | string | 필수 | 대표 이미지. 기존 이미지 업로드와 동일한 JPEG/PNG·크기 검증을 적용한다. | {&quot;format&quot;: &quot;binary&quot;} |
+
+### 응답
+
+| 상태 코드 | 설명 |
+|---|---|
+| 201 | 최초 등록 결과. 재전송에도 동일한 최초 결과를 반환한다. |
+| 400 | 요청 값·형식 또는 금액 범위 오류 |
+| 401 | 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다. |
+| 403 | 검증된 주체의 권한 부족 또는 비활성 개발 API |
+| 409 | 같은 판매자·멱등키에 다른 등록 내용을 사용함 |
+| 500 | 저장 또는 DB 처리 실패. 같은 요청과 키로 재시도하며 새 키로 중복 등록하지 않는다. |
+
+#### 201 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | schema | 필수 |  | — |
+| data | object | 필수 |  | — |
+| data.productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.mainImageId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.mainImageUrl | string | 필수 |  | — |
+| data.saleEnabled | schema | 필수 |  | — |
+| data.skus | array | 필수 | 요청 SKU 배열 순서와 동일한 최초 등록 스냅샷. 후속 가격·재고 변경과 무관하게 재응답한다. | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
+| data.skus&#91;&#93;.skuId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.skus&#91;&#93;.optionLabel | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+| data.skus&#91;&#93;.price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
+| data.skus&#91;&#93;.available | integer | 필수 |  | {&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 0} |
+| data.skus&#91;&#93;.reserved | schema | 필수 |  | — |
+| data.skus&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;&#93;} |
+| error | null | 필수 |  | — |
+
+#### 400 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 401 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+#### 403 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
+### 계약 원문
+
+```yaml
+x-required-roles:
+- SELLER
+tags:
+- Seller Product
+summary: 이미지·상품·초기 SKU 통합 등록
+operationId: registerProductBundle
+description: 대표 이미지 1개와 상품·1~100개 SKU를 한 번에 등록한다. Product는 saleEnabled=true, SKU는
+  ON_SALE·입력 가용 재고·예약 재고 0으로 최초 저장한다. 재고 0은 SOLD_OUT으로 응답한다. 이미지 메타데이터·상품·모든 SKU·Outbox·완료
+  응답은 같은 DB 트랜잭션으로 커밋한다. 판매자+멱등키 범위에서 정규화한 JSON, SKU 배열 순서, 이미지 바이트와 표시 파일명이 같은 재요청은
+  최초 201 결과를 재응답하고 다른 내용은 409이다. 동시 요청은 직렬화한다. 완료 기록은 만료시키지 않는다. 파일 저장은 DB와 원자적이지
+  않으며 실패 시 삭제를 시도한다. 중단·삭제 실패 파일은 복구 기록으로 정리한다. 다중 SKU의 optionLabel은 옵션 표시명이며 구조화된
+  옵션 조합·자동 생성은 지원하지 않는다. 기존 Catalog 단일 판매 조회는 다중 SKU를 503으로 거절하며 고객 다중 옵션 구매 UI는 별도
+  연계 범위다.
+parameters:
+- $ref: '#/components/parameters/IdempotencyKey'
+requestBody:
+  required: true
+  content:
+    multipart/form-data:
+      schema:
+        type: object
+        required:
+        - request
+        - file
+        properties:
+          request:
+            $ref: '#/components/schemas/RegisterProductBundleRequest'
+          file:
+            type: string
+            format: binary
+            description: 대표 이미지. 기존 이미지 업로드와 동일한 JPEG/PNG·크기 검증을 적용한다.
+      encoding:
+        request:
+          contentType: application/json
+responses:
+  '201':
+    description: 최초 등록 결과. 재전송에도 동일한 최초 결과를 반환한다.
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - success
+          - data
+          - error
+          properties:
+            success:
+              const: true
+            data:
+              $ref: '#/components/schemas/ProductBundleResponse'
+            error:
+              type: 'null'
+  '400':
+    $ref: '#/components/responses/BadRequest'
+  '401':
+    $ref: '#/components/responses/Unauthorized'
+  '403':
+    $ref: '#/components/responses/Forbidden'
+  '409':
+    description: 같은 판매자·멱등키에 다른 등록 내용을 사용함
+  '500':
+    description: 저장 또는 DB 처리 실패. 같은 요청과 키로 재시도하며 새 키로 중복 등록하지 않는다.
+경로 공통 선언: {}
+적용 서버:
+- url: http://localhost:8083
+  description: CommerceCore 서비스 로컬 직접 호출
+- url: http://dev-commercecore-service:8080
+  description: dev 네임스페이스 내부 Service 주소
+```
+
 ## POST /v1/seller/products
 
 상품 기본정보 등록
@@ -2302,6 +2471,132 @@ components:
         format: int64
         minimum: 1
   schemas:
+    RegisterProductBundleRequest:
+      type: object
+      required:
+      - name
+      - description
+      - skus
+      properties:
+        name:
+          type: string
+          description: 앞뒤 공백 제거 후 1~100자
+        description:
+          type: string
+          description: 앞뒤 공백 제거 후 1~2000자
+        category:
+          $ref: '#/components/schemas/ProductCategory'
+        skus:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - price
+            - initialStock
+            properties:
+              optionLabel:
+                type:
+                - string
+                - 'null'
+                maxLength: 255
+                description: 단일 SKU는 생략 가능. 다중 SKU는 앞뒤 공백 제거 후 서로 다른 비어 있지 않은 표시명이
+                  필수다.
+              price:
+                type: integer
+                format: int64
+                minimum: 1
+              initialStock:
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 2147483647
+    ProductCategory:
+      type:
+      - string
+      - 'null'
+      enum:
+      - FASHION
+      - BEAUTY
+      - FOOD
+      - LIVING
+      - DIGITAL
+      - KIDS
+      - ETC
+      - null
+      description: 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST.
+    ProductBundleResponse:
+      type: object
+      required:
+      - productId
+      - mainImageId
+      - mainImageUrl
+      - saleEnabled
+      - skus
+      properties:
+        productId:
+          type: integer
+          format: int64
+        mainImageId:
+          type: integer
+          format: int64
+        mainImageUrl:
+          type: string
+        saleEnabled:
+          const: true
+        skus:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: 요청 SKU 배열 순서와 동일한 최초 등록 스냅샷. 후속 가격·재고 변경과 무관하게 재응답한다.
+          items:
+            type: object
+            required:
+            - skuId
+            - optionLabel
+            - price
+            - available
+            - reserved
+            - status
+            properties:
+              skuId:
+                type: integer
+                format: int64
+              optionLabel:
+                type:
+                - string
+                - 'null'
+              price:
+                type: integer
+                format: int64
+              available:
+                type: integer
+                format: int32
+                minimum: 0
+              reserved:
+                const: 0
+              status:
+                type: string
+                enum:
+                - ON_SALE
+                - SOLD_OUT
+    ErrorEnvelope:
+      type: object
+      required:
+      - success
+      - data
+      - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        data:
+          type: 'null'
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiError:
+      $ref: ./common.yaml#/components/schemas/ApiError
     RegisterProductRequest:
       type: object
       required:
@@ -2323,36 +2618,6 @@ components:
           minimum: 1
         category:
           $ref: '#/components/schemas/ProductCategory'
-    ProductCategory:
-      type:
-      - string
-      - 'null'
-      enum:
-      - FASHION
-      - BEAUTY
-      - FOOD
-      - LIVING
-      - DIGITAL
-      - KIDS
-      - ETC
-      - null
-      description: 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST.
-    ErrorEnvelope:
-      type: object
-      required:
-      - success
-      - data
-      - error
-      properties:
-        success:
-          type: boolean
-          const: false
-        data:
-          type: 'null'
-        error:
-          $ref: '#/components/schemas/ApiError'
-    ApiError:
-      $ref: ./common.yaml#/components/schemas/ApiError
     ProductEnvelope:
       type: object
       required:
@@ -2737,6 +3002,21 @@ components:
           format: int64
           minimum: 0
   responses:
+    BadRequest:
+      description: 요청 값·형식 또는 금액 범위 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            invalidRequest:
+              value:
+                success: false
+                data: null
+                error:
+                  code: INVALID_REQUEST
+                  message: 잘못된 요청입니다.
+                  requestId: request-001
     Unauthorized:
       description: 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.
       content:
@@ -2766,21 +3046,6 @@ components:
                 error:
                   code: FORBIDDEN
                   message: 권한이 없습니다.
-                  requestId: request-001
-    BadRequest:
-      description: 요청 값·형식 또는 금액 범위 오류
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorEnvelope'
-          examples:
-            invalidRequest:
-              value:
-                success: false
-                data: null
-                error:
-                  code: INVALID_REQUEST
-                  message: 잘못된 요청입니다.
                   requestId: request-001
     ProductConflict:
       description: 요청 version 불일치 또는 저장 시점의 낙관적 락 충돌
@@ -2921,4 +3186,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `f4c2038141f06220c4fb7196f6a6f220f26c6d12de94c76b10eb438b5ed3ece8`
+입력 SHA-256: `47b11bb36205b732cb86fa6133c08fac4432d9b05abefb89d12a09d7d4770a6b`

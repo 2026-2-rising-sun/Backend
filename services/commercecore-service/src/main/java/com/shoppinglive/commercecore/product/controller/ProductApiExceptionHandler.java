@@ -21,9 +21,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ProductApiExceptionHandler {
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(
-            HttpMessageNotReadableException e) {
+    @ExceptionHandler({
+        HttpMessageNotReadableException.class,
+        org.springframework.web.multipart.support.MissingServletRequestPartException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(Exception e) {
         return badRequest("요청 본문을 해석할 수 없습니다 (JSON 형식과 필드 타입을 확인해 주세요).");
     }
 

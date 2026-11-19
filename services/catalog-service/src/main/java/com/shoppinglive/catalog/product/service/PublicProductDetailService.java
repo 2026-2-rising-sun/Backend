@@ -37,6 +37,8 @@ public class PublicProductDetailService {
                         .findById(productId)
                         .filter(p -> p.getDeletedAt() == null)
                         .orElseThrow(() -> notFound(productId));
+        if (product.getInitialSkuCount() != null && product.getInitialSkuCount() > 1)
+            throw new SalesInfoUnavailableException("다중 SKU 상품은 기존 단일 판매 상세로 조회할 수 없습니다.");
         SalesInfo salesInfo = salesInfoClient.findByProductId(productId).orElse(null);
         SalesDisplayStatus status = SalesDisplayStatus.from(salesInfo);
         if (!status.isPubliclyVisible()) {

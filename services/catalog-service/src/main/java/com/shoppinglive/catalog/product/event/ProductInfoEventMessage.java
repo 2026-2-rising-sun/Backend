@@ -18,7 +18,37 @@ public record ProductInfoEventMessage(
         Instant createdAt,
         Instant updatedAt,
         boolean saleEnabled,
-        Instant deletedAt) {
+        Instant deletedAt,
+        Integer initialSkuCount) {
+    public ProductInfoEventMessage(
+            long productId,
+            String name,
+            String description,
+            ProductCategory category,
+            long mainImageId,
+            String mainImageUrl,
+            String sellerId,
+            long version,
+            Instant createdAt,
+            Instant updatedAt,
+            boolean saleEnabled,
+            Instant deletedAt) {
+        this(
+                productId,
+                name,
+                description,
+                category,
+                mainImageId,
+                mainImageUrl,
+                sellerId,
+                version,
+                createdAt,
+                updatedAt,
+                saleEnabled,
+                deletedAt,
+                null);
+    }
+
     public static final String TOPIC = "commerce.product-info.v1";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -100,10 +130,19 @@ public record ProductInfoEventMessage(
                     Instant.parse(text(p, "createdAt", 100)),
                     Instant.parse(text(p, "updatedAt", 100)),
                     saleEnabled,
-                    deletedAt);
+                    deletedAt,
+                    p.path("initialSkuCount").isMissingNode() || p.path("initialSkuCount").isNull()
+                            ? null
+                            : initialSkuCount(p));
         } catch (Exception failure) {
             throw new InvalidMessageException("상품 snapshot 형식이 올바르지 않습니다.", failure);
         }
+    }
+
+    private static int initialSkuCount(JsonNode node) {
+        long count = integer(node, "initialSkuCount", 1);
+        if (count > 100) throw new IllegalArgumentException("initialSkuCount는 1~100이어야 합니다.");
+        return (int) count;
     }
 
     private static String text(JsonNode node, String field, int max) {

@@ -59,7 +59,7 @@ class SkuServiceTest {
                   available INT NOT NULL CHECK(available>=0), reserved INT NOT NULL CHECK(reserved>=0),
                   sale_status VARCHAR(32) NOT NULL CHECK(sale_status IN ('READY','ON_SALE','PRIVATE')),
                   snapshot_version BIGINT NOT NULL,
-                  product_name_snapshot VARCHAR(255) NOT NULL,
+                  product_name_snapshot VARCHAR(255) NOT NULL, option_label VARCHAR(255),
                   created_at TIMESTAMP WITH TIME ZONE NOT NULL, updated_at TIMESTAMP WITH TIME ZONE NOT NULL)
                 """);
     }

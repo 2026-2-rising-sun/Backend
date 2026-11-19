@@ -15,3 +15,5 @@ Order 별도 후속 [#345 동시 환불](https://github.com/2026-2-rising-sun/Ba
 - [#340 구매 SKU 장바구니 정리](active/340-cart-sku-cleanup/README.md): 로컬 구현·검증과 외부 FigJam 잔여.
 
 - [#371 SKU 일반 버전 제거](completed/371-sku-version/README.md): 구현·계약·실제 DB/브로커 로컬 검증 완료.
+
+- [#372 통합 상품 등록](completed/372-product-registration/README.md): 로컬 구현·검증 완료. DB 원자성·멱등·파일 복구와 Catalog 부분 수신 보호.
