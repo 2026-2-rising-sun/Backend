@@ -333,6 +333,58 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                 .path("data");
     }
 
+    @Test
+    @DisplayName("통합 다중 SKU는 첫 SKU만 도착해도 단일 상품으로 노출되지 않고 이벤트 역순에도 유지된다")
+    void rejectsPartialBundleReplica() throws Exception {
+        long id = product("통합 상품", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        var snapshots =
+                new com.shoppinglive.catalog.product.repository.ProductReplicaRepository(
+                        new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(
+                                jdbc));
+        var time = java.time.Instant.now();
+        snapshots.apply(
+                new com.shoppinglive.catalog.product.event.ProductInfoEventMessage(
+                        id,
+                        "통합 상품",
+                        "설명",
+                        null,
+                        1,
+                        "/image",
+                        JwtTestTokens.SELLER,
+                        10,
+                        time,
+                        time,
+                        true,
+                        null,
+                        2));
+        for (int stage = 0; stage < 2; stage++) {
+            mvc.perform(get("/v1/products").param("q", "통합 상품"))
+                    .andExpect(status().isServiceUnavailable());
+            mvc.perform(get("/v1/products/" + id)).andExpect(status().isServiceUnavailable());
+            sales.apply(new SalesInfo(id, id * 10 + 1, 200, SalesStatus.ON_SALE, 2), 1);
+        }
+        snapshots.apply(
+                new com.shoppinglive.catalog.product.event.ProductInfoEventMessage(
+                        id,
+                        "과거 상품",
+                        "설명",
+                        null,
+                        1,
+                        "/image",
+                        JwtTestTokens.SELLER,
+                        0,
+                        time,
+                        time,
+                        true,
+                        null));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT initial_sku_count FROM product WHERE id=?",
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+    }
+
     private long product(String name, long price, SalesStatus status, String sellerId) {
         return product(name, price, status, sellerId, null);
     }

@@ -62,6 +62,23 @@ public class SkuService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
+    public SkuView createOnSale(
+            Long productId, long price, int available, String productName, String optionLabel) {
+        requireId(productId);
+        if (price <= 0 || available < 0) throw new IllegalArgumentException("가격·초기 재고가 올바르지 않습니다.");
+        long id =
+                repository.create(
+                        productId,
+                        price,
+                        available,
+                        productName,
+                        SkuSaleStatus.ON_SALE,
+                        optionLabel);
+        events.registered(id);
+        return required(id);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
     public SkuView changePrice(Long skuId, long price) {
         if (price <= 0) throw new IllegalArgumentException("가격은 KRW 1원 이상이어야 합니다.");
         watch(skuId);

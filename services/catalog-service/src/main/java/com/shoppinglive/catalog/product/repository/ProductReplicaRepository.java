@@ -29,12 +29,13 @@ public class ProductReplicaRepository {
         args.put("created", Timestamp.from(p.createdAt()));
         args.put("updated", Timestamp.from(p.updatedAt()));
         args.put("saleEnabled", p.saleEnabled());
+        args.put("initialSkuCount", p.initialSkuCount());
         args.put("deletedAt", p.deletedAt() == null ? null : Timestamp.from(p.deletedAt()));
         try {
             if (jdbc.update(
                             """
-    INSERT INTO product (id,name,description,category,main_image_id,main_image_url,seller_id,version,created_at,updated_at,sale_enabled,deleted_at)
-    SELECT :id,:name,:description,:category,:imageId,:url,:seller,:version,:created,:updated,:saleEnabled,:deletedAt
+    INSERT INTO product (id,name,description,category,main_image_id,main_image_url,seller_id,version,created_at,updated_at,sale_enabled,deleted_at,initial_sku_count)
+    SELECT :id,:name,:description,:category,:imageId,:url,:seller,:version,:created,:updated,:saleEnabled,:deletedAt,:initialSkuCount
     WHERE NOT EXISTS (SELECT 1 FROM product WHERE id=:id)
     """,
                             args)
@@ -47,7 +48,8 @@ public class ProductReplicaRepository {
    UPDATE product SET name=:name,description=:description,category=:category,main_image_id=:imageId,
     main_image_url=:url,seller_id=:seller,version=:version,created_at=:created,updated_at=:updated,
     sale_enabled=CASE WHEN deleted_at IS NOT NULL THEN FALSE ELSE :saleEnabled END,
-    deleted_at=COALESCE(deleted_at,:deletedAt)
+    deleted_at=COALESCE(deleted_at,:deletedAt),
+    initial_sku_count=COALESCE(initial_sku_count,:initialSkuCount)
    WHERE id=:id AND version<:version
    """,
                         args)

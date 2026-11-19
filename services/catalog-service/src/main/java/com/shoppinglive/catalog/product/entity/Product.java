@@ -42,6 +42,12 @@ public class Product {
 
     private Instant deletedAt;
 
+    private Integer initialSkuCount;
+
+    public Integer getInitialSkuCount() {
+        return initialSkuCount;
+    }
+
     protected Product() {}
 
     public Long getId() {

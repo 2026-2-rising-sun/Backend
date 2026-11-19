@@ -26,8 +26,9 @@
 | refund_target_order | PK (refund_request_id,order_id); product/seller snapshot; quantity/refund_amount | [V9](../../../../services/commercecore-service/src/main/resources/db/migration/V9__refund_requests.sql)  · [V104](../../../../services/commercecore-service/src/main/resources/db/migration/V104__order_sheets_and_closure.sql) |
 | event_outbox | PK id; UQ event_id; payload; published_at; claim_token/lease_until; next_attempt_at | [V18](../../../../services/commercecore-service/src/main/resources/db/migration/V18__event_outbox.sql) · [V20](../../../../services/commercecore-service/src/main/resources/db/migration/V20__outbox_worker_claim.sql) |
 | payment_delivery_request | PK id; UQ request_id, core_refund_request_id; kind; order_id; payment_group_id; payment_id; command; result; status | [V21](../../../../services/commercecore-service/src/main/resources/db/migration/V21__payment_delivery_requests.sql) |
+| product_registration | PK (seller_id,request_key); fingerprint; UQ storage_key; response_json; updated_at | [V108](../../../../services/commercecore-service/src/main/resources/db/migration/V108__product_registration.sql) |
 | product_image | PK id; UQ storage_key; content_type; size_bytes; width/height | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) |
-| product | PK id; UQ idempotency_key; main_image_id; seller_id; category; version; sale_enabled; deleted_at | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) · [V101](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql) |
+| product | PK id; UQ idempotency_key; main_image_id; seller_id; category; version; sale_enabled; deleted_at; initial_sku_count | [V100](../../../../services/commercecore-service/src/main/resources/db/migration/V100__products.sql) · [V101](../../../../services/commercecore-service/src/main/resources/db/migration/V101__product_sale_control.sql) |
 
 ## 관계
 
@@ -94,3 +95,7 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 신규 order_payment_closure/COMPENSATION 목적·참조열과Payment V4는현재PR에서제외했다. 내부policy1은도메인검증만하며공개legacy는policy0/신규기본600초이다. 보존V104적용환경을변경하거나진행중policy1/2를0으로변환하지않는다.
 
 V105는 별도 처리기한 컬럼과 늦은 승인 환불 필요 기록을 추가한다. 기존 생성기한·상태·정책0/1/2 확인중 데이터의 null 처리기한은 보존한다. Payment DB/제어행/종료API는 수정하지 않는다. V106의 새 계약 중계는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 소비·결과 생산 검증은 미완이다.
+
+## 통합 등록의 스키마 추가 (#372)
+
+V108: product.initial_sku_count, sku.option_label, product_registration 복구 기록을 추가한다. 이미지·상품·모든 초기 SKU·Outbox·등록 결과의 업무 커밋과 파일 저장 전 복구 기록 커밋을 구분한다. 상세는 [Product ERD](product/erd.md#통합-등록-복구-기록-372)와 [SKU ERD](sku/erd.md#통합-등록-표시명-372)를 따른다.

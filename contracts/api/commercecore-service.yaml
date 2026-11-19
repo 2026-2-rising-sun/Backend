@@ -45,6 +45,65 @@ tags:
   - name: Internal Product
     description: Live가 호출하는 CommerceCore 상품 원본 스냅샷
 paths:
+  /v1/seller/products/registrations:
+    post:
+      x-required-roles: [SELLER]
+      tags: [Seller Product]
+      summary: 이미지·상품·초기 SKU 통합 등록
+      operationId: registerProductBundle
+      description: >-
+        대표 이미지 1개와 상품·1~100개 SKU를 한 번에 등록한다. Product는 saleEnabled=true,
+        SKU는 ON_SALE·입력 가용 재고·예약 재고 0으로 최초 저장한다. 재고 0은 SOLD_OUT으로 응답한다.
+        이미지 메타데이터·상품·모든 SKU·Outbox·완료 응답은 같은 DB 트랜잭션으로 커밋한다.
+        판매자+멱등키 범위에서 정규화한 JSON, SKU 배열 순서, 이미지 바이트와 표시 파일명이 같은 재요청은
+        최초 201 결과를 재응답하고 다른 내용은 409이다. 동시 요청은 직렬화한다. 완료 기록은 만료시키지 않는다.
+        파일 저장은 DB와 원자적이지 않으며 실패 시 삭제를 시도한다. 중단·삭제 실패 파일은 복구 기록으로 정리한다.
+        다중 SKU의 optionLabel은 옵션 표시명이며 구조화된 옵션 조합·자동 생성은 지원하지 않는다.
+        기존 Catalog 단일 판매 조회는 다중 SKU를 503으로 거절하며 고객 다중 옵션 구매 UI는 별도 연계 범위다.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [request, file]
+              properties:
+                request:
+                  $ref: '#/components/schemas/RegisterProductBundleRequest'
+                file:
+                  type: string
+                  format: binary
+                  description: 대표 이미지. 기존 이미지 업로드와 동일한 JPEG/PNG·크기 검증을 적용한다.
+            encoding:
+              request:
+                contentType: application/json
+      responses:
+        '201':
+          description: 최초 등록 결과. 재전송에도 동일한 최초 결과를 반환한다.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, error]
+                properties:
+                  success:
+                    const: true
+                  data:
+                    $ref: '#/components/schemas/ProductBundleResponse'
+                  error:
+                    type: 'null'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: 같은 판매자·멱등키에 다른 등록 내용을 사용함
+        '500':
+          description: 저장 또는 DB 처리 실패. 같은 요청과 키로 재시도하며 새 키로 중복 등록하지 않는다.
   /v1/seller/products:
     post:
       x-required-roles:
@@ -2095,6 +2154,79 @@ components:
               minimum: 0
         error:
           type: 'null'
+    RegisterProductBundleRequest:
+      type: object
+      required: [name, description, skus]
+      properties:
+        name:
+          type: string
+          description: 앞뒤 공백 제거 후 1~100자
+        description:
+          type: string
+          description: 앞뒤 공백 제거 후 1~2000자
+        category:
+          $ref: '#/components/schemas/ProductCategory'
+        skus:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [price, initialStock]
+            properties:
+              optionLabel:
+                type: [string, 'null']
+                maxLength: 255
+                description: 단일 SKU는 생략 가능. 다중 SKU는 앞뒤 공백 제거 후 서로 다른 비어 있지 않은 표시명이 필수다.
+              price:
+                type: integer
+                format: int64
+                minimum: 1
+              initialStock:
+                type: integer
+                format: int32
+                minimum: 0
+                maximum: 2147483647
+    ProductBundleResponse:
+      type: object
+      required: [productId, mainImageId, mainImageUrl, saleEnabled, skus]
+      properties:
+        productId:
+          type: integer
+          format: int64
+        mainImageId:
+          type: integer
+          format: int64
+        mainImageUrl:
+          type: string
+        saleEnabled:
+          const: true
+        skus:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: 요청 SKU 배열 순서와 동일한 최초 등록 스냅샷. 후속 가격·재고 변경과 무관하게 재응답한다.
+          items:
+            type: object
+            required: [skuId, optionLabel, price, available, reserved, status]
+            properties:
+              skuId:
+                type: integer
+                format: int64
+              optionLabel:
+                type: [string, 'null']
+              price:
+                type: integer
+                format: int64
+              available:
+                type: integer
+                format: int32
+                minimum: 0
+              reserved:
+                const: 0
+              status:
+                type: string
+                enum: [ON_SALE, SOLD_OUT]
     RegisterProductRequest:
       type: object
       required:

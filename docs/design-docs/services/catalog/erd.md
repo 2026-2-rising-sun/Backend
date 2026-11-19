@@ -12,7 +12,7 @@
 
 | 테이블 | 핵심 키·열 | DDL 근거 |
 |---|---|---|
-| product | PK id; name; main_image_id/url; seller_id; category; version; sale_enabled; deleted_at | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) · [V2](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql) |
+| product | PK id; name; main_image_id/url; seller_id; category; version; sale_enabled; deleted_at; initial_sku_count | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) · [V2](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql) |
 | product_sales | PK sales_id; product_id 비유일; price; status; available; version | [V3](../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql) |
 | coupon_display | PK coupon_id; fixed_discount; sold_out; version; 유효 기간 | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display_product | PK (coupon_id,product_id) | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
@@ -46,3 +46,7 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 단일 판매정보 API는 SKU를 대표가·합산 재고로 축약하지 않는다. 상세는 상품의 전체 SKU가 둘 이상이면 503이다. 목록은 검색·카테고리·공개 상태에 해당하는 상품 중 전체 SKU가 둘 이상인 상품이 있으면 커서·LIMIT 적용 전 503이다. 비공개 SKU도 전체 수에 포함하므로 상태 필터로 차단을 우회하지 않는다. 조건 밖/삭제 상품은 해당 목록을 막지 않는다. 두 목록 조회는 REPEATABLE_READ의 같은 스냅샷으로 검사·페이지를 계산한다. 이는 기존 단일값 계약의 기술 구현이며 공개 다중 SKU 정책을 새로 채택한 것이 아니다.
 
 [V3 이행](../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql) · [목록 HTTP 회귀](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryHttpTest.java) · [PostgreSQL 동일 회귀](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryPostgresTest.java).
+
+## 통합 등록 SKU 수 (#372)
+
+V4는 product.initial_sku_count nullable INTEGER(1~100)를 추가한다. Core가 발행한 통합 등록 초기 SKU 수이며 단일 SKU로 잘못 노출되는 것을 막는 정보다. 기존 상품과 구형 이벤트는 null이다. 최신 snapshot을 반영해도 이미 아는 초기 수를 null로 덮지 않는다.

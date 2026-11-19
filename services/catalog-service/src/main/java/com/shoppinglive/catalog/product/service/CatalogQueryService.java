@@ -97,7 +97,7 @@ public class CatalogQueryService {
                 jdbc.queryForObject(
                         "SELECT EXISTS (SELECT 1 FROM product p JOIN product_sales s ON s.product_id=p.id"
                                 + matchingProducts
-                                + " AND (SELECT COUNT(*) FROM product_sales all_s WHERE all_s.product_id=p.id)>1)",
+                                + " AND (p.initial_sku_count>1 OR (SELECT COUNT(*) FROM product_sales all_s WHERE all_s.product_id=p.id)>1))",
                         params,
                         Boolean.class);
         if (Boolean.TRUE.equals(multipleSkus)) {

@@ -11,3 +11,5 @@
 - [0337-3-payment-result-delivery](0337-3-payment-result-delivery.md)
 - [0337-4-ledger-double-entry](0337-4-ledger-double-entry.md)
 - [0337-5-pg-timeout-and-unknown](0337-5-pg-timeout-and-unknown.md)
+
+- [ADR 0372: 상품 통합 등록의 DB 원자성과 파일 복구](0372-product-bundle-registration.md)

@@ -1,7 +1,7 @@
 asyncapi: 3.1.0
 info:
   title: CommerceCore 상품 snapshot 이벤트 계약
-  version: 1.1.0
+  version: 1.2.0
   description: 상품 원본과 common Outbox를 같은 트랜잭션으로 저장하고 Catalog 공개 조회 사본에 비동기 반영한다.
 defaultContentType: application/json
 channels:
@@ -11,7 +11,8 @@ channels:
       0이다. 실제 기본정보·전체 판매 제어·소프트 삭제로 JPA version이 증가할 때 전체 snapshot을 발행한다. Catalog는 행이 없으면 version
       0을 포함해 저장하고, 기존 행보다 큰 version만 반영해 중복·역순·동시 최초 전달을 처리한다. occurredAt은 이벤트 생성
       시각, createdAt/updatedAt은 상품 원본 시각이며 순서 비교에 사용하지 않는다. 대표 이미지 1개의 ID/URL을 전달하며
-      파일은 Core가 제공한다. 기존 commerce.sales-info.v1과 commerce.coupon-info.v1 토픽은 유지한다.
+      파일은 Core가 제공한다. 통합 등록은 initialSkuCount로 최초 SKU 수(1~100)를 전달한다.
+      Catalog 단일 판매 조회는 initialSkuCount가 2 이상이면 SKU 일부만 수신했더라도 구매 가능한 단일 SKU로 노출하지 않는다. 기존 commerce.sales-info.v1과 commerce.coupon-info.v1 토픽은 유지한다.
     messages:
       PRODUCT_INFO_CHANGED:
         $ref: '#/components/messages/PRODUCT_INFO_CHANGED'
@@ -158,6 +159,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+        initialSkuCount:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 100
+          description: 통합 등록의 불변 초기 SKU 수. 기존 분리 등록은 null/생략. 후속 상품 snapshot에도 유지한다.
         saleEnabled:
           type: boolean
           default: true

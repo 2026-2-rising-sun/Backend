@@ -36,6 +36,9 @@ public class Sku {
     @Column(nullable = false, length = 255)
     private String productNameSnapshot;
 
+    @Column(length = 255)
+    private String optionLabel;
+
     @Column(nullable = false)
     private Instant createdAt;
 

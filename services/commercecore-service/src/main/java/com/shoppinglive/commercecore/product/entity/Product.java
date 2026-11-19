@@ -44,6 +44,8 @@ public class Product extends BaseEntity {
 
     private Instant deletedAt;
 
+    private Integer initialSkuCount;
+
     /** 기본정보·전체 제어·삭제의 낙관적 잠금. */
     @Version
     @Column(nullable = false)
@@ -77,6 +79,23 @@ public class Product extends BaseEntity {
         this.idempotencyKey = idempotencyKey;
         this.sellerId = sellerId;
         this.category = category;
+    }
+
+    public static Product registerForSale(
+            String name,
+            String description,
+            Long imageId,
+            String sellerId,
+            ProductCategory category,
+            int skuCount) {
+        Product product = new Product(name, description, imageId, null, sellerId, category);
+        product.saleEnabled = true;
+        product.initialSkuCount = skuCount;
+        return product;
+    }
+
+    public Integer getInitialSkuCount() {
+        return initialSkuCount;
     }
 
     /** 검증된 값으로 기본정보를 바꾼다. 실제로 바뀐 값이 있으면 flush 때 version 이 오른다. */
