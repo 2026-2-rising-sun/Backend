@@ -13,7 +13,7 @@ import org.junit.jupiter.api.*;
 
 class RefundRequestedEventContractTest {
     @Test
-    @DisplayName("팀원 LATE_APPROVAL 요청 필드와 Core 봉투를 직렬화 표본으로 남긴다")
+    @DisplayName("이행 전 저장된 LATE_APPROVAL 요청 필드를 보존한다")
     void serializesLateApprovalRequestContract() throws Exception {
         var mapper =
                 new ObjectMapper()
@@ -39,7 +39,7 @@ class RefundRequestedEventContractTest {
                 path.toFile(),
                 Map.of(
                         "contract",
-                        "commerce-refund-requests.yaml",
+                        "commerce-refund-requests-legacy.yaml",
                         "message",
                         "RefundRequested",
                         "payload",

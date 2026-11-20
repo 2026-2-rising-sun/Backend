@@ -610,7 +610,7 @@ responses:
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | buyerName | string | 필수 |  | — |
 | createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -695,7 +695,7 @@ responses:
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | buyerName | string | 필수 |  | — |
 | createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -1108,7 +1108,7 @@ responses:
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | groupNumber | string | 필수 |  | — |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -1124,7 +1124,7 @@ responses:
 | orders&#91;&#93;.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | orders&#91;&#93;.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | orders&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | orders&#91;&#93;.buyerName | string | 필수 |  | — |
 | orders&#91;&#93;.createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders&#91;&#93;.expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -1183,7 +1183,7 @@ responses:
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | groupNumber | string | 필수 |  | — |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -1199,7 +1199,7 @@ responses:
 | orders&#91;&#93;.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | orders&#91;&#93;.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | orders&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | orders&#91;&#93;.buyerName | string | 필수 |  | — |
 | orders&#91;&#93;.createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders&#91;&#93;.expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -1730,6 +1730,8 @@ components:
           - EXPIRED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         buyerName:
           type: string
         createdAt:
@@ -1921,6 +1923,8 @@ components:
           - EXPIRED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         totalAmount:
           type: integer
           format: int64
@@ -2165,4 +2169,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `47b11bb36205b732cb86fa6133c08fac4432d9b05abefb89d12a09d7d4770a6b`
+입력 SHA-256: `0e1b21b8b8e4fe70bff8ac969a28a92cafb65035b2d95522c0edc6574680259f`

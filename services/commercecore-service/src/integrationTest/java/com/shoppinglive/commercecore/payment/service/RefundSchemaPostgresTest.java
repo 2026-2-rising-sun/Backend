@@ -119,6 +119,40 @@ class RefundSchemaPostgresTest {
                 });
     }
 
+    @Test
+    @DisplayName("신규 Kafka 원문·결과 버전·사용자 이전상태와 시스템 단일 fence 제약을 생성한다")
+    void createsKafkaIntentAndCompensationFence() {
+        verify(
+                jdbc -> {
+                    assertThat(columns(jdbc, "core_refund_intent"))
+                            .contains(
+                                    "refund_request_id",
+                                    "purpose",
+                                    "request_payload",
+                                    "user_request_id",
+                                    "execution_id",
+                                    "result_version",
+                                    "result_payload",
+                                    "completed_at");
+                    assertThat(columns(jdbc, "core_refund_result_event"))
+                            .contains("event_id", "refund_request_id", "payload");
+                    assertThat(columns(jdbc, "refund_target_order"))
+                            .contains("quantity", "previous_status");
+                    assertThat(
+                                    jdbc.queryForObject(
+                                            "SELECT indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname='uk_core_system_compensation'",
+                                            String.class))
+                            .contains("UNIQUE", "payment_group_id", "SYSTEM_COMPENSATION");
+                    for (String table : List.of("orders", "payment_group"))
+                        assertThat(
+                                        jdbc.queryForList(
+                                                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid=?::regclass",
+                                                String.class,
+                                                table))
+                                .anySatisfy(value -> assertThat(value).contains("CANCEL_PENDING"));
+                });
+    }
+
     private static List<String> columns(JdbcTemplate jdbc, String table) {
         return jdbc.queryForList(
                 """

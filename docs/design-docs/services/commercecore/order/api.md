@@ -319,7 +319,7 @@ responses:
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | buyerName | string | 필수 |  | — |
 | createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -404,7 +404,7 @@ responses:
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | buyerName | string | 필수 |  | — |
 | createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -547,7 +547,7 @@ createdAt 및 id 내림차순. SELLER도 본인 거래만 조회한다.
 | items&#91;&#93;.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | items&#91;&#93;.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | items&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | items&#91;&#93;.buyerName | string | 필수 |  | — |
 | items&#91;&#93;.createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | items&#91;&#93;.expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -717,7 +717,7 @@ responses:
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | buyerName | string | 필수 |  | — |
 | createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -1267,7 +1267,7 @@ responses:
 
 본인의 활성 결제 묶음 조회
 
-회원의 PENDING_PAYMENT 또는 PAYMENT_CONFIRMING 묶음 하나를 반환한다. 생성·결제 응답 유실 또는 새로고침 후 결과 복구에 사용한다. 활성 묶음이 없으면 204이며 실패·취소·만료·완료 묶음은 활성 조회에서 제외한다.
+회원의 PENDING_PAYMENT, PAYMENT_CONFIRMING 또는 COMPENSATION_PENDING 묶음 하나를 반환한다. 생성·결제 응답 유실 또는 새로고침 후 결과 복구에 사용한다. 활성 묶음이 없으면 204이며 보상 대기는 계속 노출하고 실패·취소·만료·완료 묶음은 활성 조회에서 제외한다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Payment Groups
@@ -1287,7 +1287,7 @@ responses:
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | groupNumber | string | 필수 |  | — |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -1303,7 +1303,7 @@ responses:
 | orders&#91;&#93;.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | orders&#91;&#93;.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | orders&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | orders&#91;&#93;.buyerName | string | 필수 |  | — |
 | orders&#91;&#93;.createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders&#91;&#93;.expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -1397,8 +1397,9 @@ tags:
 - Payment Groups
 summary: 본인의 활성 결제 묶음 조회
 operationId: getMyActivePaymentGroup
-description: 회원의 PENDING_PAYMENT 또는 PAYMENT_CONFIRMING 묶음 하나를 반환한다. 생성·결제 응답 유실 또는
-  새로고침 후 결과 복구에 사용한다. 활성 묶음이 없으면 204이며 실패·취소·만료·완료 묶음은 활성 조회에서 제외한다.
+description: 회원의 PENDING_PAYMENT, PAYMENT_CONFIRMING 또는 COMPENSATION_PENDING 묶음 하나를
+  반환한다. 생성·결제 응답 유실 또는 새로고침 후 결과 복구에 사용한다. 활성 묶음이 없으면 204이며 보상 대기는 계속 노출하고 실패·취소·만료·완료
+  묶음은 활성 조회에서 제외한다.
 x-required-roles:
 - USER
 - SELLER
@@ -1492,7 +1493,7 @@ responses:
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | groupNumber | string | 필수 |  | — |
-| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -1508,7 +1509,7 @@ responses:
 | orders&#91;&#93;.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | orders&#91;&#93;.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | orders&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orders&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;CANCELLED&quot;, &quot;EXPIRED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | orders&#91;&#93;.buyerName | string | 필수 |  | — |
 | orders&#91;&#93;.createdAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders&#91;&#93;.expiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -2214,8 +2215,13 @@ commercecore.refunds.api-enabled=true일 때만 제공한다. 본인 결제 묶�
 | data&#91;&#93;.productName | string | 필수 |  | — |
 | data&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data&#91;&#93;.refundAmount | integer | 필수 | 대상 주문 전체 수량의 할인 반영 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| data&#91;&#93;.unitPrice | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| data&#91;&#93;.succeededQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
+| data&#91;&#93;.heldQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
+| data&#91;&#93;.refundableQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
+| data&#91;&#93;.remainingRefundableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data&#91;&#93;.refundable | boolean | 필수 |  | — |
-| data&#91;&#93;.unavailableReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 선택 가능하면 null. ALREADY_REQUESTED는 처리 중·결과 확인 중·완료 대상을 포함한다. | {&quot;enum&quot;: &#91;null, &quot;PAYMENT_NOT_COMPLETED&quot;, &quot;REFUND_WINDOW_EXPIRED&quot;, &quot;ALREADY_REQUESTED&quot;, &quot;CART_ITEM_UNAVAILABLE&quot;, &quot;CART_ITEM_AMBIGUOUS&quot;&#93;} |
+| data&#91;&#93;.unavailableReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 선택 가능하면 null. ALREADY_REQUESTED는 처리 중·결과 확인 중·완료 대상을 포함한다. | {&quot;enum&quot;: &#91;null, &quot;PAYMENT_NOT_COMPLETED&quot;, &quot;REFUND_WINDOW_EXPIRED&quot;, &quot;ALREADY_REQUESTED&quot;, &quot;CART_ITEM_UNAVAILABLE&quot;, &quot;CART_ITEM_AMBIGUOUS&quot;, &quot;SYSTEM_COMPENSATION&quot;&#93;} |
 | error | null | 필수 |  | — |
 
 #### 401 · application/json
@@ -2282,11 +2288,13 @@ responses:
 
 ## POST /v1/payment-groups/{number}/refunds
 
-본인 결제 묶음 전체 또는 장바구니 항목 전체 수량 환불 접수
+본인 주문의 전체·선택 항목·부분 수량 환불 접수
 
-환불 API와 자동 실행·DB 복구는 기본 활성화된다. commercecore.refunds.api-enabled=false로 경로를 비활성화하면 404이다. execution-enabled=false는 새 자동 실행·스캔을 중지하며 이미 접수한 요청은 DB에 보존되고 재활성화 시 복구한다.
-회원 본인 결제 묶음만 접수한다. 본문 생략은 결제 묶음 전체 환불, 본문을 보내면 비어 있지 않은 cartItemIds 배열이 필요하다. 값 지정은 해당 장바구니 항목 ID로 생성된 주문의 전체 수량을 뜻하며 빈 배열/null/빈 객체/알 수 없는 필드는 400으로 거절한다. 금액은 서버에 저장된 주문별 실부담액으로 계산하며 요청 금액/주문번호/부분 수량은 받지 않는다.
-결제 완료 후 168시간 경계 직전까지 서버 접수해야 한다. 장바구니 행은 결제 뒤 삭제되므로 주문 source_cart_item_id를 검증한다.
+commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이며 execution-enabled는 기존 legacy HTTP 실행에만 적용한다. 신규 접수는 이 옵션과 무관하게 원문·CANCEL_PENDING·commerce.refund.requests.v1 Outbox를 함께 저장한다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
+본문 생략은 전체 잔여 항목·수량이다. items는 orderId와 선택적 quantity로 일부 항목·수량을 지정한다. quantity 생략은 해당 항목 잔여 전량이다. cartItemIds는 저장된 유일한 출처와 연결된 항목 잔여 전량이다. 두 입력 방식을 혼용할 수 없으며 빈 객체·빈 배열·null·중복 ID·소수·알 수 없는 필드는 400이다. expectedAmount는 서버 계산 합계와 다르면 409이다.
+신규 주문서는 저장 승인시각부터 168시간 미만에 접수한다. 같은 결제의 미완료 요청과 시스템 보상 fence는 신규 접수 409다. 단가×수량과 항목 잔여 실결제액 중 작은 값을 서버가 계산한다. 요청 수량은 성공 시에만 재고로 복원하며 쿠폰은 전수량 성공 때 원래 만료를 유지하여 한 번 복원한다.
+같은 회원·키와 정렬된 입력 형태·지정 수량·expectedAmount가 같으면 기존 요청을 200으로 반환한다. 완료·기간 경과 후에도 재조회하며 다른 원문은 409다. 최초 201은 접수이며 완료가 아니다. UNKNOWN은 CANCEL_PENDING과 수량·금액 예약을 유지한다. 확정 실패만 이전 PAID/PARTIALLY_REFUNDED로 복귀한다.
+policyVersion=0의 기존 전체·cartItemIds 경로와 미완료 HTTP 원문은 보존한다. legacy items/부분수량은 지원하지 않으며 자동 Kafka 재발행하지 않는다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Payment Groups
@@ -2306,7 +2314,11 @@ responses:
 
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
-| cartItemIds | array | 필수 | 하나 이상의 장바구니 항목 ID. ID별 연결 주문의 전체 수량을 환불한다. 전체 묶음 환불은 요청 본문을 생략한다. | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
+| items | array | 선택 | orderId 중복 금지. quantity 생략은 최초 접수 시점의 잔여 전량이다. | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
+| items&#91;&#93;.orderId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| items&#91;&#93;.quantity | integer | 선택 |  | {&quot;format&quot;: &quot;int32&quot;, &quot;minimum&quot;: 1, &quot;maximum&quot;: 2147483647} |
+| cartItemIds | array | 선택 | 저장 출처와 유일하게 연결된 주문의 잔여 전량 | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
+| expectedAmount | integer | 선택 | 서버 계산 총액 대조용이며 금액 원본이 아님 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 
 ```json
 {
@@ -2336,6 +2348,7 @@ responses:
 | success | schema | 필수 |  | — |
 | data | object | 필수 |  | — |
 | data.id | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| data.refundRequestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 신규 Kafka 고정 요청 ID. 현재 생성은 UUID이며 계약상 영숫자·밑줄·하이픈1~64자를 허용한다. legacy는 null | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | data.paymentGroupNumber | string | 필수 |  | — |
 | data.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data.cumulativeRefundAmount | integer | 필수 | 결제 묶음에서 SUCCESS 확정된 환불 요청의 누적 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -2349,7 +2362,7 @@ responses:
 | data.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data.recovery.retryExhausted | boolean | 필수 |  | — |
 | data.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -2360,6 +2373,7 @@ responses:
   "success": true,
   "data": {
     "id": 51,
+    "refundRequestId": null,
     "paymentGroupNumber": "PG-EXAMPLE",
     "refundAmount": 1900,
     "cumulativeRefundAmount": 0,
@@ -2393,6 +2407,7 @@ responses:
 | success | schema | 필수 |  | — |
 | data | object | 필수 |  | — |
 | data.id | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| data.refundRequestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 신규 Kafka 고정 요청 ID. 현재 생성은 UUID이며 계약상 영숫자·밑줄·하이픈1~64자를 허용한다. legacy는 null | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | data.paymentGroupNumber | string | 필수 |  | — |
 | data.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data.cumulativeRefundAmount | integer | 필수 | 결제 묶음에서 SUCCESS 확정된 환불 요청의 누적 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -2406,7 +2421,7 @@ responses:
 | data.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data.recovery.retryExhausted | boolean | 필수 |  | — |
 | data.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -2484,16 +2499,25 @@ responses:
 tags:
 - Payment Groups
 operationId: requestMyRefund
-summary: 본인 결제 묶음 전체 또는 장바구니 항목 전체 수량 환불 접수
-description: '환불 API와 자동 실행·DB 복구는 기본 활성화된다. commercecore.refunds.api-enabled=false로
-  경로를 비활성화하면 404이다. execution-enabled=false는 새 자동 실행·스캔을 중지하며 이미 접수한 요청은 DB에 보존되고
-  재활성화 시 복구한다.
+summary: 본인 주문의 전체·선택 항목·부분 수량 환불 접수
+description: 'commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이며 execution-enabled는
+  기존 legacy HTTP 실행에만 적용한다. 신규 접수는 이 옵션과 무관하게 원문·CANCEL_PENDING·commerce.refund.requests.v1
+  Outbox를 함께 저장한다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
 
-  회원 본인 결제 묶음만 접수한다. 본문 생략은 결제 묶음 전체 환불, 본문을 보내면 비어 있지 않은 cartItemIds 배열이 필요하다. 값
-  지정은 해당 장바구니 항목 ID로 생성된 주문의 전체 수량을 뜻하며 빈 배열/null/빈 객체/알 수 없는 필드는 400으로 거절한다. 금액은
-  서버에 저장된 주문별 실부담액으로 계산하며 요청 금액/주문번호/부분 수량은 받지 않는다.
+  본문 생략은 전체 잔여 항목·수량이다. items는 orderId와 선택적 quantity로 일부 항목·수량을 지정한다. quantity 생략은
+  해당 항목 잔여 전량이다. cartItemIds는 저장된 유일한 출처와 연결된 항목 잔여 전량이다. 두 입력 방식을 혼용할 수 없으며 빈 객체·빈
+  배열·null·중복 ID·소수·알 수 없는 필드는 400이다. expectedAmount는 서버 계산 합계와 다르면 409이다.
 
-  결제 완료 후 168시간 경계 직전까지 서버 접수해야 한다. 장바구니 행은 결제 뒤 삭제되므로 주문 source_cart_item_id를 검증한다.'
+  신규 주문서는 저장 승인시각부터 168시간 미만에 접수한다. 같은 결제의 미완료 요청과 시스템 보상 fence는 신규 접수 409다. 단가×수량과
+  항목 잔여 실결제액 중 작은 값을 서버가 계산한다. 요청 수량은 성공 시에만 재고로 복원하며 쿠폰은 전수량 성공 때 원래 만료를 유지하여 한 번
+  복원한다.
+
+  같은 회원·키와 정렬된 입력 형태·지정 수량·expectedAmount가 같으면 기존 요청을 200으로 반환한다. 완료·기간 경과 후에도 재조회하며
+  다른 원문은 409다. 최초 201은 접수이며 완료가 아니다. UNKNOWN은 CANCEL_PENDING과 수량·금액 예약을 유지한다. 확정 실패만
+  이전 PAID/PARTIALLY_REFUNDED로 복귀한다.
+
+  policyVersion=0의 기존 전체·cartItemIds 경로와 미완료 HTTP 원문은 보존한다. legacy items/부분수량은 지원하지
+  않으며 자동 Kafka 재발행하지 않는다.'
 x-required-roles:
 - USER
 - SELLER
@@ -2519,6 +2543,7 @@ responses:
           success: true
           data:
             id: 51
+            refundRequestId: null
             paymentGroupNumber: PG-EXAMPLE
             refundAmount: 1900
             cumulativeRefundAmount: 0
@@ -2597,6 +2622,7 @@ responses:
 | success | schema | 필수 |  | — |
 | data | array | 필수 |  | — |
 | data&#91;&#93;.id | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| data&#91;&#93;.refundRequestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 신규 Kafka 고정 요청 ID. 현재 생성은 UUID이며 계약상 영숫자·밑줄·하이픈1~64자를 허용한다. legacy는 null | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | data&#91;&#93;.paymentGroupNumber | string | 필수 |  | — |
 | data&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data&#91;&#93;.cumulativeRefundAmount | integer | 필수 | 결제 묶음에서 SUCCESS 확정된 환불 요청의 누적 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -2610,7 +2636,7 @@ responses:
 | data&#91;&#93;.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data&#91;&#93;.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data&#91;&#93;.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data&#91;&#93;.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data&#91;&#93;.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data&#91;&#93;.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data&#91;&#93;.recovery.retryExhausted | boolean | 필수 |  | — |
 | data&#91;&#93;.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -2742,6 +2768,7 @@ responses:
 | success | schema | 필수 |  | — |
 | data | object | 필수 |  | — |
 | data.id | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
+| data.refundRequestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 신규 Kafka 고정 요청 ID. 현재 생성은 UUID이며 계약상 영숫자·밑줄·하이픈1~64자를 허용한다. legacy는 null | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | data.paymentGroupNumber | string | 필수 |  | — |
 | data.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data.cumulativeRefundAmount | integer | 필수 | 결제 묶음에서 SUCCESS 확정된 환불 요청의 누적 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -2755,7 +2782,7 @@ responses:
 | data.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data.recovery.retryExhausted | boolean | 필수 |  | — |
 | data.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -2899,7 +2926,7 @@ responses:
 | data&#91;&#93;.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data&#91;&#93;.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data&#91;&#93;.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data&#91;&#93;.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data&#91;&#93;.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data&#91;&#93;.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data&#91;&#93;.recovery.retryExhausted | boolean | 필수 |  | — |
 | data&#91;&#93;.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -3054,7 +3081,7 @@ responses:
 | data.targets&#91;&#93;.productName | string | 필수 |  | — |
 | data.targets&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
 | data.targets&#91;&#93;.refundAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
+| data.recovery | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 필수 | legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는 null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다. | — |
 | data.recovery.retryCount | integer | 필수 |  | {&quot;minimum&quot;: 0, &quot;maximum&quot;: 3} |
 | data.recovery.retryExhausted | boolean | 필수 |  | — |
 | data.recovery.nextActionAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
@@ -3444,7 +3471,7 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 |---|---|---|---|---|
 | order | object | 필수 |  | — |
 | order.orderNumber | string | 필수 |  | — |
-| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | order.failureReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | order.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -3469,16 +3496,22 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 | order.items&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | order.items&#91;&#93;.sourceCartItemId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.items&#91;&#93;.sourceCartVersion | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| order.items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;CANCEL_PENDING&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;REFUNDED&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment | object | 필수 |  | — |
 | payment.orderNumber | string | 필수 |  | — |
-| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment.paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | payment.pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | payment.amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| payment.compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 200 · application/json
 
@@ -3486,7 +3519,7 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 |---|---|---|---|---|
 | order | object | 필수 |  | — |
 | order.orderNumber | string | 필수 |  | — |
-| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | order.failureReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | order.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -3511,16 +3544,22 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 | order.items&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | order.items&#91;&#93;.sourceCartItemId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.items&#91;&#93;.sourceCartVersion | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| order.items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;CANCEL_PENDING&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;REFUNDED&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment | object | 필수 |  | — |
 | payment.orderNumber | string | 필수 |  | — |
-| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment.paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | payment.pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | payment.amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| payment.compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 400 · application/json
 
@@ -3656,7 +3695,7 @@ responses:
 |---|---|---|---|---|
 | order | object | 필수 |  | — |
 | order.orderNumber | string | 필수 |  | — |
-| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | order.failureReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | order.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -3681,16 +3720,22 @@ responses:
 | order.items&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | order.items&#91;&#93;.sourceCartItemId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.items&#91;&#93;.sourceCartVersion | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| order.items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;CANCEL_PENDING&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;REFUNDED&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment | object | 필수 |  | — |
 | payment.orderNumber | string | 필수 |  | — |
-| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment.paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | payment.pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | payment.amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| payment.compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 401 · application/json
 
@@ -3791,7 +3836,7 @@ responses:
 |---|---|---|---|---|
 | order | object | 필수 |  | — |
 | order.orderNumber | string | 필수 |  | — |
-| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| order.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | order.failureReason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | order.totalAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.discountAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
@@ -3816,16 +3861,22 @@ responses:
 | order.items&#91;&#93;.payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | order.items&#91;&#93;.sourceCartItemId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | order.items&#91;&#93;.sourceCartVersion | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| order.items&#91;&#93;.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING_PAYMENT&quot;, &quot;PAYMENT_CONFIRMING&quot;, &quot;PAID&quot;, &quot;CANCEL_PENDING&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;REFUNDED&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment | object | 필수 |  | — |
 | payment.orderNumber | string | 필수 |  | — |
-| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| payment.orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | payment.paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | payment.pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | payment.amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| payment.compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 401 · application/json
 
@@ -3927,14 +3978,19 @@ responses:
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | orderNumber | string | 필수 |  | — |
-| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 401 · application/json
 
@@ -4051,14 +4107,19 @@ Payment의 비멱등 checkout 계약을 사용하므로 호출마다 pgOrderId�
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | orderNumber | string | 필수 |  | — |
-| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 401 · application/json
 
@@ -4149,7 +4210,7 @@ responses:
 
 인증 완료 후 승인 실행 접수
 
-JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 첫 전환+600초와 승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 전달 요청이며 기한을 연장하지 않는다. 202와 UNKNOWN은 실패가 아니다. HTTP 응답 유실은 조회·같은 pgOrderId 원문 재전달로 복구한다. 기한 후에는 새 승인을 보내지 않고 조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
+JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 첫 전환+600초와 승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 전달 요청이며 기한을 연장하지 않는다. 202와 UNKNOWN은 실패가 아니다. 최초 승인 응답 유실/UNKNOWN은 별도 시스템 보상 intent·fence·공통 환불 Outbox를 저장한다. 단순202 처리중은 취소 의도가 아니다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 기한 후에는 새 승인을 보내지 않고 조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Orders
@@ -4190,28 +4251,38 @@ JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | orderNumber | string | 필수 |  | — |
-| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 202 · application/json
 
 | 필드 | 타입 | 필수 | 설명 | 제약 |
 |---|---|---|---|---|
 | orderNumber | string | 필수 |  | — |
-| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;&#93;} |
+| orderStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;PENDING&quot;, &quot;PROCESSING&quot;, &quot;PAID&quot;, &quot;FAILED&quot;, &quot;EXPIRED&quot;, &quot;CANCELLED&quot;, &quot;REFUNDED&quot;, &quot;PARTIALLY_REFUNDED&quot;, &quot;CANCEL_PENDING&quot;, &quot;COMPENSATION_PENDING&quot;&#93;} |
 | paymentId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | paymentStatus | string | 필수 | PREPARING·PREPARATION_FAILED 또는 Payment에서 마지막으로 확인한 CREATED·APPROVING·PENDING·UNKNOWN·APPROVED·DECLINED 등. 주문 상태와 구분한다. | — |
 | pgOrderId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | amount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 1} |
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
-| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초 무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
+| compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
+| compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
+| compensation.completedAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
 
 #### 400 · application/json
 
@@ -4277,8 +4348,10 @@ operationId: approveRelayPayment
 summary: 인증 완료 후 승인 실행 접수
 description: JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 첫 전환+600초와
   승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 전달 요청이며 기한을 연장하지 않는다. 202와 UNKNOWN은
-  실패가 아니다. HTTP 응답 유실은 조회·같은 pgOrderId 원문 재전달로 복구한다. 기한 후에는 새 승인을 보내지 않고 조회만 하며, 늦은
-  승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
+  실패가 아니다. 최초 승인 응답 유실/UNKNOWN은 별도 시스템 보상 intent·fence·공통 환불 Outbox를 저장한다. 단순202 처리중은
+  취소 의도가 아니다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 기한 후에는 새 승인을 보내지 않고
+  조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로
+  추정하지 않는다.
 x-required-roles:
 - USER
 - SELLER
@@ -4660,6 +4733,8 @@ components:
           - EXPIRED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         buyerName:
           type: string
         createdAt:
@@ -4813,6 +4888,8 @@ components:
           - EXPIRED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         totalAmount:
           type: integer
           format: int64
@@ -4869,6 +4946,11 @@ components:
       - refundAmount
       - refundable
       - unavailableReason
+      - unitPrice
+      - succeededQuantity
+      - heldQuantity
+      - refundableQuantity
+      - remainingRefundableAmount
       properties:
         orderId:
           type: integer
@@ -4888,6 +4970,23 @@ components:
           format: int64
           minimum: 0
           description: 대상 주문 전체 수량의 할인 반영 금액
+        unitPrice:
+          type: integer
+          format: int64
+          minimum: 0
+        succeededQuantity:
+          type: integer
+          minimum: 0
+        heldQuantity:
+          type: integer
+          minimum: 0
+        refundableQuantity:
+          type: integer
+          minimum: 0
+        remainingRefundableAmount:
+          type: integer
+          format: int64
+          minimum: 0
         refundable:
           type: boolean
         unavailableReason:
@@ -4901,13 +5000,37 @@ components:
           - ALREADY_REQUESTED
           - CART_ITEM_UNAVAILABLE
           - CART_ITEM_AMBIGUOUS
+          - SYSTEM_COMPENSATION
           description: 선택 가능하면 null. ALREADY_REQUESTED는 처리 중·결과 확인 중·완료 대상을 포함한다.
     RefundRequest:
       type: object
       additionalProperties: false
-      required:
-      - cartItemIds
+      oneOf:
+      - required:
+        - items
+      - required:
+        - cartItemIds
       properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: orderId 중복 금지. quantity 생략은 최초 접수 시점의 잔여 전량이다.
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - orderId
+            properties:
+              orderId:
+                type: integer
+                format: int64
+                minimum: 1
+              quantity:
+                type: integer
+                format: int32
+                minimum: 1
+                maximum: 2147483647
         cartItemIds:
           type: array
           minItems: 1
@@ -4917,8 +5040,12 @@ components:
             type: integer
             format: int64
             minimum: 1
-          description: 하나 이상의 장바구니 항목 ID. ID별 연결 주문의 전체 수량을 환불한다. 전체 묶음 환불은 요청 본문을
-            생략한다.
+          description: 저장 출처와 유일하게 연결된 주문의 잔여 전량
+        expectedAmount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: 서버 계산 총액 대조용이며 금액 원본이 아님
     RefundViewEnvelope:
       type: object
       required:
@@ -4936,6 +5063,7 @@ components:
       type: object
       required:
       - id
+      - refundRequestId
       - paymentGroupNumber
       - refundAmount
       - cumulativeRefundAmount
@@ -4949,6 +5077,13 @@ components:
           type: integer
           format: int64
           minimum: 1
+        refundRequestId:
+          type:
+          - string
+          - 'null'
+          pattern: ^[A-Za-z0-9_-]{1,64}$
+          description: 신규 Kafka 고정 요청 ID. 현재 생성은 UUID이며 계약상 영숫자·밑줄·하이픈1~64자를 허용한다.
+            legacy는 null
         paymentGroupNumber:
           type: string
         refundAmount:
@@ -5021,9 +5156,9 @@ components:
       type:
       - object
       - 'null'
-      description: PROCESSING/UNKNOWN의 복구 상태. SUCCESS/FAILED는 null. 최초 실행을 제외한 추가
-        재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다. nextActionAt은 다음 처리
-        대상 시각이며 완료 시각을 보장하지 않는다.
+      description: legacy PROCESSING/UNKNOWN의 복구 상태. 신규 Kafka 요청과 SUCCESS/FAILED는
+        null. 최초 실행을 제외한 추가 재시도 횟수와 소진 여부를 표시한다. 소진 뒤에도 기존 결과를 조회하며 자동 실패 종료하지 않는다.
+        nextActionAt은 다음 처리 대상 시각이며 완료 시각을 보장하지 않는다.
       required:
       - retryCount
       - retryExhausted
@@ -5222,6 +5357,8 @@ components:
           - CANCELLED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         failureReason:
           type:
           - string
@@ -5282,6 +5419,7 @@ components:
             - payableAmount
             - sourceCartItemId
             - sourceCartVersion
+            - status
             properties:
               orderItemId:
                 type: integer
@@ -5339,6 +5477,19 @@ components:
                 - 'null'
                 format: int64
                 minimum: 0
+              status:
+                type: string
+                enum:
+                - PENDING_PAYMENT
+                - PAYMENT_CONFIRMING
+                - PAID
+                - CANCEL_PENDING
+                - PARTIALLY_REFUNDED
+                - REFUNDED
+                - FAILED
+                - EXPIRED
+                - CANCELLED
+                - COMPENSATION_PENDING
     RelayPaymentState:
       type: object
       required:
@@ -5365,6 +5516,8 @@ components:
           - CANCELLED
           - REFUNDED
           - PARTIALLY_REFUNDED
+          - CANCEL_PENDING
+          - COMPENSATION_PENDING
         paymentId:
           type:
           - integer
@@ -5400,9 +5553,51 @@ components:
           enum:
           - null
           - REQUESTED
+          - UNKNOWN
+          - COMPLETED
           - SUCCEEDED
           - FAILED
-          description: 늦은 승인 환불의 실제 결과. REQUESTED나 Kafka 발행 성공은 환불 완료가 아니다.
+          description: 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다.
+        compensation:
+          type:
+          - object
+          - 'null'
+          description: 시스템 보상은 사용자 CANCEL_PENDING과 별도다. 명시적 승인 UNKNOWN 또는 첫 처리 시작부터600초
+            무응답에서 COMPENSATION_PENDING과 고정 요청·Outbox를 함께 저장한다. 단순 통신 오류와 정상202는 기한까지
+            PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기와 예약을 유지하고 검증된 SUCCEEDED/NO_CHARGE에서
+            CANCELLED로 확정하며 자원을 한 번 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다.
+            이미 종료한 과거 주문은 유지한다.
+          required:
+          - requestId
+          - status
+          - outcome
+          - completedAt
+          properties:
+            requestId:
+              type: string
+              pattern: ^[A-Za-z0-9_-]{1,64}$
+            status:
+              type: string
+              enum:
+              - REQUESTED
+              - UNKNOWN
+              - COMPLETED
+              - FAILED
+            outcome:
+              type:
+              - string
+              - 'null'
+              enum:
+              - null
+              - UNKNOWN
+              - SUCCEEDED
+              - FAILED
+              - NO_CHARGE
+            completedAt:
+              type:
+              - string
+              - 'null'
+              format: date-time
   responses:
     BadRequest:
       description: 요청 값·형식 또는 금액 범위 오류
@@ -5648,4 +5843,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `47b11bb36205b732cb86fa6133c08fac4432d9b05abefb89d12a09d7d4770a6b`
+입력 SHA-256: `0e1b21b8b8e4fe70bff8ac969a28a92cafb65035b2d95522c0edc6574680259f`

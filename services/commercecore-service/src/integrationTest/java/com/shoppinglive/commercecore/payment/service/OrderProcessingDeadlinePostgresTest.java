@@ -124,6 +124,13 @@ class OrderProcessingDeadlinePostgresTest extends RefundTestSupport {
                 .contains(p.paymentGroupId());
         assertThat(paymentGroups.expire(p.paymentGroupId())).isTrue();
         assertThat(paymentGroups.expire(p.paymentGroupId())).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE topic='commerce.refund.requests.v1'",
+                                Long.class))
+                .isZero();
         assertThat(paymentGroups.get(MEMBER_A, group.groupNumber()).status())
                 .isEqualTo(OrderStatus.EXPIRED);
         assertThat(legacyStock(orders.findAll().getFirst().getTradeSkuId()).getReserved()).isZero();

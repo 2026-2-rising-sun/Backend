@@ -23,6 +23,62 @@ public class RefundQueryRepository {
         this.named = new NamedParameterJdbcTemplate(jdbc);
     }
 
+    public String kafkaRequestId(long id) {
+        var ids =
+                jdbc.queryForList(
+                        "SELECT refund_request_id FROM core_refund_intent WHERE user_request_id=?",
+                        String.class,
+                        id);
+        return ids.isEmpty() ? null : ids.getFirst();
+    }
+
+    public List<RefundableTarget> sheetTargets(
+            com.shoppinglive.commercecore.order.entity.PaymentGroup group) {
+        return jdbc.query(
+                """
+            SELECT o.*,COALESCE(x.succeeded_quantity,0) AS succeeded_quantity,COALESCE(x.held_quantity,0) AS held_quantity,COALESCE(x.success_amount,0) AS success_amount,COALESCE(x.held_amount,0) AS held_amount,
+              p.approved_at,EXISTS(SELECT 1 FROM core_refund_intent i WHERE i.payment_group_id=o.payment_group_id AND i.purpose='SYSTEM_COMPENSATION') AS fenced
+            FROM orders o LEFT JOIN order_payment_relay p ON p.payment_group_id=o.payment_group_id
+            LEFT JOIN (SELECT t.order_id,SUM(CASE WHEN r.status='SUCCESS' THEN t.quantity ELSE 0 END) AS succeeded_quantity,
+                SUM(CASE WHEN r.status IN ('PROCESSING','UNKNOWN') THEN t.quantity ELSE 0 END) AS held_quantity,
+                SUM(CASE WHEN r.status='SUCCESS' THEN t.refund_amount ELSE 0 END) AS success_amount,
+                SUM(CASE WHEN r.status IN ('PROCESSING','UNKNOWN') THEN t.refund_amount ELSE 0 END) AS held_amount
+                FROM refund_target_order t JOIN refund_request r ON r.id=t.refund_request_id GROUP BY t.order_id) x ON x.order_id=o.id
+            WHERE o.payment_group_id=? ORDER BY o.id
+            """,
+                (r, n) -> {
+                    int quantity = r.getInt("quantity"),
+                            done = r.getInt("succeeded_quantity"),
+                            held = r.getInt("held_quantity");
+                    long remaining = r.getLong("payable_amount") - r.getLong("success_amount");
+                    String reason = null;
+                    if (r.getBoolean("fenced")) reason = "SYSTEM_COMPENSATION";
+                    else if (!java.util.Set.of("PAID", "PARTIALLY_REFUNDED")
+                            .contains(group.getStatus().name())) reason = "PAYMENT_NOT_COMPLETED";
+                    else if (r.getTimestamp("approved_at") == null
+                            || !com.shoppinglive.commercecore.payment.service.RefundWindowPolicy
+                                    .isOpen(
+                                            java.time.Instant.now(),
+                                            r.getTimestamp("approved_at").toInstant()))
+                        reason = "REFUND_WINDOW_EXPIRED";
+                    else if (quantity - done - held <= 0) reason = "ALREADY_REQUESTED";
+                    return new RefundableTarget(
+                            r.getLong("id"),
+                            (Long) r.getObject("source_cart_item_id"),
+                            r.getString("product_name_snapshot"),
+                            quantity,
+                            remaining,
+                            reason == null,
+                            reason,
+                            r.getLong("unit_price"),
+                            done,
+                            held,
+                            quantity - done - held,
+                            remaining - r.getLong("held_amount"));
+                },
+                group.getId());
+    }
+
     public List<Long> requestedOrderIds(Long groupId) {
         return jdbc.query(
                 """
@@ -99,7 +155,7 @@ public class RefundQueryRepository {
     public List<RefundTarget> targets(long id) {
         return jdbc.query(
                 """
-            SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
+            SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,COALESCE(t.quantity,o.quantity) AS quantity,t.refund_amount
               FROM refund_target_order t JOIN orders o ON o.id=t.order_id
              WHERE t.refund_request_id=? ORDER BY t.order_id
             """,
@@ -110,7 +166,7 @@ public class RefundQueryRepository {
     public List<RefundTarget> sellerTargets(long id, String sellerId) {
         return jdbc.query(
                 """
-            SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
+            SELECT o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,COALESCE(t.quantity,o.quantity) AS quantity,t.refund_amount
               FROM refund_target_order t JOIN orders o ON o.id=t.order_id
              WHERE t.refund_request_id=? AND t.seller_id_snapshot=? ORDER BY t.order_id
             """,
@@ -161,7 +217,7 @@ public class RefundQueryRepository {
     public Map<Long, List<RefundTarget>> targetsForGroup(long groupId) {
         return bulkTargets(
                 """
-            SELECT t.refund_request_id,o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
+            SELECT t.refund_request_id,o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,COALESCE(t.quantity,o.quantity) AS quantity,t.refund_amount
             FROM refund_target_order t JOIN orders o ON o.id=t.order_id
             JOIN refund_request r ON r.id=t.refund_request_id
             WHERE r.payment_group_id=:groupId ORDER BY t.refund_request_id,t.order_id
@@ -173,7 +229,7 @@ public class RefundQueryRepository {
             List<Long> ids, String sellerId) {
         return bulkTargets(
                 """
-            SELECT t.refund_request_id,o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,o.quantity,t.refund_amount
+            SELECT t.refund_request_id,o.source_cart_item_id,t.order_id,t.product_id_snapshot,o.product_name_snapshot,COALESCE(t.quantity,o.quantity) AS quantity,t.refund_amount
             FROM refund_target_order t JOIN orders o ON o.id=t.order_id
             WHERE t.refund_request_id IN (:ids) AND t.seller_id_snapshot=:sellerId
             ORDER BY t.refund_request_id,t.order_id
