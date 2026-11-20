@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.nio.file.*;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.*;
 
 class RefundRequestedEventContractTest {
@@ -32,5 +33,16 @@ class RefundRequestedEventContractTest {
         assertThat(json.path("aggregateId").asText()).isEqualTo(ref);
         assertThat(json.path("payload").size()).isEqualTo(4);
         assertThat(json.path("payload").path("refundRequestId").asText()).isEqualTo("late-7001");
+        var path = Path.of("build/contract-samples/RefundRequested.json");
+        Files.createDirectories(path.getParent());
+        mapper.writeValue(
+                path.toFile(),
+                Map.of(
+                        "contract",
+                        "commerce-refund-requests-legacy.yaml",
+                        "message",
+                        "RefundRequested",
+                        "payload",
+                        event));
     }
 }
