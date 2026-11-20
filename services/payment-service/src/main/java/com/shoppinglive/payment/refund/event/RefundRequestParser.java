@@ -11,8 +11,9 @@ import java.util.regex.Pattern;
  * {@code commerce.refund.requests.v1} 메시지를 읽어 요청 payload를 고치지 않고 돌려준다. 계약 원본은 {@code
  * contracts/events/commerce-refund-requests.yaml}.
  *
- * <p>결과를 만들 수 없는 경우(봉투·키·요청 ID·목적·금액·paymentId·items가 계약과 다름)만 {@link
- * InvalidRefundRequestException}이다. 결제 없음 같은 업무 판단은 하지 않는다.
+ * <p>요청 payload는 결과에 그대로 실린다. 그래서 요청 계약을 어긴 메시지(봉투·키·필드 집합·값 형식)는 결과를 만들지 않고 {@link
+ * InvalidRefundRequestException}으로 DLT에 보낸다. 어긴 원문을 결과에 실으면 Core가 거부하고 무한 재시도해 파티션이 막힌다(#389). 결제
+ * 없음 같은 업무 판단은 하지 않는다.
  */
 public final class RefundRequestParser {
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -25,9 +26,31 @@ public final class RefundRequestParser {
                     "aggregateId",
                     "occurredAt",
                     "payload");
+    // 결과에 그대로 실리므로 Core 결과 소비자가 받는 요청 필드만 허용한다. paymentId만 선택이다
+    private static final Set<String> REQUIRED =
+            Set.of(
+                    "refundRequestId",
+                    "orderRef",
+                    "purpose",
+                    "reason",
+                    "currency",
+                    "amount",
+                    "items",
+                    "requestedAt");
+    private static final Set<String> SELLER_ITEM =
+            Set.of("sellerOrderNumber", "amount", "orderItems");
+    private static final Set<String> ORDER_ITEM = Set.of("orderItemId", "quantity", "amount");
     private static final Pattern ORDER_REF = Pattern.compile("[A-Za-z0-9_-]{6,50}");
     private static final Pattern REFUND_REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private static final Set<String> PURPOSES = Set.of("USER_REFUND", "SYSTEM_COMPENSATION");
+    private static final Set<String> REASONS =
+            Set.of(
+                    "CUSTOMER_REQUEST",
+                    "APPROVAL_RESPONSE_LOST",
+                    "APPROVAL_UNKNOWN",
+                    "LATE_APPROVAL",
+                    "ORDER_EXPIRED",
+                    "ORDER_CANCELLED");
 
     private RefundRequestParser() {}
 
@@ -38,10 +61,7 @@ public final class RefundRequestParser {
         } catch (JsonProcessingException | IllegalArgumentException e) {
             throw new InvalidRefundRequestException("JSON이 아닙니다.", e);
         }
-        require(
-                event != null && event.isObject() && event.size() == ENVELOPE.size(),
-                "봉투 필드가 계약과 다릅니다.");
-        event.fieldNames().forEachRemaining(f -> require(ENVELOPE.contains(f), "모르는 봉투 필드: " + f));
+        require(event != null && hasExactly(event, ENVELOPE), "봉투 필드가 계약과 다릅니다.");
         require("RefundRequested".equals(event.path("eventType").asText()), "eventType이 다릅니다.");
         require(
                 event.path("schemaVersion").isInt() && event.path("schemaVersion").intValue() == 1,
@@ -51,6 +71,14 @@ public final class RefundRequestParser {
 
         JsonNode payload = event.path("payload");
         require(payload.isObject(), "payload가 객체가 아닙니다.");
+        payload.fieldNames()
+                .forEachRemaining(
+                        f ->
+                                require(
+                                        REQUIRED.contains(f) || f.equals("paymentId"),
+                                        "모르는 payload 필드: " + f));
+        REQUIRED.forEach(f -> require(payload.has(f), "필수 payload 필드가 없습니다: " + f));
+
         String orderRef = payload.path("orderRef").asText();
         require(
                 payload.path("orderRef").isTextual() && ORDER_REF.matcher(orderRef).matches(),
@@ -64,23 +92,68 @@ public final class RefundRequestParser {
                                 .matcher(payload.path("refundRequestId").asText())
                                 .matches(),
                 "refundRequestId 형식이 다릅니다.");
-        require(PURPOSES.contains(payload.path("purpose").asText()), "purpose가 다릅니다.");
+        String purpose = payload.path("purpose").asText();
+        String reason = payload.path("reason").asText();
+        require(PURPOSES.contains(purpose), "purpose가 다릅니다.");
+        require(REASONS.contains(reason), "reason이 다릅니다.");
         require(
-                payload.path("amount").isIntegralNumber()
-                        && payload.path("amount").canConvertToLong()
-                        && payload.path("amount").longValue() >= 0,
-                "amount가 0 이상 정수가 아닙니다.");
+                !purpose.equals("USER_REFUND") || reason.equals("CUSTOMER_REQUEST"),
+                "고객 환불의 reason은 CUSTOMER_REQUEST입니다.");
+        require("KRW".equals(payload.path("currency").asText()), "currency가 KRW가 아닙니다.");
+        require(payload.path("requestedAt").isTextual(), "requestedAt이 문자열이 아닙니다.");
+        require(isMoney(payload.path("amount")), "amount가 0 이상 정수가 아닙니다.");
         if (payload.has("paymentId")) {
-            require(
-                    payload.get("paymentId").isIntegralNumber()
-                            && payload.get("paymentId").canConvertToLong()
-                            && payload.get("paymentId").longValue() >= 1,
-                    "paymentId가 양의 정수가 아닙니다.");
+            require(isPositiveId(payload.get("paymentId")), "paymentId가 양의 정수가 아닙니다.");
         }
-        require(
-                payload.path("items").isArray() && !payload.path("items").isEmpty(),
-                "items가 비었습니다.");
+        requireItems(payload.path("items"));
         return payload;
+    }
+
+    /** Core가 결과의 items를 정규화할 때 요구하는 모양이다. */
+    private static void requireItems(JsonNode items) {
+        require(items.isArray() && !items.isEmpty() && items.size() <= 100, "items 개수가 다릅니다.");
+        for (JsonNode seller : items) {
+            require(hasExactly(seller, SELLER_ITEM), "판매자 항목 필드가 다릅니다.");
+            String number = seller.path("sellerOrderNumber").asText();
+            require(
+                    seller.path("sellerOrderNumber").isTextual()
+                            && !number.isEmpty()
+                            && number.length() <= 64,
+                    "sellerOrderNumber 형식이 다릅니다.");
+            require(isMoney(seller.path("amount")), "판매자 항목 금액이 다릅니다.");
+            JsonNode orderItems = seller.path("orderItems");
+            require(
+                    orderItems.isArray() && !orderItems.isEmpty() && orderItems.size() <= 100,
+                    "orderItems 개수가 다릅니다.");
+            for (JsonNode item : orderItems) {
+                require(hasExactly(item, ORDER_ITEM), "주문 항목 필드가 다릅니다.");
+                require(isPositiveId(item.path("orderItemId")), "orderItemId가 양의 정수가 아닙니다.");
+                require(
+                        item.path("quantity").isInt() && item.path("quantity").intValue() >= 1,
+                        "quantity가 1 이상 정수가 아닙니다.");
+                require(isMoney(item.path("amount")), "주문 항목 금액이 다릅니다.");
+            }
+        }
+    }
+
+    private static boolean isMoney(JsonNode node) {
+        return node.isIntegralNumber() && node.canConvertToLong() && node.longValue() >= 0;
+    }
+
+    private static boolean isPositiveId(JsonNode node) {
+        return node.isIntegralNumber() && node.canConvertToLong() && node.longValue() >= 1;
+    }
+
+    private static boolean hasExactly(JsonNode node, Set<String> fields) {
+        if (!node.isObject() || node.size() != fields.size()) {
+            return false;
+        }
+        for (String field : fields) {
+            if (!node.has(field)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isUuid(JsonNode node) {

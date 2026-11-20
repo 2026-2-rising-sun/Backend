@@ -184,7 +184,8 @@
 <li>결제가 없거나 paymentId가 없거나 다르면, 또는 같은 결제에 진행 중인 시스템 보상이 있으면 돈을 움직이지 않고 FAILED 결과를 같은 트랜잭션의 outbox로 <code>payment.refund.results.v1</code>에 보낸다.</li>
 <li>같은 요청·같은 본문은 저장한 결과를 그대로 다시 보낸다. 다른 본문은 <code>refund_request_conflict</code>에 기록하고 결과를 보내지 않는다.</li>
 <li>유효한 요청은 PROCESSING으로 접수하고 <code>RefundIntakeService.execute</code>의 목적별 분기에서 끝난다. 고객 환불(#370)과 시스템 보상(#386) 실행이 붙기 전까지 토스 취소를 부르지 않고 결과도 보내지 않는다.</li>
+<li><code>execute</code>는 이번에 새로 넣은 행에서만 불린다. 같은 요청을 다시 받아도, 커밋 뒤 <code>execute</code> 전에 죽었거나 <code>execute</code>가 예외를 던져도 다시 불리지 않는다. 끝나지 못한 PROCESSING은 실행 PR의 재처리 스케줄러(REF-EXEC-01)가 집어야 한다.</li>
 </ul>
-<p>소비자는 <code>payment.refunds.consumer-enabled</code>(기본 켜짐)로 끈다. 목표는 <a href="requirements/refund.html">환불 요구사항</a>과 <a href="design.html#states">목표 설계</a>에 있다. 지운 Mock 구현은 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>에서 볼 수 있다.</p><p class="muted fingerprint">MD SHA-256: <code>b457acfb699b2c10bb375947cd4f891fd026ddfb00b74253b7e7bff2720f279c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>소비자는 <code>payment.refunds.consumer-enabled</code>(기본 켜짐)로 끈다. 목표는 <a href="requirements/refund.html">환불 요구사항</a>과 <a href="design.html#states">목표 설계</a>에 있다. 지운 Mock 구현은 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>에서 볼 수 있다.</p><p class="muted fingerprint">MD SHA-256: <code>a421680e528c8b90cc1cc523c8abfc794ae602b94c70d9514bfc681632d40fb5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
