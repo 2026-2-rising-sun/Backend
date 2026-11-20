@@ -23,7 +23,7 @@ class PaymentApprovedContractTest {
                 new PaymentApproved(1001L, "OD-20261110-K7Q2M9XA", 30000L, approvedAt);
         EventEnvelope<PaymentApproved> event = payload.envelope(approvedAt.plusSeconds(1));
 
-        assertThat(PaymentApproved.TOPIC).isEqualTo("payment.execution-results.v1");
+        assertThat(PaymentApproved.TOPIC).isEqualTo("payment.execution.results.v1");
         assertThat(event.eventType()).isEqualTo("PaymentApproved");
         assertThat(event.aggregateId()).isEqualTo("OD-20261110-K7Q2M9XA");
 
