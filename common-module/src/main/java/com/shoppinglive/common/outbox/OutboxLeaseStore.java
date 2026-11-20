@@ -14,6 +14,7 @@ public class OutboxLeaseStore {
     private final Duration lease;
     private final long retryMillis;
     private final long maxRetryMillis;
+    private final java.util.List<String> excludedTopics;
 
     public OutboxLeaseStore(
             JdbcTemplate jdbc,
@@ -21,6 +22,17 @@ public class OutboxLeaseStore {
             Duration lease,
             Duration retry,
             Duration maxRetry) {
+        this(jdbc, manager, lease, retry, maxRetry, java.util.List.of());
+    }
+
+    public OutboxLeaseStore(
+            JdbcTemplate jdbc,
+            PlatformTransactionManager manager,
+            Duration lease,
+            Duration retry,
+            Duration maxRetry,
+            java.util.List<String> excludedTopics) {
+        this.excludedTopics = java.util.List.copyOf(excludedTopics);
         if (lease.toMillis() <= 0 || retry.toMillis() <= 0 || maxRetry.compareTo(retry) < 0) {
             throw new IllegalArgumentException("Outbox lease와 재시도 간격이 올바르지 않습니다.");
         }
@@ -42,6 +54,15 @@ public class OutboxLeaseStore {
         return transactions.execute(
                 status -> {
                     // 같은 토픽·키의 앞선 미발행 행이 남아 있으면 뒤의 행은 가져오지 않는다.
+                    String excluded =
+                            excludedTopics.isEmpty()
+                                    ? ""
+                                    : " AND e.topic NOT IN ("
+                                            + String.join(
+                                                    ",",
+                                                    java.util.Collections.nCopies(
+                                                            excludedTopics.size(), "?"))
+                                            + ") ";
                     var ids =
                             jdbc.queryForList(
                                     """
@@ -52,9 +73,11 @@ public class OutboxLeaseStore {
                         SELECT 1 FROM event_outbox earlier
                         WHERE earlier.topic=e.topic AND earlier.message_key=e.message_key
                           AND earlier.published_at IS NULL AND earlier.id < e.id)
-                    ORDER BY e.id LIMIT 1 FOR UPDATE OF e SKIP LOCKED
-                    """,
-                                    Long.class);
+                    """
+                                            + excluded
+                                            + " ORDER BY e.id LIMIT 1 FOR UPDATE OF e SKIP LOCKED",
+                                    Long.class,
+                                    excludedTopics.toArray());
                     if (ids.isEmpty()) return null;
                     long id = ids.getFirst();
                     String token = UUID.randomUUID().toString();

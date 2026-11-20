@@ -27,6 +27,7 @@ spring:
 shoppinglive:
   outbox:
     relay:
+      excluded-topics: [commerce.catalog.snapshots.v1]
       claim:
         enabled: true
   security:
@@ -49,6 +50,9 @@ server:
     max-swallow-size: 10MB
 
 commercecore:
+  catalog:
+    inventory-interval: 60s
+    inventory-batch-size: 500
   refunds:
     api-enabled: true
     execution-enabled: true

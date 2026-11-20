@@ -46,6 +46,23 @@ class OutboxRelayTest {
         relay.observeWith(new com.shoppinglive.common.observability.BusinessTelemetry(metrics));
     }
 
+    @Test
+    @DisplayName("CDC 제외 토픽이 있으면 일반 경로도 필터 조회를 사용한다")
+    void excludesCdcTopicsInNormalPolling() {
+        var excluded = List.of("commerce.catalog.snapshots.v1");
+        var filtered =
+                new OutboxRelay(
+                        repository,
+                        kafka,
+                        new OutboxProperties(100, Duration.ofSeconds(1), excluded),
+                        Runnable::run);
+        when(repository.findPendingExcluding(eq(excluded), any(Pageable.class)))
+                .thenReturn(List.of());
+        assertEquals(0, filtered.relay());
+        verify(repository, never()).findByPublishedAtIsNullOrderByIdAsc(any());
+        verify(kafka, never()).send(any(ProducerRecord.class));
+    }
+
     @DisplayName("대기 이벤트를 키·타입 헤더와 함께 순서대로 전송하고 발행 표시를 남긴다")
     @Test
     void sendsPendingMessagesInOrderWithKeyAndTypeHeaderThenMarksThemPublished() {

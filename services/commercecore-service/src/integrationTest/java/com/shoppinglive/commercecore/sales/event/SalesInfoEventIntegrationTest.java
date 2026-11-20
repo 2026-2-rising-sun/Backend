@@ -110,7 +110,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         return UUID.randomUUID().toString();
     }
 
-    @DisplayName("트랜잭션별 최종 스냅샷 하나에서 네 종류의 이벤트를 수집한다")
+    @DisplayName("트랜잭션별 최종 스냅샷에서 필요한 판매 알림을 수집하고 순수 재고 알림을 제외한다")
     @Test
     void capturesFourTypesAndOneFinalSnapshotPerTransaction() {
         long id = register(3);
@@ -126,7 +126,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                 });
         assertThat(emitted)
                 .extracting(EventEnvelope::eventType)
-                .containsExactly("PriceChanged", "InventoryChanged", "SalesStatusChanged");
+                .containsExactly("PriceChanged", "SalesStatusChanged");
         assertThat(emitted)
                 .allSatisfy(
                         event -> {
@@ -181,7 +181,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         var order = creation.create(command, "replay").order();
         assertThat(emitted)
                 .extracting(EventEnvelope::eventType)
-                .containsExactly("InventoryChanged", "SalesStatusChanged");
+                .containsExactly("SalesStatusChanged");
         assertThat(emitted).allSatisfy(e -> assertThat(e.payload().snapshotVersion()).isEqualTo(3));
         emitted.clear();
         creation.create(command, "replay");
@@ -189,7 +189,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
         orders.cancelBeforePayment(order.getOrderNumber(), member);
         assertThat(emitted)
                 .extracting(EventEnvelope::eventType)
-                .containsExactly("InventoryChanged", "SalesStatusChanged");
+                .containsExactly("SalesStatusChanged");
         assertThat(emitted)
                 .allSatisfy(
                         e -> {
@@ -222,7 +222,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                                 2000,
                                 "group")
                         .group();
-        assertThat(emitted).hasSize(4);
+        assertThat(emitted).hasSize(2);
         assertThat(emitted)
                 .allSatisfy(
                         e -> {
@@ -240,7 +240,7 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                 groupId);
         emitted.clear();
         assertThat(groups.expire(groupId)).isTrue();
-        assertThat(emitted).hasSize(4);
+        assertThat(emitted).hasSize(2);
         assertThat(emitted)
                 .allSatisfy(
                         e -> {
@@ -281,10 +281,16 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                                 java.util.Comparator.comparingLong(
                                         e -> e.payload().snapshotVersion()))
                         .toList();
-        assertThat(ordered).hasSize(2);
-        assertThat(ordered).extracting(e -> e.payload().snapshotVersion()).containsExactly(2L, 3L);
-        assertThat(ordered.getLast().payload().price()).isEqualTo(2000);
-        assertThat(ordered.getLast().payload().available()).isEqualTo(9);
+        assertThat(ordered).hasSize(1);
+        assertThat(ordered.getFirst().eventType()).isEqualTo("PriceChanged");
+        assertThat(ordered.getFirst().payload().snapshotVersion()).isIn(2L, 3L);
+        assertThat(ordered.getFirst().payload().price()).isEqualTo(2000);
+        assertThat(jdbc.queryForObject("SELECT available FROM sku WHERE id=?", Integer.class, id))
+                .isEqualTo(9);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT inventory_version FROM sku WHERE id=?", Long.class, id))
+                .isEqualTo(1);
         assertThat(version(id)).isEqualTo(3);
     }
 
@@ -302,8 +308,19 @@ class SalesInfoEventIntegrationTest extends CommerceCoreSecurityTestSupport {
                             ignored -> sales.adjustAvailable(innerId, 1, SELLER));
                     status.setRollbackOnly();
                 });
-        assertThat(emitted).hasSize(1);
-        assertThat(emitted.getFirst().payload().salesId()).isEqualTo(innerId);
+        assertThat(emitted).isEmpty();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT inventory_version FROM sku WHERE id=?",
+                                Long.class,
+                                innerId))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT inventory_published_version FROM sku WHERE id=?",
+                                Long.class,
+                                innerId))
+                .isEqualTo(-1);
         assertThat(version(outerId)).isEqualTo(1);
         assertThat(version(innerId)).isEqualTo(2);
     }

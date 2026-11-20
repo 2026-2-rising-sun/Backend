@@ -65,7 +65,7 @@ class SkuSalesIntegrationTest
         assertThat(sku.status()).isEqualTo(SalesStatus.READY);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM sales_info", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM sales_stock", Long.class)).isZero();
-        assertThat(events.count()).isEqualTo(1);
+        assertThat(events.count()).isEqualTo(2);
         assertThatThrownBy(() -> register(1))
                 .isInstanceOf(
                         com.shoppinglive.commercecore.sales.exception
@@ -164,7 +164,7 @@ class SkuSalesIntegrationTest
         }
         var current = skus.findBySkuIds(List.of(sku.skuId())).getFirst();
         assertThat(current.price()).isEqualTo(1000);
-        assertThat(events.count()).isEqualTo(1);
+        assertThat(events.count()).isEqualTo(2);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT snapshot_version FROM sku WHERE id=?",
@@ -198,7 +198,7 @@ class SkuSalesIntegrationTest
                     .containsExactlyInAnyOrder(true, false);
         }
         assertThat(skus.findByProductId(product.getId())).hasSize(1);
-        assertThat(events.count()).isEqualTo(1);
+        assertThat(events.count()).isEqualTo(2);
     }
 
     @Test

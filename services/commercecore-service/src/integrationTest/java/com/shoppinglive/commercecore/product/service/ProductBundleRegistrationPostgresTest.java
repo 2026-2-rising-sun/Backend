@@ -129,10 +129,25 @@ class ProductBundleRegistrationPostgresTest {
         assertThat(jdbc.queryForList("SELECT sale_status FROM sku", String.class))
                 .containsOnly("ON_SALE");
         assertThat(jdbc.queryForList("SELECT reserved FROM sku", Integer.class)).containsOnly(0);
-        assertThat(count("event_outbox")).isEqualTo(3);
+        com.shoppinglive.commercecore.product.support.ProductBundleOutboxAssertions
+                .assertRegisteredBundle(
+                        jdbc,
+                        mapper,
+                        response.productId(),
+                        response.skus().stream()
+                                .map(ProductBundleResponse.RegisteredSku::skuId)
+                                .toList());
         assertThat(jdbc.queryForObject("SELECT initial_sku_count FROM product", Integer.class))
                 .isEqualTo(2);
         assertThat(register("same")).isEqualTo(response);
+        com.shoppinglive.commercecore.product.support.ProductBundleOutboxAssertions
+                .assertRegisteredBundle(
+                        jdbc,
+                        mapper,
+                        response.productId(),
+                        response.skus().stream()
+                                .map(ProductBundleResponse.RegisteredSku::skuId)
+                                .toList());
         assertThat(count("product")).isEqualTo(1);
         try (var paths = Files.list(DIRECTORY)) {
             assertThat(paths.count()).isEqualTo(1);
@@ -172,17 +187,57 @@ class ProductBundleRegistrationPostgresTest {
     }
 
     @Test
-    @DisplayName("Product와 커밋 직전 SKU Outbox 실패는 각각 전체 등록을 롤백한다")
-    void rollsBackOutboxFailures() {
-        for (String topic : List.of("commerce.product-info.v1", "commerce.sales-info.v1")) {
+    @DisplayName("상품·SKU CDC와 기존 판매 알림의 각 Outbox 실패는 완료 응답·전체 등록·파일을 롤백한다")
+    void rollsBackOutboxFailures() throws Exception {
+        var failures =
+                List.of(
+                        Map.entry("ProductSnapshotChanged", "commerce.catalog.snapshots.v1"),
+                        Map.entry("SkuSnapshotChanged", "commerce.catalog.snapshots.v1"),
+                        Map.entry("SalesRegistered", "commerce.sales-info.v1"));
+        for (var failure : failures) {
             jdbc.execute("ALTER TABLE event_outbox DROP CONSTRAINT IF EXISTS reject_outbox");
             jdbc.execute(
-                    "ALTER TABLE event_outbox ADD CONSTRAINT reject_outbox CHECK(topic<>'"
-                            + topic
-                            + "')");
-            assertThatThrownBy(() -> register(topic)).isInstanceOf(RuntimeException.class);
+                    "ALTER TABLE event_outbox ADD CONSTRAINT reject_outbox CHECK(NOT(topic='"
+                            + failure.getValue()
+                            + "' AND event_type='"
+                            + failure.getKey()
+                            + "'))");
+            assertThatThrownBy(() -> register(failure.getKey()))
+                    .as(failure.getKey())
+                    .isInstanceOf(RuntimeException.class);
             noBusinessRows();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM product_registration WHERE response_json IS NOT NULL",
+                                    Long.class))
+                    .isZero();
+            String key =
+                    jdbc.queryForObject(
+                            "SELECT storage_key FROM product_registration WHERE seller_id='seller' AND request_key=?",
+                            String.class,
+                            failure.getKey());
+            assertThat(storage.exists(key)).as(failure.getKey()).isFalse();
+            try (var files = Files.list(DIRECTORY)) {
+                assertThat(files.count()).isZero();
+            }
         }
+        // 별도 커밋한 복구 위치는 남지만 완료 멱등 응답은 없다. 같은 요청을 다시 완료할 수 있다.
+        jdbc.execute("ALTER TABLE event_outbox DROP CONSTRAINT reject_outbox");
+        var replay = register("SkuSnapshotChanged");
+        assertThat(register("SkuSnapshotChanged")).isEqualTo(replay);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM product_registration WHERE response_json IS NOT NULL",
+                                Long.class))
+                .isEqualTo(1);
+        com.shoppinglive.commercecore.product.support.ProductBundleOutboxAssertions
+                .assertRegisteredBundle(
+                        jdbc,
+                        mapper,
+                        replay.productId(),
+                        replay.skus().stream()
+                                .map(ProductBundleResponse.RegisteredSku::skuId)
+                                .toList());
     }
 
     @Test

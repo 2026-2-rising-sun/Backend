@@ -79,7 +79,7 @@ Product들을 ID순으로 공유 잠금·검증한 다음 SKU들을 ID순 FOR UP
 
 수량 조건만으로 주문 A/B의 예약을 구별하지 못한다. Order가 취소/환불 적용 여부를 먼저 보호한 뒤 SKU를 한 번 변경해야 한다. 이미 생성된 주문의 consume/release/restock에는 Product/SKU의 신규 판매허용 조건을 재사용하지 않는다.
 
-현재가·available·외부 표시 상태의 최종 스냅샷이 같으면 이벤트를 만들지 않는다. 변경하면 SKU별 snapshotVersion을 올리고 같은 트랜잭션의 Outbox에 기존 sales-info 토픽/키/필드로 기록한다. 실제 Kafka 전달 검증은 별도다.
+판매 등록·가격·판매 상태 전환 알림은 기존 sales-info 토픽/키를 보존한다. 순수 InventoryChanged Outbox는 만들지 않는다. 가격/판매의도 변경은 SKU metadata_version과 metadata_updated_at을 함께 바꾸고 업무 TX의 Catalog Outbox에 즉시 저장한다. 수량 변경은 공통 저장소 SQL에서 inventory_version과 inventory_changed_at을 함께 바꾼다. reserved만 소진해도 재고 dirty에 포함된다. 실제 CDC/Kafka 전달 검증은 별도다.
 
 ### 근거
 
@@ -141,3 +141,11 @@ SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생
 ## 통합 등록의 최초 판매 상태 (#372)
 
 통합 등록 서비스는 활성 DB 트랜잭션에서 createOnSale을 호출한다. SKU를 처음부터 ON_SALE로 생성하고 reserved=0, available=입력 초기 재고, snapshot_version=1을 저장한다. registered 추적기가 최종 스냅샷을 같은 커밋의 Outbox에 남긴다. 기존 create와 단일 판매 API의 READY 생성은 그대로 유지한다. optionLabel은 등록 항목을 구분하는 선택적 표시명이며 구조화된 옵션 정의는 아니다. 다중 SKU에서는 비어 있지 않은 고유 표시명이 필수다.
+
+## 60초 재고 합침과 초기 적재
+
+V109는 metadata_version/metadata_product_version, inventory_version/inventory_published_version, 독립 변경시각, deleted_at을 추가한다. 기존 SKU와 새 SKU는 inventory_published_version=-1이므로 최초 수량도 배치 대상이다. 모든 수량 포트가 같은 UPDATE에서 dirty revision을 증가시켜 호출자에게 새 marker API를 요구하지 않는다. 기본 주기는 `commercecore.catalog.inventory-interval=60s`, 한 TX의 최대 SKU 수는500이다.
+
+`InventorySnapshotBatch`는 dirty SKU를 ID순 FOR UPDATE SKIP LOCKED로 선점한다. 수량·revision을 같은 잠금 아래 읽어 InventorySnapshotChanged를 Outbox에 쓰고 마지막 발행 revision을 같은 TX에서 완료한다. 다른 인스턴스는 잠긴 행을 건너뛴다. 동시 수량 변경은 이 잠금 뒤에 실행되므로 다음 주기에 남는다. Outbox 오류·프로세스 종료는 TX 롤백으로 완료 표시도 취소하며 재시작이 다시 가져간다. 별도 lease 만료나 메모리 큐에 의존하지 않는다.60초는 배치 주기이고 장애 포함 최대 전파 SLA가 아니다.
+
+초기 적재는 `commercecore.catalog.backfill.enabled=true`를 명시한 기동에서 Product ID를100개씩 읽고 상품별 TX를 실행한다. Product 공유 잠금→SKU ID순 잠금으로 현재 버전과 삭제 이력을 같은 새 계약에 저장한다. 중단 뒤 재기동은 동일 revision을 반복해도 안전하다. capturedAt은 영속 inventory_changed_at을 재사용하며 SKU productMetadataVersion도 해당 메타데이터 변경 시 저장한 참조 버전을 쓴다. 재적재 때문에 같은 revision의 원문이 달라지지 않는다.

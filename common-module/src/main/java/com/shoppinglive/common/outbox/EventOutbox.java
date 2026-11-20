@@ -9,8 +9,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 상태 전이와 같은 트랜잭션에서 이벤트를 기록한다. 트랜잭션이 롤백되면 이벤트도 남지 않고, 커밋되면 {@link OutboxRelay} 가 언젠가 반드시 Kafka 로 보낸다
- * (at-least-once). 요청 처리 중에는 Kafka 를 호출하지 않으므로 Kafka 장애가 API 성공을 막지 않는다.
+ * 상태 전이와 같은 트랜잭션에서 이벤트를 기록한다. 롤백하면 이벤트도 남지 않는다. 커밋 뒤 relay 대상은 {@link OutboxRelay}, 명시적으로 제외한 CDC
+ * 대상은 별도 connector가 전달한다. 전달은 중복될 수 있어 소비자의 멱등 처리가 필요하다. 요청 처리 중에는 Kafka를 호출하지 않는다.
  *
  * <p>append 는 커밋 직후 fast-path 발행을 유도하기 위해 {@link OutboxCommittedEvent} 를 함께 발행한다. 호출자 트랜잭션이 커밋되면
  * relay 가 즉시 drain 하고, 커밋이 롤백되면 이벤트도 함께 폐기되므로 발행이 일어나지 않는다.
