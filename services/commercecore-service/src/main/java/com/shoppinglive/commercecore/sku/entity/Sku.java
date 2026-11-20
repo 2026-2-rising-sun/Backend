@@ -45,5 +45,31 @@ public class Sku {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    private long metadataVersion;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    private long metadataProductVersion;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("0")
+    private long inventoryVersion;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("-1")
+    private long inventoryPublishedVersion;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("CURRENT_TIMESTAMP")
+    private Instant metadataUpdatedAt;
+
+    @Column(nullable = false)
+    @org.hibernate.annotations.ColumnDefault("CURRENT_TIMESTAMP")
+    private Instant inventoryChangedAt;
+
+    private Instant deletedAt;
+
     protected Sku() {}
 }

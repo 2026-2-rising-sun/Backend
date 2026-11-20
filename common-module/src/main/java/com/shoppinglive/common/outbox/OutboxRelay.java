@@ -104,8 +104,12 @@ public class OutboxRelay {
 
     private int drainBatch() {
         final List<OutboxMessage> pending =
-                repository.findByPublishedAtIsNullOrderByIdAsc(
-                        PageRequest.ofSize(properties.batchSize()));
+                properties.excludedTopics().isEmpty()
+                        ? repository.findByPublishedAtIsNullOrderByIdAsc(
+                                PageRequest.ofSize(properties.batchSize()))
+                        : repository.findPendingExcluding(
+                                properties.excludedTopics(),
+                                PageRequest.ofSize(properties.batchSize()));
         int published = 0;
         for (final OutboxMessage message : pending) {
             try {

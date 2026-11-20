@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Core Outbox CDC와 Catalog 상품·SKU·60초 재고 동기화</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-19-catalog-cdc-sync.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#기준과-소유-경계">기준과 소유 경계</a></li>
+<li><a href="#구현-결과">구현 결과</a></li>
+<li><a href="#스키마계약-변경">스키마·계약 변경</a></li>
+<li><a href="#실행-환경과-검증">실행 환경과 검증</a><ul>
+<li><a href="#최종-검증-결과">최종 검증 결과</a></li>
+<li><a href="#스킵5건의-이름과-사유">스킵5건의 이름과 사유</a></li>
+<li><a href="#하네스-실제-미실행과-e의-실행-항목">하네스 실제 미실행과 E의 실행 항목</a></li>
+<li><a href="#앞선-실패와-재검증">앞선 실패와 재검증</a></li>
+</ul>
+</li>
+<li><a href="#전달-산출물">전달 산출물</a></li>
+<li><a href="#남은-경계와-저장-상태">남은 경계와 저장 상태</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Core Outbox CDC와 Catalog 상품·SKU·60초 재고 동기화</h1><p>실행일:2026-11-19~20(KST).</p>
+<h2 id="기준과-소유-경계">기준과 소유 경계</h2>
+<p>Backend 기준 <code>3537340c4686fec3b962da8ed02d368829d639af</code>, 작업 브랜치 <code>catalog-cdc-sync</code>. 시작 당시 미커밋 변경이 없었다. 승인된 A 계약 patch와 신규23파일을 해시/적용 가능성 확인 뒤 상속했다. A 원본 계약·문서는 수정하지 않았다. B는 common-module Outbox, Core Product/SKU/Sales와 Core application.yml, Catalog/API/관련 문서·테스트만 변경했다. 주문·결제 상태·환불 업무, Frontend, Infra와 다른 체크아웃은 수정하지 않았다. 커밋·푸시·PR·병합·배포는 하지 않았다.</p>
+<h2 id="구현-결과">구현 결과</h2>
+<ul>
+<li>상품 metadataVersion(JPA version, 최초0) 전체 스냅샷은 업무 TX에서 <code>commerce.catalog.snapshots.v1</code> Outbox로 즉시 기록한다. 상품명·설명·이미지·판매자·판매 제어·삭제·initialSkuCount를 포함한다. timestamp는 flush 후 DB 값으로 읽어 재적재 원문 정밀도를 맞춘다.</li>
+<li>SKU 가격/판매의도는 독립 metadata_version과 영속 변경시각으로 즉시 Outbox에 저장한다. Product 참조 버전도 메타데이터 변경 때 저장해 재적재 시 바꾸지 않는다.</li>
+<li>예약·소진·해제·환불 복원·판매자 수량 수정의 공통 SQL에서 inventory_version을 증가시킨다. 호출자에게 dirty-marker API를 추가하지 않았다. 수량마다 Catalog Outbox를 쓰지 않고 기본60초 주기에 SKU별 최신 한 건을 합친다.</li>
+<li>배치는 ID순 FOR UPDATE SKIP LOCKED로 다중 인스턴스의 대상을 선점한다. 스냅샷 Outbox와 inventory_published_version 완료표시는 한 TX다. 동시 변경은 잠금 뒤 새로운 dirty revision으로 남고, Outbox 실패·중단은 롤백/재시작 재처리한다. capturedAt은 영속 inventory_changed_at을 재사용한다.</li>
+<li>초기 적재는 <code>commercecore.catalog.backfill.enabled=true</code>인 명시적 기동으로 Product 공유잠금→SKU ID순 잠금을 사용한다. 삭제 이력과 세 스냅샷을 같은 버전으로 재적재한다. 범위별 서비스 포트도 유지한다.</li>
+<li>공용 Outbox의 excluded-topics 기본은 빈 목록이다. Core만 Catalog 토픽을 제외하며 일반 JPA 조회와 lease/claim SQL이 모두 배제한다. 다른 서비스 기본 relay와 필요한 sales-info/주문/쿠폰/Live 알림은 유지하고 CDC 장애 fallback/행 TTL 삭제는 추가하지 않았다.</li>
+<li>Catalog 공통 리스너는 봉투·source·schemaVersion·eventType·UUID·key/ID·필수 필드·타입을 확인하고 상품/SKU metadataVersion과 inventoryVersion을 독립 적용한다. 같은 revision의 원문 충돌 및 eventId 재사용을 거절한다. JSON 중복 키·후행 JSON도 허용하지 않는다.</li>
+<li>Catalog의 aggregate 행 잠금과 receipt/상태/공개 사본 갱신은 같은 TX다. SKU·재고 선도착은 영속 보관하고 두 SKU 영역이 모여야 product_sales를 만든다. Product가 없으면 공개 JOIN에서 숨는다. 삭제 fence는 재시작·높은 생존 버전·재고 메시지로 부활시키지 않는다. 다중 SKU 단일값 API503 보호를 유지한다.</li>
+<li>Catalog API2.1.0은 available/salesStatus를 표시 사본으로 보존하며 사본 수량만으로 PurchaseCheck를 SOLD_OUT/EXCEEDS_STOCK으로 거절하지 않는다. purchasable/orderable은 Core 확인 진입 표시이고 구매 승인이 아니다. 실제 가격·재고는 Core가 확정한다. Frontend의 현재 차단과 수용 기준은 <a href="2026-11-19-catalog-cdc-frontend-handoff.html">전용 인계</a>에 남겼다.</li>
+</ul>
+<h2 id="스키마계약-변경">스키마·계약 변경</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>변경</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Core V109</td>
+<td>SKU metadata_version, metadata_product_version, inventory_version, inventory_published_version, metadata_updated_at, inventory_changed_at, deleted_at. 기존 SKU 최초 재고도 dirty(-1)</td>
+</tr>
+<tr>
+<td>Catalog V5</td>
+<td>catalog_snapshot_state(독립 revision/원문/삭제 fence), catalog_snapshot_receipt(eventId 봉투 원문)</td>
+</tr>
+<tr>
+<td>API</td>
+<td>contracts/api/catalog-service.yaml2.1.0과 생성 MD/HTML. 경로·필드 형태를 유지하고 지연 재고/진입 가능/수량 입력 상한의 의미를 변경</td>
+</tr>
+<tr>
+<td>이벤트</td>
+<td>A의 commerce-catalog-snapshots.yaml을 그대로 구현. B는 contracts/events를 직접 수정하지 않음. 구 상품 토픽 이중 발행 없음. 필요한 기존 sales-info 상태 알림 유지</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="실행-환경과-검증">실행 환경과 검증</h2>
+<p>Java21, Gradle Wrapper, H2 및 EmbeddedKafka 검사와 독립 Lima PostgreSQL16 검사를 구분했다. Python 검사는 기존 API 가상환경을 읽기 전용으로 사용했다. B PostgreSQL은 <code>127.0.0.1:25433</code>의 전용 DB와 테스트마다 고유 schema를 사용했다. 다른 DB/볼륨/클러스터 초기화·종료나 Docker context 변경은 하지 않았다. 실제 PG 결제와 운영 환경 검증은 없다.</p>
+<h3 id="최종-검증-결과">최종 검증 결과</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>결과와 한계</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>scripts/verify.py --dry-run / 실제 실행</td>
+<td>공통 모듈 변경으로 전체 build/API/이벤트/외부 검사를 선택. 실제 하네스 종료2(incomplete), 검사 중 diff 변경 없음. 전체 통과 아님</td>
+</tr>
+<tr>
+<td>./gradlew build --no-daemon --max-workers=2 --console=plain</td>
+<td>종료0,1,223건·실패/오류0·스킵5. common 단위62/통합60, Catalog 단위12/통합92, Core 단위188/통합288, Live 단위38/통합216, Member 통합32, Notification 통합106, Payment 단위54/통합75</td>
+</tr>
+<tr>
+<td>스킵/0건</td>
+<td>Core의 외부 Kafka2건, Notification 동시 쓰기3건 스킵. Member/Notification 단위 작업은 원래 테스트 소스가 없는 NO-SOURCE이며0건 통과로 계산하지 않음</td>
+</tr>
+<tr>
+<td>독립 PostgreSQL 업무 검사</td>
+<td>최종 Core22/Catalog6, 실패/오류/스킵0. 새 스냅샷 전용 시나리오와 기존 SKU 판매/재고 경합 회귀 포함</td>
+</tr>
+<tr>
+<td>V108→V109 기존 데이터 이관</td>
+<td>실제 B PostgreSQL에서 V108 데이터의 가격·재고·예약·기존 버전·시각을 넣고 V109로 올린1건 통과(실패/스킵0). 최초 dirty(-1)와 참조 Product 버전 보존 확인</td>
+</tr>
+<tr>
+<td>새 공통 리스너</td>
+<td>전체 Catalog 통합92건에 EmbeddedKafka 신규1건 포함. 조회 준비 전 count 확인을 보강한 최종 단독 재검사1건 통과(실패/스킵0)</td>
+</tr>
+<tr>
+<td>API/이벤트 정적 검사</td>
+<td>API128개 매핑 일치, 이벤트9계약·33예시 통과. B 실제 DTO/Outbox 표본3종은 Catalog 스키마에 별도 통과</td>
+</tr>
+<tr>
+<td>문서</td>
+<td>문서268개 링크/구조 오류0, 설계/기록 MD·HTML111쌍 및 API10쌍 최신성 불일치0, git diff --check 통과</td>
+</tr>
+<tr>
+<td>전체 event-samples</td>
+<td>하네스에서는 Gradle 스킵 때문에 미실행. 별도 전체 samples 실행은 C/D 적용 전 구 환불 표본과 새 A 계약 불일치로 실패</td>
+</tr>
+<tr>
+<td>하네스 외부 검사</td>
+<td>Catalog/Core migrationTest 및 Catalog/Core/Live/Payment postgresTest는 --external 미지정으로 미실행. Core/Catalog의 위 선택 검사는 별도 명령으로 실제 실행했으나 전체 외부 선택을 통과한 의미는 아님</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="스킵5건의-이름과-사유">스킵5건의 이름과 사유</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>테스트 클래스·이름</th>
+<th>실제 스킵 사유</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>commercecore.coupon.service.CouponSyncKafkaTest</code> · 실제 Kafka에서 별도 직렬화기를 사용한 Outbox JSON과 도메인 JSON을 수신한다</td>
+<td><code>COMMERCECORE_TEST_KAFKA_SERVERS</code> 미설정. 외부 Kafka 조건부 검사로 실행되지 않음</td>
+</tr>
+<tr>
+<td><code>commercecore.sales.event.SalesInfoEventKafkaTest</code> · API 변경은 실제 Kafka에 계약 JSON과 고정된 키를 발행한다</td>
+<td>같은 외부 Kafka 환경변수 미설정. 순수 InventoryChanged 제거 뒤 필요한 판매 알림5개를 기대하도록 B가 수정했으며 외부 브로커 실행은 E 후속</td>
+</tr>
+<tr>
+<td><code>notification.ConcurrentInsertPostgresTest</code> · 다른 요청이 같은 재입고 신청을 넣고 아직 커밋하지 않았어도 터지지 않는다</td>
+<td><code>NOTIFICATION_TEST_POSTGRES_URL</code> 미설정. PostgreSQL 조건부 검사로 실행되지 않음</td>
+</tr>
+<tr>
+<td><code>notification.ConcurrentInsertPostgresTest</code> · 다른 요청이 같은 방송 신청을 넣고 아직 커밋하지 않았어도 터지지 않는다</td>
+<td>같은 Notification PostgreSQL 환경변수 미설정</td>
+</tr>
+<tr>
+<td><code>notification.ConcurrentInsertPostgresTest</code> · 다른 instance 가 같은 알림을 넣고 아직 커밋하지 않았어도 터지지 않는다</td>
+<td>같은 Notification PostgreSQL 환경변수 미설정</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="하네스-실제-미실행과-e의-실행-항목">하네스 실제 미실행과 E의 실행 항목</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>하네스에서 실제 미실행</th>
+<th>B의 별도 실행과 차이</th>
+<th>E가 통합 뒤 실행할 것</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event-samples</code></td>
+<td>전체 build의 스킵 때문에 하네스가 표본 검사 단계를 실행하지 않음. 별도 전체 samples 명령은 구 환불 표본/새 A 계약 불일치로 실패. B Catalog3종만 별도로 통과</td>
+<td>A/B/C/D 통합 소스로 서비스 EventContractTest 표본을 다시 생성하고 <code>.github/scripts/api/check_events.py --samples</code> 전체 실행</td>
+</tr>
+<tr>
+<td><code>:services:catalog-service:migrationTest</code></td>
+<td>B의 Catalog PostgreSQL6건이 V5까지 Flyway 적용했지만 전용 migrationTest 전체는 미실행</td>
+<td>독립 Catalog DB/schema에서 선택된 migrationTest 전체</td>
+</tr>
+<tr>
+<td><code>:services:commercecore-service:migrationTest</code></td>
+<td>B는 <code>*CatalogSnapshotMigrationPostgresTest</code>1건만 별도 실행. 기존 migrationTest 전체는 미실행</td>
+<td>C의 신규 migration(예약 V115~V119)과 B V109를 함께 대조한 뒤 독립 Core DB/schema에서 migrationTest 전체</td>
+</tr>
+<tr>
+<td><code>:services:catalog-service:postgresTest</code></td>
+<td>B의 <code>*snapshot.CatalogSnapshotPostgresTest</code>6건만 별도 실행</td>
+<td>통합 Catalog postgresTest 전체</td>
+</tr>
+<tr>
+<td><code>:services:commercecore-service:postgresTest</code></td>
+<td>B의 스냅샷/SKU 판매 선택22건만 별도 실행</td>
+<td>통합 Core postgresTest 전체와 C의 주문·환불 회귀</td>
+</tr>
+<tr>
+<td><code>:services:live-service:postgresTest</code></td>
+<td>B 미실행</td>
+<td>독립 Live DB 환경과 기존 태그 조건을 읽고 실제 실행</td>
+</tr>
+<tr>
+<td><code>:services:payment-service:postgresTest</code></td>
+<td>B 미실행. D 자체 증거를 대신 확인한 것으로 취급하지 않음</td>
+<td>통합 Payment postgresTest 전체 및 PG 대역 승인/환불 복구 흐름</td>
+</tr>
+</tbody>
+</table></div>
+<p>이6개 외부 Gradle 작업은 하네스에 <code>--external</code>과 연결 설정을 주지 않아 실행되지 않았다. E는 각 서비스의 독립 DB/schema를 먼저 확인하고 현재 통합 diff에서 <code>scripts/verify.py --dry-run</code>으로 선택을 갱신한 뒤 필요한 외부 검사를 실행해야 한다. 위 별도 B 검사로 전체 외부 선택을 통과했다고 대체하지 않는다.</p>
+<p>스킵5건도 별도로 해소하거나 미실행으로 남겨야 한다. Core의 두 외부 Kafka 테스트는 E 전용 broker/topic/group을 준비하고 해당 환경변수를 주입해 <code>integrationTest --tests '*SalesInfoEventKafkaTest' --tests '*CouponSyncKafkaTest' --rerun-tasks</code>로 재실행한다. Notification 동시성3건은 독립 Notification PostgreSQL 설정으로 <code>integrationTest --tests '*ConcurrentInsertPostgresTest' --rerun-tasks</code>를 실행한다. 새 쿠폰 동기화 기능을 추가하라는 뜻은 아니며 기존 전송 경계 회귀다.</p>
+<p>E의 서비스 간 게이트는 실제 앱 변경→Core DB/Outbox→연속 CDC→Kafka→Catalog 소비·조회와 사용자/시스템 환불→Payment PG 대역→Core 결과 적용, 알림/Live 보존이다. 실제 PG/운영 검증으로 확대하지 않는다. I 별도 인프라 전체 smoke의 broker 재시작/최종 확인은 I dependency 완료를 기다린다.</p>
+<p>PostgreSQL 명령은 <code>COMMERCECORE_TEST_POSTGRES_*</code>, <code>CATALOG_TEST_POSTGRES_*</code>를 B 전용 DB로 주입한 뒤 다음 선택을 실행했다. 자격값은 기록하지 않는다.</p>
+<pre><code class="language-bash">./gradlew :services:commercecore-service:postgresTest \
+  --tests '*sku.event.CatalogSnapshotPostgresTest' \
+  --tests '*sku.service.SkuSalesPostgresTest' \
+  :services:catalog-service:postgresTest \
+  --tests '*snapshot.CatalogSnapshotPostgresTest' \
+  --continue --max-workers=2 --console=plain
+</code></pre>
+<p>전체 하네스 후 추가한 것은 기존 데이터 migration 검사, Kafka 테스트의 조회 준비 확인, 미실행 외부 Kafka 회귀의 판매 알림 기대값7→5 정렬과 문서 인계다. 해당 migration1건·Kafka1건, 판매 알림 H2 회귀8건(실패/스킵0)과 문서/포맷 검사를 별도로 재실행했다. 외부 Kafka 회귀의 수정은 컴파일됐으나 환경변수 미설정 조건부 실행을 통과로 표시하지 않는다. 하네스의 전체 외부 선택이나 최종 서비스 간 CDC·환불 통합을 완료했다는 의미는 아니다.</p>
+<h3 id="앞선-실패와-재검증">앞선 실패와 재검증</h3>
+<p>초기 공용 설정의 다중 생성자 바인딩, H2 테스트용 SKU 열/producer 주입 누락, 새 토픽·순수 재고 Outbox 제거에 따른 기존 기대값, serializer H2 연결 수명 오류를 검사 실패로 기록하고 수정했다. 앞선 common 전체 통합 검사에는 JSON 로깅 회귀2건 실패도 있었으나 최종 전체 실행의 common60건에서 실패0을 확인했다. 이를 초기 실행부터 통과한 것으로 합산하지 않는다.</p>
+<p>첫 PostgreSQL 실행은 Core21건 중 테스트 spy reset의 제네릭 varargs 형변환 오류6건으로 실패했다. 형변환을 명시해 재실행한 Core21/Catalog6건은 모두 통과했고, 상품 시각/삭제 재적재1건을 추가한 최종 Core22/Catalog6건도 실패·스킵0으로 통과했다. Core의 원자성·claim·경합 시나리오와 Catalog의 독립 버전·원문·선도착·삭제/동시 소비 시나리오를 실제 PostgreSQL에서 확인했다.</p>
+<p>Desktop 전용 DB 기동 시도는 포트25432 중복/비실행 상태로 확인돼 접속·초기화·재시작하지 않았다. 조정자가 실제 health를 확인한 Lima25433을 받은 뒤에만 DB 검증을 재개했다. 앞선 환경 미실행을 DB 통과로 보고하지 않는다.</p>
+<p>전체 이벤트 직렬화 표본 검사는 상속받은 새 환불 계약에 기존 Core 환불 표본의 purpose 등이 없어 실패한 별도 실행이 있다. 이는 C/D 적용 전 상태로 B가 수정하지 않았다. B의 실제 세 DTO 표본은 A Catalog 스키마에 별도로 검증해3건 통과했다. 통합 후 전체 환불/결제 표본 대조는 E가 수행해야 한다.</p>
+<h2 id="전달-산출물">전달 산출물</h2>
+<p>B 소유 patch/신규 파일 묶음·파일별 SHA-256·검증 로그는 <code>build/catalog-cdc-handoff/rev-b-20261120-*</code>의 불변 receipt로 전달한다. 초안의 상위 경로 묶음은 최종 인계로 사용하지 않는다. 상속한 A 계약 patch/신규 파일과 구분하며 기준 SHA를 유지한다.</p>
+<p>실제 PostgreSQL 업무 TX에서 커밋된 event_outbox.payload TEXT3종은 <code>build/cdc-handoff/rev-pg-39cd278e12896b23/</code>에 고정했다. manifest SHA-256은 <code>47942ca94ea054bbdfcfd0f5ad59ddbd9879e4568f0b8dbe198bed72671b5b61</code>이며 JSON/생산자 소스 해시·생성 테스트·명령·검증28건을 포함한다. 이 revision은 덮어쓰지 않는다. 앞선 mutable 경로의 해시 불일치는 같은 경로 재검사 덮어쓰기에서 발생해 사용을 보류하고 이 불변 경로로 교체했다.</p>
+<p>I의 connector.json에서 event_id/event_type/topic/message_key/payload TEXT와 source public.event_outbox, 해당 토픽 create/read-only 선필터, 전체 봉투 원문 value를 정적으로 대조했다.</p>
+<p>I가 실제 Lima/Kafka/Connect로 위 불변 PostgreSQL 표본을 재삽입해3건 통과·실패/스킵0을 확인했다. receipt 원본은 Infra <code>kafka-cdc-infra/.local-current/cdc/b-postgres-fixtures.json</code>, SHA-256 <code>1096ae48db7dc6e9ba51217291654ceda14484e7044e43c534f95f4912e6970c</code>이며 실행로그는 <code>b-pg-fixtures.log</code>, 해시 대조는 <code>b-pg-manifest-verified.json</code>이다. B도 receipt와 해시를 직접 읽어 revision/manifest/3개 payload 해시 및 생산자 소스3종이 일치함을 확인했다. JSON 객체·UTF-8 value 원문 bytes·product:3/sku:2 key와 eventId/eventType header 대조 범위다. 최종 B 묶음에는 이 증거 사본도 포함한다.</p>
+<p>이 증거는 <strong>B의 실제 커밋 TEXT를 I fixture DB에 재삽입한 CDC 전송</strong>이다. 실제 앱 변경부터 연속 CDC와 Catalog 소비까지 이어지는 검증은 E 게이트로 남는다. I 별도 전체 smoke의 broker 재시작/최종 검증은 아직 완료로 확인되지 않았으며 B 완료로 대체하지 않는다.</p>
+<h2 id="남은-경계와-저장-상태">남은 경계와 저장 상태</h2>
+<ul>
+<li>Frontend 코드는 그대로이며 상세/Live 진입의 status·stock 조건은 후속 과제다. 서버만으로 화면 false rejection을 해결했다고 주장하지 않는다.</li>
+<li>일반 Core 외부 Kafka 조건부 검사와 Notification PostgreSQL 동시성 및 Live/Payment 등 외부 검사, 전체 환불 표본 대조 및 최종 서비스 간 통합은 E의 격리 실행 결과가 필요하다.</li>
+<li>60초는 실행 주기이며 장애 포함 최대 전파 SLA가 아니다. 사본 재고로 구매를 승인하지 않는다. CDC 보관/slot/offset checkpoint 기반 정리는 별도 운영 과제다.</li>
+<li>실제 PG·운영 클러스터·브라우저 E2E·성능 수치는 검증하지 않았다. 문서 HTML은 생성 최신성과 링크를 검사했으며 브라우저 렌더링 검증은 하지 않았다.</li>
+<li>모든 B 변경은 로컬 미커밋 상태다. 커밋·푸시·PR·병합·배포는 없다. 기존 user-refund-367와 다른 체크아웃의 사용자 변경은 보존했다.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>272b27c68f8d914744c30786e70c92dffab39af07f88101624fc08314924a2e9</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

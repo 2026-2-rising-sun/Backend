@@ -69,9 +69,9 @@ public class SkuRepository {
         jdbc.update(
                 """
                 INSERT INTO sku(product_id,price,available,reserved,sale_status,
-                    snapshot_version,product_name_snapshot,option_label,created_at,updated_at)
+                    snapshot_version,product_name_snapshot,option_label,created_at,updated_at,metadata_updated_at,inventory_changed_at)
                 VALUES(:productId,:price,:available,0,:status,1,:productName,:optionLabel,
-                    CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                    CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                 """,
                 new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
                         .addValue("productId", productId)
@@ -92,7 +92,8 @@ public class SkuRepository {
     public int changeStatus(Long id, SkuSaleStatus status) {
         return jdbc.update(
                 """
-                UPDATE sku SET sale_status=:status,updated_at=CURRENT_TIMESTAMP
+                UPDATE sku SET sale_status=:status,updated_at=CURRENT_TIMESTAMP,
+                    metadata_version=metadata_version+1,metadata_updated_at=CURRENT_TIMESTAMP
                 WHERE id=:id AND sale_status<>:status
                 """,
                 Map.of("id", id, "status", status.name()));
@@ -132,6 +133,9 @@ public class SkuRepository {
         return jdbc.update(
                 "UPDATE sku SET "
                         + assignment
+                        + (assignment.startsWith("price=")
+                                ? ",metadata_version=metadata_version+1,metadata_updated_at=CURRENT_TIMESTAMP"
+                                : ",inventory_version=inventory_version+1,inventory_changed_at=CURRENT_TIMESTAMP")
                         + ",updated_at=CURRENT_TIMESTAMP WHERE id=:id AND "
                         + condition,
                 Map.of("id", id, "value", value));

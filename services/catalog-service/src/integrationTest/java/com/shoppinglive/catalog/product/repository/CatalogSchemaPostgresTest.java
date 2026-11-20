@@ -46,8 +46,8 @@ class CatalogSchemaPostgresTest {
     }
 
     @Test
-    @DisplayName("빈 Catalog DB에는 상품·판매·쿠폰 조회 사본만 생성한다")
-    void initializesOnlyReplicaTables() {
+    @DisplayName("빈 Catalog DB에는 조회 사본과 스냅샷 적용 상태·수신 원문만 생성한다")
+    void initializesOnlyReplicasAndSnapshotTracking() {
         assertThat(
                         jdbc.queryForList(
                                 "SELECT table_name FROM information_schema.tables WHERE table_schema=?",
@@ -58,6 +58,8 @@ class CatalogSchemaPostgresTest {
                         "product_sales",
                         "coupon_display",
                         "coupon_display_product",
+                        "catalog_snapshot_state",
+                        "catalog_snapshot_receipt",
                         "flyway_schema_history");
         assertThat(
                         jdbc.queryForObject(

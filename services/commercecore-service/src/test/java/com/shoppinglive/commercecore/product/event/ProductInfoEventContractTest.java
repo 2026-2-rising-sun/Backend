@@ -37,12 +37,7 @@ class ProductInfoEventContractTest {
                         2);
         var envelope =
                 EventEnvelope.create(
-                        ProductInfoEventPublisher.EVENT_TYPE,
-                        1,
-                        "commercecore-service",
-                        "7",
-                        time,
-                        payload);
+                        "PRODUCT_INFO_CHANGED", 1, "commercecore-service", "7", time, payload);
         assertThat(
                         mapper.readTree(mapper.writeValueAsBytes(envelope))
                                 .at("/payload/initialSkuCount")
@@ -86,12 +81,7 @@ class ProductInfoEventContractTest {
                         deleted);
         var envelope =
                 EventEnvelope.create(
-                        ProductInfoEventPublisher.EVENT_TYPE,
-                        1,
-                        "commercecore-service",
-                        "7",
-                        deleted,
-                        payload);
+                        "PRODUCT_INFO_CHANGED", 1, "commercecore-service", "7", deleted, payload);
         var json = mapper.readTree(mapper.writeValueAsBytes(envelope));
         assertThat(json.at("/payload/saleEnabled").asBoolean()).isFalse();
         assertThat(json.at("/payload/deletedAt").asText()).isEqualTo(deleted.toString());
@@ -133,7 +123,7 @@ class ProductInfoEventContractTest {
                         null);
         var envelope =
                 EventEnvelope.create(
-                        ProductInfoEventPublisher.EVENT_TYPE,
+                        "PRODUCT_INFO_CHANGED",
                         1,
                         "commercecore-service",
                         "7",
@@ -147,7 +137,7 @@ class ProductInfoEventContractTest {
                 .isEqualTo("/api/commercecore/v1/product-images/10");
         assertThat(json.path("occurredAt").asText())
                 .isNotEqualTo(json.at("/payload/updatedAt").asText());
-        assertThat(ProductInfoEventPublisher.TOPIC).isEqualTo("commerce.product-info.v1");
+        assertThat(ProductInfoEventPublisher.TOPIC).isEqualTo("commerce.catalog.snapshots.v1");
         var dir = Path.of("build/contract-samples");
         Files.createDirectories(dir);
         mapper.writeValue(

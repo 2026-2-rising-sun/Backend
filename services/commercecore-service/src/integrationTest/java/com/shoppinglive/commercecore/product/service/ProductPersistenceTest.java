@@ -57,6 +57,7 @@ class ProductPersistenceTest {
         com.shoppinglive.commercecore.sku.service.SkuSalesService.class,
         com.shoppinglive.commercecore.sku.repository.SkuRepository.class,
         com.shoppinglive.commercecore.sku.event.SkuEventTracker.class,
+        com.shoppinglive.commercecore.sku.event.CatalogSnapshotPublisher.class,
         JpaAuditingConfig.class,
         OutboxConfiguration.class,
         ProductConfiguration.class,
@@ -131,7 +132,7 @@ class ProductPersistenceTest {
     @DisplayName("등록 후 Outbox 기록이 실패하면 상품과 이벤트가 함께 롤백된다")
     void outboxFailureRollsBackProduct() {
         jdbc.execute(
-                "ALTER TABLE event_outbox ADD CONSTRAINT reject_product_event CHECK (topic <> 'commerce.product-info.v1')");
+                "ALTER TABLE event_outbox ADD CONSTRAINT reject_product_event CHECK (topic <> 'commerce.catalog.snapshots.v1')");
         try {
             assertThatThrownBy(() -> registration.register(command(), "rollback", "seller"))
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
@@ -323,7 +324,7 @@ class ProductPersistenceTest {
         Product p = registration.register(command(), "control-rollback", "seller");
         messages.deleteAll();
         jdbc.execute(
-                "ALTER TABLE event_outbox ADD CONSTRAINT reject_control_event CHECK (topic <> 'commerce.product-info.v1')");
+                "ALTER TABLE event_outbox ADD CONSTRAINT reject_control_event CHECK (topic <> 'commerce.catalog.snapshots.v1')");
         try {
             assertThatThrownBy(() -> lifecycle.changeSaleState(p.getId(), true, 0L, "seller"))
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);

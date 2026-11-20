@@ -34,7 +34,7 @@
 | 금액 | KRW 1원 단위 양의 정수 | price BIGINT, 1원 이상. 향후 환불/배분의 정밀도·잔여 원 규칙은 재검토. 가격 이력/예약 가격 추가 없음. |
 | 재고 | available>=0, reserved>=0, available+reserved<=2147483647 | 판매자 증감·환불 restock의 조건부 UPDATE가 BIGINT 합산으로 예약 해제 공간을 보존한다. 기존 두 INTEGER 열은 유지하며 새 업무상 수량한도를 정한 것이 아니다. |
 | 판매 의도 | READY/ON_SALE/PRIVATE | READY는 생성 전용. ON_SALE+available=0이면 외부 SOLD_OUT 표시. |
-| 이벤트 버전 | snapshot_version>0 | 최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. 일반 SKU version은 V107에서 제거한다. Catalog product_sales.version은 이 snapshot_version의 사본이며 유지한다. |
+| 이벤트 버전 | snapshot_version>0 | 최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. 일반 SKU version은 V107에서 제거한다. 구 Catalog 경로는 이 snapshot_version을 사용한다. 새 CDC 경로는 metadata_version/inventory_version을 독립 저장한다. |
 | 이름 사본 | product_name_snapshot | 기존 sales-info 호환용 등록 시 이름 사본. 상품 표현정보의 원본은 Product. |
 | 조회 인덱스 | sku(product_id,id), product_sales(product_id,sales_id) | 상품별 SKU를 정렬 조회. 상품당 대표 가격·합산 재고는 저장하지 않음. |
 
@@ -52,3 +52,17 @@ H2 업무 테스트와 Catalog H2 이행 테스트를 실제 PostgreSQL의 잠�
 ## 통합 등록 표시명 (#372)
 
 V108은 sku.option_label VARCHAR(255)를 추가한다. 기존 SKU는 null이다. 신규 통합 등록은 SKU ID를 서버에서 발급하고 다중 SKU 표시명의 정규화·중복을 서비스에서 검증한다. 가격·재고·판매 상태와 같은 sku 행에 저장하며 이벤트 최신성은 기존 snapshot_version을 유지한다.
+
+## Catalog CDC revision (V109)
+
+| SKU 열 | 의미 |
+|---|---|
+| metadata_version >=0 | 가격·판매의도 메타데이터 revision |
+| metadata_product_version | 메타데이터 변경 시 참조한 Product 버전. 재적재 원문 보존 |
+| metadata_updated_at | 메타데이터 변경 시각. 순수 수량 변경은 건드리지 않음 |
+| inventory_version >=0 | 모든 available/reserved 변경의 영속 dirty revision |
+| inventory_published_version, 기본-1 | 마지막 Outbox 저장 완료 revision. inventory_version보다 작으면 배치 대상 |
+| inventory_changed_at | 현재 inventory revision의 영속 capturedAt |
+| deleted_at | SKU 삭제 표현용 tombstone, 현재 판매자 SKU 삭제 API는 없음 |
+
+[V109](../../../../../services/commercecore-service/src/main/resources/db/migration/V109__catalog_snapshot_revisions.sql)는 기존 수량·이벤트 버전을 보존한다. 행 잠금 아래 Outbox append와 inventory_published_version 변경을 한 TX에 넣는다. 새 외부 테이블/FK나 주문 예약 정책을 추가하지 않는다.

@@ -13,7 +13,9 @@ public class ProductInfoEventListener {
         this.products = products;
     }
 
-    @KafkaListener(topics = ProductInfoEventMessage.TOPIC)
+    @KafkaListener(
+            autoStartup = "${catalog.legacy-events.enabled:true}",
+            topics = ProductInfoEventMessage.TOPIC)
     public void consume(ConsumerRecord<String, String> record) {
         products.apply(ProductInfoEventMessage.parse(record.key(), record.value()));
     }

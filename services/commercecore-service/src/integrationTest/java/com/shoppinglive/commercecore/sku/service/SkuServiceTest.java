@@ -44,6 +44,7 @@ class SkuServiceTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @MockitoBean private EventOutbox outbox;
+    @MockitoBean private com.shoppinglive.commercecore.sku.event.CatalogSnapshotPublisher catalog;
     private TransactionTemplate transaction;
 
     @BeforeEach
@@ -59,6 +60,9 @@ class SkuServiceTest {
                   available INT NOT NULL CHECK(available>=0), reserved INT NOT NULL CHECK(reserved>=0),
                   sale_status VARCHAR(32) NOT NULL CHECK(sale_status IN ('READY','ON_SALE','PRIVATE')),
                   snapshot_version BIGINT NOT NULL,
+                  metadata_version BIGINT NOT NULL DEFAULT 0,inventory_version BIGINT NOT NULL DEFAULT 0,
+                  metadata_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                  inventory_changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                   product_name_snapshot VARCHAR(255) NOT NULL, option_label VARCHAR(255),
                   created_at TIMESTAMP WITH TIME ZONE NOT NULL, updated_at TIMESTAMP WITH TIME ZONE NOT NULL)
                 """);

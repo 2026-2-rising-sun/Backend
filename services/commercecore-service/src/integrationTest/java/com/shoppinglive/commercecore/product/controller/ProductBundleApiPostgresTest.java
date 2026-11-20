@@ -92,7 +92,10 @@ class ProductBundleApiPostgresTest extends ProductSecuritySupport {
         }
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM product", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM sku", Long.class)).isEqualTo(2);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM event_outbox", Long.class))
-                .isEqualTo(3);
+        var result = mapper.readTree(first).path("data");
+        var skuIds = new java.util.ArrayList<Long>();
+        result.path("skus").forEach(sku -> skuIds.add(sku.path("skuId").asLong()));
+        ProductBundleOutboxAssertions.assertRegisteredBundle(
+                jdbc, mapper, result.path("productId").asLong(), skuIds);
     }
 }
