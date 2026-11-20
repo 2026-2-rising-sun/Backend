@@ -244,9 +244,17 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
             }
         }
         assertThat(cartExists(cart)).isTrue();
-        assertThat(reserved(501)).isZero();
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        if (outcome.equals("late")) {
+            assertThat(relay.state(MEMBER_A, number).orderStatus())
+                    .isEqualTo("COMPENSATION_PENDING");
+            assertThat(reserved(501)).isEqualTo(2);
+            assertThat(available(501)).isEqualTo(18);
+            assertThat(couponStatus()).isEqualTo("RESERVED");
+        } else {
+            assertThat(reserved(501)).isZero();
+            assertThat(available(501)).isEqualTo(20);
+            assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        }
     }
 
     @Test
@@ -358,7 +366,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         relayDispatcher.dispatch(delivery);
         remoteStatus = "UNKNOWN";
         relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
         assertThat(reserved(501)).isEqualTo(2);
         assertThat(couponStatus()).isEqualTo("RESERVED");
         verify(remote, times(1)).approve(anyString(), any());
@@ -366,7 +374,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인 접수 뒤 HTTP 응답이 유실되면 조회로 PAID를 복구하고 승인을 다시 실행하지 않는다")
+    @DisplayName("승인 응답 유실 뒤600초 전 정상 승인 사실은 보상 없이 PAID로 복구한다")
     void lostApprovalResponseRecoversByLookup() {
         String number = createRelay("lost", true).number();
         prepare(number);
@@ -383,6 +391,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
         relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+        assertThat(relay.state(MEMBER_A, number).compensation()).isNull();
         assertThat(available(501)).isEqualTo(18);
         assertThat(reserved(501)).isZero();
         assertThat(couponStatus()).isEqualTo("USED");
@@ -391,6 +400,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                         relay.approved(
                                 new Approved(paymentId, number, remoteCreate.amount(), approvedAt)))
                 .isFalse();
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
     }
 
     @Test
@@ -418,7 +428,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("미전달 승인 원문이 처리기한에 도달하면 조회만 하고 새 승인을 보내지 않는다")
+    @DisplayName("미전달 승인 원문도 처리기한에 도달하면 보상대기로 전환하고 새 승인을 보내지 않는다")
     void expiredUnsentApprovalNeverStartsPayment() {
         String number = createRelay("unsent", true).number();
         prepare(number);
@@ -426,9 +436,9 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         expiry(number);
         relayDispatcher.dispatch(delivery);
         verify(remote, never()).approve(anyString(), any());
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
+        assertThat(available(501)).isEqualTo(18);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_relay_refund", Long.class))
                 .isZero();
     }
@@ -443,19 +453,19 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         var fact = fact(number);
         assertThat(relay.approved(fact)).isTrue();
         assertThat(relay.approved(fact)).isFalse();
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
         assertThat(relay.state(MEMBER_A, number).refundStatus()).isEqualTo("REQUESTED");
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT refund_request_id FROM payment_relay_refund", String.class))
-                .isEqualTo("late-7001");
+                                "SELECT refund_request_id FROM core_refund_intent", String.class))
+                .matches("[0-9a-f-]{36}");
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='RefundRequested' AND topic='commerce.refund-requests.v1'",
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='RefundRequested' AND topic='commerce.refund.requests.v1'",
                                 Long.class))
                 .isEqualTo(1);
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(available(501)).isEqualTo(18);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
     }
 
     @Test
@@ -469,7 +479,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                 org.springframework.test.util.AopTestUtils.getUltimateTargetObject(outbox);
         doThrow(new IllegalStateException("outbox 저장 실패"))
                 .when(target)
-                .append(eq("commerce.refund-requests.v1"), any());
+                .append(eq("commerce.refund.requests.v1"), any());
         assertThatThrownBy(() -> relay.approved(fact(number)))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(groups.findById(id(number)).orElseThrow().getStatus().name())
@@ -481,7 +491,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인과 만료가 기한 경계에서 경합해도 환불 요청 한 건과 선점해제 한 번으로 끝난다")
+    @DisplayName("승인과 처리기한이 경합하면 보상 요청 한 건과 예약보존에 수렴한다")
     void expiryAndApprovalSerializeAtBoundary() throws Exception {
         String number = createRelay("race", true).number();
         prepare(number);
@@ -506,10 +516,10 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
             assertThat(a.get(15, TimeUnit.SECONDS)).isTrue();
             b.get(15, TimeUnit.SECONDS);
         }
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_relay_refund", Long.class))
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
                 .isEqualTo(1);
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(available(501)).isEqualTo(18);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
     }
 
     @Test
@@ -552,9 +562,11 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     void refundSuccessRecordsOnceWithoutChangingExpiredOrder() {
         String number = createRelay("refund", true).number();
         prepare(number);
-        accept(number);
-        expiry(number);
-        relay.approved(fact(number));
+        doReturn(groups.findById(id(number)).orElseThrow().getExpiresAt()).when(time).now();
+        lifecycle.expire(id(number));
+        jdbc.update(
+                "INSERT INTO payment_relay_refund(refund_request_id,payment_group_id,remote_payment_id,amount,reason,status,approved_at,requested_at) VALUES('late-7001',?,7001,9000,'LATE_APPROVAL','REQUESTED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                id(number));
         var items =
                 remoteCreate.sellerAmounts().stream()
                         .map(s -> new RefundItem(s.sellerOrderNumber(), s.amount()))
@@ -668,9 +680,11 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     void validatesRefundResultAndRecordsFailure() {
         String number = createRelay("refund-failed", true).number();
         prepare(number);
-        accept(number);
-        expiry(number);
-        relay.approved(fact(number));
+        doReturn(groups.findById(id(number)).orElseThrow().getExpiresAt()).when(time).now();
+        lifecycle.expire(id(number));
+        jdbc.update(
+                "INSERT INTO payment_relay_refund(refund_request_id,payment_group_id,remote_payment_id,amount,reason,status,approved_at,requested_at) VALUES('late-7001',?,7001,9000,'LATE_APPROVAL','REQUESTED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                id(number));
         assertThatThrownBy(
                         () ->
                                 relay.refundSucceeded(
@@ -761,7 +775,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("조회 대기 중 처리기한이 지나면 새 승인 HTTP를 보내지 않고 만료한다")
+    @DisplayName("조회 대기 중 처리기한이 지나면 새 승인 HTTP를 보내지 않고 보상대기로 전환한다")
     void expiresWhileLookupWaits() {
         String number = createRelay("lookup-deadline", false).number();
         prepare(number);
@@ -786,8 +800,8 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                 .get(number);
         relayDispatcher.dispatch(delivery);
         verify(remote, never()).approve(anyString(), any());
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
-        assertThat(available(501)).isEqualTo(20);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
+        assertThat(available(501)).isEqualTo(18);
     }
 
     @Test
@@ -960,20 +974,22 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("활성 조회의 정확 만료 경계는 선점·쿠폰을 한 번 해제하고 새 주문 없음으로 반환한다")
+    @DisplayName("활성 조회의 처리기한 경계는 보상대기 주문과 예약을 유지한다")
     void activeReadExpiresAtBoundaryOnce() throws Exception {
         String number = createRelay("active-expiry", true).number();
         prepare(number);
         accept(number);
         expiry(number);
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("order.status").value("COMPENSATION_PENDING"));
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isNoContent());
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(reserved(501)).isZero();
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("order.status").value("COMPENSATION_PENDING"));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
+        assertThat(available(501)).isEqualTo(18);
+        assertThat(reserved(501)).isEqualTo(2);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
     }
 
     @ParameterizedTest(name = "정책 {0}")

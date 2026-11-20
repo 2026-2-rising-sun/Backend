@@ -55,7 +55,8 @@ public record OrderSheetResponse(
             long discountAmount,
             long payableAmount,
             Long sourceCartItemId,
-            Long sourceCartVersion) {
+            Long sourceCartVersion,
+            String status) {
         private static Item from(Order o) {
             return new Item(
                     o.getId(),
@@ -71,7 +72,8 @@ public record OrderSheetResponse(
                     o.getDiscountAmount(),
                     o.getPayableAmount(),
                     o.getSourceCartItemId(),
-                    o.getSourceCartItemVersion());
+                    o.getSourceCartItemVersion(),
+                    o.getStatus().name());
         }
     }
 }

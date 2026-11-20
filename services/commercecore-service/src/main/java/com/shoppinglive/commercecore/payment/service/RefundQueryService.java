@@ -56,6 +56,7 @@ public class RefundQueryService {
                                 () ->
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
+        if (group.isOrderSheet()) return repository.sheetTargets(group);
         List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
         PaymentExecution attempt =
                 group.getPaymentId() == null ? null : attempts.get(group.getPaymentId());
@@ -101,7 +102,23 @@ public class RefundQueryService {
                                     order.getQuantity(),
                                     order.getPayableAmount(),
                                     reason == null,
-                                    reason);
+                                    reason,
+                                    order.getUnitPrice(),
+                                    order.getStatus() == OrderStatus.REFUNDED
+                                            ? order.getQuantity()
+                                            : 0,
+                                    order.getStatus() != OrderStatus.REFUNDED
+                                                    && requestedIds.contains(order.getId())
+                                            ? order.getQuantity()
+                                            : 0,
+                                    order.getStatus() == OrderStatus.REFUNDED
+                                                    || requestedIds.contains(order.getId())
+                                            ? 0
+                                            : order.getQuantity(),
+                                    order.getStatus() == OrderStatus.REFUNDED
+                                                    || requestedIds.contains(order.getId())
+                                            ? 0
+                                            : order.getPayableAmount());
                         })
                 .toList();
     }
@@ -184,7 +201,7 @@ public class RefundQueryService {
         return refundView(request, groupNumber, targets, cumulative);
     }
 
-    private static RefundView refundView(
+    private RefundView refundView(
             RequestRow request, String groupNumber, List<RefundTarget> targets, long cumulative) {
         return new RefundView(
                 request.id(),
@@ -195,7 +212,8 @@ public class RefundQueryService {
                 request.requestedAt(),
                 request.resolvedAt(),
                 targets,
-                recoveryView(request));
+                repository.kafkaRequestId(request.id()) == null ? recoveryView(request) : null,
+                repository.kafkaRequestId(request.id()));
     }
 
     private SellerRefundView loadSeller(long id, String sellerId) {
@@ -208,7 +226,7 @@ public class RefundQueryService {
         return sellerView(request, targets, cumulative == null ? 0L : cumulative);
     }
 
-    private static SellerRefundView sellerView(
+    private SellerRefundView sellerView(
             RequestRow request, List<RefundTarget> targets, long cumulative) {
         long sellerAmount = 0;
         try {
@@ -226,7 +244,7 @@ public class RefundQueryService {
                 request.requestedAt(),
                 request.resolvedAt(),
                 targets,
-                recoveryView(request));
+                repository.kafkaRequestId(request.id()) == null ? recoveryView(request) : null);
     }
 
     private static RefundRecoveryView recoveryView(RequestRow request) {

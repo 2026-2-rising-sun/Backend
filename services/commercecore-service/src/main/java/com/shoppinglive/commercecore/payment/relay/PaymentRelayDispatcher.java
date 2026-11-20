@@ -69,6 +69,7 @@ public class PaymentRelayDispatcher {
         var group = service.deliveryGroup(delivery);
         lifecycle.expire(group.getId());
         group = service.deliveryGroup(delivery);
+        if (!service.approvalAllowed(delivery)) return;
         var current = client.get(group.getGroupNumber());
         if (current.httpStatus() != 200 || !current.success() || current.data() == null) {
             service.pending(delivery, Map.of("code", error(current)), null);
@@ -88,6 +89,10 @@ public class PaymentRelayDispatcher {
                             lookup.approvedAt()));
             return;
         }
+        if ("UNKNOWN".equals(lookup.status())) {
+            service.approvalUnknown(delivery, lookup);
+            return;
+        }
         if ("CANCELED".equals(lookup.status())) {
             service.declined(delivery, lookup);
             return;
@@ -102,7 +107,14 @@ public class PaymentRelayDispatcher {
             return;
         }
         var request = deliveries.read(delivery.command(), Approval.class);
-        var result = client.approve(group.getGroupNumber(), request);
+        if (!service.claimApprovalSend(delivery)) return;
+        Reply<ApprovalResult> result;
+        try {
+            result = client.approve(group.getGroupNumber(), request);
+        } catch (RestClientException lost) {
+            service.pending(delivery, Map.of("code", "TRANSPORT_UNKNOWN"), null);
+            return;
+        }
         if (result.httpStatus() == 200
                 && result.success()
                 && result.data() != null
@@ -127,18 +139,31 @@ public class PaymentRelayDispatcher {
                 && result.data() != null
                 && "DECLINED".equals(result.data().status()))
             service.declined(delivery, result.data());
+        else if (result.httpStatus() == 202
+                && result.success()
+                && result.data() != null
+                && !"UNKNOWN".equals(result.data().status()))
+            service.pending(delivery, result.data(), "APPROVING");
+        else if (result.httpStatus() >= 400 && result.httpStatus() < 500)
+            service.pending(delivery, Map.of("code", error(result)), null);
+        else if (result.success()
+                && result.data() != null
+                && "UNKNOWN".equals(result.data().status())
+                && java.util.Objects.equals(result.data().paymentId(), binding.paymentId()))
+            service.approvalUnknown(delivery, result.data());
         else
             service.pending(
                     delivery,
                     result.data() == null ? Map.of("code", error(result)) : result.data(),
-                    "PENDING");
+                    null);
     }
 
     public PaymentRelayService.PaymentState checkout(String member, String number) {
         var group = service.owned(member, number);
         lifecycle.expire(group.getId());
         group = service.owned(member, number);
-        if (group.getStatus() != OrderStatus.PENDING_PAYMENT)
+        if (service.state(member, number).compensation() != null
+                || group.getStatus() != OrderStatus.PENDING_PAYMENT)
             throw new com.shoppinglive.common.core.BusinessException(
                     com.shoppinglive.common.core.ErrorCode.CONFLICT, "결제창을 열 수 없는 주문입니다.");
         if (store.binding(group.getId()).paymentId() == null)

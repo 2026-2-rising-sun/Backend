@@ -9,8 +9,6 @@ import com.shoppinglive.commercecore.order.repository.*;
 import com.shoppinglive.commercecore.order.service.*;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import com.shoppinglive.common.core.*;
-import com.shoppinglive.common.events.EventEnvelope;
-import com.shoppinglive.common.outbox.EventOutbox;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,12 +26,16 @@ public class PaymentRelayService {
     private final OrderJpaRepository orders;
     private final PurchaseGuard guard;
     private final OrderTimeSource time;
+
+    private final com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds;
+
+    private final com.shoppinglive.commercecore.payment.service.RefundIntentStore refundIntents;
+
     private final PaymentRelayStore store;
     private final PaymentDeliveryStore deliveries;
     private final OrderPaymentResultApplier orderOutcomes;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
-    private final EventOutbox outbox;
     private final String commissionRate;
     @PersistenceContext private EntityManager em;
 
@@ -49,7 +51,8 @@ public class PaymentRelayService {
             OrderPaymentResultApplier orderOutcomes,
             JdbcTemplate jdbc,
             TransactionTemplate tx,
-            EventOutbox outbox,
+            com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds,
+            com.shoppinglive.commercecore.payment.service.RefundIntentStore refundIntents,
             @Value("${commerce.commission-rate:}") String commissionRate) {
         this.sheets = sheets;
         this.lifecycle = lifecycle;
@@ -62,7 +65,8 @@ public class PaymentRelayService {
         this.orderOutcomes = orderOutcomes;
         this.jdbc = jdbc;
         this.tx = tx;
-        this.outbox = outbox;
+        this.kafkaRefunds = kafkaRefunds;
+        this.refundIntents = refundIntents;
         this.commissionRate = commissionRate;
     }
 
@@ -142,6 +146,7 @@ public class PaymentRelayService {
                             || !Objects.equals(request.pgOrderId(), binding.pgOrderId())
                             || request.amount() != group.getPayableAmount())
                         throw conflict("준비된 결제창 정보와 승인 요청이 다릅니다.");
+                    require(!refundIntents.fenced(group.getId()), "시스템 보상으로 승인 재개가 차단되었습니다.");
                     var existing = deliveries.relay(group.getId(), "APPROVAL");
                     if (existing != null)
                         return deliveries.relay(
@@ -213,7 +218,8 @@ public class PaymentRelayService {
                 t -> {
                     guard.lock(member);
                     var group = locked(found.getId());
-                    if (group.getStatus() != OrderStatus.PENDING_PAYMENT
+                    if (refundIntents.fenced(group.getId())
+                            || group.getStatus() != OrderStatus.PENDING_PAYMENT
                             || group.paymentDeadlineReached(time.now()))
                         throw conflict("결제창을 열 수 없는 주문입니다.");
                     require(
@@ -231,6 +237,49 @@ public class PaymentRelayService {
         tx.executeWithoutResult(
                 t -> {
                     if (remoteStatus != null) store.status(id, remoteStatus);
+                    deliveries.record(delivery, reply, "UNKNOWN");
+                });
+    }
+
+    public boolean approvalAllowed(PaymentDeliveryStore.Delivery delivery) {
+        var found = deliveryGroup(delivery);
+        guard.ensure(found.getMemberId());
+        return tx.execute(
+                t -> {
+                    guard.lock(found.getMemberId());
+                    var group = locked(found.getId());
+                    return !refundIntents.fenced(group.getId())
+                            && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING;
+                });
+    }
+
+    public boolean claimApprovalSend(PaymentDeliveryStore.Delivery delivery) {
+        var found = deliveryGroup(delivery);
+        guard.ensure(found.getMemberId());
+        return tx.execute(
+                t -> {
+                    guard.lock(found.getMemberId());
+                    var group = locked(found.getId());
+                    if (refundIntents.fenced(group.getId())
+                            || group.getStatus() != OrderStatus.PAYMENT_CONFIRMING) return false;
+                    // 이 커밋이 송신 시작의 직렬화 지점이다. 이후 보상은 이 호출을 이미 진행 중인 호출로 취급한다.
+                    return jdbc.update(
+                                    "UPDATE order_payment_relay SET approval_send_started_at=CURRENT_TIMESTAMP WHERE payment_group_id=? AND NOT EXISTS(SELECT 1 FROM core_refund_intent WHERE payment_group_id=? AND purpose='SYSTEM_COMPENSATION')",
+                                    group.getId(),
+                                    group.getId())
+                            == 1;
+                });
+    }
+
+    public void approvalUnknown(PaymentDeliveryStore.Delivery delivery, Object reply) {
+        var found = deliveryGroup(delivery);
+        guard.ensure(found.getMemberId());
+        tx.executeWithoutResult(
+                t -> {
+                    guard.lock(found.getMemberId());
+                    var group = locked(found.getId());
+                    if (store.binding(group.getId()).approvedAt() == null)
+                        kafkaRefunds.compensateLocked(group, "APPROVAL_UNKNOWN");
                     deliveries.record(delivery, reply, "UNKNOWN");
                 });
     }
@@ -266,25 +315,14 @@ public class PaymentRelayService {
                         lifecycle.expire(group.getId());
                         group = locked(group.getId());
                     }
-                    if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
+                    if (refundIntents.fenced(group.getId())) {
+                        // 늦은 승인은 사실만 보존하고 이미 접수한 보상 ID로 수렴한다.
+                    } else if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
                         orderOutcomes.finish(group, true);
                     else if (Set.of(OrderStatus.EXPIRED, OrderStatus.CANCELLED, OrderStatus.FAILED)
-                            .contains(group.getStatus())) {
-                        if (store.requireRefund(group, result))
-                            outbox.append(
-                                    "commerce.refund-requests.v1",
-                                    EventEnvelope.create(
-                                            "RefundRequested",
-                                            1,
-                                            "commercecore-service",
-                                            group.getGroupNumber(),
-                                            time.now(),
-                                            new RefundRequested(
-                                                    "late-" + result.paymentId(),
-                                                    result.paymentId(),
-                                                    result.orderRef(),
-                                                    "LATE_APPROVAL")));
-                    } else throw conflict("승인 결과를 적용할 주문 상태가 아닙니다.");
+                            .contains(group.getStatus()))
+                        kafkaRefunds.compensateLocked(group, "LATE_APPROVAL");
+                    else throw conflict("승인 결과를 적용할 주문 상태가 아닙니다.");
                     store.approved(group.getId(), result.approvedAt());
                     var delivery = deliveries.relay(group.getId(), "APPROVAL");
                     if (delivery != null) deliveries.record(delivery, result, "SUCCESS");
@@ -306,7 +344,8 @@ public class PaymentRelayService {
                         lifecycle.expire(id);
                         group = locked(id);
                     }
-                    if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
+                    if (!refundIntents.fenced(group.getId())
+                            && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
                         orderOutcomes.finish(group, false);
                     store.status(id, "DECLINED");
                     deliveries.record(delivery, result, "FAILED");
@@ -414,7 +453,8 @@ public class PaymentRelayService {
                                     member,
                                     List.of(
                                             OrderStatus.PENDING_PAYMENT,
-                                            OrderStatus.PAYMENT_CONFIRMING))) {
+                                            OrderStatus.PAYMENT_CONFIRMING,
+                                            OrderStatus.COMPENSATION_PENDING))) {
                         if (found.usesLegacyExecution()) continue;
                         var group = locked(found.getId());
                         if (!group.isOrderSheet() || store.binding(group.getId()) == null)
@@ -422,7 +462,8 @@ public class PaymentRelayService {
                         lifecycle.expire(group.getId());
                         group = locked(group.getId());
                         if (group.getStatus() != OrderStatus.PENDING_PAYMENT
-                                && group.getStatus() != OrderStatus.PAYMENT_CONFIRMING) continue;
+                                && group.getStatus() != OrderStatus.PAYMENT_CONFIRMING
+                                && group.getStatus() != OrderStatus.COMPENSATION_PENDING) continue;
                         if (active != null) throw conflict("진행 중인 주문이 여러 건입니다. 기존 주문을 확인해 주세요.");
                         active = viewLocked(group);
                     }
@@ -451,7 +492,10 @@ public class PaymentRelayService {
                         group.getPayableAmount(),
                         group.getExpiresAt(),
                         group.getProcessingExpiresAt(),
-                        store.refundStatus(group.getId()));
+                        refundIntents.fenced(group.getId())
+                                ? refundIntents.compensation(group.getId()).status()
+                                : store.refundStatus(group.getId()),
+                        refundIntents.compensation(group.getId()));
         return new View(
                 OrderSheetResponse.from(
                         group, orders.findByPaymentGroupIdOrderByIdAsc(group.getId())),
@@ -520,5 +564,7 @@ public class PaymentRelayService {
             long amount,
             Instant expiresAt,
             Instant processingExpiresAt,
-            String refundStatus) {}
+            String refundStatus,
+            com.shoppinglive.commercecore.payment.service.RefundIntentStore.Compensation
+                    compensation) {}
 }

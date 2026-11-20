@@ -33,9 +33,9 @@ import org.springframework.test.context.bean.override.mockito.*;
 @EmbeddedKafka(
         partitions = 1,
         topics = {
-            "payment.execution-results.v1",
-            "payment.refund-results.v1",
-            "commerce.refund-requests.v1",
+            "payment.execution.results.v1",
+            "payment.refund.results.v1",
+            "commerce.refund.requests.v1",
             "commerce.payment-group.v1",
             "commerce.sales-info.v1"
         })
@@ -102,7 +102,7 @@ class PaymentRelayKafkaPostgresTest extends OrderSheetPostgresSupport {
         try (var consumer =
                 new KafkaConsumer<String, String>(
                         props, new StringDeserializer(), new StringDeserializer())) {
-            consumer.subscribe(List.of("commerce.refund-requests.v1"));
+            consumer.subscribe(List.of("commerce.refund.requests.v1"));
             var approved =
                     EventEnvelope.create(
                             "PaymentApproved",
@@ -113,15 +113,15 @@ class PaymentRelayKafkaPostgresTest extends OrderSheetPostgresSupport {
                             new Approved(7001, number, 8000, Instant.now()));
             String json = mapper.writeValueAsString(approved);
             clearInvocations(relay);
-            kafka.send("payment.execution-results.v1", number, json).get(10, TimeUnit.SECONDS);
-            kafka.send("payment.execution-results.v1", number, json).get(10, TimeUnit.SECONDS);
+            kafka.send("payment.execution.results.v1", number, json).get(10, TimeUnit.SECONDS);
+            kafka.send("payment.execution.results.v1", number, json).get(10, TimeUnit.SECONDS);
             await().atMost(Duration.ofSeconds(20))
                     .untilAsserted(
                             () -> {
                                 verify(relay, times(2)).approved(any());
                                 assertThat(
                                                 jdbc.queryForObject(
-                                                        "SELECT COUNT(*) FROM payment_relay_refund WHERE refund_request_id='late-7001'",
+                                                        "SELECT COUNT(*) FROM core_refund_intent WHERE purpose='SYSTEM_COMPENSATION'",
                                                         Long.class))
                                         .isEqualTo(1);
                                 assertThat(
@@ -139,31 +139,37 @@ class PaymentRelayKafkaPostgresTest extends OrderSheetPostgresSupport {
             var payload = mapper.readTree(outgoing.value());
             assertThat(payload.path("eventType").asText()).isEqualTo("RefundRequested");
             assertThat(payload.path("payload").path("refundRequestId").asText())
-                    .isEqualTo("late-7001");
-            assertThat(payload.path("payload").path("reason").asText()).isEqualTo("LATE_APPROVAL");
+                    .matches("[0-9a-f-]{36}");
+            assertThat(payload.path("payload").path("reason").asText())
+                    .isEqualTo("APPROVAL_UNKNOWN");
+            var resultPayload =
+                    (com.fasterxml.jackson.databind.node.ObjectNode)
+                            payload.path("payload").deepCopy();
+            resultPayload
+                    .put("executionId", UUID.randomUUID().toString())
+                    .put("resultVersion", 1)
+                    .put("status", "SUCCEEDED")
+                    .put("refundedAmount", 8000)
+                    .put("resolvedAt", Instant.now().toString())
+                    .putNull("nextActionAt")
+                    .putNull("failureCode");
             var succeeded =
                     EventEnvelope.create(
-                            "RefundSucceeded",
+                            "RefundResultRecorded",
                             1,
                             "payment-service",
                             number,
                             Instant.now(),
-                            new RefundSucceeded(
-                                    8001,
-                                    "late-7001",
-                                    "LATE_APPROVAL",
-                                    List.of(new RefundItem(number + "-S1", 8000)),
-                                    8000,
-                                    Instant.now()));
+                            resultPayload);
             String refund = mapper.writeValueAsString(succeeded);
-            kafka.send("payment.refund-results.v1", number, refund).get(10, TimeUnit.SECONDS);
-            kafka.send("payment.refund-results.v1", number, refund).get(10, TimeUnit.SECONDS);
+            kafka.send("payment.refund.results.v1", number, refund).get(10, TimeUnit.SECONDS);
+            kafka.send("payment.refund.results.v1", number, refund).get(10, TimeUnit.SECONDS);
             await().atMost(Duration.ofSeconds(20))
                     .untilAsserted(
                             () ->
                                     assertThat(relay.state(MEMBER_A, number).refundStatus())
-                                            .isEqualTo("SUCCEEDED"));
-            assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("EXPIRED");
+                                            .isEqualTo("COMPLETED"));
+            assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("CANCELLED");
             assertThat(available(501)).isEqualTo(20);
             assertThat(reserved(501)).isZero();
         }

@@ -1,12 +1,6 @@
 package com.shoppinglive.commercecore.payment.controller;
 
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.commercecore.payment.dto.RefundView;
 import com.shoppinglive.commercecore.payment.dto.RefundableTarget;
 import com.shoppinglive.commercecore.payment.dto.SellerRefundView;
@@ -16,8 +10,6 @@ import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -36,26 +28,17 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @ConditionalOnProperty(prefix = "commercecore.refunds", name = "api-enabled", havingValue = "true")
 public class RefundController {
+    private final com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds;
     private final RefundIntakeService refunds;
-    private final ObjectMapper mapper;
     private final RefundQueryService queries;
 
     public RefundController(
-            RefundIntakeService refunds, RefundQueryService queries, ObjectMapper mapper) {
+            RefundIntakeService refunds,
+            RefundQueryService queries,
+            com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds) {
         this.refunds = refunds;
         this.queries = queries;
-        this.mapper = mapper;
-    }
-
-    public record RefundRequest(
-            @JsonProperty(value = "cartItemIds", required = true)
-                    @JsonSetter(nulls = Nulls.FAIL)
-                    @Size(min = 1, max = 100, message = "크기는 {min}~{max} 범위여야 합니다.")
-                    List<@Positive(message = "0보다 커야 합니다.") Long> cartItemIds) {
-        @JsonAnySetter
-        public void rejectUnknownField(String name, Object value) {
-            throw new IllegalArgumentException("지원하지 않는 환불 요청 필드: " + name);
-        }
+        this.kafkaRefunds = kafkaRefunds;
     }
 
     @PostMapping("/v1/payment-groups/{number}/refunds")
@@ -64,34 +47,18 @@ public class RefundController {
             @PathVariable String number,
             @RequestHeader("Idempotency-Key") String key,
             @RequestBody(required = false) JsonNode body) {
-        List<Long> cartItemIds = parseCartItemIds(body);
-        RefundIntakeService.RequestResult result =
-                refunds.request(member.memberId(), number, key, cartItemIds);
+        var selection = com.shoppinglive.commercecore.payment.dto.RefundSelection.parse(body);
+        RefundIntakeService.RequestResult result;
+        if (kafkaRefunds.supports(member.memberId(), number))
+            result = kafkaRefunds.request(member.memberId(), number, key, selection);
+        else {
+            if (selection.mode().equals("ITEMS") || selection.expectedAmount() != null)
+                throw new BusinessException(
+                        ErrorCode.CONFLICT, "이전 정책 주문은 기존 전체·장바구니 환불 경로를 사용합니다.");
+            result = refunds.request(member.memberId(), number, key, selection.cartItemIds());
+        }
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(ApiResponse.ok(result.refund()));
-    }
-
-    private List<Long> parseCartItemIds(JsonNode body) {
-        if (body == null) {
-            return List.of();
-        }
-        if (!body.isObject()) {
-            throw invalidRefundBody();
-        }
-        try {
-            RefundRequest request = mapper.treeToValue(body, RefundRequest.class);
-            if (request.cartItemIds() == null || request.cartItemIds().isEmpty()) {
-                throw invalidRefundBody();
-            }
-            return request.cartItemIds();
-        } catch (JsonProcessingException | IllegalArgumentException exception) {
-            throw invalidRefundBody();
-        }
-    }
-
-    private static BusinessException invalidRefundBody() {
-        return new BusinessException(
-                ErrorCode.INVALID_REQUEST, "환불 요청 본문에는 비어 있지 않은 cartItemIds 배열이 필요합니다.");
     }
 
     @GetMapping("/v1/payment-groups/{number}/refundable-targets")

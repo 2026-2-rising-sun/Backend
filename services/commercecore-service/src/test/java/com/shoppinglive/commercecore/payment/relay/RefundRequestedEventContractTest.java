@@ -8,12 +8,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.nio.file.*;
 import java.time.Instant;
-import java.util.Map;
 import org.junit.jupiter.api.*;
 
 class RefundRequestedEventContractTest {
     @Test
-    @DisplayName("팀원 LATE_APPROVAL 요청 필드와 Core 봉투를 직렬화 표본으로 남긴다")
+    @DisplayName("이행 전 저장된 LATE_APPROVAL 요청 필드를 보존한다")
     void serializesLateApprovalRequestContract() throws Exception {
         var mapper =
                 new ObjectMapper()
@@ -33,16 +32,5 @@ class RefundRequestedEventContractTest {
         assertThat(json.path("aggregateId").asText()).isEqualTo(ref);
         assertThat(json.path("payload").size()).isEqualTo(4);
         assertThat(json.path("payload").path("refundRequestId").asText()).isEqualTo("late-7001");
-        var path = Path.of("build/contract-samples/RefundRequested.json");
-        Files.createDirectories(path.getParent());
-        mapper.writeValue(
-                path.toFile(),
-                Map.of(
-                        "contract",
-                        "commerce-refund-requests.yaml",
-                        "message",
-                        "RefundRequested",
-                        "payload",
-                        event));
     }
 }

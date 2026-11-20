@@ -13,4 +13,28 @@ public record RefundView(
         Instant requestedAt,
         Instant resolvedAt,
         List<RefundTarget> targets,
-        RefundRecoveryView recovery) {}
+        RefundRecoveryView recovery,
+        String refundRequestId) {
+    public RefundView(
+            long id,
+            String paymentGroupNumber,
+            long refundAmount,
+            long cumulativeRefundAmount,
+            RefundStatus status,
+            Instant requestedAt,
+            Instant resolvedAt,
+            List<RefundTarget> targets,
+            RefundRecoveryView recovery) {
+        this(
+                id,
+                paymentGroupNumber,
+                refundAmount,
+                cumulativeRefundAmount,
+                status,
+                requestedAt,
+                resolvedAt,
+                targets,
+                recovery,
+                null);
+    }
+}
