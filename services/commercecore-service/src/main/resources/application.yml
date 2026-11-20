@@ -88,9 +88,9 @@ logging:
   pattern:
     level: "%5p [${spring.application.name},%X{requestId:-}]"
 
-# 팀원 계약: 주문 생성 때 판매자 주문에 복사한다. 운영 수수료율은 환경 설정으로 공급한다.
+# 팀원 계약: 주문 생성 때 판매자 주문에 복사한다. 전 판매자 공통 0.1(10%)이며 운영 값은 환경 설정으로 바꾼다(#383).
 commerce:
-  commission-rate: ${COMMERCE_COMMISSION_RATE:}
+  commission-rate: ${COMMERCE_COMMISSION_RATE:0.1}
 
 ---
 # 새 서비스의 빈 전용 DB만 사용한다. 기존 commerce DB로 자동 연결하지 않는다.

@@ -96,3 +96,7 @@ PREPARE/APPROVAL 영속 원문을 기존 HTTP 전달표에 저장하고 legacy �
 사용자600/600·확정 실패 FAILED를 적용한다. 팀원 목표의 Commerce T+3분/거절 후 PENDING 복귀 제안은 채택하지 않는다. Payment CREATED expiresAt은 원래 준비 기한이며 APPROVING/UNKNOWN 실패 기한이 아니다. 주문 만료 후에도 미확정 결제는 조회하고 실패를 추정하지 않는다.
 
 앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. [현재 범위](../worklog/plans/active/331-order-audit-fixes/processing-deadline.md).
+
+## 2026-11-21 정정: 수수료율 기본값
+
+위 "설정 숫자 기본값은 정하지 않는다"를 바꾼다. `commerce.commission-rate`의 기본값은 0.1(전 판매자 공통 10%)이다. 값이 없어 로컬 새 주문서 생성이 500으로 실패했다(#383). 판매자별·상품별 요율은 만들지 않는다. 운영 값은 `COMMERCE_COMMISSION_RATE`로 바꾼다. 결제 담당 결정.
