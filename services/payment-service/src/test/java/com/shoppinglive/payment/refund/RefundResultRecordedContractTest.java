@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.payment.refund.entity.RefundStatus;
 import com.shoppinglive.payment.refund.event.RefundRequestParser;
 import com.shoppinglive.payment.refund.event.RefundResultRecorded;
 import java.nio.file.Files;
@@ -96,6 +97,58 @@ class RefundResultRecordedContractTest {
         JsonNode request = RefundRequestParser.parse(orderRef, event);
         JsonNode result =
                 RefundResultRecorded.failed(request, UUID.randomUUID(), failureCode, Instant.now());
+
+        Path directory = Path.of("build/contract-samples");
+        Files.createDirectories(directory);
+        MAPPER.writeValue(
+                directory.resolve("RefundResultRecorded-" + name + ".json").toFile(),
+                Map.of(
+                        "contract",
+                        "payment-refund-results.yaml",
+                        "message",
+                        "RefundResultRecorded",
+                        "payload",
+                        RefundResultRecorded.envelope(result, Instant.now())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+        "user-succeeded,USER_REFUND,CUSTOMER_REQUEST,1,SUCCEEDED,4000,",
+        "system-failed,SYSTEM_COMPENSATION,LATE_APPROVAL,1,FAILED,0,REJECT_CARD_COMPANY",
+        "system-succeeded-v2,SYSTEM_COMPENSATION,LATE_APPROVAL,2,SUCCEEDED,4000,",
+        "system-no-charge-v2,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,2,NO_CHARGE,0,NO_CHARGE"
+    })
+    @DisplayName("[REF-EXEC-02][REF-EXEC-03][REF-LATE-02] 실행 결과(성공·실패·미승인, 버전 2 포함)도 결과 계약을 지킨다")
+    void writesExecutionResultSamples(
+            String name,
+            String purpose,
+            String reason,
+            int version,
+            RefundStatus status,
+            long refundedAmount,
+            String failureCode)
+            throws Exception {
+        JsonNode request =
+                MAPPER.readTree(
+                        """
+                        {"refundRequestId":"x-%s","orderRef":"PG-22222222-2222-4222-8222-222222222222",
+                         "paymentId":7001,"purpose":"%s","reason":"%s","currency":"KRW","amount":4000,
+                         "items":[{"sellerOrderNumber":"ORDER-301","amount":4000,
+                         "orderItems":[{"orderItemId":301,"quantity":1,"amount":4000}]}],
+                         "requestedAt":"2026-11-21T00:59:59.123456789Z"}
+                        """
+                                .formatted(name, purpose, reason));
+        JsonNode result =
+                RefundResultRecorded.result(
+                        request,
+                        UUID.randomUUID(),
+                        version,
+                        status,
+                        refundedAmount,
+                        Instant.now(),
+                        failureCode);
+        assertThat(result.get("resultVersion").intValue()).isEqualTo(version);
+        assertThat(result.get("failureCode").isNull()).isEqualTo(failureCode == null);
 
         Path directory = Path.of("build/contract-samples");
         Files.createDirectories(directory);
