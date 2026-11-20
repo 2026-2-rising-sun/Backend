@@ -41,10 +41,8 @@ class CompensationStateMigrationPostgresTest {
         try {
             old.migrate();
             var jdbc = new JdbcTemplate(ds);
-            assertThat(jdbc.queryForObject("SELECT current_database()", String.class))
-                    .isEqualTo("core_refunds_c");
-            assertThat(jdbc.queryForObject("SELECT current_user", String.class))
-                    .isEqualTo("core_refunds_c");
+            assertThat(jdbc.queryForObject("SELECT current_schema()", String.class))
+                    .isEqualTo(schema);
             int checksum =
                     jdbc.queryForObject(
                             "SELECT checksum FROM flyway_schema_history WHERE version='115'",

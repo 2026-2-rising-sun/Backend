@@ -78,3 +78,5 @@ PR378의 최초 head80c13632를 다시 검토하여 공유 만료 서비스가 p
 missing-paymentId는 새 사용자 접수와 정상 승인 진입 모두 저장binding을 요구하므로 정상 신규 API 경로의 보편적 오류는 아니다. 다만 과거/불완전 연결에서 원요청에 원결제ID가 없고 결과에 새ID가 있으면 동일 결과를 계속 거절하고 결과원장을 확정하지 않는다. 이미 송신 중이던 정상 PREPARE 응답이 뒤늦게 와 기존binding을 채우면 코드상 재처리 가능하지만, 응답을 영구 유실한 경우 새 PREPARE는 대기/종료 상태에서 차단되고 현재 GET6필드만으로 구매자·판매자 원문을 확인할 수 없어 자동수렴을 보장할 수 없다. ID없는 유효 NO_CHARGE는 기존 테스트로 완료 가능하다. 실제 Kafka에서의 정체 범위는 미실행이며 정적 무한재시도 설정상 같은 partition의 후속 소비 지연도 가능하다.
 
 Core opt-in(default-off) 격리는 대안분석만 했고 구현하지 않았다. 기존 api-enabled만 끄면 시스템 자동보상을 막지 못한다. 별도 승인된 정책으로 신규 policy1 환불을 접수 전 거절하고, 기존intent없는 빠른UNKNOWN은 Processing·예약을 유지하고,600초는 baseline EXPIRED로 분기해야 한다. 종료 뒤 늦은 승인의 기존 payment_relay_refund/하이픈4필드 발행까지 보존해야 하며 이미 접수된 common intent/fence/결과 소비는 OFF에도 유지해야 한다. 새 기능의 정상600초보상 요구는 ON일 때만 적용되는 별도 롤아웃 결정이므로 사용자 승인·on/off·이행 회귀 없이 토글을 추가하지 않는다.
+
+이행 테스트의 로컬 DB명/계정 core_refunds_c 고정 assertion도 CI의 commercecore_test/postgres와 불일치함을 확인했다. 접속 계정 이름은 migration의 업무 조건이 아니므로 테스트 전용 schema 일치 검증으로 바꾸고 최종 migration5를 C 전용 DB에서 재실행했다. CI DB를 로컬에서 기동하거나 연결한 것으로 보고하지 않는다.
