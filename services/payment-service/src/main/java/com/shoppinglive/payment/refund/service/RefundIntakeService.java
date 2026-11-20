@@ -13,6 +13,8 @@ import com.shoppinglive.payment.refund.entity.RefundStatus;
 import com.shoppinglive.payment.refund.event.RefundResultRecorded;
 import com.shoppinglive.payment.refund.repository.RefundRepository;
 import com.shoppinglive.payment.refund.repository.RefundRequestConflictRepository;
+import com.shoppinglive.payment.refund.service.compensation.CompensationExecutor;
+import com.shoppinglive.payment.refund.service.user.UserRefundExecutor;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +41,8 @@ public class RefundIntakeService {
     private final RefundRequestConflictRepository conflicts;
     private final PaymentRepository payments;
     private final EventOutbox outbox;
+    private final UserRefundExecutor userRefunds;
+    private final CompensationExecutor compensations;
 
     /**
      * 요청 payload 하나를 접수한다. 형식은 {@code RefundRequestParser}가 이미 확인했다.
@@ -57,7 +61,7 @@ public class RefundIntakeService {
         Long paymentId = payment.map(Payment::getId).orElse(null);
         String failure = identityFailure(request, paymentId);
         if (failure == null) {
-            if (insert(id, executionId, paymentId, purpose, request, body, null, null) == 1) {
+            if (insert(id, executionId, paymentId, purpose, request, body, null, null, null) == 1) {
                 return refunds.findByRefundRequestId(id);
             }
             if (refunds.findByRefundRequestId(id).isPresent()) {
@@ -66,9 +70,11 @@ public class RefundIntakeService {
             // 같은 id가 없는데 0행이면 부분 UNIQUE(결제당 진행 중 보상 1건)에 걸렸다
             failure = COMPENSATION_IN_PROGRESS;
         }
+        Instant resolvedAt = Instant.now();
         String result =
-                write(RefundResultRecorded.failed(request, executionId, failure, Instant.now()));
-        if (insert(id, executionId, paymentId, purpose, request, body, failure, result) == 0) {
+                write(RefundResultRecorded.failed(request, executionId, failure, resolvedAt));
+        if (insert(id, executionId, paymentId, purpose, request, body, failure, result, resolvedAt)
+                == 0) {
             return redelivered(id, request, body);
         }
         log.error(
@@ -90,16 +96,8 @@ public class RefundIntakeService {
      */
     public void execute(Refund refund) {
         switch (refund.getPurpose()) {
-            // #370이 고객 환불 실행을 여기에 붙인다
-            case USER_REFUND ->
-                    log.info(
-                            "고객 환불 실행은 아직 없어 접수만 했다: refundRequestId={}",
-                            refund.getRefundRequestId());
-            // #386이 시스템 보상 실행을 여기에 붙인다
-            case SYSTEM_COMPENSATION ->
-                    log.info(
-                            "시스템 보상 실행은 아직 없어 접수만 했다: refundRequestId={}",
-                            refund.getRefundRequestId());
+            case USER_REFUND -> userRefunds.execute(refund); // #370
+            case SYSTEM_COMPENSATION -> compensations.execute(refund); // #386
         }
     }
 
@@ -140,7 +138,8 @@ public class RefundIntakeService {
             JsonNode request,
             String body,
             String failure,
-            String result) {
+            String result,
+            Instant resolvedAt) {
         return refunds.insertIfAbsent(
                 id,
                 executionId,
@@ -151,7 +150,8 @@ public class RefundIntakeService {
                 (failure == null ? RefundStatus.PROCESSING : RefundStatus.FAILED).name(),
                 failure,
                 result == null ? 0 : 1,
-                result);
+                result,
+                resolvedAt);
     }
 
     /** 저장한 결과 문자열을 그대로 싣는다. 같은 resultVersion은 같은 payload여야 Core가 중복으로 받는다. */

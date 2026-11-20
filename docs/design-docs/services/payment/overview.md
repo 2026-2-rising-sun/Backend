@@ -86,6 +86,7 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 - 결제가 없거나 paymentId가 없거나 다르면, 또는 같은 결제에 진행 중인 시스템 보상이 있으면 돈을 움직이지 않고 FAILED 결과를 같은 트랜잭션의 outbox로 `payment.refund.results.v1`에 보낸다.
 - 같은 요청·같은 본문은 저장한 결과를 그대로 다시 보낸다. 다른 본문은 `refund_request_conflict`에 기록하고 결과를 보내지 않는다.
 - 유효한 요청은 PROCESSING으로 접수하고 `RefundIntakeService.execute`의 목적별 분기에서 끝난다. 고객 환불(#370)과 시스템 보상(#386) 실행이 붙기 전까지 토스 취소를 부르지 않고 결과도 보내지 않는다.
+- 실행 공용 기반: `execute`는 목적별로 `UserRefundExecutor`(`refund/service/user`, #370)와 `CompensationExecutor`(`refund/service/compensation`, #386)를 부른다. 지금 구현(`Pending…Executor`)은 로그만 남긴다. 확정 결과는 `RefundResultService.record`(조건부 UPDATE + 같은 트랜잭션 outbox, 시스템 보상만 FAILED 뒤 재확정)로, 재처리는 `RefundRepository.findDue`(목적별, next_attempt_at이 지난 PROCESSING·UNKNOWN)와 `claim`(선점)으로 한다. 토스 부분 취소는 `TossPaymentsClient.cancel(…, cancelAmount)`다.
 - `execute`는 이번에 새로 넣은 행에서만 불린다. 같은 요청을 다시 받아도, 커밋 뒤 `execute` 전에 죽었거나 `execute`가 예외를 던져도 다시 불리지 않는다. 끝나지 못한 PROCESSING은 실행 PR의 재처리 스케줄러(REF-EXEC-01)가 집어야 한다.
 
 소비자는 `payment.refunds.consumer-enabled`(기본 켜짐)로 끈다. 목표는 [환불 요구사항](requirements/refund.md)과 [목표 설계](design.html#states)에 있다. 지운 Mock 구현은 `e5a1b66bf3b06a971b1242dd02bd623e717c2902`에서 볼 수 있다.

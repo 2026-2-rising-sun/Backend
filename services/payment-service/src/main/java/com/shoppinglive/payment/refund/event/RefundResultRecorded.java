@@ -3,6 +3,7 @@ package com.shoppinglive.payment.refund.event;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.payment.refund.entity.RefundStatus;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,14 +22,30 @@ public final class RefundResultRecorded {
     /** 돈을 움직이지 않은 첫 결과(resultVersion 1). */
     public static ObjectNode failed(
             JsonNode request, UUID executionId, String failureCode, Instant resolvedAt) {
+        return result(request, executionId, 1, RefundStatus.FAILED, 0, resolvedAt, failureCode);
+    }
+
+    /** 요청 원문 노드를 복사해 Payment 필드 7개를 더한다. nextActionAt은 확정 결과라 항상 null이다. */
+    public static ObjectNode result(
+            JsonNode request,
+            UUID executionId,
+            int resultVersion,
+            RefundStatus status,
+            long refundedAmount,
+            Instant resolvedAt,
+            String failureCode) {
         ObjectNode result = request.deepCopy();
         result.put("executionId", executionId.toString());
-        result.put("resultVersion", 1);
-        result.put("status", "FAILED");
-        result.put("refundedAmount", 0);
+        result.put("resultVersion", resultVersion);
+        result.put("status", status.name());
+        result.put("refundedAmount", refundedAmount);
         result.put("resolvedAt", resolvedAt.toString());
         result.putNull("nextActionAt");
-        result.put("failureCode", failureCode);
+        if (failureCode == null) {
+            result.putNull("failureCode");
+        } else {
+            result.put("failureCode", failureCode);
+        }
         return result;
     }
 

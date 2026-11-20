@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -61,4 +62,22 @@ public class Refund extends AuditedEntity {
 
     @Column(name = "result_payload", columnDefinition = "text")
     private String resultPayload;
+
+    @Column(name = "refunded_amount", nullable = false)
+    private Long refundedAmount;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
+    @Column(name = "pg_transaction_key", unique = true, length = 64)
+    private String pgTransactionKey;
+
+    @Column(name = "attempt_count", nullable = false)
+    private Integer attemptCount;
+
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
+    @Column(name = "check_deadline_at")
+    private Instant checkDeadlineAt;
 }

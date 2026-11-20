@@ -89,6 +89,7 @@ class PaymentSchemaMigrationTest {
                         "ledger_journal",
                         "ledger_entry",
                         "refund",
+                        "refund_item",
                         "refund_request_conflict");
     }
 
