@@ -65,7 +65,8 @@ public class OrderSheetLifecycleService {
                             if (refundIntents.fenced(group.getId())
                                     || !awaitingPayment(group)
                                     || !group.paymentDeadlineReached(time.now())) return false;
-                            if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
+                            if (group.isOrderSheet()
+                                    && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
                                 kafkaRefunds.compensateLocked(group, "APPROVAL_UNKNOWN");
                             else expireLocked(group);
                             return true;
