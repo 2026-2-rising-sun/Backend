@@ -1,8 +1,8 @@
 # SKU 모듈 구현과 목표 설계
 
-통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 #379 병합 상태다. [이전 Order 감사](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)와 모듈 체크포인트의 이행 배경은 보존하되, 현재 CDC·통합 상태는 [상위 흐름](../../../flows/catalog-sync.md)과 [검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)을 따른다.
 
-상태: 기존 단일 SKU 판매 API·상품 조회를 SKU 원본으로 전환했다. 최종 감사 후속의 모듈별 검사와 PR 상태는 [2026-11-15 기록](../../../../worklog/2026-11-15-sku.md)을 따른다. Product `729d2d5f`를 일반 merge했다. 공개 다중 SKU 생성·조회/옵션 선택·대표가·가격 정렬은 보류다. 운영 배포 결과와 구분한다.
+상태: 기존 단일 SKU 판매 API·상품 조회를 SKU 원본으로 전환했다. 최종 감사 후속의 모듈별 검사와 PR 상태는 [2026-11-15 기록](../../../../worklog/2026-11-15-sku.md)을 따른다. Product `729d2d5f`를 일반 merge했다. 통합 상품·다중 SKU 등록은 #372로 제공하며 공개 다중 SKU 조회/옵션 선택·대표가·가격 정렬은 보류다. 운영 배포 결과와 구분한다.
 
 - [ERD 원본](erd.md) · [ERD HTML](erd.html)
 - [판매 상태·수량 원본](overview.md) · [상태 HTML](overview.html)
@@ -20,6 +20,8 @@
 
 ## API와 이행 상태
 
+아래 V102·Product→SKU→Order 순서는 당시 모듈 통합 절차다. 현재 dev는 거래 연결과 #379 CDC를 포함하며 이 문서의 중간 브랜치 설명을 현재 미통합 상태로 읽지 않는다.
+
 기존 `/v1/sales` REST 경로는 SkuSalesService를 통해 SKU·Outbox만 쓴다. Product 본인·미삭제 검증과 잠금 뒤 가격·수량·상태를 변경하며 전체 중지 중에도 준비할 수 있다. 단일 상품 등록은 Product 행 배타 잠금으로 중복 생성을 직렬화한다. 조회·거래 내부 포트는 SKU 원본을 사용한다. 기존 SalesService/RegistrationService와 Sales 테이블은 선행 브랜치의 Order 호환·이력 경로로 남아 있으며 Order #331이 최종 거래 연결을 통합한다. 이 중간 브랜치를 독립 배포하지 않는다. Core API 최종 편집자는 Order이고 SKU 담당이 실제 변경 조각을 제공한다. Catalog API 판매/SKU 구간은 SKU가 맡는다.
 
 V102는 기존 Sales ID·가격·재고·버전을 SKU로 복사하는 확장 단계다. 소비자 연결 전에 이 중간 상태를 독립 배포하거나 두 원본에 병행 쓰지 않는다. V102/V3 번호와 Product→SKU→Cart→Order 순서는 코디네이터 기술 조정이며 사용자 개별 번호 정책이 아니다. 대표가·최저가·합산 재고·새 가격 정렬·SKU별 방송 노출은 미결정이다.
@@ -29,7 +31,7 @@ V102는 기존 Sales ID·가격·재고·버전을 SKU로 복사하는 확장 �
 
 SKU의 일반 `version`은 수정 요청과 비교하지 않는 값이므로 V107에서 제거한다. `SkuView`와 판매 등록·가격 변경·상태 변경 응답에도 이 필드를 반환하지 않는다. Product의 `@Version`과 상품 수정 요청의 버전, Cart·기존 Sales의 버전은 유지한다.
 
-가격·상태·수량 변경은 `SkuEventTracker.watch()`의 SKU 행 잠금과 필드별 조건부 UPDATE로 보호한다. 신규 주문의 Product→SKU 잠금 순서와 활성 쓰기 트랜잭션 요구는 유지한다. 이벤트 최신성 판별용 `snapshotVersion`은 별개이며, 최종 표시 가격·available·상태 변경 때 증가한다. Catalog의 `product_sales.version`은 이 이벤트 버전을 저장하므로 제거하지 않는다.
+가격·상태·수량 변경은 `SkuEventTracker.watch()`의 SKU 행 잠금과 필드별 조건부 UPDATE로 보호한다. 신규 주문의 Product→SKU 잠금 순서와 활성 쓰기 트랜잭션 요구는 유지한다. 기존 판매 알림의 `snapshotVersion`은 별개로 유지한다. #379의 Catalog 경로는 SKU `metadata_version`과 `inventory_version`을 독립 사용한다. 메타데이터는 같은 업무 TX에 즉시 Outbox를 쓰고, 재고는 dirty revision을 기본 60초 fixedDelay 배치로 합친다. Catalog의 `product_sales.version`은 메타데이터 버전이며 재고 버전은 `catalog_snapshot_state`에서 따로 관리한다. [현재 CDC 흐름](../../../flows/catalog-sync.md)을 따른다.
 
 판매 응답의 필드 제거는 외부 계약 변경이다. 조사한 Frontend `e2748d7`은 판매 변경 응답을 사용하지 않고 상품을 다시 조회한다. Catalog·Live의 판매 일괄 조회 DTO에도 일반 SKU 버전은 없다. 저장소 밖 소비자와 실제 배포본은 별도 확인 대상이다. 구 애플리케이션은 `sku.version`을 읽고 쓰므로 컬럼 삭제 시 구 인스턴스를 함께 실행하지 않는다. 이번 변경은 배포 실행을 포함하지 않는다.
 
@@ -37,15 +39,15 @@ SKU의 일반 `version`은 수정 요청과 비교하지 않는 값이므로 V10
 
 상품 페이지를 먼저 자른 뒤 productIds를 모아 SKU를 한 번에 읽는다. 상태 필터는 Product 페이지 계산 전에 EXISTS로 적용해 SKU 수가 상품 total/offset을 늘리지 않는다. 기존 단일 SKU는 최신 가격·available·품절 파생 표시를 반환한다. 복수 SKU를 기존 단일 응답으로 읽으면 Core409/Catalog503이며 첫 SKU·최저가·합산재고를 임의 선택하지 않는다.
 
-판매자 내부 listSkus는 본인·미삭제 상품의0..N개를 제공한다. 판매자의 다중 SKU 생성/조회 HTTP·고객 옵션 선택·상품별 공개 skus[]·Live 다중 SKU 노출은 아직 구현되지 않았다. 옵션 JSON 저장/중복/전파 상세와 대표 가격 정책은 사용자 후속 결정 사항이다. [실제 API 조각](../../../../worklog/plans/active/334-sku-module/api-changes.md)과 [검증 결과](../../../../worklog/plans/active/334-sku-module/README.md)를 함께 본다.
+판매자 내부 listSkus는 본인·미삭제 상품의0..N개를 제공한다. 판매자의 다중 SKU 통합 생성은 [Product 등록](../product/overview.md)으로 제공한다. 판매자 다중 SKU 조회 HTTP·고객 옵션 선택·상품별 공개 skus[]·Live 다중 SKU 노출은 아직 구현되지 않았다. 옵션 JSON 저장/중복/전파 상세와 대표 가격 정책은 사용자 후속 결정 사항이다. [실제 API 조각](../../../../worklog/plans/active/334-sku-module/api-changes.md)과 [검증 결과](../../../../worklog/plans/active/334-sku-module/README.md)를 함께 본다.
 
 ## SKU 판매 상태와 수량 변화
 
-통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 #379 병합 상태다. [이전 Order 감사](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)와 모듈 체크포인트의 이행 배경은 보존하되, 현재 CDC·통합 상태는 [상위 흐름](../../../flows/catalog-sync.md)과 [검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)을 따른다.
 
 <!-- visual: relations -->
 
-상태: #334의 SkuService/SkuView/SkuEventTracker 및 기존 Sales HTTP→SkuSalesService 전환을 반영한다. Product `729d2d5f` 통합 기준이다. 기존 외부 enum을 보존하고 SOLD_OUT만 파생한다. 공개 다중 SKU 흐름과 Order/Cart 최종 통합은 별도다.
+상태: SkuService/SkuView/SkuEventTracker와 기존 Sales HTTP→SkuSalesService 전환을 반영한다. 기존 외부 enum을 보존하고 SOLD_OUT만 파생한다. 통합 등록은 제공하지만 공개 다중 SKU 조회·구매 옵션 선택은 후속이다.
 
 [시각 자료](overview.html)
 
@@ -75,7 +77,7 @@ SKU의 일반 `version`은 수정 요청과 비교하지 않는 값이므로 V10
 
 ### 트랜잭션·실패 복구
 
-Product들을 ID순으로 공유 잠금·검증한 다음 SKU들을 ID순 FOR UPDATE로 잠근다. SKU 변경은 MANDATORY로 호출자 트랜잭션에 참여하고 독립 커밋하지 않는다. 수량 조건 실패·Outbox 실패·후속 Order 실패 시 전체 롤백한다. 예약 상태 엔티티나 Cart 상태를 새로 만들지 않는다.
+Product들을 ID순으로 공유 잠금·검증한 다음 SKU들을 ID순 FOR UPDATE로 잠근다. SKU 변경은 MANDATORY로 호출자 트랜잭션에 참여하고 독립 커밋하지 않는다. 수량 조건 실패·해당 TX의 Outbox 실패·후속 Order 실패 시 전체 롤백한다. 재고 스냅샷 Outbox는 뒤의 배치 TX에서 완료 revision과 함께 커밋·롤백하며, 앞서 커밋한 수량 변경을 되돌리는 것은 아니다. 예약 상태 엔티티나 Cart 상태를 새로 만들지 않는다.
 
 수량 조건만으로 주문 A/B의 예약을 구별하지 못한다. Order가 취소/환불 적용 여부를 먼저 보호한 뒤 SKU를 한 번 변경해야 한다. 이미 생성된 주문의 consume/release/restock에는 Product/SKU의 신규 판매허용 조건을 재사용하지 않는다.
 
@@ -136,7 +138,7 @@ SKU는 판매자의 의도 READY·ON_SALE·PRIVATE를 저장한다. READY는 생
 
 기존 SalesService/RegistrationService·테이블은 이 브랜치의 전환 전 Order 호환·이력용이다. 판매 HTTP와 Product 판매 조회는 이 경로를 사용하지 않는다. 최종 Order/Cart 통합·실제 브로커 검증은 후행 PR에서 확인하며 이 중간 브랜치를 독립 배포하지 않는다.
 
-통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 예약 해제 공간과 환불 복구 상한은 [SKU 수량 상세](overview.md#정수-범위와-남은-제한)를 따른다.
+현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 #379 병합 상태다. [이전 Order 감사](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)와 모듈 체크포인트의 이행 배경은 보존하되, 현재 CDC·통합 상태는 [상위 흐름](../../../flows/catalog-sync.md)과 [검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)을 따른다. 예약 해제 공간과 환불 복구 상한은 [SKU 수량 상세](overview.md#정수-범위와-남은-제한)를 따른다.
 
 ## 통합 등록의 최초 판매 상태 (#372)
 

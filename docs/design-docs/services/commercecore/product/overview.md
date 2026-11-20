@@ -1,6 +1,6 @@
 # Product 모듈
 
-Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 기준은 `cc91c09b` 위의 이 워크트리 구현이며 배포/운영 DB 적용 결과는 아니다. SKU #334의 가격·재고·개별 상태 구현과 후속 Order 연결은 별도로 통합한다.
+Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`다. #372 통합 상품/SKU 등록과 #379 CDC 경로가 병합됐으며 [상위 동기화 흐름](../../../flows/catalog-sync.md)을 따른다. 아래 #333 당시 설명은 초기 설계 배경이고 운영 DB 적용 결과가 아니다.
 
 - [ERD 원본](erd.md) · [ERD HTML](erd.html)
 - [상태 원본](overview.md) · [상태 HTML](overview.html)
@@ -13,7 +13,7 @@ MD가 원본이고 HTML은 저장소 렌더러로 생성한다. 실제 테스트
 
 <!-- visual: relations -->
 
-기준: `cc91c09b` 위 Product #333 구현. ProductLifecycleService와 ProductTradingService, Catalog의 최소 제어 반영을 설명한다. SKU/Order의 후속 연결은 통합 대상이며 운영 배포 완료를 뜻하지 않는다.
+ProductLifecycleService와 ProductTradingService의 상태 경계를 설명한다. 현재 Catalog에는 최소 제어뿐 아니라 상품·SKU 전체 스냅샷과 독립 재고 버전을 전달한다. 운영 배포 완료를 뜻하지 않는다.
 
 [시각 자료](overview.html)
 

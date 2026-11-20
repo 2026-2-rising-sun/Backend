@@ -4,7 +4,7 @@
 
 상품·판매·쿠폰 원본의 변경 주체는 CommerceCore다. 사본의 버전과 원본의 확정을 구분한다.
 
-기준: Product V2·SKU V3와 단일 SKU 공개 호환 모델. 통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 #379 병합 상태. Catalog V5의 독립 버전 사본과 단일 SKU 공개 호환 모델을 설명한다. [상위 CDC 흐름](../../flows/catalog-sync.md)과 [최종 로컬 검증·미실행 범위](../../../worklog/2026-11-20-cdc-refund-status.md)를 함께 본다.
 
 ## 문서
 
@@ -24,7 +24,7 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 <!-- visual: relations -->
 
-기준: Product V2·SKU V3 판매 사본과 현재 공개 조회. 통합 감사 기준은 [Order `5048413b`](https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8)이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.
+현재 사본 적용은 아래 독립 revision 경로를 따른다. 이전 Product V2·SKU V3 단일 사본 감사는 [과거 기록](../../../worklog/2026-11-15-sku.md)에 보존한다.
 
 [시각 자료](overview.html)
 
@@ -51,7 +51,7 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 관련 기존 테스트: [ProductSalesRepositoryTest.java](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/sales/repository/ProductSalesRepositoryTest.java) · [ProductSalesBackfillTest.java](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/sales/service/ProductSalesBackfillTest.java).
 
-현재 전체 중지 중 공개 유지와 재고0 판매 시작 성공은 직접 사용자 답변 대기 중인 기술 동작이다. 이번 수정에서 바꾸거나 사용자 승인으로 재분류하지 않았다. 다중 SKU는 대표값 대신 상세·해당 목록 503이며 [ERD의 단일값 경계](erd.md#단일-sku-공개-호환)를 따른다. 실제 실행 여부는 [최신 워크로그](../../../worklog/2026-11-15-sku.md)에서 확인한다.
+현재 전체 중지 중 공개 유지와 재고0 판매 시작 성공은 직접 사용자 답변 대기 중인 기술 동작이다. 이번 수정에서 바꾸거나 사용자 승인으로 재분류하지 않았다. 다중 SKU는 대표값 대신 상세·해당 목록 503이며 [ERD의 단일값 경계](erd.md#단일-sku-공개-호환)를 따른다. 실제 실행 여부와 Frontend 후속은 [최신 검증 기록](../../../worklog/2026-11-20-cdc-refund-status.md)에서 확인한다.
 
 ## 통합 등록의 부분 수신 보호 (#372)
 

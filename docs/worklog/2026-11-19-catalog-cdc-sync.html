@@ -20,6 +20,7 @@
 </ul>
 </div>
 </div></aside><main id="content"><h1>Core Outbox CDC와 Catalog 상품·SKU·60초 재고 동기화</h1><p>실행일:2026-11-19~20(KST).</p>
+<p>후속 정정: 이 문서는 B 작업 종료 당시 기록이다. #379 병합과 E의 최종 CDC 단독 실행·두 JVM 재고 증거의 적용 범위는 <a href="2026-11-20-cdc-refund-status.html">2026-11-20 현재성·검증 기록</a>을 따른다. 아래 미실행·미커밋·인계 대기 문구를 최신 전체 상태로 읽지 않는다. 환불 #378은 여전히 별도 미병합이다.</p>
 <h2 id="기준과-소유-경계">기준과 소유 경계</h2>
 <p>Backend 기준 <code>3537340c4686fec3b962da8ed02d368829d639af</code>, 작업 브랜치 <code>catalog-cdc-sync</code>. 시작 당시 미커밋 변경이 없었다. 승인된 A 계약 patch와 신규23파일을 해시/적용 가능성 확인 뒤 상속했다. A 원본 계약·문서는 수정하지 않았다. B는 common-module Outbox, Core Product/SKU/Sales와 Core application.yml, Catalog/API/관련 문서·테스트만 변경했다. 주문·결제 상태·환불 업무, Frontend, Infra와 다른 체크아웃은 수정하지 않았다. 커밋·푸시·PR·병합·배포는 하지 않았다.</p>
 <h2 id="구현-결과">구현 결과</h2>
@@ -222,6 +223,6 @@
 <li>60초는 실행 주기이며 장애 포함 최대 전파 SLA가 아니다. 사본 재고로 구매를 승인하지 않는다. CDC 보관/slot/offset checkpoint 기반 정리는 별도 운영 과제다.</li>
 <li>실제 PG·운영 클러스터·브라우저 E2E·성능 수치는 검증하지 않았다. 문서 HTML은 생성 최신성과 링크를 검사했으며 브라우저 렌더링 검증은 하지 않았다.</li>
 <li>모든 B 변경은 로컬 미커밋 상태다. 커밋·푸시·PR·병합·배포는 없다. 기존 user-refund-367와 다른 체크아웃의 사용자 변경은 보존했다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>272b27c68f8d914744c30786e70c92dffab39af07f88101624fc08314924a2e9</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>a315e39f1cdbe905351f5c1e50a9ad5888246fa6bb6f50b885356551bf6afe2f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

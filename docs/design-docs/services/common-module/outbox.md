@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: `3537340c4686fec3b962da8ed02d368829d639af` 위의 CDC/relay 배타적 전달 변경을 반영한다. 이전 Outbox 동작을 보존하고 Core만 Catalog 토픽을 제외한다. 실제 검사와 미실행 범위는 [B 실행 기록](../../../worklog/2026-11-19-catalog-cdc-sync.md)을 따른다.
+기준: dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`에 병합된 #379의 CDC/relay 배타적 전달 변경을 반영한다. 이전 Outbox 동작을 보존하고 Core만 Catalog 토픽을 제외한다. 실제 검사와 미실행 범위는 [최종 검증 기록](../../../worklog/2026-11-20-cdc-refund-status.md)을 따른다. 이전 B 검사 범위는 [당시 기록](../../../worklog/2026-11-19-catalog-cdc-sync.md)에 보존한다.
 
 [시각 자료](outbox.html)
 
@@ -36,4 +36,6 @@
 
 `shoppinglive.outbox.relay.excluded-topics`의 기본값은 빈 목록이라 다른 서비스는 기존 relay 동작을 유지한다. Core만 commerce.catalog.snapshots.v1을 제외한다. 일반 JPA 조회와 DB lease/claim 조회가 모두 같은 제외 목록을 적용하며, fast path도 이 조회를 사용한다. CDC 중단을 감지해 relay로 보내는 fallback은 없다.
 
-Catalog Outbox 행도 기존 event_id/event_type/topic/message_key/payload TEXT/created_at을 그대로 사용한다. I의 connector는 public.event_outbox의 해당 토픽 create/read만 먼저 필터한 뒤 전체 봉투 TEXT를 원문 value로 보낸다. 관리 UPDATE/DELETE는 비즈니스 이벤트가 아니다. CDC는 published_at/attempts를 relay 완료로 갱신하지 않는다. NULL published_at을 실패나 TTL 정리 가능으로 단정하지 않으며 이번 변경은 CDC 행 삭제를 추가하지 않는다. 보관·slot·offset checkpoint 정리는 별도 운영 설계가 필요하다.
+Catalog Outbox 행도 기존 event_id/event_type/topic/message_key/payload TEXT/created_at을 그대로 사용한다. Infra #58의 connector는 public.event_outbox의 해당 토픽 create/read만 먼저 필터한 뒤 전체 봉투 TEXT를 원문 value로 보낸다. 관리 UPDATE/DELETE는 비즈니스 이벤트가 아니다. CDC는 published_at/attempts를 relay 완료로 갱신하지 않는다. NULL published_at을 실패나 TTL 정리 가능으로 단정하지 않으며 이번 변경은 CDC 행 삭제를 추가하지 않는다. 보관·slot·offset checkpoint 정리는 별도 운영 설계가 필요하다.
+
+[Catalog 전달·초기 적재·전환 순서](../../flows/catalog-sync.md)를 함께 확인한다. `payment_delivery_request`는 별도의 HTTP 전달 복구 저장소이며 이 CDC가 실행하지 않는다.
