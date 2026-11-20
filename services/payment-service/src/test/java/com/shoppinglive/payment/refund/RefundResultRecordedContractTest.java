@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.payment.refund.event.RefundRequestParser;
 import com.shoppinglive.payment.refund.event.RefundResultRecorded;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +15,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /** 접수가 outbox에 쓰는 것과 같은 팩터리로 결과 봉투를 만들어 계약 검사 표본으로 남긴다(event-samples 검사가 읽는다). */
 class RefundResultRecordedContractTest {
@@ -62,5 +65,48 @@ class RefundResultRecordedContractTest {
                         "RefundResultRecorded",
                         "payload",
                         event));
+    }
+
+    /** 파서가 받아들인 요청으로 접수가 만드는 실패 결과를 표본으로 남긴다. check_events --samples가 실제 생산 결과를 결과 계약으로 검사한다. */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+        "user-no-payment-id,USER_REFUND,CUSTOMER_REQUEST,,PAYMENT_ID_REQUIRED",
+        "user-not-found,USER_REFUND,CUSTOMER_REQUEST,7001,PAYMENT_NOT_FOUND",
+        "user-mismatch,USER_REFUND,CUSTOMER_REQUEST,7002,PAYMENT_MISMATCH",
+        "system-in-progress,SYSTEM_COMPENSATION,LATE_APPROVAL,7001,COMPENSATION_IN_PROGRESS",
+        "system-no-payment-id,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,,PAYMENT_ID_REQUIRED"
+    })
+    @DisplayName("[REF-EVENT-01][REF-ACCEPT-05][REF-ACCEPT-06] 파서가 받은 요청의 실패 결과는 결과 계약을 지킨다")
+    void writesFailedResultSamplesFromParsedRequests(
+            String name, String purpose, String reason, Long paymentId, String failureCode)
+            throws Exception {
+        String orderRef = "PG-22222222-2222-4222-8222-222222222222";
+        String payment = paymentId == null ? "" : "\"paymentId\":" + paymentId + ",";
+        String event =
+                """
+                {"eventId":"11111111-1111-4111-8111-000000000009","eventType":"RefundRequested",
+                 "schemaVersion":1,"source":"commercecore-service","aggregateId":"%s",
+                 "occurredAt":"2026-11-21T01:00:00Z","payload":{"refundRequestId":"r-%s",
+                 "orderRef":"%s",%s"purpose":"%s","reason":"%s","currency":"KRW","amount":4000,
+                 "items":[{"sellerOrderNumber":"ORDER-301","amount":4000,
+                 "orderItems":[{"orderItemId":301,"quantity":1,"amount":4000}]}],
+                 "requestedAt":"2026-11-21T00:59:59.123456789Z"}}
+                """
+                        .formatted(orderRef, name, orderRef, payment, purpose, reason);
+        JsonNode request = RefundRequestParser.parse(orderRef, event);
+        JsonNode result =
+                RefundResultRecorded.failed(request, UUID.randomUUID(), failureCode, Instant.now());
+
+        Path directory = Path.of("build/contract-samples");
+        Files.createDirectories(directory);
+        MAPPER.writeValue(
+                directory.resolve("RefundResultRecorded-" + name + ".json").toFile(),
+                Map.of(
+                        "contract",
+                        "payment-refund-results.yaml",
+                        "message",
+                        "RefundResultRecorded",
+                        "payload",
+                        RefundResultRecorded.envelope(result, Instant.now())));
     }
 }

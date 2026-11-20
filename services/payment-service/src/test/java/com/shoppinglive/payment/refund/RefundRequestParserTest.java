@@ -34,7 +34,13 @@ class RefundRequestParserTest {
         p.put("reason", "LATE_APPROVAL");
         p.put("currency", "KRW");
         p.put("amount", 4000);
-        p.putArray("items").addObject().put("sellerOrderNumber", "ORDER-301");
+        ObjectNode seller = p.putArray("items").addObject();
+        seller.put("sellerOrderNumber", "ORDER-301");
+        seller.put("amount", 4000);
+        ObjectNode item = seller.putArray("orderItems").addObject();
+        item.put("orderItemId", 301);
+        item.put("quantity", 1);
+        item.put("amount", 4000);
         p.put("requestedAt", "2026-11-21T00:59:59.123456789Z");
         return event;
     }
@@ -86,5 +92,28 @@ class RefundRequestParserTest {
         rejects(e -> ((ObjectNode) e.get("payload")).put("amount", "4000"));
         rejects(e -> ((ObjectNode) e.get("payload")).put("paymentId", 0));
         rejects(e -> ((ObjectNode) e.get("payload")).putArray("items"));
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-07] 결과에 그대로 실릴 필드가 계약과 다르면 해석할 수 없다(Core가 결과를 거부해 파티션이 막히는 것을 막는다)")
+    void rejectsFieldsCoreWouldRejectInResult() {
+        rejects(e -> ((ObjectNode) e.get("payload")).put("extra", 1));
+        rejects(e -> ((ObjectNode) e.get("payload")).remove("requestedAt"));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("requestedAt", 1));
+        rejects(e -> ((ObjectNode) e.get("payload")).remove("reason"));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("reason", "OTHER"));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("currency", "USD"));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("purpose", "USER_REFUND"));
+        rejects(e -> ((ObjectNode) e.get("payload").get("items").get(0)).put("extra", 1));
+        rejects(e -> ((ObjectNode) e.get("payload").get("items").get(0)).remove("amount"));
+        rejects(e -> ((ObjectNode) e.get("payload").get("items").get(0)).putArray("orderItems"));
+        rejects(
+                e ->
+                        ((ObjectNode) e.get("payload").get("items").get(0).get("orderItems").get(0))
+                                .put("quantity", 0));
+        rejects(
+                e ->
+                        ((ObjectNode) e.get("payload").get("items").get(0).get("orderItems").get(0))
+                                .put("extra", 1));
     }
 }
