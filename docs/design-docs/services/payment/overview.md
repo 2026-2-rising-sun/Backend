@@ -2,7 +2,7 @@
 
 책임: 결제·환불 실행, PG(토스) 연동, 원장, 결과 Outbox.
 
-결제 재설계(#337)가 진행 중이다. 결제 1차(결제 생성·승인·결과 불명 복구·만료)는 구현했고, 환불부터는 **새 설계**에만 있다. **현재 코드** 절은 지금 코드에 있는 것만 적는다.
+결제 재설계(#337)가 진행 중이다. 결제 1차(결제 생성·승인·결과 불명 복구·만료)와 환불 요청 접수(#385)는 구현했고, 환불 실행부터는 **새 설계**에만 있다. **현재 코드** 절은 지금 코드에 있는 것만 적는다.
 
 ## 새 설계 (결제 재설계)
 
@@ -22,9 +22,9 @@
 - API: [API HTML](api.html) · [계약 YAML](../../../../contracts/api/payment-service.yaml). `X-Service-Token`(commercecore)만 허용하고, 허용 목록(`/v1/internal/payments`, `…/{orderRef}`, `…/{orderRef}/checkouts`, `…/{orderRef}/approval`) 밖의 `/v1/internal/**`는 403이다.
 - 결제 키는 `orderRef`다. 같은 orderRef 생성은 `INSERT … ON CONFLICT DO NOTHING`의 영향 행 수로 판단하고, 결제창은 `CREATED`·만료 전 조건부 UPDATE로 회차를 올린다. 상세는 [#348 설계서](../../../worklog/plans/active/337-payment-redesign/phase1/348-create-api.md#api).
 - DB: [ERD 설명](erd.md) · [관계도](erd.html)
-- 결과 이벤트: [계약 YAML](../../../../contracts/events/payment-execution-results.yaml). `PaymentApproved`(키 orderRef)로 교체했다(호환 깨짐). CommerceCore는 주문서 결제 중계(`/v1/order-sheets`, `HttpPaymentRelayClient`)로 새 내부 API를 부르고 `PaymentApproved`를 소비한다. 옛 `HttpPaymentClient` 경로는 #347에서 지운 API를 부르므로 동작하지 않는다.
+- 결과 이벤트: [계약 YAML](../../../../contracts/events/payment-execution-results.yaml). `PaymentApproved`(키 orderRef, 토픽 `payment.execution.results.v1`)로 교체했다(호환 깨짐). CommerceCore는 주문서 결제 중계(`/v1/order-sheets`, `HttpPaymentRelayClient`)로 새 내부 API를 부르고 `PaymentApproved`를 소비한다. 옛 `HttpPaymentClient` 경로는 #347에서 지운 API를 부르므로 동작하지 않는다.
 
-- 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)(환불 흐름은 Mock 구현 기록이고 새 환불 구현 때 교체한다)
+- 서비스 간 흐름: [주문·결제](../../flows/order-payment.md) · [환불](../../flows/refund.md)
 
 ## 원본·갱신
 
@@ -81,4 +81,10 @@ API 계약 변경 후 HTML을 재생성한다. DB·상태 변경은 MD의 근거
 
 ## Payment 환불 실행
 
-환불 실행 코드는 없다. Mock 환불 코드는 #347에서, 테이블(`refund_execution`·`mock_refund_result`)은 V4 마이그레이션에서 지웠다. 새 환불은 아직 구현하지 않았고 목표는 [환불 요구사항](requirements/refund.md)과 [목표 설계](design.html#states)에 있다. 지운 Mock 구현은 `e5a1b66bf3b06a971b1242dd02bd623e717c2902`에서 볼 수 있다.
+환불 요청 접수만 있다(#385). `RefundRequestListener`가 `commerce.refund.requests.v1`을 받아 `RefundRequestParser`로 봉투·키·요청 ID·목적·금액을 확인하고, 해석할 수 없으면 `commerce.refund.requests.v1.payment.dlt`로 보낸다(`RefundConsumerConfiguration`: DB 장애만 무한 재시도, 그 밖은 5회 재시도 뒤 DLT). `RefundIntakeService`는 refund_request_id로 한 번만 접수하고 원문을 저장한다.
+
+- 결제가 없거나 paymentId가 없거나 다르면, 또는 같은 결제에 진행 중인 시스템 보상이 있으면 돈을 움직이지 않고 FAILED 결과를 같은 트랜잭션의 outbox로 `payment.refund.results.v1`에 보낸다.
+- 같은 요청·같은 본문은 저장한 결과를 그대로 다시 보낸다. 다른 본문은 `refund_request_conflict`에 기록하고 결과를 보내지 않는다.
+- 유효한 요청은 PROCESSING으로 접수하고 `RefundIntakeService.execute`의 목적별 분기에서 끝난다. 고객 환불(#370)과 시스템 보상(#386) 실행이 붙기 전까지 토스 취소를 부르지 않고 결과도 보내지 않는다.
+
+소비자는 `payment.refunds.consumer-enabled`(기본 켜짐)로 끈다. 목표는 [환불 요구사항](requirements/refund.md)과 [목표 설계](design.html#states)에 있다. 지운 Mock 구현은 `e5a1b66bf3b06a971b1242dd02bd623e717c2902`에서 볼 수 있다.

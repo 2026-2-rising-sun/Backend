@@ -60,6 +60,8 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
         p.add("spring.datasource.username", () -> System.getenv("PAYMENT_TEST_POSTGRES_USER"));
         p.add("spring.datasource.password", () -> System.getenv("PAYMENT_TEST_POSTGRES_PASSWORD"));
         p.add("spring.flyway.schemas", () -> SCHEMA);
+        // 다른 Postgres 테스트 컨텍스트도 캐시돼 연결을 쥐고 있다. 기본 10개면 max_connections(100)를 넘는다
+        p.add("spring.datasource.hikari.maximum-pool-size", () -> 3);
         p.add("payment.core-service-token", () -> "payment-refund-postgres-test-credential-32");
         p.add("spring.kafka.bootstrap-servers", () -> "localhost:1");
     }
@@ -89,7 +91,8 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-ACCEPT-05][REF-EVENT-01] 결제가 없으면 돈을 움직이지 않고 요청 원문 그대로 FAILED(PAYMENT_NOT_FOUND)를 보낸다")
+    @DisplayName(
+            "[REF-ACCEPT-05][REF-EVENT-01] 결제가 없으면 돈을 움직이지 않고 요청 원문 그대로 FAILED(PAYMENT_NOT_FOUND)를 보낸다")
     void paymentNotFound(CapturedOutput output) throws Exception {
         String orderRef = newOrderRef();
         ObjectNode request = request(orderRef, 7001L, "USER_REFUND");
@@ -109,7 +112,8 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-ACCEPT-05] paymentId가 없거나 결제와 다르면 FAILED(PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH)를 보낸다")
+    @DisplayName(
+            "[REF-ACCEPT-05] paymentId가 없거나 결제와 다르면 FAILED(PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH)를 보낸다")
     void paymentIdMissingOrMismatched() throws Exception {
         String orderRef = newOrderRef();
         long paymentId = newPayment(orderRef);
@@ -125,8 +129,11 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
         // 요청에 없던 paymentId를 결과에 채우지 않는다
         assertThat(results.get(0).at("/payload").has("paymentId")).isFalse();
         assertCoreShape(results.get(1), mismatched, "FAILED", "PAYMENT_MISMATCH");
-        assertThat(jdbc.queryForObject(
-                        "SELECT refunded_amount FROM payment WHERE id = ?", Long.class, paymentId))
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT refunded_amount FROM payment WHERE id = ?",
+                                Long.class,
+                                paymentId))
                 .isZero();
     }
 
@@ -179,7 +186,9 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
                         original.get("refundRequestId").asText());
         assertThat(conflict.get("failure_code")).isEqualTo("REQUEST_CONFLICT");
         assertThat(JSON.readTree((String) conflict.get("request_payload"))).isEqualTo(changed);
-        assertThat(output.getOut() + output.getErr()).contains("ERROR").contains("REQUEST_CONFLICT");
+        assertThat(output.getOut() + output.getErr())
+                .contains("ERROR")
+                .contains("REQUEST_CONFLICT");
     }
 
     @Test
@@ -263,8 +272,7 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
         assertThat(RESULT_FIELDS).containsAll(fields);
         // 요청 필드는 고치지 않고 그대로다(requestedAt 나노초 포함)
         request.fields()
-                .forEachRemaining(
-                        f -> assertThat(payload.get(f.getKey())).isEqualTo(f.getValue()));
+                .forEachRemaining(f -> assertThat(payload.get(f.getKey())).isEqualTo(f.getValue()));
         assertThat(UUID.fromString(payload.get("executionId").asText())).isNotNull();
         assertThat(payload.get("resultVersion").longValue()).isEqualTo(1);
         assertThat(payload.get("status").asText()).isEqualTo(status);

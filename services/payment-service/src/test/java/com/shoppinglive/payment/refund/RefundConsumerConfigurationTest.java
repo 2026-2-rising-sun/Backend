@@ -22,8 +22,7 @@ class RefundConsumerConfigurationTest {
                                         new CannotCreateTransactionException(
                                                 "x", new SQLTransientConnectionException()))))
                 .isTrue();
-        assertThat(RefundConsumerConfiguration.isDbOutage(new QueryTimeoutException("x")))
-                .isTrue();
+        assertThat(RefundConsumerConfiguration.isDbOutage(new QueryTimeoutException("x"))).isTrue();
         assertThat(RefundConsumerConfiguration.isDbOutage(new DataIntegrityViolationException("x")))
                 .isFalse();
         assertThat(RefundConsumerConfiguration.isDbOutage(new IllegalStateException("x")))

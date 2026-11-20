@@ -47,7 +47,10 @@ abstract class RefundPostgresTestSupport {
                 "SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
     }
 
-    /** Core #378이 보내는 모양의 요청 payload. requestedAt은 Core처럼 나노초까지 쓴다. paymentId가 null이면 넣지 않는다. */
+    /**
+     * Core #378이 보내는 모양의 요청 payload. requestedAt은 Core처럼 나노초까지 쓴다. paymentId가 null이면 넣지 않는다.
+     * Kafka에서 읽은 것처럼 JSON 문자열을 한 번 거친다(put(long)은 LongNode라 읽은 IntNode와 equals가 다르다).
+     */
     static ObjectNode request(String orderRef, Long paymentId, String purpose) {
         ObjectNode payload = JSON.createObjectNode();
         payload.put("refundRequestId", UUID.randomUUID().toString());
@@ -56,8 +59,7 @@ abstract class RefundPostgresTestSupport {
             payload.put("paymentId", paymentId);
         }
         payload.put("purpose", purpose);
-        payload.put(
-                "reason", purpose.equals("USER_REFUND") ? "CUSTOMER_REQUEST" : "LATE_APPROVAL");
+        payload.put("reason", purpose.equals("USER_REFUND") ? "CUSTOMER_REQUEST" : "LATE_APPROVAL");
         payload.put("currency", "KRW");
         payload.put("amount", 4000);
         ObjectNode seller = payload.putArray("items").addObject();
@@ -68,7 +70,11 @@ abstract class RefundPostgresTestSupport {
         item.put("quantity", 1);
         item.put("amount", 4000);
         payload.put("requestedAt", "2026-11-21T00:59:59.123456789Z");
-        return payload;
+        try {
+            return (ObjectNode) copy(payload);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /** Core가 같은 요청을 다시 보낼 때처럼 JSON 문자열을 거친 새 노드를 만든다. */

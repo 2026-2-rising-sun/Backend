@@ -62,13 +62,16 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
         p.add("spring.datasource.username", () -> System.getenv("PAYMENT_TEST_POSTGRES_USER"));
         p.add("spring.datasource.password", () -> System.getenv("PAYMENT_TEST_POSTGRES_PASSWORD"));
         p.add("spring.flyway.schemas", () -> SCHEMA);
+        // 다른 Postgres 테스트 컨텍스트도 캐시돼 연결을 쥐고 있다. 기본 10개면 max_connections(100)를 넘는다
+        p.add("spring.datasource.hikari.maximum-pool-size", () -> 3);
         p.add("payment.core-service-token", () -> "payment-refund-kafka-test-credential-32");
     }
 
     @Autowired EmbeddedKafkaBroker broker;
 
     @Test
-    @DisplayName("[REF-ACCEPT-07][REF-ACCEPT-02][REF-EVENT-01] 깨진 요청은 DLT로 가고, 뒤의 요청은 접수돼 결과가 orderRef 키로 발행되며 중복 수신은 같은 결과를 다시 보낸다")
+    @DisplayName(
+            "[REF-ACCEPT-07][REF-ACCEPT-02][REF-EVENT-01] 깨진 요청은 DLT로 가고, 뒤의 요청은 접수돼 결과가 orderRef 키로 발행되며 중복 수신은 같은 결과를 다시 보낸다")
     void consumesRequestsPublishesResultsAndDeadLetters() throws Exception {
         String orderRef = newOrderRef();
         ObjectNode payload = request(orderRef, 7001L, "USER_REFUND");

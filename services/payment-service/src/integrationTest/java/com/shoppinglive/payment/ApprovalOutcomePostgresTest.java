@@ -94,7 +94,7 @@ class ApprovalOutcomePostgresTest extends ApprovalPostgresTestSupport {
         assertThat(events).hasSize(1);
         assertThat(events.get(0))
                 .containsEntry("event_type", "PaymentApproved")
-                .containsEntry("topic", "payment.execution-results.v1");
+                .containsEntry("topic", "payment.execution.results.v1");
         assertThat((String) events.get(0).get("payload"))
                 .contains("\"aggregateId\":\"" + c.orderRef() + "\"")
                 .contains("\"paymentId\":" + id)

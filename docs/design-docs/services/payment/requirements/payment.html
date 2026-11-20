@@ -112,10 +112,10 @@
 </ul>
 <h2 id="결과-이벤트">결과 이벤트</h2>
 <ul>
-<li>[x] <strong>PAY-EVENT-01</strong> <code>PaymentApproved {paymentId, orderRef, amount, approvedAt}</code>를 <code>payment.execution-results.v1</code>에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module <code>OutboxTransactionIntegrationTest</code>가 검증한다.</li>
+<li>[x] <strong>PAY-EVENT-01</strong> <code>PaymentApproved {paymentId, orderRef, amount, approvedAt}</code>를 <code>payment.execution.results.v1</code>(2026-11-21 점 표기로 변경, #385)에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module <code>OutboxTransactionIntegrationTest</code>가 검증한다.</li>
 <li>[x] <strong>PAY-EVENT-02</strong> 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.</li>
 </ul>
 <h2 id="범위-밖">범위 밖</h2>
-<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>85ca7c9fe610f78fe365ed053ecd7796c01d2f4d759c189f2234981dc9ecc27f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>376a9136c1179f1d4445f06641788b52addf076933c2d9c6f1ad4662cfcd49a2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

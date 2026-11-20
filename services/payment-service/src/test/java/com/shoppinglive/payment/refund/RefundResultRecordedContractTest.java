@@ -23,7 +23,8 @@ class RefundResultRecordedContractTest {
                     .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Test
-    @DisplayName("[REF-EVENT-01] 결과는 요청 원문에 Payment 필드 7개를 더하고 orderRef 키로 payment.refund.results.v1에 간다")
+    @DisplayName(
+            "[REF-EVENT-01] 결과는 요청 원문에 Payment 필드 7개를 더하고 orderRef 키로 payment.refund.results.v1에 간다")
     void writesFailedResultSample() throws Exception {
         JsonNode request =
                 MAPPER.readTree(
