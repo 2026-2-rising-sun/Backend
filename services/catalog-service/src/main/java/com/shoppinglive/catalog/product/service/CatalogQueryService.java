@@ -147,8 +147,7 @@ public class CatalogQueryService {
                                                 row.available(),
                                                 row.status(),
                                                 row.saleEnabled()
-                                                        && row.status().isPurchasable()
-                                                        && row.available() > 0,
+                                                        && row.status().isPubliclyVisible(),
                                                 row.category() == null
                                                         ? null
                                                         : ProductCategory.valueOf(row.category())))

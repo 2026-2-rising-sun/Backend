@@ -14,6 +14,8 @@
 |---|---|---|
 | product | PK id; name; main_image_id/url; seller_id; category; version; sale_enabled; deleted_at; initial_sku_count | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) · [V2](../../../../services/catalog-service/src/main/resources/db/migration/V2__product_sale_control.sql) |
 | product_sales | PK sales_id; product_id 비유일; price; status; available; version | [V3](../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql) |
+| catalog_snapshot_state | PK aggregate_id; metadata_version/inventory_version(-1=미수신); 각 payload TEXT; deleted fence | [V5](../../../../services/catalog-service/src/main/resources/db/migration/V5__catalog_snapshot_state.sql) |
+| catalog_snapshot_receipt | PK event_id; 원문 봉투 TEXT. 조회 모델과 동일 TX | [V5](../../../../services/catalog-service/src/main/resources/db/migration/V5__catalog_snapshot_state.sql) |
 | coupon_display | PK coupon_id; fixed_discount; sold_out; version; 유효 기간 | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display_product | PK (coupon_id,product_id) | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 
@@ -50,3 +52,13 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 ## 통합 등록 SKU 수 (#372)
 
 V4는 product.initial_sku_count nullable INTEGER(1~100)를 추가한다. Core가 발행한 통합 등록 초기 SKU 수이며 단일 SKU로 잘못 노출되는 것을 막는 정보다. 기존 상품과 구형 이벤트는 null이다. 최신 snapshot을 반영해도 이미 아는 초기 수를 null로 덮지 않는다.
+
+## 독립 revision 저장
+
+Catalog V5의 상태 테이블은 상품/SKU별 row lock 단위다. payload는 초기0 revision도 수용하며 미수신은-1로 구분한다. SKU 두 영역 중 하나만 도착하면 product_sales를 확정하지 않는다. product_sales.version은 새 경로에서 metadataVersion의 표시 사본이고 재고 최신성은 catalog_snapshot_state.inventory_version이 소유한다. eventId 수신 원문과 같은 revision의 payload를 각각 비교한다. receipt/상태/공개 사본 갱신은 한 TX이며 오류면 함께 롤백한다. 삭제 fence는 정리하지 않는다. 이벤트 전환 전의 legacy 행은 제거하지 않지만 새 current snapshot 적재와 구 offset 대조가 필요하다.
+
+## V5 저장 경계 회귀
+
+`catalog_snapshot_state`는 조회 사본에 적용한 독립 revision·payload·삭제 fence를, `catalog_snapshot_receipt`는 eventId별 수신 봉투 원문을 보관한다. 두 테이블은 사본 반영과 재처리를 위한 Catalog 내부 상태이며 Core 상품 원본의 변경 권한이나 상품 등록 멱등키를 소유하지 않는다. 이미지도 Core의 ID/URL 참조만 보관하며 이미지 파일·파일 저장 메타데이터 테이블을 만들지 않는다.
+
+`CatalogSchemaPostgresTest`는 위 두 테이블을 포함한 업무 테이블6개와 Flyway 이력 테이블1개의 **정확한 목록**을 검사한다. `product.idempotency_key` 부재, Core에서 받은 상품 ID 사용, 최초 버전0 허용·음수 거절 검사도 유지한다. V5 추가 테이블을 누락한 기대 목록을 고쳤으며, 조건을 부분 포함 검사로 완화하지 않는다. 실제 실패와 수정 후 검증은 [Catalog migration 후속 기록](../../../worklog/2026-11-20-catalog-migration-expectations.md)을 따른다.

@@ -3,7 +3,7 @@ package com.shoppinglive.catalog.product.dto;
 import com.shoppinglive.catalog.product.entity.PurchaseCheck;
 
 /**
- * 구매 진입 수량 확인 응답. {@code orderable=false} 면 {@code reason} 이 SOLD_OUT 또는 EXCEEDS_STOCK 이다.
+ * 구매 진입 사전 확인 응답. 상품 전체 판매 중지만 거절하며 재고 수량은 Core가 확인한다.
  *
  * @param unitPrice 조회 시점 단가 (원). 주문 생성 때 Commerce 가 다시 확정한다
  */

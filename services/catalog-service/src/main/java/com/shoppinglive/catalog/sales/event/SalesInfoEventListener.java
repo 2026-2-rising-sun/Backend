@@ -22,7 +22,9 @@ public class SalesInfoEventListener {
         this.repository = repository;
     }
 
-    @KafkaListener(topics = SalesInfoEventContract.TOPIC_NAME)
+    @KafkaListener(
+            autoStartup = "${catalog.legacy-events.enabled:true}",
+            topics = SalesInfoEventContract.TOPIC_NAME)
     public void consume(ConsumerRecord<String, String> record) {
         SalesInfoEventMessage message = SalesInfoEventMessage.parse(record.value());
         if (!Long.toString(message.salesId()).equals(record.key())) {
