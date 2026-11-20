@@ -38,6 +38,20 @@
 | 공통 요청/결과 | commerce.refund.requests.v1 → payment.refund.results.v1 | dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현 |
 | 종료 뒤 승인 | 주문 부활 없이 고정된 요청 ID로 보상 재요청·대조 | 원결제 ID 연결과 결과 원문 검증 유지 |
 
-Payment provider가 새 요청 consumer/결과 producer를 제공하지 않으며, 별도 provider 쪽 구 `payment.refund-results.v1/RefundExecutionResolved` 계약도 새 dot 결과와 일치하지 않는다. 이 상태로는 CANCEL_PENDING/COMPENSATION_PENDING이 끝나지 않고 시스템 보상은 재고·쿠폰·활성 구매 자리를 계속 점유한다. 원요청에 paymentId가 없고 결과에만 새 ID가 있는 경우 현재 조회 계약으로 안전한 연결 복구도 보장할 수 없다. 두 문제는 실제 병합 차단 사유이며 Draft 표시·단위 테스트로 해소되지 않는다.
+## 결과 계약 (#384)
+
+Payment 결과 계약은 [payment-refund-results.yaml](../../../contracts/events/payment-refund-results.yaml)에 #378 Core 결과 소비자가 검증하는 모양으로 맞췄다. 구 `payment.refund-results.v1`·`RefundExecutionResolved` 계약은 이 계약으로 바뀌었다.
+
+| 출발 | 도착 | 조건·처리 |
+|---|---|---|
+| Core `RefundRequested` | Payment 환불 PROCESSING | `commerce.refund.requests.v1`, 키 orderRef. 고객 환불(USER_REFUND)과 시스템 보상(SYSTEM_COMPENSATION)이 같은 토픽이다. `refundRequestId`로 한 번만 접수하고 원문을 저장한다. |
+| Payment 환불 | `RefundResultRecorded` | `payment.refund.results.v1`, 키 orderRef. payload는 요청 원문 그대로에 `executionId`(UUID, 요청당 고정)·`resultVersion`(1부터)·`status`·`refundedAmount`·`resolvedAt`·`nextActionAt`(null)·`failureCode`를 더한다. |
+| 결제 없음·paymentId 없음·불일치 | FAILED 결과 | 돈을 움직이지 않는다. `failureCode` `PAYMENT_NOT_FOUND`·`PAYMENT_ID_REQUIRED`·`PAYMENT_MISMATCH`. |
+| 같은 ID·같은 본문 | 저장 결과 재발행 | 같은 `resultVersion`·같은 payload, 새 eventId. 결과가 아직 없으면 보내지 않는다. |
+| 같은 ID·다른 본문 | 결과 없음 | Payment가 REQUEST_CONFLICT 수신으로 기록하고 ERROR 로그. Core가 원문과 다른 결과를 거부해 파티션이 막히는 것을 피한다(#389). |
+| 시스템 보상 FAILED | 더 높은 버전 SUCCEEDED·NO_CHARGE | 시스템 보상만 허용한다. NO_CHARGE는 `failureCode: NO_CHARGE`, 환불 금액 0. |
+| 결과 불명 | 결과 없음 | Payment는 UNKNOWN을 보내지 않는다. 확정될 때 보낸다. |
+
+Payment의 요청 consumer와 결과 producer는 #385가 만든다. 그 전까지는 CANCEL_PENDING/COMPENSATION_PENDING이 끝나지 않고 시스템 보상은 재고·쿠폰·활성 구매 자리를 계속 점유한다. 원요청에 paymentId가 없으면 Payment는 결과에 paymentId를 채우지 않고 FAILED(`PAYMENT_ID_REQUIRED`)로 답한다. Payment consumer가 없는 것은 실제 병합 차단 사유이며 Draft 표시·단위 테스트로 해소되지 않는다.
 
 [현재 Core 모듈](../services/commercecore/order/overview.md) · [Payment 소유 설계](../services/payment/overview.md) · [계약 원본](../../../contracts/events). Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.

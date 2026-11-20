@@ -1,36 +1,42 @@
 asyncapi: 3.1.0
 info:
-  title: Payment 환불 실행 결과
-  version: 1.0.0
+  title: Payment 환불·시스템 보상 결과
+  version: 2.0.0
 defaultContentType: application/json
 channels:
   results:
-    address: payment.refund-results.v1
-    description: Kafka key와 aggregateId는 requestId. Payment 실행 확정과 common Outbox append를
-      같은 트랜잭션에 기록한다. Core는 영속 원문과 식별자·대상·금액·상태·시각을 검증해 중복 결과를 멱등 적용한다. 결과 선도착도 requestId로
-      복구한다. Core 로컬 반영 실패는 이벤트를 ack하지 않는다. 기존 알림 토픽은 Core만 생산한다.
+    address: payment.refund.results.v1
+    description: >-
+      commerce.refund.requests.v1의 RefundRequested 한 건에 대한 Payment의 확정 결과. Kafka key = aggregateId = payload.orderRef.
+      payload는 받은 요청 payload를 고치지 않고 그대로 담고(키 순서 무관, 값은 JSON으로 같음) Payment 필드 7개(executionId·resultVersion·status·refundedAmount·resolvedAt·nextActionAt·failureCode)를
+      덧붙인다. Payment는 상태 변경과 같은 트랜잭션에서 common Outbox에 쓴다. Payment는 확정 결과(SUCCEEDED·FAILED·NO_CHARGE)만 보내고
+      UNKNOWN(처리 중)은 보내지 않는다. executionId는 Payment 환불 실행 ID로 요청당 하나이고 바뀌지 않는다. resultVersion은 요청마다
+      1부터 시작해 새 결과를 기록할 때마다 1씩 오른다. 같은 요청을 다시 받으면 저장한 결과를 같은 resultVersion·같은 payload로 새 eventId에 실어
+      다시 보낸다. 결과를 바꾸는 것은 SYSTEM_COMPENSATION의 FAILED 뒤에 더 높은 resultVersion으로 SUCCEEDED·NO_CHARGE를 보내는 경우만이다.
+      같은 refundRequestId에 다른 본문이 오면 Payment는 수신을 REQUEST_CONFLICT로 기록하고 ERROR 로그를 남길 뿐 결과를 보내지 않는다.
+      Core 결과 소비자는 원문과 맞지 않는 결과를 받으면 무한 재시도해 파티션이 막히기 때문이다(#389). 결제가 없거나 paymentId가 없거나 맞지 않으면
+      돈을 움직이지 않고 FAILED를 보낸다. 같은 결제에 진행 중인 SYSTEM_COMPENSATION이 있으면 새 요청은 FAILED(COMPENSATION_IN_PROGRESS)다.
+      해석할 수 없는 요청은 commerce.refund.requests.v1.payment.dlt로 가고 결과가 없다.
     messages:
-      RefundExecutionResolved:
-        $ref: '#/components/messages/RefundExecutionResolved'
+      RefundResultRecorded:
+        $ref: '#/components/messages/RefundResultRecorded'
 operations:
   publishResult:
     action: send
     channel:
       $ref: '#/channels/results'
     messages:
-    - $ref: '#/channels/results/messages/RefundExecutionResolved'
+    - $ref: '#/channels/results/messages/RefundResultRecorded'
 components:
-  schemas:
-    Timestamp:
-      type: string
-      format: date-time
-    PositiveId:
-      type: integer
-      format: int64
-      minimum: 1
   messages:
-    RefundExecutionResolved:
-      name: RefundExecutionResolved
+    RefundResultRecorded:
+      name: RefundResultRecorded
+      summary: 환불 요청 한 건의 확정 결과를 기록했다.
+      bindings:
+        kafka:
+          key:
+            $ref: '#/components/schemas/OrderRef'
+          bindingVersion: 0.5.0
       payload:
         type: object
         additionalProperties: false
@@ -47,88 +53,288 @@ components:
             type: string
             format: uuid
           eventType:
-            const: RefundExecutionResolved
+            const: RefundResultRecorded
           schemaVersion:
             const: 1
           source:
             const: payment-service
           aggregateId:
-            type: string
-            format: uuid
+            $ref: '#/components/schemas/OrderRef'
           occurredAt:
             $ref: '#/components/schemas/Timestamp'
           payload:
-            type: object
-            additionalProperties: false
-            required:
-            - requestId
-            - paymentId
-            - orderId
-            - paymentGroupId
-            - referenceNumber
-            - amount
-            - coreRefundRequestId
-            - executionId
-            - status
-            - requestedAt
-            - resolvedAt
-            - retryCount
-            - nextActionAt
-            properties:
-              requestId:
-                type: string
-                format: uuid
-              paymentId:
-                $ref: '#/components/schemas/PositiveId'
-              orderId:
-                $ref: '#/components/schemas/PositiveId'
-              paymentGroupId:
-                $ref: '#/components/schemas/PositiveId'
-              referenceNumber:
-                type: string
-                minLength: 1
-                maxLength: 64
-              amount:
-                type: integer
-                format: int64
-                minimum: 0
-              coreRefundRequestId:
-                $ref: '#/components/schemas/PositiveId'
-              executionId:
-                $ref: '#/components/schemas/PositiveId'
-              status:
-                enum:
-                - SUCCESS
-                - FAILED
-              requestedAt:
-                $ref: '#/components/schemas/Timestamp'
-              resolvedAt:
-                $ref: '#/components/schemas/Timestamp'
-              retryCount:
-                type: integer
-                minimum: 0
-                maximum: 3
-              nextActionAt:
-                $ref: '#/components/schemas/Timestamp'
+            $ref: '#/components/schemas/RefundResult'
       examples:
-      - payload:
-          eventId: b1111111-1111-4111-8111-111111111111
-          eventType: RefundExecutionResolved
+      - name: 결제없음실패
+        payload:
+          eventId: c1111111-1111-4111-8111-000000000001
+          eventType: RefundResultRecorded
           schemaVersion: 1
           source: payment-service
-          aggregateId: a1111111-1111-4111-8111-111111111111
-          occurredAt: '2026-11-09T00:00:01Z'
+          aggregateId: PG-22222222-2222-4222-8222-222222222222
+          occurredAt: '2026-11-21T01:00:01Z'
           payload:
-            requestId: a1111111-1111-4111-8111-111111111111
-            paymentId: 7
-            orderId: 1
-            paymentGroupId: 1
-            referenceNumber: PG-11111111-1111-4111-8111-111111111111
-            amount: 1000
-            status: SUCCESS
-            requestedAt: '2026-11-09T00:00:00Z'
-            resolvedAt: '2026-11-09T00:00:01Z'
-            executionId: 1
-            coreRefundRequestId: 1
-            retryCount: 0
-            nextActionAt: '2026-11-09T00:00:00Z'
+            refundRequestId: a1111111-1111-4111-8111-111111111111
+            orderRef: PG-22222222-2222-4222-8222-222222222222
+            paymentId: 7001
+            purpose: USER_REFUND
+            reason: CUSTOMER_REQUEST
+            currency: KRW
+            amount: 4000
+            items:
+            - sellerOrderNumber: ORDER-301
+              amount: 4000
+              orderItems:
+              - orderItemId: 301
+                quantity: 1
+                amount: 4000
+            requestedAt: '2026-11-21T00:59:59.123456789Z'
+            executionId: d1111111-1111-4111-8111-000000000001
+            resultVersion: 1
+            status: FAILED
+            refundedAmount: 0
+            resolvedAt: '2026-11-21T01:00:01.123456Z'
+            nextActionAt: null
+            failureCode: PAYMENT_NOT_FOUND
+      - name: 사용자환불성공
+        payload:
+          eventId: c1111111-1111-4111-8111-000000000002
+          eventType: RefundResultRecorded
+          schemaVersion: 1
+          source: payment-service
+          aggregateId: PG-22222222-2222-4222-8222-222222222222
+          occurredAt: '2026-11-21T01:00:02Z'
+          payload:
+            refundRequestId: a1111111-1111-4111-8111-111111111112
+            orderRef: PG-22222222-2222-4222-8222-222222222222
+            paymentId: 7001
+            purpose: USER_REFUND
+            reason: CUSTOMER_REQUEST
+            currency: KRW
+            amount: 4000
+            items:
+            - sellerOrderNumber: ORDER-301
+              amount: 4000
+              orderItems:
+              - orderItemId: 301
+                quantity: 1
+                amount: 4000
+            requestedAt: '2026-11-21T00:59:59Z'
+            executionId: d1111111-1111-4111-8111-000000000002
+            resultVersion: 1
+            status: SUCCEEDED
+            refundedAmount: 4000
+            resolvedAt: '2026-11-21T01:00:02Z'
+            nextActionAt: null
+            failureCode: null
+      - name: 보상실패뒤미승인종료
+        payload:
+          eventId: c1111111-1111-4111-8111-000000000003
+          eventType: RefundResultRecorded
+          schemaVersion: 1
+          source: payment-service
+          aggregateId: PG-22222222-2222-4222-8222-222222222222
+          occurredAt: '2026-11-21T01:10:00Z'
+          payload:
+            refundRequestId: late-7001
+            orderRef: PG-22222222-2222-4222-8222-222222222222
+            paymentId: 7001
+            purpose: SYSTEM_COMPENSATION
+            reason: LATE_APPROVAL
+            currency: KRW
+            amount: 4000
+            items:
+            - sellerOrderNumber: ORDER-301
+              amount: 4000
+              orderItems:
+              - orderItemId: 301
+                quantity: 1
+                amount: 4000
+            requestedAt: '2026-11-21T00:59:59Z'
+            executionId: d1111111-1111-4111-8111-000000000003
+            resultVersion: 2
+            status: NO_CHARGE
+            refundedAmount: 0
+            resolvedAt: '2026-11-21T01:10:00Z'
+            nextActionAt: null
+            failureCode: NO_CHARGE
+  schemas:
+    OrderRef:
+      type: string
+      pattern: ^[A-Za-z0-9_-]{6,50}$
+    Timestamp:
+      type: string
+      format: date-time
+    Money:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9223372036854775807
+    PositiveId:
+      type: integer
+      format: int64
+      minimum: 1
+    RefundOrderItem:
+      type: object
+      additionalProperties: false
+      required:
+      - orderItemId
+      - quantity
+      - amount
+      properties:
+        orderItemId:
+          $ref: '#/components/schemas/PositiveId'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        amount:
+          $ref: '#/components/schemas/Money'
+    RefundSellerItem:
+      type: object
+      additionalProperties: false
+      required:
+      - sellerOrderNumber
+      - amount
+      - orderItems
+      properties:
+        sellerOrderNumber:
+          type: string
+          minLength: 1
+          maxLength: 64
+        amount:
+          $ref: '#/components/schemas/Money'
+        orderItems:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/RefundOrderItem'
+    RefundResult:
+      description: >-
+        요청 필드(refundRequestId~requestedAt)는 commerce-refund-requests.yaml의 RefundRequest와 같은 값이다. paymentId는 요청에
+        있을 때만 같은 값으로 있다. Payment는 요청에 없는 paymentId를 채우지 않는다.
+      type: object
+      additionalProperties: false
+      required:
+      - refundRequestId
+      - orderRef
+      - purpose
+      - reason
+      - currency
+      - amount
+      - items
+      - requestedAt
+      - executionId
+      - resultVersion
+      - status
+      - refundedAmount
+      - resolvedAt
+      - nextActionAt
+      - failureCode
+      properties:
+        refundRequestId:
+          type: string
+          pattern: ^[A-Za-z0-9_-]{1,64}$
+        orderRef:
+          $ref: '#/components/schemas/OrderRef'
+        paymentId:
+          $ref: '#/components/schemas/PositiveId'
+        purpose:
+          enum:
+          - USER_REFUND
+          - SYSTEM_COMPENSATION
+        reason:
+          enum:
+          - CUSTOMER_REQUEST
+          - APPROVAL_RESPONSE_LOST
+          - APPROVAL_UNKNOWN
+          - LATE_APPROVAL
+          - ORDER_EXPIRED
+          - ORDER_CANCELLED
+        currency:
+          const: KRW
+        amount:
+          $ref: '#/components/schemas/Money'
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/RefundSellerItem'
+        requestedAt:
+          $ref: '#/components/schemas/Timestamp'
+        executionId:
+          description: Payment 환불 실행 ID. 요청당 하나이고 다시 보내도 바뀌지 않는다.
+          type: string
+          format: uuid
+        resultVersion:
+          description: 요청마다 1부터 시작한다. 같은 버전은 같은 payload다.
+          type: integer
+          format: int64
+          minimum: 1
+        status:
+          enum:
+          - SUCCEEDED
+          - FAILED
+          - NO_CHARGE
+        refundedAmount:
+          description: 실제로 돌려준 금액. SUCCEEDED면 amount와 같고, FAILED·NO_CHARGE면 0이다.
+          $ref: '#/components/schemas/Money'
+        resolvedAt:
+          description: 결과를 확정한 시각. 다시 보낼 때도 같은 값이다.
+          $ref: '#/components/schemas/Timestamp'
+        nextActionAt:
+          description: Payment는 확정 결과만 보내므로 항상 null이다.
+          type: 'null'
+        failureCode:
+          description: >-
+            FAILED·NO_CHARGE일 때 사유 코드, SUCCEEDED면 null. NO_CHARGE면 NO_CHARGE. Payment 접수 단계 코드는
+            PAYMENT_NOT_FOUND·PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH·COMPENSATION_IN_PROGRESS다. 실행 단계 코드(OVER_REFUND·PARTIAL_NOT_ALLOWED·UNKNOWN_SELLER_ORDER·NOT_REFUNDABLE와 토스 거절 코드)는
+            환불 요구사항 REF-ACCEPT-03·04·REF-EXEC-03을 따른다.
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 100
+      allOf:
+      - if:
+          properties:
+            status:
+              const: SUCCEEDED
+        then:
+          properties:
+            failureCode:
+              type: 'null'
+      - if:
+          properties:
+            status:
+              enum:
+              - FAILED
+              - NO_CHARGE
+        then:
+          properties:
+            refundedAmount:
+              const: 0
+            failureCode:
+              type: string
+      - if:
+          properties:
+            status:
+              const: NO_CHARGE
+        then:
+          properties:
+            purpose:
+              const: SYSTEM_COMPENSATION
+            failureCode:
+              const: NO_CHARGE
+      - if:
+          properties:
+            purpose:
+              const: USER_REFUND
+        then:
+          required:
+          - paymentId
+          properties:
+            reason:
+              const: CUSTOMER_REQUEST
