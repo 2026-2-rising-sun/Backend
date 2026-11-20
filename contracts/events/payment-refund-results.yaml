@@ -333,8 +333,17 @@ components:
             purpose:
               const: USER_REFUND
         then:
-          required:
-          - paymentId
           properties:
             reason:
               const: CUSTOMER_REQUEST
+      - description: >-
+          USER_REFUND의 성공에는 paymentId가 있다. paymentId 없는 요청은 FAILED(PAYMENT_ID_REQUIRED)로 답하고, 요청에 없는 값은 채우지 않는다.
+        if:
+          properties:
+            purpose:
+              const: USER_REFUND
+            status:
+              const: SUCCEEDED
+        then:
+          required:
+          - paymentId
