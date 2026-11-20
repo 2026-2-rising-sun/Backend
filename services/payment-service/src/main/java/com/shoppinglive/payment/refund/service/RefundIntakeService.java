@@ -82,7 +82,12 @@ public class RefundIntakeService {
         return Optional.empty();
     }
 
-    /** 새로 접수한 환불의 실행을 목적별로 시작한다. 토스를 부르므로 트랜잭션 밖에서 부른다. 실행이 붙기 전까지는 접수만 하고 결과를 보내지 않는다. */
+    /**
+     * 새로 접수한 환불의 실행을 목적별로 시작한다. 토스를 부르므로 트랜잭션 밖에서 부른다. 실행이 붙기 전까지는 접수만 하고 결과를 보내지 않는다.
+     *
+     * <p>새로 넣은 행에서만 불린다. 재수신·커밋 뒤 장애·이 메서드의 예외로는 다시 불리지 않으므로 끝나지 못한 PROCESSING은 재처리
+     * 스케줄러(REF-EXEC-01)가 집어야 한다.
+     */
     public void execute(Refund refund) {
         switch (refund.getPurpose()) {
             // #370이 고객 환불 실행을 여기에 붙인다
