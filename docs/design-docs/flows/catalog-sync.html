@@ -5,16 +5,17 @@
 *{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
 </style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="catalog-sync.md">MD 원본</a><a href="../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
 <ul>
-<li><a href="#책임과-경계">책임과 경계</a></li>
-<li><a href="#전이">전이</a></li>
+<li><a href="#책임과-전달-경로">책임과 전달 경로</a></li>
+<li><a href="#기본-60초-재고-배치의-의미">기본 60초 재고 배치의 의미</a></li>
+<li><a href="#초기-적재와-전달-경로-전환">초기 적재와 전달 경로 전환</a></li>
+<li><a href="#catalog-적용과-조회">Catalog 적용과 조회</a></li>
 <li><a href="#상세와-근거">상세와 근거</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>Catalog 사본 동기화 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 560" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="Core 원본 변경" data-target="Core Outbox"><title>Core 원본 변경 → Core Outbox: 상품·판매·쿠폰의 변경 내용과 버전을 기록한다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="Core Outbox" data-target="Kafka"><title>Core Outbox → Kafka: 커밋 후 발행. ACK와 소비 DB 반영은 별도 단계다.</title><path class="connector" d="M725,77 L780,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="72.0">2</text></g><g class="edge-row" data-source="Kafka" data-target="Catalog 사본"><title>Kafka → Catalog 사본: 소비한 버전이 현재보다 최신일 때 반영하고 중복·역순으로 되돌리지 않는다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">3</text></g><g class="edge-row" data-source="Core 판매 조회" data-target="판매 backfill"><title>Core 판매 조회 → 판매 backfill: 없는 사본만 version 0으로 채운다. 이후 이벤트 버전이 우선한다.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">4</text></g><g class="edge-row" data-source="사용자 구매 진입" data-target="원본 확인"><title>사용자 구매 진입 → 원본 확인: 사본의 화면 표시와 실제 주문 시점의 판매·재고 확정을 구분한다.</title><path class="connector" d="M350,417 L405,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="412.0">5</text></g><g><title>Core 원본 변경</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">Core 원본 변경</tspan></text></g><g><title>Core Outbox</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">Core Outbox</tspan></text></g><g><title>Kafka</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">Kafka</tspan></text></g><g><title>Catalog 사본</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">Catalog 사본</tspan></text></g><g><title>Core 판매 조회</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">Core 판매 조회</tspan></text></g><g><title>판매 backfill</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">판매 backfill</tspan></text></g><g><title>사용자 구매 진입</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">사용자 구매 진입</tspan></text></g><g><title>원본 확인</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">원본 확인</tspan></text></g></svg></div></section><p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
-<p><a href="catalog-sync.html">시각 자료</a></p>
-<h2 id="책임과-경계">책임과 경계</h2>
-<p>Catalog는 조회 사본의 소유자이고 Core는 상품·거래 원본의 소유자다. replica와 HTTP 모드는 설정 경로다. 사본을 갱신했다고 PostgreSQL CDC나 실제 Kafka 운영 전달을 검증한 것은 아니다.</p>
-<h2 id="전이">전이</h2>
+</div></aside><main id="content"><h1>Catalog 사본 동기화 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 560" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="상품·SKU 메타데이터 변경" data-target="Core Outbox"><title>상품·SKU 메타데이터 변경 → Core Outbox: 업무 변경과 같은 TX에 ProductSnapshotChanged·SkuSnapshotChanged 전체 봉투를 저장한다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="재고 변경" data-target="dirty SKU"><title>재고 변경 → dirty SKU: inventory_version을 증가시킨다. 수량 변경마다 Catalog Outbox를 쓰지 않는다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="dirty SKU" data-target="Core Outbox"><title>dirty SKU → Core Outbox: 기본 60초 fixedDelay 배치가 최신 InventorySnapshotChanged와 완료 revision을 같은 TX에 저장한다.</title><path class="connector" d="M190,205 L565,120" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="157.5">3</text></g><g class="edge-row" data-source="Core Outbox" data-target="Connect"><title>Core Outbox → Connect: public.event_outbox 중 op=c/r이고 topic=commerce.catalog.snapshots.v1인 행만 먼저 필터한다.</title><path class="connector" d="M565,120 L565,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">4</text></g><g class="edge-row" data-source="Connect" data-target="Kafka"><title>Connect → Kafka: Filter 다음 EventRouter가 topic·key·전체 봉투 TEXT를 전달한다. 관리 UPDATE/DELETE는 이벤트가 아니다.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">5</text></g><g class="edge-row" data-source="Kafka" data-target="Catalog 사본"><title>Kafka → Catalog 사본: 독립 버전·원문 중복 검사와 삭제 fence를 적용하고 receipt·조회 사본을 같은 TX에 저장한다.</title><path class="connector" d="M940,290 L190,375" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="327.5">6</text></g><g class="edge-row" data-source="Catalog 표시" data-target="Core 주문 검증"><title>Catalog 표시 → Core 주문 검증: 표시 재고로 구매를 확정하지 않는다. Core가 현재 가격·재고·판매 조건을 검증한다.</title><path class="connector" d="M725,417 L780,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="412.0">7</text></g><g><title>상품·SKU 메타데이터 변경</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">상품·SKU 메타데이터 변경</tspan></text></g><g><title>Core Outbox</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">Core Outbox</tspan></text></g><g><title>재고 변경</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">재고 변경</tspan></text></g><g><title>dirty SKU</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">dirty SKU</tspan></text></g><g><title>Connect</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">Connect</tspan></text></g><g><title>Kafka</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Kafka</tspan></text></g><g><title>Catalog 사본</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">Catalog 사본</tspan></text></g><g><title>Catalog 표시</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">Catalog 표시</tspan></text></g><g><title>Core 주문 검증</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">Core 주문 검증</tspan></text></g></svg></div></section><p>기준: 2026-11-20 dev <code>d42c3b787f12b716789d35c8df37dd63a2b42ddc</code>(<a href="https://github.com/2026-2-rising-sun/Backend/pull/379">#379 병합</a>). Connect 구성은 <a href="https://github.com/2026-2-rising-sun/Infra/pull/58">Infra #58</a>의 main <code>cd6778590bcb57eb0603506f2130912e23bd37cc</code>와 함께 읽는다. 병합은 운영 배포를 뜻하지 않는다.</p>
+<p><a href="catalog-sync.html">시각 자료</a> · <a href="../../worklog/2026-11-20-cdc-refund-status.html">최종 로컬 검증과 한계</a></p>
+<h2 id="책임과-전달-경로">책임과 전달 경로</h2>
+<p>Core가 상품·가격·재고 원본을 소유하고 Catalog가 탐색용 조회 사본을 소유한다. 상품명이나 가격 변경은 업무 트랜잭션에서 즉시 Outbox에 기록한다. 예약·소진·해제 등 재고 변경은 SKU의 영속 revision을 올리고, 배치가 여러 변경을 최신 수량 한 건으로 합친다. DB 커밋, Kafka 전달, Catalog 반영은 각각 다른 단계다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -25,37 +26,58 @@
 </thead>
 <tbody>
 <tr>
-<td>Core 원본 변경</td>
+<td>상품·SKU 메타데이터 변경</td>
 <td>Core Outbox</td>
-<td>상품·판매·쿠폰의 변경 내용과 버전을 기록한다.</td>
+<td>업무 변경과 같은 TX에 ProductSnapshotChanged·SkuSnapshotChanged 전체 봉투를 저장한다.</td>
+</tr>
+<tr>
+<td>재고 변경</td>
+<td>dirty SKU</td>
+<td>inventory_version을 증가시킨다. 수량 변경마다 Catalog Outbox를 쓰지 않는다.</td>
+</tr>
+<tr>
+<td>dirty SKU</td>
+<td>Core Outbox</td>
+<td>기본 60초 fixedDelay 배치가 최신 InventorySnapshotChanged와 완료 revision을 같은 TX에 저장한다.</td>
 </tr>
 <tr>
 <td>Core Outbox</td>
+<td>Connect</td>
+<td>public.event_outbox 중 op=c/r이고 topic=commerce.catalog.snapshots.v1인 행만 먼저 필터한다.</td>
+</tr>
+<tr>
+<td>Connect</td>
 <td>Kafka</td>
-<td>커밋 후 발행. ACK와 소비 DB 반영은 별도 단계다.</td>
+<td>Filter 다음 EventRouter가 topic·key·전체 봉투 TEXT를 전달한다. 관리 UPDATE/DELETE는 이벤트가 아니다.</td>
 </tr>
 <tr>
 <td>Kafka</td>
 <td>Catalog 사본</td>
-<td>소비한 버전이 현재보다 최신일 때 반영하고 중복·역순으로 되돌리지 않는다.</td>
+<td>독립 버전·원문 중복 검사와 삭제 fence를 적용하고 receipt·조회 사본을 같은 TX에 저장한다.</td>
 </tr>
 <tr>
-<td>Core 판매 조회</td>
-<td>판매 backfill</td>
-<td>없는 사본만 version 0으로 채운다. 이후 이벤트 버전이 우선한다.</td>
-</tr>
-<tr>
-<td>사용자 구매 진입</td>
-<td>원본 확인</td>
-<td>사본의 화면 표시와 실제 주문 시점의 판매·재고 확정을 구분한다.</td>
+<td>Catalog 표시</td>
+<td>Core 주문 검증</td>
+<td>표시 재고로 구매를 확정하지 않는다. Core가 현재 가격·재고·판매 조건을 검증한다.</td>
 </tr>
 </tbody>
 </table></div>
-<h2 id="상세와-근거">상세와 근거</h2>
+<h2 id="기본-60초-재고-배치의-의미">기본 60초 재고 배치의 의미</h2>
+<p><a href="../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/sku/event/InventorySnapshotBatch.java">InventorySnapshotBatch</a>는 <code>inventory_version &gt; inventory_published_version</code>인 SKU만 ID순으로 최대 500건 선점한다. <code>FOR UPDATE SKIP LOCKED</code>로 여러 인스턴스가 대상을 나누고, Outbox와 완료 표시는 함께 커밋·롤백한다. 처리 중 새 변경은 다음 dirty revision으로 남는다.</p>
+<p>60초는 이전 배치가 끝난 뒤 다음 실행까지의 기본 지연이다. 모든 재고의 매분 기록이나 장애·적체를 포함한 최대 전파 SLA가 아니다. 신규 SKU도 최초 재고가 dirty이므로 메타데이터보다 재고 도착이 늦을 수 있다. 필요한 기존 판매 상태 알림은 유지하지만 순수 재고 변경의 기존 InventoryChanged 알림은 발행하지 않는다.</p>
+<h2 id="초기-적재와-전달-경로-전환">초기 적재와 전달 경로 전환</h2>
+<p>신규 토픽·Catalog 수신 호환과 DB migration을 준비하고, Core DB의 logical WAL·권한·publication을 설정한다. Core의 일반/claim relay가 Catalog 토픽을 제외하는 것을 확인한 뒤 connector를 등록해 RUNNING과 실제 전달을 대조한다. 현재 Core 설정은 이미 이 제외를 적용한다. Catalog는 <code>catalog.legacy-events.enabled=false</code>로 구 상품/판매 리스너와 새 경로의 혼합을 막는다.</p>
+<p>기존 원본과 사본을 채울 때는 <code>commercecore.catalog.backfill.enabled=true</code>인 명시적 Core 기동을 사용한다. <a href="../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/sku/event/CatalogSnapshotBackfill.java">CatalogSnapshotBackfill</a>은 상품 공유잠금→SKU ID순 잠금 아래 상품·SKU·재고 전체 스냅샷과 삭제 이력을 기존 revision 그대로 Outbox에 넣는다. 중단 후 재실행할 수 있다. Connect의 initial snapshot은 남아 있는 Outbox를 읽는 단계이며, 이 업무 초기 적재를 대신하지 않는다. 과거 HTTP 판매 backfill의 version 0보다 새 독립 버전 경로가 우선한다.</p>
+<p>relay 제외와 connector가 준비된 뒤 명시적 초기 적재를 실행하고 버전·누락·지연을 대조한다. 이미 새 Core가 기록한 Outbox도 connector의 initial snapshot/streaming으로 전달한다. connector 중단 시 relay 자동 fallback은 없다. CDC 행은 <code>published_at</code>을 갱신하지 않으므로 NULL을 실패로 세거나 age TTL로 삭제하지 않는다. 되돌리기는 connector 중지·offset 확인·생산 경계 기록과 중복 대조가 필요하며, 제외 설정만 해제하면 이미 전송한 행도 재발행될 수 있다. <a href="https://github.com/2026-2-rising-sun/Infra/blob/cd6778590bcb57eb0603506f2130912e23bd37cc/local/cdc/README.md">Infra 등록·복구 절차</a>를 따른다.</p>
+<h2 id="catalog-적용과-조회">Catalog 적용과 조회</h2>
 <ul>
-<li><a href="../services/catalog/overview.html">Catalog 판매 사본·표시 상태</a></li>
-<li><a href="../services/commercecore/sku/overview.html">CommerceCore 판매 상태</a></li>
+<li>Product metadataVersion, SKU metadataVersion, SKU inventoryVersion은 독립적이다. 한 영역의 높은 버전이 다른 영역의 갱신을 막지 않는다.</li>
+<li>낮은 버전은 무시하고 같은 버전·같은 payload는 무변경이다. 같은 버전의 다른 payload와 같은 eventId의 다른 봉투는 충돌로 거절한다.</li>
+<li>SKU 메타데이터·재고가 먼저 오면 영속 보관하고 둘 다 모여야 판매 사본을 만든다. 상품이 없으면 공개 JOIN에서 숨긴다. Product/SKU 삭제 fence는 높은 생존 버전이나 재고 도착으로 부활시키지 않는다.</li>
+<li>available·salesStatus는 지연된 표시다. PurchaseCheck는 사본 재고 0/수량 초과만으로 SOLD_OUT/EXCEEDS_STOCK을 확정하지 않는다. purchasable/orderable은 Core 검증으로 들어갈 수 있다는 뜻이다. maxQuantity 999999999는 입력 형식 상한이다.</li>
+<li>다중 SKU의 기존 단일값 API는 대표 가격·합산 재고를 만들지 않고 503을 유지한다. Frontend의 stock/status 버튼 차단은 <a href="../../worklog/2026-11-19-catalog-cdc-frontend-handoff.html">후속 인계</a>이며 이번 Backend 문서 변경으로 해결되지 않는다.</li>
 </ul>
-<p><a href="../services/common-module/outbox.html">공통 Outbox</a> · <a href="../../../contracts/events">이벤트 계약</a></p><p class="muted fingerprint">MD SHA-256: <code>81cc898acbfffbd6ceed16911163c8f52d31812c611c365256f7a1bfe8aef634</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<h2 id="상세와-근거">상세와 근거</h2>
+<p><a href="../services/catalog/overview.html">Catalog 적용·조회</a> · <a href="../services/commercecore/sku/overview.html">Core SKU·재고</a> · <a href="../services/commercecore/product/overview.html">상품 통합 등록</a> · <a href="../services/common-module/outbox.html">공통 Outbox</a> · <a href="../../../contracts/events/commerce-catalog-snapshots.yaml">이벤트 계약</a></p><p class="muted fingerprint">MD SHA-256: <code>7af5e9deae34c7b6f6a2492334a5a01993cbee90a3a0d0bb0ad5fa5236adb98b</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

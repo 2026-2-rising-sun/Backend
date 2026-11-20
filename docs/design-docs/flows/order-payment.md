@@ -4,7 +4,7 @@
 
 새 주문서 경로는 결제창 준비와 실제 승인을 나눈다. 준비 동안 생성부터600초 PENDING을 유지하고 인증 후 승인 접수에서 PROCESSING 별도600초를 시작한다. 기존 공개 legacy 경로도 유지한다. Payment 실행·원장은 팀원 소유이며 Core는 주문·재고·쿠폰과 전달 기록을 소유한다.
 
-기존 Mock 실행 설명은 #337에서 교체할 예정이며 목표 설계 원본은 [Payment 도메인 홈](../services/payment/overview.md)이다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 기존 결제·환불 호출은 403을 받는다. 이 문서의 새 경로는 Core 소유 어댑터와 주문 상태를 설명한다. 이 저장소 dev의 Payment 설명과 별도 팀원 구현 브랜치를 실행한 증거를 구분한다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`. 새 주문서 결제 HTTP 중계와 legacy 공개 입구가 함께 남아 있다. 기존 Mock 내부 결제·환불 API는 Payment에서 삭제됐지만 새 생성·승인·조회 어댑터는 별개다. 구 호출의 실패를 새 결제 경로 전체의 403으로 일반화하지 않는다. 현재 환불과 미병합 #378은 [환불 흐름](refund.md)에서 구분한다.
 
 ## 새 계약 경로
 
@@ -16,11 +16,17 @@
 | Core 커밋 후 | Payment 조회/승인 | 먼저 조회, 유효한 미접수만 승인. 202/UNKNOWN·통신 예외는 실패가 아님 |
 | Payment 확정 승인 | Core PAID | HTTP 조회 또는 PaymentApproved 검증·멱등 반영·재고 소진/쿠폰 사용 |
 | Core 기한 경계 | EXPIRED | 재고/쿠폰 선점 한 번 해제. 이후 새 승인 POST 없이 조회 유지 |
-| 종료 주문의 늦은 승인 | 환불 필요+Outbox | 주문 부활 없이 late-{paymentId}와 RefundRequested(LATE_APPROVAL) 같은 TX |
-| Core 환불 요청 발행 | Payment 환불 소비 | 실제 소비자는 아직 미발견. 발행 성공은 환불 접수/완료가 아님 |
-| Payment 환불 결과 | Core 환불 상태 | Core 소비자는 계약 대역으로 검증. 금액/판매자 원문 검증 뒤 SUCCEEDED/FAILED, 주문은 종료 상태 유지 |
+| 종료 주문의 늦은 승인 | 환불 필요+Outbox | 주문 부활 없이 late-{paymentId}와 구 commerce.refund-requests.v1의 RefundRequested(LATE_APPROVAL) 같은 TX |
+| Core 환불 요청 발행 | Payment 환불 소비 | 현재 dev Payment에는 해당 환불 consumer가 없음. 발행 성공은 환불 접수/완료가 아님 |
+| Payment 환불 결과 | Core 환불 상태 | 구 payment.refund-results.v1의 RefundSucceeded/RefundFailed를 검증해 SUCCEEDED/FAILED, 주문은 종료 상태 유지. 실제 provider 연동은 미완 |
 
-팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.
+과거 실행 기록에서는 팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.
+
+## 미병합 환불 변경과 재고 사본
+
+미병합 #378의 CANCEL_PENDING/COMPENSATION_PENDING과 공통 dot 환불 토픽은 현재 dev에 없다. 현행 처리기한 만료의 EXPIRED·즉시 선점 해제와 #378의 보상 결과 후 해제를 혼동하지 않는다. provider 부재·계약 불일치·paymentId 복구 차단이 남아 있다.
+
+예약·소진·해제·환불 복원으로 바뀐 재고는 SKU dirty revision을 올리고 기본 60초 배치가 Catalog로 보낸다. Catalog 재고는 표시 정보이며 이 주문 처리의 원본 검증·잠금을 대신하지 않는다. [CDC 경로](catalog-sync.md)와 [최종 검증 범위](../../worklog/2026-11-20-cdc-refund-status.md)를 따른다.
 
 ## 기존 경로와 이행
 

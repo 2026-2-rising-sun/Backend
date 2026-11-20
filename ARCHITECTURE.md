@@ -1,6 +1,6 @@
 # Backend 아키텍처
 
-기준: `e5a1b66bf3b06a971b1242dd02bd623e717c2902`의 코드·계약·설정. #330은 문서·도구만 변경한다. 운영 배포·실제 PG·브로커 실행 결과를 뜻하지 않는다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 코드·계약·설정. [CDC/Catalog #379](https://github.com/2026-2-rising-sun/Backend/pull/379)는 병합됐고 [Core 환불 #378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 미병합 Draft다. 로컬 실행 근거와 운영·외부 서비스 미확인 범위는 [검증 기록](docs/worklog/2026-11-20-cdc-refund-status.md)에서 구분한다.
 
 [프로젝트 소개](README.md) · [모듈 문서](docs/design-docs/README.md) · [업무 흐름](docs/design-docs/README.md)
 
@@ -22,8 +22,9 @@
 
 서비스 내부는 업무 도메인 아래 Controller → Service → Repository/Entity, 외부 호출은 대상별 Client로 구성한다. 트랜잭션·멱등성·잠금·복구 경계는 실제 서비스 코드에서 확인한다.
 
-- Core → Payment: 내부 HTTP로 영속 결제/환불 접수·조회. Payment → Core: 결과 이벤트와 대조 조회로 상태를 반영한다.
-- Core → Catalog: 상품·판매·쿠폰 이벤트로 사본을 갱신한다. Catalog → Core: 구매 진입 확인 및 설정에 따른 판매/쿠폰 조회.
+- Core → Payment: 새 주문서의 결제 생성·승인·조회는 영속 원문을 둔 HTTP 중계다. 기존 legacy 환불 HTTP와 늦은 승인 환불 요청 Outbox도 남아 있지만 실제 환불 실행 연동은 미완이다. Payment → Core: 결제 결과 이벤트·대조 조회, Core에 구현된 환불 결과 소비를 구분한다.
+- Core → Catalog: 상품·SKU 메타데이터는 업무 변경과 같은 트랜잭션의 Outbox에 기록하고, 변경된 재고는 기본 60초 fixedDelay 배치로 합친다. Connect가 Catalog 토픽의 삽입·초기 snapshot만 선별해 Kafka로 보낸다. Core relay는 이 토픽을 제외하고 기존 판매·쿠폰·주문 알림 경로는 유지한다.
+- Catalog는 상품·SKU 메타데이터와 재고의 버전을 독립 적용한다. 사본 재고는 지연된 표시 정보이며 주문 시 실제 가격·재고는 Core가 최종 검증한다. 기존 HTTP 판매/쿠폰 조회 설정과 새 CDC 초기 적재를 구분한다.
 - Live → Core/Member: 상품·판매·회원 표시 정보 확인. 방송·프로모션 이벤트는 관련 소비자에 전달한다.
 - Catalog/Core/Live/Notification → Member: 접근 세션 활성 상태 확인.
 - Core/Live → Notification: 주문·쿠폰·판매·방송 이벤트. 중복·순서 처리는 소비 코드와 계약을 함께 읽는다.
@@ -34,8 +35,8 @@
 
 각 서비스의 PostgreSQL 스키마는 Flyway와 엔티티가 설명한다. Payment는 `db/payment-migration/`, 다른 서비스는 `db/migration/`를 사용한다. Outbox는 DB 상태와 발행 요청을 같은 트랜잭션에 저장하지만 브로커 전달·소비 반영까지 한 번에 보장하는 것은 아니다.
 
-결제 PG는 토스페이먼츠다(테스트 키로 확인). 환불 실행은 재설계 중이라 지금 코드에 없다. UNKNOWN은 확정 실패와 구분하고 토스 조회로 복구한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
+결제 PG 어댑터는 토스페이먼츠를 대상으로 한다. 현재 dev의 Payment에는 Core가 요구하는 환불 실행 소비자·결과 생산자가 없다. Core의 접수·발행·결과 처리 코드가 실제 금전 환불을 보장하지 않는다. UNKNOWN은 확정 실패와 구분한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
 
 ## Order 처리 기한 후속
 
-2026-11-16 Core 변경은 새 주문 생성600초와 첫 실행부터별도600초를 적용한다. 주문 기한 종료는 Payment 실패 확정이 아니다. 늦은 승인은 Core의 환불 필요 REQUIRED 기록으로 보존하고 새 Payment 환불 이벤트 연동은 미완이다. [현재 범위와 제약](docs/worklog/plans/active/331-order-audit-fixes/processing-deadline.md). Payment 소유 코드·DB·계약은 수정하지 않는다.
+현재 dev는 주문 생성부터 600초, 최초 승인 접수부터 별도 600초를 적용한다. 기한 종료는 EXPIRED와 선점 해제이며 Payment 실패 확정이 아니다. legacy 늦은 승인은 REQUIRED, 새 주문서의 늦은 승인은 payment_relay_refund REQUESTED와 구 하이픈 토픽 요청으로 보존한다. #378의 사용자 CANCEL_PENDING·시스템 COMPENSATION_PENDING과 공통 dot 토픽 전환은 현재 dev에 없다. [현행과 미병합 목표](docs/design-docs/flows/refund.md)를 함께 확인한다.

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CDC 병합 후 현재 흐름과 환불 미병합 상태 정정 (#380)</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-20-cdc-refund-status.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#기준과-수정-범위">기준과 수정 범위</a></li>
+<li><a href="#현재-코드로-확인한-것">현재 코드로 확인한 것</a></li>
+<li><a href="#e-최종-cdc-단독-실행의-근거">E 최종 CDC 단독 실행의 근거</a><ul>
+<li><a href="#재현-조건">재현 조건</a></li>
+</ul>
+</li>
+<li><a href="#두-jvm-재고-증거의-적용-범위">두 JVM 재고 증거의 적용 범위</a></li>
+<li><a href="#문서-검증과-남은-일">문서 검증과 남은 일</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>CDC 병합 후 현재 흐름과 환불 미병합 상태 정정 (#380)</h1><h2 id="기준과-수정-범위">기준과 수정 범위</h2>
+<p>2026-11-20 dev <code>d42c3b787f12b716789d35c8df37dd63a2b42ddc</code>에서 문서 전용 브랜치를 시작했다. <a href="https://github.com/2026-2-rising-sun/Backend/pull/379">Backend #379</a>는 head <code>2c2dde556d93374a0f5294a41e7f9885399d8054</code>를 squash 병합한 상태다. <a href="https://github.com/2026-2-rising-sun/Infra/pull/58">Infra #58</a>은 main <code>cd6778590bcb57eb0603506f2130912e23bd37cc</code>에 병합됐다. 반면 <a href="https://github.com/2026-2-rising-sun/Backend/pull/378">Core 환불 #378</a>은 head <code>228f33faaa5e9519ffd74ec12b2878825fa85dde</code>의 미병합 Draft다.</p>
+<p>아키텍처·Catalog/주문/환불 상위 흐름과 관련 Core/Catalog/Common 모듈의 현재성 설명을 대조했다. 업무 코드·테스트·계약·설정·DB·Payment 소유 문서·AGENTS는 바꾸지 않았다. <a href="2026-11-19-catalog-cdc-sync.html">B의 이전 기록</a>은 당시 실패·미실행·미커밋 상태를 보존하고 이 정정으로 연결했다.</p>
+<h2 id="현재-코드로-확인한-것">현재 코드로 확인한 것</h2>
+<ul>
+<li>상품·SKU 메타데이터 변경은 같은 업무 TX의 Catalog Outbox다. 재고 변경은 영속 dirty revision이며 기본 60초 fixedDelay 배치가 최신 수량만 합친다. 최대 전파 SLA나 전체 재고의 매분 기록이 아니다.</li>
+<li>Core 일반/claim relay는 Catalog 토픽을 제외한다. Connect의 c/r·정확한 Catalog 토픽 필터가 EventRouter보다 먼저다. 초기 적재는 Core의 명시적 backfill과 Connect의 Outbox initial snapshot을 모두 고려한다. Catalog는 독립 버전·원문 대조·삭제 fence를 유지한다.</li>
+<li>Catalog의 available/status는 표시 정보다. Core 주문 생성에서 실제 재고·가격을 검증한다. Frontend stock/status 버튼 차단 후속은 <a href="2026-11-19-catalog-cdc-frontend-handoff.html">전용 인계</a>에 남아 있다.</li>
+<li>dev legacy 사용자 환불은 기존 HTTP 내부 API를 호출하고, 새 주문서의 늦은 승인은 구 <code>commerce.refund-requests.v1</code> 요청과 <code>payment.refund-results.v1</code> 결과 소비를 갖는다. Payment에 실제 환불 provider가 없어 완료 경로를 연결했다고 볼 수 없다.</li>
+<li>미병합 #378의 사용자 CANCEL_PENDING과 시스템 UNKNOWN/최초 600초→COMPENSATION_PENDING→성공 후 CANCELLED, 공통 dot 토픽은 미병합이다. provider 구 하이픈 결과 계약 불일치와 원요청의 missing paymentId 연결 복구가 실제 차단 사유로 남는다. <a href="../design-docs/flows/refund.html">현행과 목표</a>를 분리했다.</li>
+</ul>
+<h2 id="e-최종-cdc-단독-실행의-근거">E 최종 CDC 단독 실행의 근거</h2>
+<p>이번 문서 작업에서 업무 런타임을 재실행하지 않았다. E가 만든 불변 receipt·manifest·JUnit 및 테스트 원본을 읽고 파일 해시를 대조했다. 아래는 그 실행 결과의 공개 요약이다. 로컬 build 경로는 팀 공용 자료 링크가 아니며 원시 로그 전체나 자격정보를 저장소에 첨부하지 않았다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>확인한 조건·결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>대상</td>
+<td>#379 head의 전체 소스 1,238파일 변경 없음. E 전용 CatalogOnlyRuntimeReviewPostgresTest는 build 사본에만 추가</td>
+</tr>
+<tr>
+<td>실행</td>
+<td>fresh 3차, JUnit 1건·실패/오류/스킵 0, 112.703초, 종료 0</td>
+</tr>
+<tr>
+<td>실제 경로</td>
+<td>Core Spring bean/TX·PostgreSQL → Debezium 3.3.2.Final Connect → 실제 로컬 Kafka → 별도 Catalog bootJar → 공개 HTTP</td>
+</tr>
+<tr>
+<td>초기 적재</td>
+<td>기존 상품·SKU backfill로 기존 사본 재고 1→30 반영</td>
+</tr>
+<tr>
+<td>변경·복구</td>
+<td>상품명·가격·이미지, 기본 60초 재고 29, 중복/역순, Catalog kill/재시작 뒤 복구, 삭제 뒤 공개 HTTP 404</td>
+</tr>
+<tr>
+<td>Payment 경계</td>
+<td>Payment 프로세스·DB·PG 없이 Mockito client 사용, noInteraction 확인. 환불/결제 제공자 실행 증거가 아님</td>
+</tr>
+<tr>
+<td>알림 경계</td>
+<td>기존 PriceChanged 발행 ACK 2건 관찰. 실제 Notification/Live 소비 앱은 실행하지 않음</td>
+</tr>
+<tr>
+<td>앞선 실패</td>
+<td>1차는 consumer group 시작 offset 격리 오류, 2차는 누적 로그의 옛 PID를 재시작으로 오인. 각각 JUnit 1건 실패/종료 1을 보존하고 3차 성공에 합산하지 않음</td>
+</tr>
+</tbody>
+</table></div>
+<p>증거 식별자: <code>catalog-only-runtime-0b3bec4a190348a5854595317c462ae1</code>. manifest SHA-256은 <code>70fa139602d7c359e43325ddbaf5fa27e3096863dbe963dc49e6c1fec2baee67</code>, receipt SHA-256은 <code>e359189bd10c7ab572ab20633d702a1a037cf6a35e74c5afcf45d3658737ab5e</code>다. manifest에 기록된 18파일은 해시가 일치했다. 이 요약은 E 로컬 실행을 설명하며 이번 문서 검사·CI가 해당 실행을 새로 수행한 것은 아니다.</p>
+<h3 id="재현-조건">재현 조건</h3>
+<p>같은 결과를 재현하려면 #379 기준 소스/현재 dev의 업무 코드, Java 21과 위 Infra 구성의 독립 PostgreSQL·Kafka·Connect, Core/Catalog 각각의 고유 schema·consumer group·slot·publication을 준비한다. migration→Catalog 소비 기동→relay 제외 확인→connector 등록→Core 명시적 backfill·상품/SKU 변경→기본 배치 대기→공개 HTTP 대조 순서다. 삭제·중복/역순·Catalog 재시작을 각각 관찰하고 Payment client 호출 0을 별도로 검증한다. connector 권한은 E 테스트 역할을 사용했으므로 최소 권한 검증으로 확대하지 않는다.</p>
+<p>E 전용 테스트는 공개 저장소에 포함되지 않아 저장소의 단일 Gradle 명령만으로 이 실행을 그대로 재현할 수 없다. 동일 하네스 재현에는 증거 식별자에 대응하는 테스트 원본과 격리 실행 설정이 추가로 필요하다. 기존 Infra smoke는 <a href="https://github.com/2026-2-rising-sun/Infra/blob/cd6778590bcb57eb0603506f2130912e23bd37cc/local/cdc/README.md">공개 절차</a>로 재현할 수 있지만 fixture 전송이며 위 앱 실행을 대체하지 않는다.</p>
+<h2 id="두-jvm-재고-증거의-적용-범위">두 JVM 재고 증거의 적용 범위</h2>
+<p>별도 불변 증거 <code>rev-inventory-twojvm-7404e5f6cac4c54e</code>의 manifest SHA-256은 <code>b2d1aa095bbe3aabad6aa719b3d300cdd9d51d8901a05b83058a65db07a41bc8</code>다. JUnit 1건·실패/오류/스킵 0이며 두 worker JVM만 배치를 수행하도록 테스트 JVM scheduler를 제외한 상태에서 행 claim·동시 변경·잔여 dirty·재시작을 확인했다. E의 적용성 대조는 #379 대상 77파일 차이 0과 증거 55파일 무결성을 기록한다.</p>
+<p>당시 Core JAR와 실행 구성에는 현재 병합하지 않은 환불 코드 및 Payment 기동이 포함됐다. 재고 관련 동일 코드의 해당 단계 근거로만 사용하고, 현재 전체 앱 기동·환불 provider·전체 종단 성공으로 확대하지 않는다. 최종 CDC 단독 실행도 두 Core JVM 단계를 새로 실행하지 않았다.</p>
+<h2 id="문서-검증과-남은-일">문서 검증과 남은 일</h2>
+<p>MD 원본을 저장소 <code>render_design_docs.py</code>의 공식 render 함수로 해당 HTML만 생성한다. 링크·구조, 설계/API 생성 최신성, 대표 HTML desktop/mobile의 내용·탐색·관계도는 문서 검사 범위다. 업무 코드를 바꾸지 않아 Java 전체 테스트는 반복하지 않는다. 최종 명령과 화면 확인 결과는 다음과 같다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>문서 검사</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>scripts/check.sh --base origin/dev --dry-run / 실제 실행</td>
+<td>문서 전용으로 docs/API 생성/설계 생성 검사 3종 선택, 종료 0. Java·업무 이벤트·외부 실행은 선택하지 않음</td>
+</tr>
+<tr>
+<td>scripts/check-docs.sh에 대응하는 check_docs.py</td>
+<td>문서 264개, 링크·구조 오류 0</td>
+</tr>
+<tr>
+<td>render_api_docs.py --check</td>
+<td>API MD/HTML 10쌍, 불일치 0</td>
+</tr>
+<tr>
+<td>render_design_docs.py --check</td>
+<td>설계·기록 MD/HTML 109쌍, 불일치 0</td>
+</tr>
+<tr>
+<td>git diff --check</td>
+<td>오류 없음</td>
+</tr>
+<tr>
+<td>Orca 내장 브라우저</td>
+<td>Catalog/환불 HTML 1440×1000·390×844, 워크로그 390×844 확인. 페이지 너비 넘침 없음, 관계도 내부 가로 이동·확대/전체 보기·워크로그 링크 확인, 콘솔 오류 없음</td>
+</tr>
+</tbody>
+</table></div>
+<p>기존 Python 가상환경을 사용했고 외부 설치는 하지 않았다. 개인 작성 기준을 읽고 저장소 공식 생성기로 HTML을 만들었으며 Orca 내장 브라우저에서 확인했다. 브라우저 확인 중 발견한 #378 문장의 Markdown 제목 오인은 원본을 고쳐 정상 목차·단일 h1을 확인했다. Core SKU V109·Catalog V5 ERD는 독립 버전 설명이 이미 있어 그대로 보존했다.</p>
+<p>실제 Payment/PG·Notification/Live 소비 앱·운영 배포·업무 브라우저 E2E는 위 E 실행에서 미실행이다. 문서 HTML 확인은 업무 브라우저 검증과 다르다. provider 구현·계약 합의·paymentId 복구, Frontend 진입 조건, CDC 보관/slot/offset 기반 정리·운영 성능/SLA 검증은 후속이다. #378을 완료 처리하거나 미완료 계획을 완료 폴더로 옮기지 않는다. #380 문서 PR은 독립 리뷰·최신 CI 확인 뒤 조정자가 병합한다.</p><p class="muted fingerprint">MD SHA-256: <code>7f300e244f4647d0a9ac7d17f202a69ba65888abaf53f1bd0ec37614114fa938</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

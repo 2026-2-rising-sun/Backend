@@ -4,9 +4,16 @@
 
 CommerceCore Order·새 Payment 계약 중계와 기존 legacy 실행 동작을 구분한다. 실제 환불 통합은 팀원 구현을 기다린다. 이전 구현은 보존ref/과거검증으로 남기며 현재 전체기능완료로 표시하지 않는다.
 
+
+## 2026-11-20 현재 기준과 과거 설명
+
+현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`다. 아래 날짜가 붙은 PR343/2026-11-16 경계는 당시 기록이며 현재 새 주문서의 PREPARE/APPROVAL HTTP 중계와 늦은 승인 환불 요청·결과 소비는 구현돼 있다. 현행 legacy 사용자 환불은 legacy 주문만 접수하고, 새 주문서의 늦은 승인은 구 하이픈 토픽 요청과 payment_relay_refund REQUESTED로 보존한다. 실제 Payment 환불 provider는 없다.
+
+[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 미병합 Draft다. 사용자 CANCEL_PENDING, 시스템의 명시적 UNKNOWN/최초 처리 600초 후 COMPENSATION_PENDING, 보상 성공 후 해제·CANCELLED와 공통 dot 토픽은 현재 dev 동작이 아니다. provider 계약 불일치와 paymentId 연결 복구 차단이 남는다. [현행·목표 비교](../../../flows/refund.md)와 [검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)을 현재 상태의 기준으로 본다.
+
 ## Order 상세설계
 
-현재 PR343은 **CommerceCore Order와 Commerce 소유 Payment 중계 범위**다. Payment 소유 코드·DB·API·이벤트·설계 문서는 수정하지 않는다. 기존 금전 연동이 포함된 구현은 보존 ref `archive/order331-before-payment-scope-correction`의 `e08b8aea`에 남는다. 당시 실행 성공은 현재 축소 범위의 실행 성공이나 운영 검증이 아니다.
+과거 PR343의 작업 범위는 **CommerceCore Order와 Commerce 소유 Payment 중계**였다. Payment 소유 코드·DB·API·이벤트·설계 문서는 수정하지 않는다. 기존 금전 연동이 포함된 구현은 보존 ref `archive/order331-before-payment-scope-correction`의 `e08b8aea`에 남는다. 당시 실행 성공은 현재 축소 범위의 실행 성공이나 운영 검증이 아니다.
 
 [ERD](erd.md) · [상태](overview.md) · [ADR0331](../../../../adr/0331-order-snapshot-lifecycle.md) · [기존 실행 기록](../../../../worklog/plans/completed/331-order-module/verification.md) · [현재 보완 계획](../../../../worklog/plans/active/331-order-audit-fixes/README.md) · [CommerceCore 결제 인계 요구](../../../../worklog/plans/active/331-order-audit-fixes/payment-handoff.md)
 
@@ -132,9 +139,9 @@ Core PostgreSQL/계약 대역·Kafka 검사와 실제 Payment 생성·조회·ch
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
-### 2026-11-16 현재 PR 경계
+### 2026-11-16 당시 PR 경계
 
-새 공개 주문은 기본600초이고 첫 실행 접수에서 별도600초 처리 기한을 저장한다. 기존 생성 기한과 V105 이전 확인중 null 처리기한은 유지한다. 새 Payment의 준비 생성/인증 후 승인 중계는 미완이다. 늦은 승인의 REQUIRED는 환불 요청 전 기록이며 Kafka 발행/Payment 환불 완료가 아니다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [현재 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
+새 공개 주문은 기본600초이고 첫 실행 접수에서 별도600초 처리 기한을 저장한다. 기존 생성 기한과 V105 이전 확인중 null 처리기한은 유지한다. 당시 새 Payment의 준비 생성/인증 후 승인 중계는 미완이었다. 현재 구현 상태는 문서 상단의 정정을 따른다. 늦은 승인의 REQUIRED는 환불 요청 전 기록이며 Kafka 발행/Payment 환불 완료가 아니다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [현재 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
 
 ## CommerceCore 결제 전달·결과 반영
 
@@ -171,7 +178,7 @@ Core의 payment_delivery_request는 실행 원본이 아니라 영속 전달·�
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
-### 2026-11-16 현재 PR 경계
+### 2026-11-16 당시 PR 경계
 
 새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. legacy 늦은 승인은 REQUIRED 기록이며 새 계약 경로는 환불 요청 outbox와 결과 소비를 제공한다. 실제 Payment 환불 통합은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
 
@@ -233,9 +240,9 @@ commercecore.refunds.execution-enabled가 꺼져 있으면 REFUND 전달을 하�
 
 테스트 링크는 검증 경로다. 이번 문서 작업에서는 업무 테스트를 재실행하지 않았으며, 실제 실행 여부는 워크로그에서 확인한다.
 
-### 2026-11-16 현재 PR 경계
+### 2026-11-16 당시 PR 경계
 
-새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 늦은 승인은 REQUIRED 기록까지 제공하고, 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
+새 공개 주문 생성은 기본600초이며 첫 승인 실행 접수에서 별도600초 기한을 저장한다. 처리 기한 도달은 EXPIRED와 선점해제이며 Payment 실패 확정이 아니다. 당시 늦은 승인은 REQUIRED 기록까지 제공했고 새 Payment 생성·승인·조회/RefundRequested/환불 결과 연동은 미완이었다. 현재 Core 중계 구현과 실제 provider 부재는 문서 상단에서 구분한다. 기존 공개 결제/환불 입구를 제거하거나503으로 막지 않는다. [현재 작업](../../../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [새 검증](../../../../worklog/2026-11-16.md). 전체설계 미충족·Draft·배포 불가다.
 
 ## #340 Cart 출처와 성공 정리
 
