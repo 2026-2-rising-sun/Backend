@@ -1,6 +1,6 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — Phase 1 구현·검증 완료, PR #352–#359·#366 병합 대기(2026-11-18). Phase 2는 CommerceCore에서 대부분 구현
+상태: 진행 중 — Phase 1 dev 병합, 2026-11-20 실제 토스 sandbox E2E(주문 → 승인) 확인. Phase 2는 Core 정리(#377·#389·#390) 남음. Phase 3 이슈 생성(#384–#387, #370)
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: [결제](../../../../design-docs/services/payment/requirements/payment.md) · [원장](../../../../design-docs/services/payment/requirements/ledger.md) · [환불](../../../../design-docs/services/payment/requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../../adr/0337-5-pg-timeout-and-unknown.md)
@@ -23,12 +23,12 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | Phase | 목표 | 이슈 | 요구사항 | 상태 |
 |---|---|---|---|---|
 | 0 스펙 | 스펙·결정·계획 문서 | #337 (PR #339) | 이 폴더, 요구사항 3개, ADR 0337-1–5 | 완료 |
-| **1 결제 1차** | 기존 코드 삭제 | #347 | — | 구현 완료, 병합 대기 (PR #352) |
-| | 결제 생성·결제창·조회 API | #348 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 구현 완료, 병합 대기 (PR #354·#355) |
-| | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 구현 완료, 병합 대기 (PR #353·#356–#358, 토스 샌드박스 확인 #366) |
-| | 결과 불명 복구와 만료 | #349 | PAY-RECOVER·EXPIRE | 구현 완료, 병합 대기 (PR #359) |
-| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | #343·#365(CommerceCore) | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 진행 중 — 주문서 결제 중계·`PaymentApproved` 소비는 dev에 있음. 남은 일: 옛 `HttpPaymentClient`·`PaymentExecutionResolved` 소비 경로 정리, 토스 결제창 → Commerce → Payment 수동 확인 |
-| **3 환불** | 환불 접수·실행·늦은 승인 환불 + 환불 주문 연동 | 착수 때 | REF-*, LED-REFUND-01 | 대기 |
+| **1 결제 1차** | 기존 코드 삭제 | #347 | — | 완료 (PR #352) |
+| | 결제 생성·결제창·조회 API | #348 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 완료 (PR #354·#355) |
+| | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 완료 (PR #353·#356–#358, 토스 샌드박스 확인 #366) |
+| | 결과 불명 복구와 만료 | #349 | PAY-RECOVER·EXPIRE | 완료 (PR #359) |
+| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | #343·#365·#377·#389·#390(CommerceCore) | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 진행 중 — 주문서 결제 중계·`PaymentApproved` 소비는 dev에 있고, 토스 결제창 → Commerce → Payment는 2026-11-20 실제 토스 sandbox로 확인했다. 남은 일: 시스템 보상 상태(#377), 결과 소비자 DLT(#389), 옛 결제 경로 정리(#390) |
+| **3 환불** | Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다 | #384 계약 → #385 기반 → #370·#386 → #387 (Core: #367·#369·#345) | REF-*, LED-REFUND-01 | 대기 — 계약(#384)과 문서 갱신 먼저 |
 | 후순위 | 대사 → 정산 → 지급 → 선택(서킷 브레이커·2차 PG·웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
 
 모든 Phase의 이슈는 #337의 GitHub 하위 이슈로 연결하고, #337 본문의 로드맵 체크리스트에 추가한다. 이슈 하나 = 확인 가능한 기능 하나(PR 1–4개). PR은 자기 이슈를 `Refs`로 연결하고 그 이슈의 마지막 PR에서 `Closes`한다.
@@ -97,7 +97,7 @@ gh pr edit <내-PR> --base dev && gh pr ready <내-PR>
 | Phase | PR (예상) |
 |---|---|
 | 2 주문 연동 | 착수 때 Commerce 쪽 설계. 결제 생성 호출·재시도, 승인 중계와 "결제 확인 중" 잠금, `PaymentApproved` 소비, 정체 해소 조회(원본 `#commerce`·`#checkout`). 기존 CommerceCore 결제 코드(재전달·소비자·만료 배치)를 고쳐 쓸지 교체할지 먼저 정한다(원본 `#commerce` 대응표). 끝에 토스 테스트 키로 결제위젯 → Commerce → Payment 수동 확인 |
-| 3 환불 | R1 V5 + 접수 API(REF-ACCEPT-*) → R2 실행·결과 이벤트(REF-EXEC-01–03, REF-EVENT-01, LED-REFUND-01) → R3 복구·늦은 승인 소비(REF-EXEC-04, REF-LATE-*) → Commerce 환불 연동 |
+| 3 환불 | 문서 PR(#384: 고객 환불 HTTP → Kafka 전환을 ADR 0337-2·design.md·refund.md에 반영) → #385 V5 + 요청 소비·결과 발행·DLT(REF-LATE-02, REF-EVENT-01) → #370 구매자 환불 실행·복구(REF-ACCEPT-*·REF-EXEC-*, LED-REFUND-01) · #386 시스템 보상 실행(REF-LATE-01 포함) → #387 장기 미확정 알림. Core 쪽은 #378에 있음 |
 | 후순위 | 대사: V6 + 원장 대사 → 거래 대사·자동 보정(EC 38). 정산: V7 + `PurchaseConfirmed` → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 서킷 브레이커 → 2차 PG → 웹훅 |
 
 ## Commerce 의존
