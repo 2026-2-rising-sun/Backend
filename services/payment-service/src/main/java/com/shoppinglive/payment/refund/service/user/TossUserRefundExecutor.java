@@ -135,6 +135,11 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             results.record(id, RefundStatus.FAILED, 0, failure, null);
             return null;
         }
+        if (refund.getAmount() == 0) {
+            // 쿠폰 등으로 실결제액이 0원인 항목. Core가 주문·재고·쿠폰을 복원하도록 성공으로 답한다(REF-EXEC-05)
+            results.record(id, RefundStatus.SUCCEEDED, 0, null, null);
+            return null;
+        }
         // 금액은 둘 다 바뀌지 않는 값이라 재요청 본문도 같다. 전액은 금액을 보내지 않아야 부분 취소 불가 결제도 취소된다
         Long cancelAmount =
                 refund.getAmount().equals(payment.getAmount()) ? null : refund.getAmount();
@@ -152,8 +157,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
 
     private String validate(Refund refund, Payment payment) {
         long amount = refund.getAmount();
-        if (amount == 0
-                || payment.getPgPaymentKey() == null
+        if (payment.getPgPaymentKey() == null
                 || (payment.getStatus() != PaymentStatus.APPROVED
                         && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED)) {
             return NOT_REFUNDABLE;
@@ -171,6 +175,9 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         // settle 뒤에 실패하면 돈만 돌아가고 반영이 막히므로 항목 합을 토스 호출 전에 맞춘다
         if (requested.values().stream().mapToLong(Long::longValue).sum() != amount) {
             return NOT_REFUNDABLE;
+        }
+        if (amount == 0) {
+            return null; // 돌려줄 돈이 없어 한도를 쓰지 않는다
         }
         if (amount < payment.getAmount() && !Boolean.TRUE.equals(payment.getPartialCancelable())) {
             return PARTIAL_NOT_ALLOWED;
@@ -276,14 +283,15 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         return "고객 환불 " + refund.getRefundRequestId();
     }
 
+    /** 판매자 주문별 금액. 0원 줄은 결제의 판매자 금액에 없을 수 있어 뺀다(REF-EXEC-05). */
     private static Map<String, Long> sellerAmounts(String requestPayload) {
         Map<String, Long> amounts = new LinkedHashMap<>();
         try {
             for (JsonNode item : JSON.readTree(requestPayload).path("items")) {
-                amounts.merge(
-                        item.path("sellerOrderNumber").asText(),
-                        item.path("amount").longValue(),
-                        Long::sum);
+                long value = item.path("amount").longValue();
+                if (value > 0) {
+                    amounts.merge(item.path("sellerOrderNumber").asText(), value, Long::sum);
+                }
             }
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(e);
