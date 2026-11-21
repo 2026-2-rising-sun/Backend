@@ -95,6 +95,13 @@ class TossUserRefundExecutor implements UserRefundExecutor {
     private record CancelCall(String paymentKey, Long cancelAmount, long callId) {}
 
     private void first(Refund refund) {
+        Instant deadline = refund.getCheckDeadlineAt();
+        if (deadline != null && !Instant.now().isBefore(deadline)) {
+            // NotSent가 마감까지 이어졌다. 돈이 안 나갔다고 단정하지 않고 한도를 잡은 채 마지막 조회 뒤 멈춘다
+            refunds.markUnknown(refund.getId(), deadline);
+            recover(refunds.findById(refund.getId()).orElseThrow());
+            return;
+        }
         CancelCall call = tx.execute(s -> admit(refund.getId()));
         if (call == null) {
             return;
@@ -110,7 +117,8 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             case TossResult.Success success -> confirm(refund, success.payment());
             case TossResult.Declined declined ->
                     results.record(refund.getId(), RefundStatus.FAILED, 0, declined.code(), null);
-            case TossResult.NotSent notSent -> refunds.releaseUnknown(refund.getId());
+            case TossResult.NotSent notSent ->
+                    refunds.releaseUnknown(refund.getId(), refund.getAttemptCount());
             case TossResult.Unknown unknown ->
                     log.warn(
                             "환불 취소 결과를 모른다: refundRequestId={}, reason={}",
