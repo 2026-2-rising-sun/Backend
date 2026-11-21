@@ -643,9 +643,9 @@
 <p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/395">PR #395</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a> · <a href="../design-docs/services/payment/overview.html#payment-환불-실행">Payment 모듈</a></p>
 <ul>
 <li>변경·판단(2026-11-21): <code>USER_REFUND</code> 실행기와 재처리 스케줄러, 고객 환불·시스템 보상 공용 <code>RefundSettlement</code>를 추가했다. 토스 호출 전에 UNKNOWN으로 예약해 동시 초과 환불을 막고, 토스 취소 내역에 멱등 키가 없어 요청별 취소 사유로 자기 취소를 찾는다.</li>
-<li>검증: 임시 PostgreSQL 17과 가짜 토스로 Payment test 77·integrationTest 75·postgresTest 103·migrationTest 9건 통과, <code>check.sh --base origin/feat/#385-refund-base --external</code> 통과.</li>
+<li>검증: 임시 PostgreSQL 17과 가짜 토스로 Payment test 77·integrationTest 75·postgresTest 104·migrationTest 9건 통과, <code>check.sh --base origin/feat/#385-refund-base --external</code> 통과.</li>
 <li>미실행·한계: 실제 토스 취소와 Infra E2E는 실행하지 않았다. <code>payment.refund.deadline</code> 알림 연결은 #387에 남았다.</li>
 <li>다음 작업: #386 시스템 보상 실행, #387 환불 미확정 알림.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7b0c804c3c0197097e520e14a3114880f17d68aa3829e5ea1425028c91c7e652</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>4677ac9b7722e78b8390756c9860c9ad22233c2961c9cf851ebb2c3fce65ac83</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
