@@ -121,6 +121,35 @@ class RefundResultPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName("[REF-LATE-02] 접수에서 실패한 보상(결제 없음·ID 없음·불일치·진행 중 보상)은 돈이 움직일 수 없어 성공·미승인으로 바꾸지 않는다")
+    void intakeFailureCannotBecomeResolved() throws Exception {
+        String missingRef = newOrderRef();
+        String orderRef = newOrderRef();
+        long paymentId = newPayment(orderRef);
+        intake.receive(request(orderRef, paymentId, "SYSTEM_COMPENSATION")).orElseThrow();
+        List<ObjectNode> failed =
+                List.of(
+                        request(missingRef, 7001L, "SYSTEM_COMPENSATION"),
+                        request(orderRef, null, "SYSTEM_COMPENSATION"),
+                        request(orderRef, paymentId + 1000, "SYSTEM_COMPENSATION"),
+                        request(orderRef, paymentId, "SYSTEM_COMPENSATION"));
+
+        for (ObjectNode request : failed) {
+            assertThat(intake.receive(request)).isEmpty();
+            long id =
+                    refunds.findByRefundRequestId(request.get("refundRequestId").asText())
+                            .orElseThrow()
+                            .getId();
+            assertThat(results.record(id, RefundStatus.SUCCEEDED, 4000, null, "tx-" + id))
+                    .isFalse();
+            assertThat(results.record(id, RefundStatus.NO_CHARGE, 0, "NO_CHARGE", null)).isFalse();
+            assertThat(refund(request.get("refundRequestId").asText()))
+                    .containsEntry("status", "FAILED")
+                    .containsEntry("result_version", 1);
+        }
+    }
+
+    @Test
     @DisplayName("[REF-EVENT-01] Core가 거부할 결과(성공 금액 불일치·고객 환불 NO_CHARGE·사유 없는 실패)는 기록하지 않는다")
     void rejectsResultsCoreWouldReject() {
         String orderRef = newOrderRef();

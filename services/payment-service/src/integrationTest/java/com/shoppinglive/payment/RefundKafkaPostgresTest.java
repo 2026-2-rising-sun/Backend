@@ -1,14 +1,20 @@
 package com.shoppinglive.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.common.outbox.EventOutbox;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -21,12 +27,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 실제 broker와 PostgreSQL로 요청 소비 → 접수 → outbox 릴레이 → 결과 토픽, 중복 수신, DLT를 확인한다. 접수 서비스를 직접 부르는 테스트로는
@@ -52,6 +61,8 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
     static final String SCHEMA =
             "payment_refund_kafka_" + UUID.randomUUID().toString().replace("-", "");
     static final String REQUESTS = "commerce.refund.requests.v1";
+    static final String DLT = REQUESTS + ".payment.dlt";
+    static final String RESULTS = "payment.refund.results.v1";
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry p) {
@@ -68,6 +79,8 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Autowired EmbeddedKafkaBroker broker;
+    @MockitoSpyBean EventOutbox outbox;
+    @Autowired TransactionTemplate tx;
 
     @Test
     @DisplayName(
@@ -81,7 +94,8 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
         send(orderRef, event);
         send(orderRef, envelope(orderRef, payload)); // Core outbox 재전달: 같은 원문, 새 eventId
 
-        List<ConsumerRecord<String, String>> results = poll("payment.refund.results.v1", 2);
+        List<ConsumerRecord<String, String>> results =
+                poll("payment.refund.results.v1", orderRef, 2);
         assertThat(results).extracting(ConsumerRecord::key).containsOnly(orderRef);
         JsonNode first = JSON.readTree(results.get(0).value());
         JsonNode second = JSON.readTree(results.get(1).value());
@@ -90,10 +104,62 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
         assertThat(second.get("payload")).isEqualTo(first.get("payload"));
         assertThat(refundCount(payload.get("refundRequestId").asText())).isEqualTo(1);
 
-        ConsumerRecord<String, String> dead =
-                poll("commerce.refund.requests.v1.payment.dlt", 1).getFirst();
+        ConsumerRecord<String, String> dead = poll(DLT, orderRef, 1).getFirst();
         assertThat(dead.value()).isEqualTo("깨진 JSON");
         assertThat(dead.headers().lastHeader("kafka_dlt-original-topic")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-07] 처리 중 일반 예외는 처음 포함 6번 시도한 뒤 DLT로 가고 뒤 메시지는 계속 처리된다")
+    void limitedRetryThenDeadLetter() throws Exception {
+        String failing = newOrderRef();
+        String next = newOrderRef();
+        ObjectNode request = request(failing, 7001L, "USER_REFUND");
+        AtomicInteger attempts =
+                failResults(failing, Integer.MAX_VALUE, new IllegalStateException("버그"));
+
+        send(failing, envelope(failing, request));
+        send(next, envelope(next, request(next, 7001L, "USER_REFUND")));
+
+        assertThat(poll(DLT, failing, 1)).hasSize(1);
+        assertThat(poll(RESULTS, next, 1)).hasSize(1);
+        assertThat(attempts).hasValue(6);
+        // 실패한 시도는 롤백돼 환불 행이 남지 않는다
+        assertThat(refundCount(request.get("refundRequestId").asText())).isZero();
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-07] DB 장애는 제한 횟수를 넘어도 DLT로 보내지 않고 재시도해 복구되면 처리한다")
+    void databaseOutageRetriesPastLimit() throws Exception {
+        String orderRef = newOrderRef();
+        ObjectNode request = request(orderRef, 7001L, "USER_REFUND");
+        AtomicInteger attempts = failResults(orderRef, 8, new QueryTimeoutException("DB 장애"));
+
+        send(orderRef, envelope(orderRef, request));
+
+        assertThat(poll(RESULTS, orderRef, 1)).hasSize(1);
+        assertThat(attempts).hasValue(9);
+        assertThat(records(DLT, orderRef, 1, Duration.ofSeconds(2))).isEmpty();
+    }
+
+    /** 이 주문의 결과 발행을 처음 {@code failures}번 실패시키고, 시도 횟수를 센다. 접수 트랜잭션 안의 실패다. */
+    private AtomicInteger failResults(String orderRef, int failures, RuntimeException failure) {
+        AtomicInteger attempts = new AtomicInteger();
+        // EventOutbox.append는 MANDATORY라 스텁 호출도 트랜잭션 안에서 한다
+        tx.executeWithoutResult(
+                status ->
+                        doAnswer(
+                                        call -> {
+                                            EventEnvelope<?> event = call.getArgument(1);
+                                            if (orderRef.equals(event.aggregateId())
+                                                    && attempts.incrementAndGet() <= failures) {
+                                                throw failure;
+                                            }
+                                            return call.callRealMethod();
+                                        })
+                                .when(outbox)
+                                .append(eq(RESULTS), any()));
+        return attempts;
     }
 
     static String envelope(String orderRef, JsonNode payload) throws Exception {
@@ -123,7 +189,16 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
         }
     }
 
-    private List<ConsumerRecord<String, String>> poll(String topic, int count) {
+    private List<ConsumerRecord<String, String>> poll(String topic, String key, int count) {
+        List<ConsumerRecord<String, String>> records =
+                records(topic, key, count, Duration.ofSeconds(60));
+        assertThat(records).hasSize(count);
+        return records;
+    }
+
+    /** 다른 테스트의 메시지가 같은 토픽에 있으므로 키로 거른다. */
+    private List<ConsumerRecord<String, String>> records(
+            String topic, String key, int count, Duration wait) {
         Map<String, Object> props =
                 KafkaTestUtils.consumerProps(
                         broker.getBrokersAsString(), "reader-" + UUID.randomUUID(), "true");
@@ -134,12 +209,16 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
                                 props, new StringDeserializer(), new StringDeserializer())
                         .createConsumer()) {
             consumer.subscribe(List.of(topic));
-            long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
+            long deadline = System.nanoTime() + wait.toNanos();
             while (records.size() < count && System.nanoTime() < deadline) {
-                consumer.poll(Duration.ofMillis(500)).forEach(records::add);
+                for (ConsumerRecord<String, String> record :
+                        consumer.poll(Duration.ofMillis(200))) {
+                    if (key.equals(record.key())) {
+                        records.add(record);
+                    }
+                }
             }
         }
-        assertThat(records).hasSize(count);
         return records;
     }
 }
