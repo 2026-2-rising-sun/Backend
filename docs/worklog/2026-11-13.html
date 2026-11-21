@@ -80,6 +80,7 @@
 <li><a href="#337-로컬-기본-가짜-토스와-실제-토스-전환-플래그">#337 로컬 기본 가짜 토스와 실제 토스 전환 플래그</a></li>
 <li><a href="#384-환불-결과-이벤트-계약-확정">#384 환불 결과 이벤트 계약 확정</a></li>
 <li><a href="#385-환불-요청-소비와-결과-발행-기반">#385 환불 요청 소비와 결과 발행 기반</a></li>
+<li><a href="#370-구매자-일반부분-환불-실행">#370 구매자 일반·부분 환불 실행</a></li>
 <li><a href="#386-시스템-보상-요청-실행">#386 시스템 보상 요청 실행</a></li>
 </ul>
 </li>
@@ -639,13 +640,21 @@
 <li>미실행·한계: Infra 로컬 스택 E2E 미실행(스택 중지, 5432 충돌). Core 반영은 #378 병합·#389 해결 뒤 확인한다. Infra <code>topics.tsv</code>에 DLT 토픽 추가 요청이 남았다.</li>
 <li>다음 작업: #370 고객 환불 실행, #386 시스템 보상 실행, #378 병합 뒤 이 PR 병합.</li>
 </ul>
+<h2 id="370-구매자-일반부분-환불-실행">#370 구매자 일반·부분 환불 실행</h2>
+<p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/395">PR #395</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a> · <a href="../design-docs/services/payment/overview.html#payment-환불-실행">Payment 모듈</a></p>
+<ul>
+<li>변경·판단(2026-11-21): <code>USER_REFUND</code> 실행기와 재처리 스케줄러, 고객 환불·시스템 보상 공용 <code>RefundSettlement</code>를 추가했다. 토스 호출 전에 UNKNOWN으로 예약해 동시 초과 환불을 막고, 토스 취소 내역에 멱등 키가 없어 요청별 취소 사유로 자기 취소를 찾는다.</li>
+<li>검증: 임시 PostgreSQL 17과 가짜 토스로 Payment test 77·integrationTest 75·postgresTest 103·migrationTest 9건 통과, <code>check.sh --base origin/feat/#385-refund-base --external</code> 통과.</li>
+<li>미실행·한계: 실제 토스 취소와 Infra E2E는 실행하지 않았다. <code>payment.refund.deadline</code> 알림 연결은 #387에 남았다.</li>
+<li>다음 작업: #386 시스템 보상 실행, #387 환불 미확정 알림.</li>
+</ul>
 <h2 id="386-시스템-보상-요청-실행">#386 시스템 보상 요청 실행</h2>
-<p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/issues/386">이슈 #386</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a></p>
+<p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/396">PR #396</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a></p>
 <ul>
 <li>변경·판단(2026-11-21): 시스템 보상 실행기와 재처리 스케줄러를 추가했다. 결제를 막은 뒤 토스 조회로 확정하고, 취소 키는 기존 보상과 같은 <code>cancel-{pgOrderId}</code>다. 금액 불일치와 이미 환불된 결제는 토스 호출 없이 FAILED로 답한다.</li>
 <li>검증: 임시 PostgreSQL 17로 payment test 78건, integrationTest 75건, postgresTest 113건 통과.</li>
 <li>미실행·한계: Infra E2E와 실제 토스 호출은 하지 않았다. Core 반영은 #378 병합·#389 해결 뒤 확인한다.</li>
 <li>다음 작업: #387.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>c264941b675ee051c92e5ea471240c310e55cd7105cfb4c01967486627c87224</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>fc1ea73bd9deadddb158a477af408ca9285b25567a7328a38d617f50343f78ad</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

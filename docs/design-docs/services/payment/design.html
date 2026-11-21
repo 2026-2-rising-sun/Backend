@@ -186,7 +186,7 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
   .flow-card { padding: 4px 14px 14px; }
 }
 </style>
-<!-- md-sha256: 16e8633c69b3a8b7aa5efb28b2ae13cc656dcbb037d7dfe4b33fe550124d4367 -->
+<!-- md-sha256: 0f27efcbdb4dc5a3c38683cc3a08efd18c84c42799672b92b1676ff70b57d071 -->
 </head>
 <body>
 <a href="design.md">MD 원본</a>
@@ -1341,7 +1341,7 @@ UPDATE orders SET status = 'CANCELLED'
   <dt>사고 1: 과다 환불</dt><dd>부분 환불 요청 두 개가 동시에 들어옵니다. 각각 "합계가 결제 금액 이하"인지 확인하고 둘 다 통과합니다. 결제 금액보다 많이 환불됩니다. 막는 방법: 결제 행의 환불 누적액을 조건부 UPDATE로 늘립니다.</dd>
   <dt>사고 2: 이중 환불</dt><dd>타임아웃 후 재시도하면 같은 환불이 두 번 실행됩니다. 막는 방법: 토스 취소 요청에 멱등키 헤더를 붙입니다. 같은 키로 다시 보내면 토스가 중복 취소하지 않습니다. 토스 문서 기준으로 멱등키는 <strong>처음 요청한 날부터 15일</strong> 유효하고 최대 300자입니다. 멱등키·API 키·주소·메서드가 같은 요청이 다시 오면 처리하지 않고 첫 응답을 그대로 돌려줍니다. 15일이 지난 재시도는 새 요청이 되므로, 오래된 환불은 다시 보내기 전에 조회부터 합니다.</dd>
   <dt>사고 3: 부분 취소 불가</dt><dd>결제수단에 따라 부분 취소가 안 되는 결제가 있습니다. 결제 때 부분 취소 가능 여부를 저장합니다. 불가능하면 부분 환불 접수를 거절합니다.</dd>
-  <dt>결과 불명</dt><dd>승인과 같습니다. 취소 응답이 없으면 UNKNOWN으로 두고, 토스 결제 조회로 취소 내역을 확인합니다.</dd>
+  <dt>결과 불명</dt><dd>승인과 같습니다. 토스 호출 전에 UNKNOWN으로 예약해 커밋하므로 UNKNOWN은 "토스에 갔을 수 있는 환불"이고 한도를 차지합니다. 토스 결제 조회의 취소 내역에서 요청별 취소 사유로 이 환불의 취소를 찾고, 없으면 같은 멱등키로 다시 요청합니다. 재요청이 거절돼도 FAILED로 단정하지 않고, 조회 마감이 지나면 UNKNOWN으로 멈춰 사람이 확인합니다. 첫 호출이 토스에 가지 않았으면 PROCESSING으로 되돌립니다. 0원 환불(쿠폰으로 실결제액이 0원인 항목)은 결제 상태만 확인하고 토스·분개·결제 변경 없이 성공(환불액 0)으로 답합니다.</dd>
 </dl>
 <div class="board">
 <div class="row"><div class="zone" data-z="Commerce"><div class="st evt">환불 요청됨 (USER_REFUND)<small>발송 전 자동 · 발송 후 판매자 승인</small></div></div><span class="ar">Kafka 접수</span><div class="zone" data-z="Payment"><div class="st cmd">환불 실행<small>환불 요청 ID·금액·판매자 주문 번호</small></div><span class="ar"></span><div class="st agg">환불<small>규칙: 누적 환불 ≤ 결제 금액 · 요청 ID당 1건</small></div><span class="ar"></span><div class="st evt">환불 접수됨<small>PROCESSING</small></div></div><span class="ar">POST /cancel · 멱등키</span><div class="st ext">토스페이먼츠<small>외부 시스템</small></div></div>
@@ -2062,7 +2062,7 @@ CREATE INDEX ix_settlement_pending ON settlement_item(seller_id, scheduled_date)
 <tbody>
 <tr><td>판매자별 금액 합 = 결제 금액</td><td>결제 생성</td><td>합이 다르면 400 <code>SUM_MISMATCH</code></td></tr>
 <tr><td>분개 하나의 차변 합 = 대변 합</td><td><code>Journal.of(...)</code> 생성자</td><td>안 맞으면 예외, 저장 안 됨</td></tr>
-<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 409 <code>OVER_REFUND</code></td></tr>
+<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 FAILED(<code>OVER_REFUND</code>)</td></tr>
 <tr><td>구매확정 판매 금액 = 판매자 주문 금액 − 성공한 환불 합</td><td>구매확정 처리. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠근다</td><td>4,000원 환불 후 확정하면 NORMAL 항목은 6,000원</td></tr>
 <tr><td>확정 시점에 진행 중(PROCESSING·UNKNOWN)이던 환불이 나중에 성공하면 역정산</td><td>환불 성공 반영. 같은 <code>payment</code> 행 잠금 아래에서 그 판매자 주문의 NORMAL 항목이 있으면 REVERSAL 추가</td><td>확정과 환불 성공이 동시에 와도 둘 중 하나만 금액을 반영</td></tr>
 <tr><td>수수료 = <code>floor(판매 금액 × commission_rate)</code>(원 미만 버림), 지급 = 판매 − 수수료. 역정산 수수료 = <code>floor(환불 전 남은 판매 × rate) − floor(환불 후 남은 판매 × rate)</code>(음수로 기록)</td><td>정산 항목 생성</td><td>10,000원 · 0.1 → 수수료 1,000. 3,333원과 6,667원을 나눠 환불하면 역정산 수수료 −334(1,000 − floor(666.7)), −666 → 합 −1,000. 전액 환불 뒤 수수료가 정확히 0</td></tr>
@@ -2751,7 +2751,7 @@ stateDiagram-v2
 <tr><td>38</td><td>대사에서 "토스 DONE · 우리 CANCELED" 발견</td><td>APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불)</td><td>거래 대사</td><td><a href="#f12">12</a></td></tr>
 <tr><th colspan="5">환불</th></tr>
 <tr><td>39</td><td>환불 요청 중복(이벤트 재전달·재시도)</td><td>1번만 실행</td><td><code>refund_request_id</code> UNIQUE · <code>ON CONFLICT DO NOTHING</code></td><td><a href="#f7">7</a></td></tr>
-<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 409 <code>OVER_REFUND</code></td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
+<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 FAILED(<code>OVER_REFUND</code>)</td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
 <tr><td>41</td><td>환불 호출 타임아웃</td><td>UNKNOWN → 조회. 이중 환불 없음</td><td>토스 멱등키 = <code>refund_request_id</code></td><td><a href="#f7">7</a></td></tr>
 <tr><td>42</td><td>환불 실패(토스 4xx)</td><td>"환불 실패됨" → 운영자</td><td>이벤트 + 거래 대사</td><td><a href="#f7">7</a></td></tr>
 <tr><td>43</td><td>부분 취소가 안 되는 결제수단에 부분 환불</td><td>409 <code>PARTIAL_NOT_ALLOWED</code></td><td><code>partial_cancelable</code></td><td><a href="#f7">7</a></td></tr>

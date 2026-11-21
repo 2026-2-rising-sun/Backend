@@ -116,6 +116,44 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             nativeQuery = true)
     int markUnknown(@Param("id") long id, @Param("deadline") Instant deadline);
 
+    /** 첫 취소가 토스에 가지 않았을 때 예약을 풀어 다음 실행이 다시 검증하게 한다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET status = 'PROCESSING', check_deadline_at = NULL, updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN'
+                    """,
+            nativeQuery = true)
+    int releaseUnknown(@Param("id") long id);
+
+    /** 조회 마감이 지난 UNKNOWN을 재처리에서 뺀다. 1행일 때만 호출자가 알림 로그를 남겨 여러 인스턴스에서도 한 번이다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET next_attempt_at = NULL, updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND next_attempt_at IS NOT NULL
+                       AND check_deadline_at <= :now
+                    """,
+            nativeQuery = true)
+    int stopRetry(@Param("id") long id, @Param("now") Instant now);
+
+    /** 한도를 차지하는 다른 환불: 성공, 토스에 갔을 수 있는 UNKNOWN, 전액을 돌려줄 진행 중 시스템 보상. 결제 행 잠금 안에서 읽는다. */
+    @Query(
+            value =
+                    """
+                    SELECT * FROM refund
+                     WHERE payment_id = :paymentId AND id <> :id
+                       AND (status IN ('SUCCEEDED','UNKNOWN')
+                            OR (purpose = 'SYSTEM_COMPENSATION' AND status = 'PROCESSING'))
+                    """,
+            nativeQuery = true)
+    List<Refund> findHoldingLimit(@Param("paymentId") long paymentId, @Param("id") long id);
+
     /** 결과 기록. 읽은 상태·버전 그대로일 때만 바꾼다. 0이면 다른 반영이 먼저 했다. */
     @Modifying(clearAutomatically = true)
     @Query(
