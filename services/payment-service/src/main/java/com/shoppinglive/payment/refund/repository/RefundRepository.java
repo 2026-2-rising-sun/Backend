@@ -83,6 +83,122 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("now") Instant now,
             @Param("leaseUntil") Instant leaseUntil);
 
+    /** 시스템 보상의 재시도 한도 알림을 한 번만 남기려고 그 시각을 기록한다. 보상은 UNKNOWN을 쓰지 않아 이 컬럼이 비어 있다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET check_deadline_at = :now, updated_at = now()
+                     WHERE id = :id AND purpose = 'SYSTEM_COMPENSATION' AND status = 'PROCESSING'
+                       AND check_deadline_at IS NULL
+                    """,
+            nativeQuery = true)
+    int markCompensationOverdue(@Param("id") long id, @Param("now") Instant now);
+
+    /** 이번 선점의 다음 처리 시각을 정한다. null이면 사람 확인까지 재처리하지 않는다. 0이면 다른 실행이 이미 집었거나 끝났다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET next_attempt_at = CAST(:next AS TIMESTAMP WITH TIME ZONE), updated_at = now()
+                     WHERE id = :id AND status = 'PROCESSING' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int reschedule(
+            @Param("id") long id,
+            @Param("attemptCount") int attemptCount,
+            @Param("next") Instant next);
+
+    /**
+     * 토스에 취소가 갔을 수 있는 상태로 표시한다. 조회 마감은 처음 한 번만 정한다. 0이면 이미 확정됐다. 혼자 불리면 자기 트랜잭션으로 커밋해 토스 호출 전에 남는다.
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET status = 'UNKNOWN',
+                           check_deadline_at = COALESCE(check_deadline_at, :deadline),
+                           updated_at = now()
+                     WHERE id = :id AND status IN ('PROCESSING','UNKNOWN')
+                    """,
+            nativeQuery = true)
+    int markUnknown(@Param("id") long id, @Param("deadline") Instant deadline);
+
+    /**
+     * 첫 취소가 토스에 가지 않았을 때 예약을 풀어 다음 실행이 다시 검증하게 한다. 조회 마감은 첫 시도 기준으로 유지한다. 그 사이 다른 실행이 선점했으면 ({@code
+     * attempt_count}가 다르면) 그 실행의 예약이므로 풀지 않는다.
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET status = 'PROCESSING', updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int releaseUnknown(@Param("id") long id, @Param("attemptCount") int attemptCount);
+
+    /** NotSent만 있던 환불이 처음 결과 불명이 된 시점부터 조회 시간을 온전히 쓰게 마감을 다시 잡는다. 다른 실행이 선점했으면 0이다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET check_deadline_at = :deadline, updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int restartDeadline(
+            @Param("id") long id,
+            @Param("attemptCount") int attemptCount,
+            @Param("deadline") Instant deadline);
+
+    /**
+     * 이 실행의 선점이 살아 있는지 확인하며 트랜잭션 끝까지 행을 잠근다. 재요청 기록과 NOT_SENT 종료 판단이 서로 끼어들지 못한다. 0이면 다른 실행이 선점했거나
+     * 이미 확정됐다.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int holdAttempt(@Param("id") long id, @Param("attemptCount") int attemptCount);
+
+    /** 조회 마감이 지난 UNKNOWN을 재처리에서 뺀다. 1행일 때만 호출자가 알림 로그를 남겨 여러 인스턴스에서도 한 번이다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET next_attempt_at = NULL, updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND next_attempt_at IS NOT NULL
+                       AND check_deadline_at <= :now
+                    """,
+            nativeQuery = true)
+    int stopRetry(@Param("id") long id, @Param("now") Instant now);
+
+    /** 한도를 차지하는 다른 환불: 성공, 토스에 갔을 수 있는 UNKNOWN, 전액을 돌려줄 진행 중 시스템 보상. 결제 행 잠금 안에서 읽는다. */
+    @Query(
+            value =
+                    """
+                    SELECT * FROM refund
+                     WHERE payment_id = :paymentId AND id <> :id
+                       AND (status IN ('SUCCEEDED','UNKNOWN')
+                            OR (purpose = 'SYSTEM_COMPENSATION' AND status = 'PROCESSING'))
+                    """,
+            nativeQuery = true)
+    List<Refund> findHoldingLimit(@Param("paymentId") long paymentId, @Param("id") long id);
+
     /**
      * 결과 기록. 읽은 상태·버전 그대로이고 허용된 전이일 때만 바꾼다. FAILED 뒤 변경은 돈이 움직였을 수 있는 시스템 보상만 가능하고, 접수에서 실패한 행은 토스를
      * 부른 적이 없어 제외한다(REF-LATE-02). 0이면 바꿀 수 없거나 다른 반영이 먼저 했다.

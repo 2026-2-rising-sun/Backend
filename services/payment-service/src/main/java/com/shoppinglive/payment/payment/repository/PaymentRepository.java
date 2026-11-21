@@ -1,10 +1,12 @@
 package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.Payment;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -124,6 +126,41 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
                     """,
             nativeQuery = true)
     int markCanceled(@Param("id") long id);
+
+    /** 시스템 보상: CREATED일 때만 막는다. 승인이 그 사이 시작됐으면 0행이라 조회 없는 NO_CHARGE로 가지 않는다. */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE payment SET status = 'CANCELED', updated_at = now()
+                     WHERE id = :id AND status = 'CREATED'
+                    """,
+            nativeQuery = true)
+    int cancelCreated(@Param("id") long id);
+
+    /** 환불 한도 검사와 예약을 결제별로 한 줄로 세운다. 토스 호출 전에 커밋해 잠금을 푼다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Payment p WHERE p.id = :id")
+    Optional<Payment> findForRefund(@Param("id") long id);
+
+    /**
+     * 환불 반영. 승인된 결제이고 누적 환불액이 결제 금액을 넘지 않을 때만 더한다. 0이면 호출자가 다시 읽어 판단한다. SET의 {@code
+     * refunded_amount}는 바뀌기 전 값이다.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE payment
+                       SET refunded_amount = refunded_amount + :amount,
+                           status = CASE WHEN refunded_amount + :amount = amount THEN 'REFUNDED'
+                                         ELSE 'PARTIALLY_REFUNDED' END,
+                           updated_at = now()
+                     WHERE id = :id AND status IN ('APPROVED', 'PARTIALLY_REFUNDED')
+                       AND refunded_amount + :amount <= amount
+                    """,
+            nativeQuery = true)
+    int applyRefund(@Param("id") long id, @Param("amount") long amount);
 
     // ---- 복구·만료(#349). 아래 SQL은 PostgreSQL 전용이고 테스트도 @Tag("postgres")다 ----
 

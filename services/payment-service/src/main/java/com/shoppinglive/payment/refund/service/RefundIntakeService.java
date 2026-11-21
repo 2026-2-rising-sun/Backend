@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefundIntakeService {
     static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
     static final String PAYMENT_ID_REQUIRED = "PAYMENT_ID_REQUIRED";
-    static final String PAYMENT_MISMATCH = "PAYMENT_MISMATCH";
+    public static final String PAYMENT_MISMATCH = "PAYMENT_MISMATCH";
     static final String COMPENSATION_IN_PROGRESS = "COMPENSATION_IN_PROGRESS";
     private static final ObjectMapper JSON = new ObjectMapper();
 

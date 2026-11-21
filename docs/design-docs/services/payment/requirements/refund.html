@@ -18,10 +18,10 @@
 <p>결과를 보내기 전에 Core가 그 결과를 받아들일 수 있는지 확인한다. Core 결과 소비자는 원문과 맞지 않는 결과를 받으면 무한 재시도하고, 그동안 파티션이 막힌다(#389). 그래서 결과에는 받은 요청 payload를 고치지 않고 그대로 싣는다.</p>
 <h2 id="접수">접수</h2>
 <ul>
-<li>[ ] <strong>REF-ACCEPT-01</strong> 요청을 받으면 요청 payload 원문과 함께 PROCESSING 환불을 저장한다. 실행 ID(<code>executionId</code>, UUID)는 이때 정하고 바꾸지 않는다. 토스 호출은 접수 트랜잭션 밖에서 한다. 실행은 목적(<code>purpose</code>)별 처리 지점에서 시작한다. 그 목적의 실행이 아직 없으면 접수만 하고 결과를 보내지 않는다.</li>
+<li>[x] <strong>REF-ACCEPT-01</strong> 요청을 받으면 요청 payload 원문과 함께 PROCESSING 환불을 저장한다. 실행 ID(<code>executionId</code>, UUID)는 이때 정하고 바꾸지 않는다. 토스 호출은 접수 트랜잭션 밖에서 한다. 실행은 목적(<code>purpose</code>)별 처리 지점에서 시작한다. 그 목적의 실행이 아직 없으면 접수만 하고 결과를 보내지 않는다.</li>
 <li>[x] <strong>REF-ACCEPT-02</strong> 같은 <code>refundRequestId</code>·같은 본문을 다시 받으면 새 환불을 만들지 않는다. 저장된 결과가 있으면 같은 <code>resultVersion</code>·같은 payload로 다시 보낸다. 결과가 없으면 아무것도 보내지 않는다. 다른 본문이면 수신을 <code>REQUEST_CONFLICT</code>로 기록하고(받은 원문 보존) ERROR 로그를 남긴다. 결과는 보내지 않고, 원래 요청과 결과는 건드리지 않는다. 결과를 보내지 않는 이유는 Core가 원문과 다른 결과를 거부해 파티션이 막히기 때문이다(#389). (EC 39)</li>
-<li>[ ] <strong>REF-ACCEPT-03</strong> 같은 결제의 환불 합이 결제 금액을 넘는 요청은 FAILED(<code>OVER_REFUND</code>)다. 동시 요청이어도 한 건만 통과한다. 마지막 방어는 DB 제약 <code>payment.refunded_amount BETWEEN 0 AND amount</code>다. (EC 40)</li>
-<li>[ ] <strong>REF-ACCEPT-04</strong> 실행 전에 결제와 요청을 맞춰 보고, 맞지 않으면 돈을 움직이지 않고 FAILED다. 부분 취소가 안 되는 결제의 부분 환불은 <code>PARTIAL_NOT_ALLOWED</code>, 이 결제에 없는 판매자 주문은 <code>UNKNOWN_SELLER_ORDER</code>, 환불할 수 없는 결제 상태는 <code>NOT_REFUNDABLE</code>이다. (EC 43)</li>
+<li>[x] <strong>REF-ACCEPT-03</strong> 같은 결제의 환불 합이 결제 금액을 넘는 요청은 FAILED(<code>OVER_REFUND</code>)다. 동시 요청이어도 한 건만 통과한다. 마지막 방어는 DB 제약 <code>payment.refunded_amount BETWEEN 0 AND amount</code>다. (EC 40)</li>
+<li>[x] <strong>REF-ACCEPT-04</strong> 실행 전에 결제와 요청을 맞춰 보고, 맞지 않으면 돈을 움직이지 않고 FAILED다. 부분 취소가 안 되는 결제의 부분 환불은 <code>PARTIAL_NOT_ALLOWED</code>, 이 결제에 없는 판매자 주문은 <code>UNKNOWN_SELLER_ORDER</code>, 환불할 수 없는 결제 상태는 <code>NOT_REFUNDABLE</code>이다. (EC 43)</li>
 <li>[x] <strong>REF-ACCEPT-05</strong> 다음 경우는 돈을 움직이지 않고 FAILED로 저장해 보내고, ERROR 로그를 남긴다.</li>
 <li><code>orderRef</code>로 결제를 찾지 못함: <code>PAYMENT_NOT_FOUND</code></li>
 <li>요청에 <code>paymentId</code>가 없음: <code>PAYMENT_ID_REQUIRED</code></li>
@@ -36,19 +36,26 @@
 <p>일시적인 DB 장애만 offset을 넘기지 않고 계속 재시도한다. 그 밖의 예외는 횟수를 제한해 재시도한 뒤 DLT로 보낸다.</p>
 <h2 id="실행">실행</h2>
 <ul>
-<li>[ ] <strong>REF-EXEC-01</strong> 접수 커밋 직후 실행한다. 끝나지 못한 PROCESSING 환불은 스케줄러가 다시 집는다. 두 실행이 겹쳐도 멱등 키(refund_request_id)로 이중 환불이 없다. (EC 41)</li>
-<li>[ ] <strong>REF-EXEC-02</strong> 성공하면 한 트랜잭션에 다음을 기록한다.</li>
+<li>[x] <strong>REF-EXEC-01</strong> 접수 커밋 직후 실행한다. 끝나지 못한 PROCESSING 환불은 스케줄러가 다시 집는다. 두 실행이 겹쳐도 멱등 키(refund_request_id)로 이중 환불이 없다. (EC 41)</li>
+<li>[x] <strong>REF-EXEC-02</strong> 성공하면 한 트랜잭션에 다음을 기록한다.</li>
 <li>환불 SUCCEEDED</li>
 <li>결제 환불액과 상태(PARTIALLY_REFUNDED/REFUNDED)</li>
 <li>분개(<a href="ledger.html">LED-REFUND-01</a>)</li>
 <li><code>RefundResultRecorded</code>(SUCCEEDED, <code>refundedAmount</code> = 요청 금액)</li>
-<li>[ ] <strong>REF-EXEC-03</strong> 토스가 거절(4xx)하면 FAILED와 <code>RefundResultRecorded</code>(FAILED, <code>refundedAmount</code> 0)를 기록한다. (EC 42)</li>
-<li>[ ] <strong>REF-EXEC-04</strong> 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다.</li>
+<li>[x] <strong>REF-EXEC-03</strong> 토스가 거절(4xx)하면 FAILED와 <code>RefundResultRecorded</code>(FAILED, <code>refundedAmount</code> 0)를 기록한다. (EC 42)</li>
+<li>[x] <strong>REF-EXEC-04</strong> 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다.</li>
+<li>[x] <strong>REF-EXEC-05</strong> 쿠폰 등으로 실결제액이 0원인 항목의 고객 환불은 정상 요청이다. 전체 <code>amount</code>가 0이면 결제 상태만 확인하고(APPROVED·PARTIALLY_REFUNDED·REFUNDED가 아니면 FAILED <code>NOT_REFUNDABLE</code>), 토스 호출·분개·결제 변경 없이 SUCCEEDED(<code>refundedAmount</code> 0, 거래 키 없음)를 기록한다. 금액이 있는 요청의 0원 판매자 줄은 판매자 주문·누적 한도 검증과 <code>refund_item</code>에서 뺀다.</li>
+<li>[x] <strong>REF-EXEC-06</strong> 고객 환불의 조회 마감까지 취소 호출(<code>pg_call</code> CANCEL)이 모두 <code>NOT_SENT</code>면 돈이 나가지 않았으므로 FAILED(<code>PG_UNAVAILABLE</code>, <code>refundedAmount</code> 0)로 끝내 한도를 풀고 ERROR 로그를 한 번 남긴다. SUCCESS·DECLINED·UNKNOWN 호출이 하나라도 있으면 UNKNOWN으로 멈춰 사람이 확인한다. NotSent 뒤 처음 결과 불명이 되면 조회 마감을 그 시점부터 다시 잡는다.</li>
 </ul>
 <h2 id="시스템-보상과-늦은-승인">시스템 보상과 늦은 승인</h2>
 <ul>
-<li>[ ] <strong>REF-LATE-01</strong> <code>SYSTEM_COMPENSATION</code> 요청(사유 <code>LATE_APPROVAL</code>·<code>APPROVAL_UNKNOWN</code> 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 <code>late-{paymentId}</code>다. 중복 수신은 1건이다. (EC 28, 37)</li>
-<li>[ ] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다. 접수에서 실패한 행(<code>payment_id</code> 없음, <code>PAYMENT_NOT_FOUND</code>·<code>PAYMENT_ID_REQUIRED</code>·<code>PAYMENT_MISMATCH</code>·<code>COMPENSATION_IN_PROGRESS</code>)은 토스를 부른 적이 없으므로 이 전이를 허용하지 않는다.</li>
+<li>[x] <strong>REF-LATE-01</strong> <code>SYSTEM_COMPENSATION</code> 요청(사유 <code>LATE_APPROVAL</code>·<code>APPROVAL_UNKNOWN</code> 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 <code>late-{paymentId}</code>다. 중복 수신은 1건이다. (EC 28, 37)</li>
+<li>[x] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.</li>
+<li>시스템 보상의 결제 상태별·토스 조회 결과별 처리는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/386">#386</a>의 표를 따른다. 표 밖 경우는 다음과 같다.</li>
+<li>요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(<code>PAYMENT_MISMATCH</code>, <code>refundedAmount</code> 0)로 답한다.</li>
+<li>결제가 PARTIALLY_REFUNDED·REFUNDED면 토스 호출 없이 FAILED(<code>NOT_REFUNDABLE</code>, <code>refundedAmount</code> 0)로 답한다. 그 돈은 다른 환불의 결과라 SUCCEEDED로 보내지 않는다. 단, 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하지 않고 보류해 사람이 확인한다.</li>
+<li>APPROVED 결제는 결제 행 잠금 안에서 상태와 <code>refunded_amount = 0</code>을 다시 확인한다. 그 사이 환불이 반영됐으면 전액 취소를 보내지 않고 <code>NOT_REFUNDABLE</code>로 답한다. 토스에 갔을 수 있는 다른 환불이 있으면 끝날 때까지 기다린다.</li>
+<li>APPROVED 취소가 <code>ALREADY_CANCELED_PAYMENT</code>인데 토스 취소 내역에 이 보상의 취소가 없거나, 취소가 <code>NOT_CANCELABLE_PAYMENT</code>면 재시도하지 않고 결과를 보류해 사람이 확인한다. SUCCEEDED로 보내지 않는다.</li>
 </ul>
 <h2 id="결과-이벤트">결과 이벤트</h2>
 <ul>
@@ -61,6 +68,6 @@
 <li><code>nextActionAt</code>: null</li>
 <li><code>failureCode</code></li>
 </ul>
-<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>1d589c91b6904b745389a474761fd87f717729bbd691986b353f0fea296677be</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>aeeaad466a34610c7839d05980e6497d2724783ad092dd5ef3cd4cc12a5d67bb</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
