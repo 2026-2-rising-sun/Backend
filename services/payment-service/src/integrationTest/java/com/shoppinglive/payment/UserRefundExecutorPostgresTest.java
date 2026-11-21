@@ -305,6 +305,26 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName("[REF-ACCEPT-04] 0원 환불과 항목 합이 금액과 다른 요청은 토스를 부르지 않고 FAILED(NOT_REFUNDABLE)다")
+    void rejectsAmountsThatCannotSettle() throws Exception {
+        String zeroRef = newOrderRef();
+        long zeroPayment = approved(zeroRef, true);
+        Refund zero = receive(zeroRef, zeroPayment, zeroRef + "-S1", 0);
+        executor.execute(zero);
+        assertFailed(zero, "NOT_REFUNDABLE");
+
+        String mismatchRef = newOrderRef();
+        long mismatchPayment = approved(mismatchRef, true);
+        ObjectNode request = request(mismatchRef, mismatchPayment, "USER_REFUND");
+        ((ObjectNode) request.get("items").get(0)).put("amount", 3000);
+        Refund mismatch = intake.receive(copy(request)).orElseThrow();
+        executor.execute(mismatch);
+        assertFailed(mismatch, "NOT_REFUNDABLE");
+
+        verify(toss, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("[REF-EXEC-03] 토스가 거절하면 FAILED와 환불액 0 결과를 남긴다")
     void declined() throws Exception {
         String orderRef = newOrderRef();
