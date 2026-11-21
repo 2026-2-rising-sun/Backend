@@ -157,9 +157,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
 
     private String validate(Refund refund, Payment payment) {
         long amount = refund.getAmount();
-        if (payment.getPgPaymentKey() == null
-                || (payment.getStatus() != PaymentStatus.APPROVED
-                        && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED)) {
+        if (payment.getPgPaymentKey() == null || !refundable(payment.getStatus(), amount)) {
             return NOT_REFUNDABLE;
         }
         Map<String, Long> requested = sellerAmounts(refund.getRequestPayload());
@@ -201,6 +199,13 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             }
         }
         return null;
+    }
+
+    /** 유료 항목을 모두 환불해 REFUNDED가 된 뒤에도 0원 항목의 재고·쿠폰은 복원해야 하므로 0원만 REFUNDED를 허용한다. */
+    private static boolean refundable(PaymentStatus status, long amount) {
+        return status == PaymentStatus.APPROVED
+                || status == PaymentStatus.PARTIALLY_REFUNDED
+                || (amount == 0 && status == PaymentStatus.REFUNDED);
     }
 
     /** 토스에 갔을 수 있는 환불. 취소 내역이 있으면 반영하고, 없으면 마감 전까지 같은 멱등 키·본문으로 다시 요청한다. */
