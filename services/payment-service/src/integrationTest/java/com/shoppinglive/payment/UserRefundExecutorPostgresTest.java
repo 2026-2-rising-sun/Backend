@@ -26,6 +26,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -61,6 +63,13 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
 
     @Autowired UserRefundExecutor executor;
     @MockitoBean TossPaymentsClient toss;
+
+    /** retryDue는 스키마 전체의 due 행을 집으므로 앞 테스트가 남긴 행을 대상에서 뺀다. */
+    @BeforeEach
+    void clearDueRefunds() {
+        jdbc.update(
+                "UPDATE refund SET next_attempt_at = NULL WHERE status IN ('PROCESSING', 'UNKNOWN')");
+    }
 
     private String key(String orderRef) {
         return "pk-" + orderRef;
@@ -588,12 +597,69 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
         executor.execute(refund);
 
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "PROCESSING");
-        assertThat(refund(refund.getRefundRequestId()).get("check_deadline_at")).isNull();
+        assertThat(refund(refund.getRefundRequestId()).get("check_deadline_at")).isNotNull();
 
         makeDue(refund);
         executor.retryDue();
 
         verify(toss, never()).getPayment(any());
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-04] 선점이 지난 뒤 늦게 온 NotSent는 다른 실행이 잡은 UNKNOWN 예약을 풀지 않는다")
+    void lateNotSentKeepsNewerReservation() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
+        AtomicInteger calls = new AtomicInteger();
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenAnswer(
+                        call -> {
+                            if (calls.incrementAndGet() == 2) {
+                                return new TossResult.Unknown("시간 초과");
+                            }
+                            // 첫 실행이 선점 시간을 넘겨 멈춘 사이 재처리가 같은 환불을 다시 요청한다
+                            makeDue(refund);
+                            executor.retryDue();
+                            return new TossResult.NotSent("연결 실패");
+                        });
+
+        executor.execute(refund);
+
+        assertThat(calls).hasValue(2);
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("check_deadline_at")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] NotSent가 첫 시도의 조회 마감을 넘기면 재요청 없이 멈추고 FAILED로 단정하지 않으며 한도를 계속 잡는다")
+    void notSentStopsAtFirstDeadline() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.NotSent("연결 실패"));
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
+        executor.execute(refund);
+        Object firstDeadline = refund(refund.getRefundRequestId()).get("check_deadline_at");
+        assertThat(firstDeadline).isNotNull();
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+        makeDue(refund);
+
+        executor.retryDue();
+
+        verify(toss, times(1)).cancel(any(), any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        executor.execute(other);
+        assertFailed(other, "OVER_REFUND");
     }
 }
