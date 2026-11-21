@@ -125,6 +125,25 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             nativeQuery = true)
     int markCanceled(@Param("id") long id);
 
+    /**
+     * 환불 반영. 승인된 결제이고 누적 환불액이 결제 금액을 넘지 않을 때만 더한다. 0이면 호출자가 다시 읽어 판단한다. SET의 {@code
+     * refunded_amount}는 바뀌기 전 값이다.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE payment
+                       SET refunded_amount = refunded_amount + :amount,
+                           status = CASE WHEN refunded_amount + :amount = amount THEN 'REFUNDED'
+                                         ELSE 'PARTIALLY_REFUNDED' END,
+                           updated_at = now()
+                     WHERE id = :id AND status IN ('APPROVED', 'PARTIALLY_REFUNDED')
+                       AND refunded_amount + :amount <= amount
+                    """,
+            nativeQuery = true)
+    int applyRefund(@Param("id") long id, @Param("amount") long amount);
+
     // ---- 복구·만료(#349). 아래 SQL은 PostgreSQL 전용이고 테스트도 @Tag("postgres")다 ----
 
     /** APPROVING 정체 → UNKNOWN, 바로 조회. 바깥 조건을 다시 걸어 동시 실행·새 승인 시도를 옮기지 않는다(PAY-RECOVER-01). */

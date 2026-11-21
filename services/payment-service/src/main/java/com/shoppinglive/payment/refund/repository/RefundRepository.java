@@ -83,6 +83,23 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("now") Instant now,
             @Param("leaseUntil") Instant leaseUntil);
 
+    /**
+     * 토스에 취소가 갔을 수 있는 상태로 표시한다. 조회 마감은 처음 한 번만 정한다. 0이면 이미 확정됐다. 혼자 불리면 자기 트랜잭션으로 커밋해 토스 호출 전에 남는다.
+     */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET status = 'UNKNOWN',
+                           check_deadline_at = COALESCE(check_deadline_at, :deadline),
+                           updated_at = now()
+                     WHERE id = :id AND status IN ('PROCESSING','UNKNOWN')
+                    """,
+            nativeQuery = true)
+    int markUnknown(@Param("id") long id, @Param("deadline") Instant deadline);
+
     /** 결과 기록. 읽은 상태·버전 그대로일 때만 바꾼다. 0이면 다른 반영이 먼저 했다. */
     @Modifying(clearAutomatically = true)
     @Query(
