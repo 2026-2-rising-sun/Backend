@@ -48,8 +48,8 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 - 시스템 보상의 결제 상태별·토스 조회 결과별 처리는 [#386](https://github.com/2026-2-rising-sun/Backend/issues/386)의 표를 따른다. 표 밖 경우는 다음과 같다.
   - 요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(`PAYMENT_MISMATCH`, `refundedAmount` 0)로 답한다.
   - 결제가 PARTIALLY_REFUNDED·REFUNDED면 토스 호출 없이 FAILED(`NOT_REFUNDABLE`, `refundedAmount` 0)로 답한다. 그 돈은 다른 환불의 결과라 SUCCEEDED로 보내지 않는다. 단, 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하지 않고 보류해 사람이 확인한다.
-  - APPROVED 결제에 토스에 갔을 수 있는 다른 환불이 있으면 결제 행 잠금 안에서 확인해, 그 환불이 끝날 때까지 전액 취소를 보내지 않는다.
-  - APPROVED 취소가 `ALREADY_CANCELED_PAYMENT`인데 토스 취소 내역에 이 보상의 취소가 없으면 다른 환불의 취소로 보고 반영하지 않는다. 그 환불이 결제에 반영되면 `NOT_REFUNDABLE`로 끝난다.
+  - APPROVED 결제는 결제 행 잠금 안에서 상태와 `refunded_amount = 0`을 다시 확인한다. 그 사이 환불이 반영됐으면 전액 취소를 보내지 않고 `NOT_REFUNDABLE`로 답한다. 토스에 갔을 수 있는 다른 환불이 있으면 끝날 때까지 기다린다.
+  - APPROVED 취소가 `ALREADY_CANCELED_PAYMENT`인데 토스 취소 내역에 이 보상의 취소가 없거나, 취소가 `NOT_CANCELABLE_PAYMENT`면 재시도하지 않고 결과를 보류해 사람이 확인한다. SUCCEEDED로 보내지 않는다.
 
 ## 결과 이벤트
 
