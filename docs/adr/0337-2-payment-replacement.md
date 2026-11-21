@@ -12,8 +12,8 @@
 
 - 새 설계를 기준으로 Payment 코드·DB·API·이벤트 계약을 교체한다. 기존 동작과 호환을 맞추지 않는다.
 - 첫 PR에서 기존 결제 코드를 지운다. 이미 적용된 마이그레이션 V1–V3는 고치지 않고, 새 V4가 기존 결제 테이블을 지운 뒤 새 테이블을 만든다. `event_outbox`(V2·V3)는 공통 outbox가 쓰므로 남긴다.
-- API 경로(`/v1/internal/payments`, `/v1/internal/refunds`)와 토픽 이름(`payment.execution-results.v1`, `payment.refund-results.v1`)은 유지하고 내용을 새 계약으로 바꾼다.
-  - 정정(2026-11-21): 고객 환불은 HTTP `/v1/internal/refunds`가 아니라 Kafka `commerce.refund.requests.v1`(`purpose: USER_REFUND`)로 받는다. Payment 내부 API는 `/v1/internal/payments`만 남는다. 토픽 이름은 점 표기로 통일한다. 결과 토픽은 `payment.execution.results.v1`, `payment.refund.results.v1`이다(#384, #385).
+- ~~API 경로(`/v1/internal/payments`, `/v1/internal/refunds`)와 토픽 이름(`payment.execution-results.v1`, `payment.refund-results.v1`)은 유지하고 내용을 새 계약으로 바꾼다.~~ (대체됨: 아래 정정)
+  - 정정(2026-11-21): 고객 환불은 HTTP `/v1/internal/refunds`가 아니라 Kafka `commerce.refund.requests.v1`(`purpose: USER_REFUND`)로 받는다. Payment 내부 API는 `/v1/internal/payments`만 남는다. 토픽 이름은 점 표기로 통일한다. 결과 토픽은 `payment.execution.results.v1`, `payment.refund.results.v1`이다(#384, #385). Core #378이 승인 결과의 점·하이픈 토픽을 함께 소비하는 것은 Payment가 점 표기로 옮기는 동안의 임시 공존이다.
 - 대안: 새 경로·새 토픽(v2)으로 공존시킨 뒤 기존을 지움. 아키텍처를 새로 설계하므로 공존 비용만 늘어 택하지 않았다.
 
 ## 영향

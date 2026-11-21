@@ -154,7 +154,10 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             nativeQuery = true)
     List<Refund> findHoldingLimit(@Param("paymentId") long paymentId, @Param("id") long id);
 
-    /** 결과 기록. 읽은 상태·버전 그대로일 때만 바꾼다. 0이면 다른 반영이 먼저 했다. */
+    /**
+     * 결과 기록. 읽은 상태·버전 그대로이고 허용된 전이일 때만 바꾼다. FAILED 뒤 변경은 돈이 움직였을 수 있는 시스템 보상만 가능하고, 접수에서 실패한 행은 토스를
+     * 부른 적이 없어 제외한다(REF-LATE-02). 0이면 바꿀 수 없거나 다른 반영이 먼저 했다.
+     */
     @Modifying(clearAutomatically = true)
     @Query(
             value =
@@ -167,6 +170,13 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
                                                          pg_transaction_key),
                            next_attempt_at = NULL, updated_at = now()
                      WHERE id = :id AND status = :previousStatus AND result_version = :previousVersion
+                       AND (status IN ('PROCESSING', 'UNKNOWN')
+                            OR (status = 'FAILED'
+                                AND purpose = 'SYSTEM_COMPENSATION'
+                                AND :status IN ('SUCCEEDED', 'NO_CHARGE')
+                                AND payment_id IS NOT NULL
+                                AND failure_code NOT IN ('PAYMENT_NOT_FOUND', 'PAYMENT_ID_REQUIRED',
+                                                         'PAYMENT_MISMATCH', 'COMPENSATION_IN_PROGRESS')))
                     """,
             nativeQuery = true)
     int recordResult(

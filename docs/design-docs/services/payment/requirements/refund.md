@@ -62,4 +62,4 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
   - `nextActionAt`: null
   - `failureCode`
 
-  다시 보낼 때 payload는 처음과 같아야 하므로 `resolvedAt`은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.
+  다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(`resolvedAt` 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.

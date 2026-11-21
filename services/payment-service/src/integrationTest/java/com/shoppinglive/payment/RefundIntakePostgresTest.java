@@ -5,11 +5,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -249,6 +255,110 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
                                         "UPDATE payment SET refunded_amount = amount + 1 WHERE id = ?",
                                         paymentId))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-02] 같은 요청을 동시에 받아도 환불은 1건이고 한 수신만 실행으로 넘어간다")
+    void concurrentSameRequest() throws Exception {
+        String orderRef = newOrderRef();
+        ObjectNode request = request(orderRef, newPayment(orderRef), "USER_REFUND");
+
+        List<Boolean> accepted = concurrently(12, i -> intake.receive(copy(request)).isPresent());
+
+        assertThat(accepted).containsOnlyOnce(true);
+        assertThat(refundCount(request.get("refundRequestId").asText())).isEqualTo(1);
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-02] 실패로 끝나는 같은 요청을 동시에 받으면 환불은 1건이고 결과는 모두 같은 payload다")
+    void concurrentSameFailedRequest() throws Exception {
+        String orderRef = newOrderRef();
+        ObjectNode request = request(orderRef, 7001L, "USER_REFUND");
+
+        concurrently(12, i -> intake.receive(copy(request)).isPresent());
+
+        assertThat(refundCount(request.get("refundRequestId").asText())).isEqualTo(1);
+        List<JsonNode> results = results(orderRef);
+        assertThat(results).hasSize(12);
+        assertThat(results)
+                .extracting(e -> e.get("payload"))
+                .containsOnly(results.getFirst().get("payload"));
+        assertThat(results).extracting(e -> e.get("eventId").asText()).doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-02] 같은 요청 ID의 다른 본문이 동시에 오면 한 본문만 접수하고 나머지는 충돌로 기록한다")
+    void concurrentDifferentBodies() throws Exception {
+        String orderRef = newOrderRef();
+        ObjectNode first = request(orderRef, newPayment(orderRef), "USER_REFUND");
+        ObjectNode second = (ObjectNode) copy(first);
+        second.put("requestedAt", "2026-11-21T01:00:00Z");
+
+        concurrently(12, i -> intake.receive(copy(i % 2 == 0 ? first : second)).isPresent());
+
+        String id = first.get("refundRequestId").asText();
+        assertThat(refundCount(id)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM refund_request_conflict WHERE refund_request_id = ?",
+                                Integer.class,
+                                id))
+                .isEqualTo(6);
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-06] 같은 결제의 서로 다른 시스템 보상이 동시에 오면 1건만 진행 중이고 나머지는 FAILED다")
+    void concurrentCompensations() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = newPayment(orderRef);
+
+        List<Boolean> accepted =
+                concurrently(
+                        12,
+                        i ->
+                                intake.receive(request(orderRef, paymentId, "SYSTEM_COMPENSATION"))
+                                        .isPresent());
+
+        assertThat(accepted).containsOnlyOnce(true);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM refund WHERE payment_id = ? AND status = 'PROCESSING'",
+                                Integer.class,
+                                paymentId))
+                .isEqualTo(1);
+        List<JsonNode> results = results(orderRef);
+        assertThat(results).hasSize(11);
+        assertThat(results)
+                .extracting(e -> e.at("/payload/failureCode").asText())
+                .containsOnly("COMPENSATION_IN_PROGRESS");
+    }
+
+    private interface Receive {
+        boolean run(int index) throws Exception;
+    }
+
+    private static List<Boolean> concurrently(int count, Receive receive) throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService pool = Executors.newFixedThreadPool(count)) {
+            List<Future<Boolean>> calls = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                int index = i;
+                calls.add(
+                        pool.submit(
+                                () -> {
+                                    start.await();
+                                    return receive.run(index);
+                                }));
+            }
+            start.countDown();
+            List<Boolean> values = new ArrayList<>();
+            for (Future<Boolean> call : calls) {
+                values.add(call.get(60, TimeUnit.SECONDS));
+            }
+            return values;
+        }
     }
 
     private JsonNode single(String orderRef) throws Exception {

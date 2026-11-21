@@ -186,7 +186,7 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
   .flow-card { padding: 4px 14px 14px; }
 }
 </style>
-<!-- md-sha256: 59667c8732f0ad6aa5b64270117d942ace2aeb65fd4aacb931abbfb09bff60c6 -->
+<!-- md-sha256: 41ff0cfe57af7df65c5103a251e9ffb68a596c9e1e788c7c74381c7aec233d31 -->
 </head>
 <body>
 <a href="design.md">MD 원본</a>
@@ -2062,7 +2062,7 @@ CREATE INDEX ix_settlement_pending ON settlement_item(seller_id, scheduled_date)
 <tbody>
 <tr><td>판매자별 금액 합 = 결제 금액</td><td>결제 생성</td><td>합이 다르면 400 <code>SUM_MISMATCH</code></td></tr>
 <tr><td>분개 하나의 차변 합 = 대변 합</td><td><code>Journal.of(...)</code> 생성자</td><td>안 맞으면 예외, 저장 안 됨</td></tr>
-<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 FAILED(<code>OVER_REFUND</code>)</td></tr>
+<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 결과 이벤트 FAILED(<code>OVER_REFUND</code>)</td></tr>
 <tr><td>구매확정 판매 금액 = 판매자 주문 금액 − 성공한 환불 합</td><td>구매확정 처리. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠근다</td><td>4,000원 환불 후 확정하면 NORMAL 항목은 6,000원</td></tr>
 <tr><td>확정 시점에 진행 중(PROCESSING·UNKNOWN)이던 환불이 나중에 성공하면 역정산</td><td>환불 성공 반영. 같은 <code>payment</code> 행 잠금 아래에서 그 판매자 주문의 NORMAL 항목이 있으면 REVERSAL 추가</td><td>확정과 환불 성공이 동시에 와도 둘 중 하나만 금액을 반영</td></tr>
 <tr><td>수수료 = <code>floor(판매 금액 × commission_rate)</code>(원 미만 버림), 지급 = 판매 − 수수료. 역정산 수수료 = <code>floor(환불 전 남은 판매 × rate) − floor(환불 후 남은 판매 × rate)</code>(음수로 기록)</td><td>정산 항목 생성</td><td>10,000원 · 0.1 → 수수료 1,000. 3,333원과 6,667원을 나눠 환불하면 역정산 수수료 −334(1,000 − floor(666.7)), −666 → 합 −1,000. 전액 환불 뒤 수수료가 정확히 0</td></tr>
@@ -2751,10 +2751,10 @@ stateDiagram-v2
 <tr><td>38</td><td>대사에서 "토스 DONE · 우리 CANCELED" 발견</td><td>APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불)</td><td>거래 대사</td><td><a href="#f12">12</a></td></tr>
 <tr><th colspan="5">환불</th></tr>
 <tr><td>39</td><td>환불 요청 중복(이벤트 재전달·재시도)</td><td>1번만 실행</td><td><code>refund_request_id</code> UNIQUE · <code>ON CONFLICT DO NOTHING</code></td><td><a href="#f7">7</a></td></tr>
-<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 FAILED(<code>OVER_REFUND</code>)</td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
+<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 결과 이벤트 FAILED(<code>OVER_REFUND</code>)</td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
 <tr><td>41</td><td>환불 호출 타임아웃</td><td>UNKNOWN → 조회. 이중 환불 없음</td><td>토스 멱등키 = <code>refund_request_id</code></td><td><a href="#f7">7</a></td></tr>
 <tr><td>42</td><td>환불 실패(토스 4xx)</td><td>"환불 실패됨" → 운영자</td><td>이벤트 + 거래 대사</td><td><a href="#f7">7</a></td></tr>
-<tr><td>43</td><td>부분 취소가 안 되는 결제수단에 부분 환불</td><td>409 <code>PARTIAL_NOT_ALLOWED</code></td><td><code>partial_cancelable</code></td><td><a href="#f7">7</a></td></tr>
+<tr><td>43</td><td>부분 취소가 안 되는 결제수단에 부분 환불</td><td>결과 이벤트 FAILED(<code>PARTIAL_NOT_ALLOWED</code>)</td><td><code>partial_cancelable</code></td><td><a href="#f7">7</a></td></tr>
 <tr><th colspan="5">재고 · 쿠폰 정합성</th></tr>
 <tr><td>44</td><td>늦은 승인 환불 때 재고</td><td>변화 없음(이미 반환됨)</td><td>환불 사유로 분기</td><td><a href="#checkout">주문</a></td></tr>
 <tr><td>45</td><td>재고 카운터와 예약 행이 어긋남(버그)</td><td>알림. 자동 수정 안 함</td><td>정기 점검 <code>reserved = SUM(HELD)</code></td><td><a href="#checkout">주문</a></td></tr>

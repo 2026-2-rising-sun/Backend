@@ -3,6 +3,9 @@ package com.shoppinglive.payment.refund.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -99,19 +102,25 @@ public final class RefundRequestParser {
         require(
                 !purpose.equals("USER_REFUND") || reason.equals("CUSTOMER_REQUEST"),
                 "고객 환불의 reason은 CUSTOMER_REQUEST입니다.");
+        require(
+                !purpose.equals("SYSTEM_COMPENSATION") || !reason.equals("CUSTOMER_REQUEST"),
+                "시스템 보상의 reason은 CUSTOMER_REQUEST일 수 없습니다.");
         require("KRW".equals(payload.path("currency").asText()), "currency가 KRW가 아닙니다.");
-        require(payload.path("requestedAt").isTextual(), "requestedAt이 문자열이 아닙니다.");
+        require(isTimestamp(payload.path("requestedAt")), "requestedAt이 시각이 아닙니다.");
         require(isMoney(payload.path("amount")), "amount가 0 이상 정수가 아닙니다.");
         if (payload.has("paymentId")) {
             require(isPositiveId(payload.get("paymentId")), "paymentId가 양의 정수가 아닙니다.");
         }
-        requireItems(payload.path("items"));
+        requireItems(payload.path("items"), payload.path("amount").longValue());
         return payload;
     }
 
-    /** Core가 결과의 items를 정규화할 때 요구하는 모양이다. */
-    private static void requireItems(JsonNode items) {
+    /** Core가 결과의 items를 정규화할 때 요구하는 모양과 합계다. 0원 항목은 정상이다. */
+    private static void requireItems(JsonNode items, long amount) {
         require(items.isArray() && !items.isEmpty() && items.size() <= 100, "items 개수가 다릅니다.");
+        Set<String> sellerNumbers = new HashSet<>();
+        Set<Long> orderItemIds = new HashSet<>();
+        long total = 0;
         for (JsonNode seller : items) {
             require(hasExactly(seller, SELLER_ITEM), "판매자 항목 필드가 다릅니다.");
             String number = seller.path("sellerOrderNumber").asText();
@@ -120,11 +129,13 @@ public final class RefundRequestParser {
                             && !number.isEmpty()
                             && number.length() <= 64,
                     "sellerOrderNumber 형식이 다릅니다.");
+            require(sellerNumbers.add(number), "sellerOrderNumber가 중복됩니다.");
             require(isMoney(seller.path("amount")), "판매자 항목 금액이 다릅니다.");
             JsonNode orderItems = seller.path("orderItems");
             require(
                     orderItems.isArray() && !orderItems.isEmpty() && orderItems.size() <= 100,
                     "orderItems 개수가 다릅니다.");
+            long sellerTotal = 0;
             for (JsonNode item : orderItems) {
                 require(hasExactly(item, ORDER_ITEM), "주문 항목 필드가 다릅니다.");
                 require(isPositiveId(item.path("orderItemId")), "orderItemId가 양의 정수가 아닙니다.");
@@ -132,7 +143,30 @@ public final class RefundRequestParser {
                         item.path("quantity").isInt() && item.path("quantity").intValue() >= 1,
                         "quantity가 1 이상 정수가 아닙니다.");
                 require(isMoney(item.path("amount")), "주문 항목 금액이 다릅니다.");
+                require(
+                        orderItemIds.add(item.path("orderItemId").longValue()),
+                        "orderItemId가 중복됩니다.");
+                sellerTotal = add(sellerTotal, item.path("amount").longValue());
             }
+            require(sellerTotal == seller.path("amount").longValue(), "판매자 금액과 항목 합계가 다릅니다.");
+            total = add(total, sellerTotal);
+        }
+        require(total == amount, "요청 금액과 판매자 합계가 다릅니다.");
+    }
+
+    private static long add(long left, long right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException e) {
+            throw new InvalidRefundRequestException("금액 합계가 범위를 넘습니다.", e);
+        }
+    }
+
+    private static boolean isTimestamp(JsonNode node) {
+        try {
+            return node.isTextual() && Instant.parse(node.asText()) != null;
+        } catch (DateTimeParseException e) {
+            return false;
         }
     }
 
