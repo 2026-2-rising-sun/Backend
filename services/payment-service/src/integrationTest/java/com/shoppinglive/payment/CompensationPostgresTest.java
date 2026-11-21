@@ -210,6 +210,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         makeDue(refund);
         retryJob.run();
         assertHeld(c, refund);
+        verify(toss, times(2)).getPayment(c.paymentKey());
     }
 
     @Test
@@ -278,6 +279,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         intake.execute(refund);
 
         assertHeld(c, refund);
+        verify(toss, times(1))
+                .cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId()));
     }
 
     @Test
@@ -302,6 +305,26 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
                 .cancel(eq(c.paymentKey()), reason.capture(), eq("cancel-" + c.pgOrderId()));
         assertThat(reason.getAllValues().get(0)).isEqualTo(reason.getAllValues().get(1));
         assertThat(journals(c.orderRef())).isZero();
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 경합에서 기존 compensate가 409를 받아도 사람 확인 로그 없이 SUCCEEDED 한 번으로 끝난다")
+    void compensateConflictIsNotHumanCheck(CapturedOutput output) throws Exception {
+        ApproveCommand c = newPayment();
+        ApprovalService.Attempt attempt = (ApprovalService.Attempt) approvalService.start(c);
+        tossQuery(c, new TossResult.Success(done(c)));
+        when(toss.cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId())))
+                .thenReturn(new TossResult.Success(withStatus(c, "CANCELED")))
+                .thenReturn(new TossResult.Unknown("HTTP 409 IDEMPOTENT_REQUEST_PROCESSING", 409));
+        when(toss.confirm(eq(c.paymentKey()), eq(c.pgOrderId()), eq(c.amount()), anyString()))
+                .thenReturn(new TossResult.Success(done(c)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        approvalService.process(attempt);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertThat(output.getAll()).doesNotContain("보상 취소가 확정되지 않았다");
     }
 
     @Test
@@ -376,6 +399,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         intake.execute(refund);
 
         assertHeld(c, refund);
+        verify(toss).getPayment(c.paymentKey());
         assertThat(status(c.orderRef())).isEqualTo("APPROVED");
         assertThat(refundJournals(refund)).isZero();
     }

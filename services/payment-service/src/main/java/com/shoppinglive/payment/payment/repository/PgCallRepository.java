@@ -18,8 +18,8 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
         Instant getFirstRequestedAt();
     }
 
-    boolean existsByIdempotencyKeyAndOutcomeIn(
-            String idempotencyKey, Collection<PgCallOutcome> outcomes);
+    boolean existsByPaymentIdAndIdempotencyKeyAndOutcomeIn(
+            Long paymentId, String idempotencyKey, Collection<PgCallOutcome> outcomes);
 
     @Query(
             """

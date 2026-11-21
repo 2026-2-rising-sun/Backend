@@ -200,8 +200,10 @@ class SystemCompensationExecutor implements CompensationExecutor {
     /** 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하면 안 된다. */
     private void failAlreadyRefunded(Refund refund, Payment payment) {
         ConfirmAttempt attempt = pgCalls.findLatestConfirmAttempt(payment.getId()).orElseThrow();
-        if (pgCalls.existsByIdempotencyKeyAndOutcomeIn(
-                cancelKey(attempt), List.of(PgCallOutcome.SUCCESS, PgCallOutcome.UNKNOWN))) {
+        if (pgCalls.existsByPaymentIdAndIdempotencyKeyAndOutcomeIn(
+                payment.getId(),
+                cancelKey(attempt),
+                List.of(PgCallOutcome.SUCCESS, PgCallOutcome.UNKNOWN))) {
             holdForHuman(refund, "보상 취소가 토스에 닿았을 수 있는데 결제에 다른 환불이 반영됐다");
             return;
         }

@@ -35,6 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class PaymentOutcomeService {
     private static final Logger log = LoggerFactory.getLogger(PaymentOutcomeService.class);
     public static final String COMPENSATION_REASON = "승인 응답 불일치";
+    private static final String IDEMPOTENT_REQUEST_PROCESSING = "IDEMPOTENT_REQUEST_PROCESSING";
 
     private final PaymentRepository payments;
     private final PgCallRepository pgCalls;
@@ -192,7 +193,11 @@ public class PaymentOutcomeService {
                             record(callId, result);
                             return payments.findById(paymentId).orElseThrow();
                         });
-        if (!(result instanceof TossResult.Success)) {
+        if (result instanceof TossResult.Unknown unknown
+                && unknown.reason().endsWith(IDEMPOTENT_REQUEST_PROCESSING)) {
+            // 같은 키의 다른 호출이 처리 중이고 그쪽이 결과를 책임진다. 시스템 보상은 재조회로 확정한다
+            log.warn("같은 키의 보상 취소가 처리 중이다: paymentId={}", paymentId);
+        } else if (!(result instanceof TossResult.Success)) {
             // 감수: DB는 CANCELED인데 토스 결제는 남았을 수 있다. 자동 재시도 없이 사람이 확인한다
             log.error(
                     "[사람 확인 필요] 보상 취소가 확정되지 않았다: paymentId={}, orderRef={}, paymentKey={}, amount={}, result={}",
