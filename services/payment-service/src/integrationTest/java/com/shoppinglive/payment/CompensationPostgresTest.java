@@ -546,6 +546,27 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertRefunded(c, refund);
     }
 
+    @Test
+    @DisplayName("[REF-LATE-01][REF-EXEC-05] 끝난 0원 고객 환불은 APPROVED 보상을 막지 않는다")
+    void zeroUserRefundDoesNotBlockApproved() throws Exception {
+        ApproveCommand c = approved();
+        Refund zero = receive(c);
+        jdbc.update(
+                "UPDATE refund SET purpose = 'USER_REFUND', status = 'SUCCEEDED', amount = 0,"
+                        + " result_version = 1, result_payload = '{}', resolved_at = now(),"
+                        + " next_attempt_at = NULL WHERE id = ?",
+                zero.getId());
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
     private ApproveCommand approved() {
         ApproveCommand c = newPayment();
