@@ -40,6 +40,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 - [x] **REF-EXEC-03** 토스가 거절(4xx)하면 FAILED와 `RefundResultRecorded`(FAILED, `refundedAmount` 0)를 기록한다. (EC 42)
 - [x] **REF-EXEC-04** 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다.
 - [x] **REF-EXEC-05** 쿠폰 등으로 실결제액이 0원인 항목의 고객 환불은 정상 요청이다. 전체 `amount`가 0이면 결제 상태만 확인하고(APPROVED·PARTIALLY_REFUNDED·REFUNDED가 아니면 FAILED `NOT_REFUNDABLE`), 토스 호출·분개·결제 변경 없이 SUCCEEDED(`refundedAmount` 0, 거래 키 없음)를 기록한다. 금액이 있는 요청의 0원 판매자 줄은 판매자 주문·누적 한도 검증과 `refund_item`에서 뺀다.
+- [x] **REF-EXEC-06** 고객 환불의 조회 마감까지 취소 호출(`pg_call` CANCEL)이 모두 `NOT_SENT`면 돈이 나가지 않았으므로 FAILED(`PG_UNAVAILABLE`, `refundedAmount` 0)로 끝내 한도를 풀고 ERROR 로그를 한 번 남긴다. SUCCESS·DECLINED·UNKNOWN 호출이 하나라도 있으면 UNKNOWN으로 멈춰 사람이 확인한다. NotSent 뒤 처음 결과 불명이 되면 조회 마감을 그 시점부터 다시 잡는다.
 
 ## 시스템 보상과 늦은 승인
 

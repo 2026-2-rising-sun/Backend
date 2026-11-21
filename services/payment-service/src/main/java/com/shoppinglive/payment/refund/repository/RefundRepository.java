@@ -145,6 +145,35 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             nativeQuery = true)
     int releaseUnknown(@Param("id") long id, @Param("attemptCount") int attemptCount);
 
+    /** NotSent만 있던 환불이 처음 결과 불명이 된 시점부터 조회 시간을 온전히 쓰게 마감을 다시 잡는다. 다른 실행이 선점했으면 0이다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET check_deadline_at = :deadline, updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int restartDeadline(
+            @Param("id") long id,
+            @Param("attemptCount") int attemptCount,
+            @Param("deadline") Instant deadline);
+
+    /**
+     * 이 실행의 선점이 살아 있는지 확인하며 트랜잭션 끝까지 행을 잠근다. 재요청 기록과 NOT_SENT 종료 판단이 서로 끼어들지 못한다. 0이면 다른 실행이 선점했거나
+     * 이미 확정됐다.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET updated_at = now()
+                     WHERE id = :id AND status = 'UNKNOWN' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int holdAttempt(@Param("id") long id, @Param("attemptCount") int attemptCount);
+
     /** 조회 마감이 지난 UNKNOWN을 재처리에서 뺀다. 1행일 때만 호출자가 알림 로그를 남겨 여러 인스턴스에서도 한 번이다. */
     @Transactional
     @Modifying(clearAutomatically = true)

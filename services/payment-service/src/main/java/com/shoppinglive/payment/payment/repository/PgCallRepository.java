@@ -1,6 +1,7 @@
 package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.PgCall;
+import com.shoppinglive.payment.payment.entity.PgCallKind;
 import com.shoppinglive.payment.payment.entity.PgCallOutcome;
 import java.time.Instant;
 import java.util.Collection;
@@ -32,6 +33,12 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
              GROUP BY c.pgOrderId
             """)
     Optional<ConfirmAttempt> findLatestConfirmAttempt(@Param("paymentId") long paymentId);
+
+    long countByPaymentIdAndKindAndIdempotencyKey(
+            Long paymentId, PgCallKind kind, String idempotencyKey);
+
+    long countByPaymentIdAndKindAndIdempotencyKeyAndOutcome(
+            Long paymentId, PgCallKind kind, String idempotencyKey, PgCallOutcome outcome);
 
     /** 호출 전에 UNKNOWN으로 넣은 행에 결과를 한 번만 채운다. httpStatus는 응답을 받지 못했으면 null이다. */
     @Modifying
