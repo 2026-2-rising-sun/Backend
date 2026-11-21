@@ -13,6 +13,7 @@
 - Payment는 상태 변경과 같은 트랜잭션에서 공통 outbox에 이벤트를 쓴다. 받는 쪽은 업무 키(UNIQUE·조건부 UPDATE)로 한 번만 반영한다.
 - Payment는 "토스에서 승인됐다"는 사실만 알린다. 주문을 결제 완료로 바꿀지 환불할지는 주문 상태를 가진 Commerce가 판단한다(코레오그래피 Saga).
 - 늦은 승인은 Commerce가 `RefundRequested`(사유 LATE_APPROVAL)를 보내고 Payment가 전액 환불한다.
+  - 정정(2026-11-21): 고객 환불과 시스템 보상(늦은 승인·승인 결과 불명)은 모두 `commerce.refund.requests.v1`의 `RefundRequested` 하나로 오고 `purpose`(USER_REFUND·SYSTEM_COMPENSATION)로 구분한다. Payment는 `payment.refund.results.v1`의 `RefundResultRecorded`로 답한다. 결과에는 받은 요청 payload를 그대로 싣고 확정 결과(SUCCEEDED·FAILED·NO_CHARGE)만 보낸다. UNKNOWN은 보내지 않는다. 같은 `refundRequestId`에 다른 본문이 오면 결과를 보내지 않는다. 원문과 다른 결과를 Core가 거부하면 파티션이 막히기 때문이다. 필드 의미는 [결과 계약](../../contracts/events/payment-refund-results.yaml)과 [환불 요구사항](../design-docs/services/payment/requirements/refund.md)에 있다(#384).
 - Payment는 주문 만료·취소 이벤트를 구독하지 않는다. 자기 만료 시각으로 CREATED 결제를 닫는다.
 - 대안: 오케스트레이터 또는 Payment가 주문 상태를 판단. 판단 주체가 둘이 되어 택하지 않았다.
 
