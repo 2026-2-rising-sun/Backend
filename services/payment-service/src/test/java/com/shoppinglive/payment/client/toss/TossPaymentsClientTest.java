@@ -99,6 +99,37 @@ class TossPaymentsClientTest {
     }
 
     @Test
+    @DisplayName("[REF-EXEC-04] 조회 응답의 취소 내역(거래 키·사유·금액·상태)을 읽고, 내역이 없으면 빈 목록이다")
+    void readsCancels() {
+        server.expect(requestTo(BASE + "/v1/payments/pk-1"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {"paymentKey":"pk-1","orderId":"o-1","status":"PARTIAL_CANCELED",
+                                 "totalAmount":30000,"isPartialCancelable":true,
+                                 "cancels":[{"transactionKey":"tx-1","cancelReason":"고객 환불 r-1",
+                                 "cancelAmount":4000,"cancelStatus":"DONE","refundableAmount":26000}]}
+                                """,
+                                MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/payments/pk-2"))
+                .andRespond(
+                        withSuccess(
+                                """
+                                {"paymentKey":"pk-2","orderId":"o-2","status":"DONE",
+                                 "totalAmount":30000,"isPartialCancelable":true,"cancels":null}
+                                """,
+                                MediaType.APPLICATION_JSON));
+
+        TossPayment canceled = ((TossResult.Success) client.getPayment("pk-1")).payment();
+        TossPayment done = ((TossResult.Success) client.getPayment("pk-2")).payment();
+
+        assertThat(canceled.partialCancelable()).isTrue();
+        assertThat(canceled.cancels())
+                .containsExactly(new TossPayment.Cancel("tx-1", "고객 환불 r-1", 4000, "DONE"));
+        assertThat(done.cancels()).isEmpty();
+    }
+
+    @Test
     @DisplayName(
             "[REF-EXEC-02] 부분 취소는 cancelAmount를 보내고 CANCELED·PARTIAL_CANCELED면 Success, 금액이 없으면 전액 취소 본문 그대로다")
     void partialCancelSendsAmount() {
