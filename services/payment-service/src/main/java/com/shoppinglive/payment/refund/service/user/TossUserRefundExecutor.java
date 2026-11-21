@@ -10,8 +10,10 @@ import com.shoppinglive.payment.payment.entity.Payment;
 import com.shoppinglive.payment.payment.entity.PaymentSellerAmount;
 import com.shoppinglive.payment.payment.entity.PaymentStatus;
 import com.shoppinglive.payment.payment.entity.PgCallKind;
+import com.shoppinglive.payment.payment.entity.PgCallOutcome;
 import com.shoppinglive.payment.payment.repository.PaymentRepository;
 import com.shoppinglive.payment.payment.repository.PaymentSellerAmountRepository;
+import com.shoppinglive.payment.payment.repository.PgCallRepository;
 import com.shoppinglive.payment.payment.service.PaymentOutcomeService;
 import com.shoppinglive.payment.payment.service.RecoveryProperties;
 import com.shoppinglive.payment.refund.entity.Refund;
@@ -46,6 +48,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
     static final String PARTIAL_NOT_ALLOWED = "PARTIAL_NOT_ALLOWED";
     static final String UNKNOWN_SELLER_ORDER = "UNKNOWN_SELLER_ORDER";
     static final String NOT_REFUNDABLE = "NOT_REFUNDABLE";
+    static final String PG_UNAVAILABLE = "PG_UNAVAILABLE";
     // 토스 호출 최대 63초 × 2(조회 + 재요청)보다 길게
     private static final Duration LEASE = Duration.ofMinutes(3);
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -56,6 +59,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
     private final RefundResultService results;
     private final RefundSettlement settlement;
     private final PaymentOutcomeService calls;
+    private final PgCallRepository pgCalls;
     private final TossPaymentsClient toss;
     private final TransactionTemplate tx;
     private final RecoveryProperties recovery;
@@ -119,11 +123,17 @@ class TossUserRefundExecutor implements UserRefundExecutor {
                     results.record(refund.getId(), RefundStatus.FAILED, 0, declined.code(), null);
             case TossResult.NotSent notSent ->
                     refunds.releaseUnknown(refund.getId(), refund.getAttemptCount());
-            case TossResult.Unknown unknown ->
-                    log.warn(
-                            "환불 취소 결과를 모른다: refundRequestId={}, reason={}",
-                            refund.getRefundRequestId(),
-                            unknown.reason());
+            case TossResult.Unknown unknown -> {
+                // 여기까지의 호출은 모두 NOT_SENT였으니 조회 시간은 지금부터 잰다
+                refunds.restartDeadline(
+                        refund.getId(),
+                        refund.getAttemptCount(),
+                        Instant.now().plus(recovery.checkDeadline()));
+                log.warn(
+                        "환불 취소 결과를 모른다: refundRequestId={}, reason={}",
+                        refund.getRefundRequestId(),
+                        unknown.reason());
+            }
         }
     }
 
@@ -225,10 +235,12 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         calls.recordCall(queryId, query);
         Instant now = Instant.now();
         boolean expired = !now.isBefore(refund.getCheckDeadlineAt());
-        if (query instanceof TossResult.Success found
-                && transactionKey(refund, found.payment()) != null) {
+        boolean foundCancel =
+                query instanceof TossResult.Success found
+                        && transactionKey(refund, found.payment()) != null;
+        if (foundCancel) {
             try {
-                confirm(refund, found.payment());
+                confirm(refund, ((TossResult.Success) query).payment());
                 return;
             } catch (IllegalStateException e) {
                 if (!expired) {
@@ -242,6 +254,16 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             }
         }
         if (expired) {
+            if (!foundCancel && Boolean.TRUE.equals(tx.execute(s -> failIfNeverSent(refund)))) {
+                log.error(
+                        "payment.refund.deadline [사람 확인 필요] 마감까지 토스에 취소가 가지 않아 FAILED({})로 끝낸다:"
+                                + " refundRequestId={}, orderRef={}, amount={}",
+                        PG_UNAVAILABLE,
+                        refund.getRefundRequestId(),
+                        payment.getOrderRef(),
+                        refund.getAmount());
+                return;
+            }
             if (refunds.stopRetry(refund.getId(), now) == 1) {
                 log.error(
                         "payment.refund.deadline [사람 확인 필요] 조회 마감까지 환불 결과를 확정하지 못했다:"
@@ -255,12 +277,19 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         if (!(query instanceof TossResult.Success)) {
             return;
         }
-        long callId =
-                calls.insertCall(
-                        payment.getId(),
-                        PgCallKind.CANCEL,
-                        payment.getPgOrderId(),
-                        refund.getRefundRequestId());
+        Long callId =
+                tx.execute(
+                        s ->
+                                refunds.holdAttempt(refund.getId(), refund.getAttemptCount()) == 0
+                                        ? null
+                                        : calls.insertCall(
+                                                payment.getId(),
+                                                PgCallKind.CANCEL,
+                                                payment.getPgOrderId(),
+                                                refund.getRefundRequestId()));
+        if (callId == null) {
+            return; // 멈춘 사이 다른 실행이 선점했거나 확정됐다
+        }
         Long cancelAmount =
                 refund.getAmount().equals(payment.getAmount()) ? null : refund.getAmount();
         TossResult result =
@@ -279,6 +308,25 @@ class TossUserRefundExecutor implements UserRefundExecutor {
                     refund.getRefundRequestId(),
                     result.getClass().getSimpleName());
         }
+    }
+
+    /** 이 환불의 취소 호출이 모두 NOT_SENT면 돈이 나가지 않았으므로 FAILED로 끝내 한도를 푼다. 호출 전에 넣은 기록은 UNKNOWN이라 걸러진다. */
+    private boolean failIfNeverSent(Refund refund) {
+        if (refunds.holdAttempt(refund.getId(), refund.getAttemptCount()) == 0) {
+            return false;
+        }
+        long all =
+                pgCalls.countByPaymentIdAndKindAndIdempotencyKey(
+                        refund.getPaymentId(), PgCallKind.CANCEL, refund.getRefundRequestId());
+        long notSent =
+                pgCalls.countByPaymentIdAndKindAndIdempotencyKeyAndOutcome(
+                        refund.getPaymentId(),
+                        PgCallKind.CANCEL,
+                        refund.getRefundRequestId(),
+                        PgCallOutcome.NOT_SENT);
+        return all > 0
+                && all == notSent
+                && results.record(refund.getId(), RefundStatus.FAILED, 0, PG_UNAVAILABLE, null);
     }
 
     private void confirm(Refund refund, TossPayment payment) {
