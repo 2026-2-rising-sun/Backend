@@ -518,6 +518,34 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
     }
 
+    @Test
+    @DisplayName(
+            "[REF-LATE-01] 토스에 갔을 수 있는 고객 환불이 있으면 APPROVED 취소를 보내지 않고 기다렸다가, 그 환불이 끝나면 전액 환불한다")
+    void approvedWaitsForInFlightUserRefund() throws Exception {
+        ApproveCommand c = approved();
+        Refund userRefund = receive(c);
+        jdbc.update(
+                "UPDATE refund SET purpose = 'USER_REFUND', status = 'UNKNOWN', next_attempt_at = NULL"
+                        + " WHERE id = ?",
+                userRefund.getId());
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+
+        jdbc.update("UPDATE refund SET status = 'FAILED' WHERE id = ?", userRefund.getId());
+        makeDue(refund);
+        retryJob.run();
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
     private ApproveCommand approved() {
         ApproveCommand c = newPayment();
