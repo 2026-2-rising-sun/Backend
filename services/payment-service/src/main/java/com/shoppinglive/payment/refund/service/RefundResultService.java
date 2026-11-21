@@ -10,7 +10,6 @@ import com.shoppinglive.payment.refund.entity.RefundStatus;
 import com.shoppinglive.payment.refund.event.RefundResultRecorded;
 import com.shoppinglive.payment.refund.repository.RefundRepository;
 import java.time.Instant;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,15 +26,14 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RefundResultService {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Set<RefundStatus> OPEN =
-            Set.of(RefundStatus.PROCESSING, RefundStatus.UNKNOWN);
 
     private final RefundRepository refunds;
     private final EventOutbox outbox;
 
     /**
      * 확정 결과(SUCCEEDED·FAILED·NO_CHARGE)를 resultVersion을 하나 올려 기록하고 보낸다. 진행 중(PROCESSING·UNKNOWN)에서만
-     * 바꾸고, 시스템 보상만 FAILED 뒤에 SUCCEEDED·NO_CHARGE로 바꿀 수 있다(REF-LATE-02).
+     * 바꾸고, 접수에서 실패하지 않은 시스템 보상만 FAILED 뒤에 SUCCEEDED·NO_CHARGE로 바꿀 수 있다(REF-LATE-02). 판정은 조건부
+     * UPDATE가 한다.
      *
      * @param pgTransactionKey 토스 취소 거래 키. 없으면 null(기존 값 유지)
      * @return true면 이번에 기록했다. false면 이미 끝났거나 다른 반영이 먼저 했다(돈은 호출자가 다시 확인)
@@ -50,14 +48,6 @@ public class RefundResultService {
             String pgTransactionKey) {
         Refund refund = refunds.findById(refundId).orElseThrow();
         validate(refund, status, refundedAmount, failureCode);
-        if (!canMove(refund, status)) {
-            log.warn(
-                    "확정된 환불 결과는 바꾸지 않는다: refundRequestId={}, status={}, 새 결과={}",
-                    refund.getRefundRequestId(),
-                    refund.getStatus(),
-                    status);
-            return false;
-        }
         int version = refund.getResultVersion() + 1;
         Instant resolvedAt = Instant.now();
         String result =
@@ -82,20 +72,15 @@ public class RefundResultService {
                         failureCode,
                         pgTransactionKey)
                 == 0) {
-            log.warn("다른 반영이 먼저 환불 결과를 바꿨다: refundRequestId={}", refund.getRefundRequestId());
+            log.warn(
+                    "환불 결과를 바꾸지 않았다(이미 확정됐거나 다른 반영이 먼저 함): refundRequestId={}, status={}, 새 결과={}",
+                    refund.getRefundRequestId(),
+                    refund.getStatus(),
+                    status);
             return false;
         }
         publish(result);
         return true;
-    }
-
-    private static boolean canMove(Refund refund, RefundStatus status) {
-        if (OPEN.contains(refund.getStatus())) {
-            return true;
-        }
-        return refund.getStatus() == RefundStatus.FAILED
-                && refund.getPurpose() == RefundPurpose.SYSTEM_COMPENSATION
-                && status != RefundStatus.FAILED;
     }
 
     /** #378 Core 결과 소비자가 거부하는 결과를 만들지 않는다. 거부되면 Core 파티션이 막힌다(#389). */
