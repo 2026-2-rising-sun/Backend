@@ -23,7 +23,7 @@
 <h2 id="사건별-분개">사건별 분개</h2>
 <ul>
 <li>[x] <strong>LED-APPROVE-01</strong> 결제 승인: 차변 PG 보관금(<code>PG_CUSTODY</code>) / 대변 구매자 예수금(<code>BUYER_DEPOSIT</code>), 결제 금액. 사건 키 (<code>PAYMENT_APPROVED</code>, payment.id).</li>
-<li>[ ] <strong>LED-REFUND-01</strong> 환불 성공: 차변 <code>BUYER_DEPOSIT</code> / 대변 <code>PG_CUSTODY</code>, 환불 금액. 사건 키 (<code>REFUND_SUCCEEDED</code>, refund.id). 구매확정 전후 모두 같다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>6c0a5c54d6f68cb418d82991817eb2ed660678dae9db9eaba34b9e15787ced8c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<li>[x] <strong>LED-REFUND-01</strong> 환불 성공: 차변 <code>BUYER_DEPOSIT</code> / 대변 <code>PG_CUSTODY</code>, 환불 금액. 사건 키 (<code>REFUND_SUCCEEDED</code>, refund.id). 구매확정 전후 모두 같다.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>2b7b649000ba362df3151ffdfab116f7673c61b4079829dc6503ea91164e828d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

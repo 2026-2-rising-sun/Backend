@@ -80,6 +80,7 @@
 <li><a href="#337-로컬-기본-가짜-토스와-실제-토스-전환-플래그">#337 로컬 기본 가짜 토스와 실제 토스 전환 플래그</a></li>
 <li><a href="#384-환불-결과-이벤트-계약-확정">#384 환불 결과 이벤트 계약 확정</a></li>
 <li><a href="#385-환불-요청-소비와-결과-발행-기반">#385 환불 요청 소비와 결과 발행 기반</a></li>
+<li><a href="#370-구매자-일반부분-환불-실행">#370 구매자 일반·부분 환불 실행</a></li>
 </ul>
 </li>
 </ul>
@@ -638,6 +639,14 @@
 <li>미실행·한계: Infra 로컬 스택 E2E 미실행(스택 중지, 5432 충돌). Core 반영은 #378 병합·#389 해결 뒤 확인한다. Infra <code>topics.tsv</code>에 DLT 토픽 추가 요청이 남았다.</li>
 <li>리뷰 반영(2026-11-21): 파서가 중복 <code>orderItemId</code>·합계 불일치·보상+<code>CUSTOMER_REQUEST</code>·날짜가 아닌 <code>requestedAt</code>을 DLT로 보내고 0원은 통과시킨다. FAILED 뒤 전이는 조건부 UPDATE에서 접수 실패 행을 제외한다. 실제 핸들러의 제한 재시도·DB 장애 재시도와 동시 수신을 테스트했다. payment test 77건·integrationTest 75건·postgresTest 87건·migrationTest 9건·표본 43개 통과. <code>check.sh --external</code>은 기존 Core·Notification 스킵과 다른 서비스 postgresTest 미실행으로 incomplete다.</li>
 <li>다음 작업: #370 고객 환불 실행, #386 시스템 보상 실행, #378 병합 뒤 이 PR 병합.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>e1279c3e68bdab7f5a64e8577542000cb12e3365288a07a530635f881b607918</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="370-구매자-일반부분-환불-실행">#370 구매자 일반·부분 환불 실행</h2>
+<p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/395">PR #395</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a> · <a href="../design-docs/services/payment/overview.html#payment-환불-실행">Payment 모듈</a></p>
+<ul>
+<li>변경·판단(2026-11-21): <code>USER_REFUND</code> 실행기와 재처리 스케줄러, 고객 환불·시스템 보상 공용 <code>RefundSettlement</code>를 추가했다. 토스 호출 전에 UNKNOWN으로 예약해 동시 초과 환불을 막고, 토스 취소 내역에 멱등 키가 없어 요청별 취소 사유로 자기 취소를 찾는다.</li>
+<li>검증: 임시 PostgreSQL 17과 가짜 토스로 Payment test·integrationTest·postgresTest·migrationTest와 <code>check.sh --base origin/feat/#385-refund-base --external</code>을 통과했고 최종 수치는 PR 본문에 있다.</li>
+<li>미실행·한계: 이 PR 단독의 Infra E2E는 실행하지 않았다. 토스 sandbox 부분·전액 취소는 #378+#396 임시 통합 E2E에서 확인됐다(2026-11-21). <code>payment.refund.deadline</code> 알림 연결은 #387에 남았다.</li>
+<li>다음 작업: #386 시스템 보상 실행, #387 환불 미확정 알림.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>a7e5454375f05bd7eca8a131cdb8a14ed58c9423c380d9b125df47673f7a0102</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
