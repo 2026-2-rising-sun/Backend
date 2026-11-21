@@ -190,7 +190,9 @@ class SystemCompensationExecutor implements CompensationExecutor {
     /** 고객 환불의 한도 검사와 같은 결제 행 잠금으로 줄을 세운다. 토스에 갔을 수 있는 다른 환불이 끝나기 전에는 전액 취소를 보내지 않는다. */
     private boolean limitIsFree(Refund refund) {
         payments.findForRefund(refund.getPaymentId()).orElseThrow();
-        return refunds.findHoldingLimit(refund.getPaymentId(), refund.getId()).isEmpty();
+        // APPROVED에 남은 SUCCEEDED는 0원 환불뿐이라 돈이 겹치지 않는다
+        return refunds.findHoldingLimit(refund.getPaymentId(), refund.getId()).stream()
+                .noneMatch(other -> other.getStatus() == RefundStatus.UNKNOWN);
     }
 
     private static String ownCancelKey(TossPayment payment, long amount) {

@@ -652,9 +652,9 @@
 <p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/396">PR #396</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a></p>
 <ul>
 <li>변경·판단(2026-11-21): 시스템 보상 실행기와 재처리 스케줄러를 추가했다. 결제를 막은 뒤 토스 조회로 확정하고, 취소 키는 기존 보상과 같은 <code>cancel-{pgOrderId}</code>다. 금액 불일치와 이미 환불된 결제는 토스 호출 없이 FAILED로 답한다. 토스에 갔을 수 있는 고객 환불이 있으면 끝날 때까지 전액 취소를 보내지 않는다.</li>
-<li>검증: 임시 PostgreSQL 17로 payment test 79건, integrationTest 75건, postgresTest 134건, migrationTest 9건 통과. <code>check.sh --base origin/feat/#385-refund-base --external</code> 통과.</li>
+<li>검증: 임시 PostgreSQL 17로 payment test 79건, integrationTest 75건, postgresTest 136건, migrationTest 9건 통과. <code>check.sh --base origin/feat/#385-refund-base --external</code> 통과.</li>
 <li>미실행·한계: Infra E2E와 실제 토스 호출은 하지 않았다. Core 반영은 #378 병합·#389 해결 뒤 확인한다.</li>
 <li>다음 작업: #387.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7c982f9681bdcc4059b2c7aa6c307a4266f88cab7e7e79fba32c94222a2b5d1b</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>0a6c13966a561d0a1b46988aaef87683c7a6f2696cbf3e8841cbcb68f493fb2c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
