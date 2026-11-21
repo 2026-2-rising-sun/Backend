@@ -1,10 +1,12 @@
 package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.Payment;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -124,6 +126,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
                     """,
             nativeQuery = true)
     int markCanceled(@Param("id") long id);
+
+    /** 환불 한도 검사와 예약을 결제별로 한 줄로 세운다. 토스 호출 전에 커밋해 잠금을 푼다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Payment p WHERE p.id = :id")
+    Optional<Payment> findForRefund(@Param("id") long id);
 
     /**
      * 환불 반영. 승인된 결제이고 누적 환불액이 결제 금액을 넘지 않을 때만 더한다. 0이면 호출자가 다시 읽어 판단한다. SET의 {@code
