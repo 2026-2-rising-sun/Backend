@@ -305,23 +305,90 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-ACCEPT-04] 0원 환불과 항목 합이 금액과 다른 요청은 토스를 부르지 않고 FAILED(NOT_REFUNDABLE)다")
-    void rejectsAmountsThatCannotSettle() throws Exception {
-        String zeroRef = newOrderRef();
-        long zeroPayment = approved(zeroRef, true);
-        Refund zero = receive(zeroRef, zeroPayment, zeroRef + "-S1", 0);
-        executor.execute(zero);
-        assertFailed(zero, "NOT_REFUNDABLE");
-
-        String mismatchRef = newOrderRef();
-        long mismatchPayment = approved(mismatchRef, true);
-        ObjectNode request = request(mismatchRef, mismatchPayment, "USER_REFUND");
+    @DisplayName("[REF-ACCEPT-04] 항목 합이 금액과 다른 요청은 토스를 부르지 않고 FAILED(NOT_REFUNDABLE)다")
+    void rejectsItemSumMismatch() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        ObjectNode request = request(orderRef, paymentId, "USER_REFUND");
         ((ObjectNode) request.get("items").get(0)).put("amount", 3000);
         Refund mismatch = intake.receive(copy(request)).orElseThrow();
-        executor.execute(mismatch);
-        assertFailed(mismatch, "NOT_REFUNDABLE");
 
+        executor.execute(mismatch);
+
+        assertFailed(mismatch, "NOT_REFUNDABLE");
         verify(toss, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-05] 전체 0원 환불은 토스·분개·결제 변경 없이 SUCCEEDED(0)이고, 결제에 없는 0원 판매자 줄도 통과한다")
+    void zeroRefundSucceedsWithoutMovingMoney() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, false);
+        Refund refund = receive(orderRef, paymentId, "free-seller-order", 0);
+
+        executor.execute(refund);
+
+        assertThat(refund(refund.getRefundRequestId()))
+                .containsEntry("status", "SUCCEEDED")
+                .containsEntry("refunded_amount", 0L)
+                .containsEntry("pg_transaction_key", null)
+                .containsEntry("result_version", 1);
+        assertThat(jdbc.queryForMap("SELECT * FROM payment WHERE id = ?", paymentId))
+                .containsEntry("status", "APPROVED")
+                .containsEntry("refunded_amount", 0L);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM ledger_journal WHERE ref_type = 'REFUND_SUCCEEDED'"
+                                        + " AND ref_id = ?",
+                                Integer.class,
+                                String.valueOf(refund.getId())))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM refund_item WHERE refund_id = ?",
+                                Integer.class,
+                                refund.getId()))
+                .isZero();
+        assertThat(results(orderRef).get(0).get("payload").get("status").asText())
+                .isEqualTo("SUCCEEDED");
+        verify(toss, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-05] 0원 환불도 환불할 수 없는 결제 상태면 FAILED(NOT_REFUNDABLE)다")
+    void zeroRefundStillChecksPaymentStatus() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = newPayment(orderRef);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 0);
+
+        executor.execute(refund);
+
+        assertFailed(refund, "NOT_REFUNDABLE");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-05] 금액이 있는 요청의 0원 판매자 줄은 검증과 refund_item에서 빠지고 나머지만 환불한다")
+    void mixedZeroSellerLine() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        ObjectNode request = request(orderRef, paymentId, "USER_REFUND");
+        ObjectNode free = ((ObjectNode) request.get("items").get(0)).deepCopy();
+        free.put("sellerOrderNumber", "free-seller-order");
+        free.put("amount", 0);
+        ((ObjectNode) free.get("orderItems").get(0)).put("amount", 0);
+        ((com.fasterxml.jackson.databind.node.ArrayNode) request.get("items")).add(free);
+        Refund refund = intake.receive(copy(request)).orElseThrow();
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(canceled(refund));
+
+        executor.execute(refund);
+
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT seller_order_number FROM refund_item WHERE refund_id = ?",
+                                String.class,
+                                refund.getId()))
+                .containsExactly(orderRef + "-S1");
     }
 
     @Test
