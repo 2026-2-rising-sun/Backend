@@ -42,6 +42,7 @@ public class RefundSettlement {
      *
      * @param pgTransactionKey 토스 {@code cancels[].transactionKey}
      * @return true면 이번에 반영했다. false면 이미 확정돼 아무것도 바꾸지 않았다
+     * @throws IllegalArgumentException 0원 환불. 호출자가 {@code RefundResultService.record}만 쓴다
      * @throws IllegalStateException 결제에 반영할 수 없다. 전체가 롤백되어 환불은 진행 중으로 남고 사람이 확인한다
      */
     @Transactional
@@ -54,6 +55,9 @@ public class RefundSettlement {
         long amount = refund.getAmount();
         String requestPayload = refund.getRequestPayload();
         String refundRequestId = refund.getRefundRequestId();
+        if (amount == 0) {
+            throw new IllegalArgumentException("0원 환불은 반영할 돈이 없다: " + refundRequestId);
+        }
         if (!results.record(refundId, RefundStatus.SUCCEEDED, amount, null, pgTransactionKey)) {
             return false;
         }

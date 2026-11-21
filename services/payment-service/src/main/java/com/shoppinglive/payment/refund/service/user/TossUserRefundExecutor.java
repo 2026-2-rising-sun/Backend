@@ -210,13 +210,25 @@ class TossUserRefundExecutor implements UserRefundExecutor {
                 calls.insertCall(payment.getId(), PgCallKind.QUERY, payment.getPgOrderId(), null);
         TossResult query = toss.getPayment(payment.getPgPaymentKey());
         calls.recordCall(queryId, query);
+        Instant now = Instant.now();
+        boolean expired = !now.isBefore(refund.getCheckDeadlineAt());
         if (query instanceof TossResult.Success found
                 && transactionKey(refund, found.payment()) != null) {
-            confirm(refund, found.payment());
-            return;
+            try {
+                confirm(refund, found.payment());
+                return;
+            } catch (IllegalStateException e) {
+                if (!expired) {
+                    throw e;
+                }
+                // 마감 뒤에도 반영할 수 없으면 무한 재시도하지 않고 아래에서 멈춰 사람에게 넘긴다
+                log.error(
+                        "마감까지 환불을 결제에 반영하지 못했다: refundRequestId={}",
+                        refund.getRefundRequestId(),
+                        e);
+            }
         }
-        Instant now = Instant.now();
-        if (!now.isBefore(refund.getCheckDeadlineAt())) {
+        if (expired) {
             if (refunds.stopRetry(refund.getId(), now) == 1) {
                 log.error(
                         "payment.refund.deadline [사람 확인 필요] 조회 마감까지 환불 결과를 확정하지 못했다:"
