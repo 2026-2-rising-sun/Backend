@@ -12,4 +12,7 @@ class PendingUserRefundExecutor implements UserRefundExecutor {
     public void execute(Refund refund) {
         log.info("고객 환불 실행은 아직 없어 접수만 했다: refundRequestId={}", refund.getRefundRequestId());
     }
+
+    @Override
+    public void retryDue() {}
 }
