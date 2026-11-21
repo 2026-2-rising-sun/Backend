@@ -6,6 +6,7 @@ import com.shoppinglive.payment.client.toss.TossProperties;
 import com.shoppinglive.payment.client.toss.TossResult;
 import com.shoppinglive.payment.payment.entity.Payment;
 import com.shoppinglive.payment.payment.entity.PgCallKind;
+import com.shoppinglive.payment.payment.entity.PgCallOutcome;
 import com.shoppinglive.payment.payment.repository.PaymentRepository;
 import com.shoppinglive.payment.payment.repository.PgCallRepository;
 import com.shoppinglive.payment.payment.repository.PgCallRepository.ConfirmAttempt;
@@ -13,9 +14,12 @@ import com.shoppinglive.payment.payment.service.PaymentOutcomeService;
 import com.shoppinglive.payment.refund.entity.Refund;
 import com.shoppinglive.payment.refund.entity.RefundStatus;
 import com.shoppinglive.payment.refund.repository.RefundRepository;
+import com.shoppinglive.payment.refund.service.RefundIntakeService;
 import com.shoppinglive.payment.refund.service.RefundResultService;
+import com.shoppinglive.payment.refund.service.RefundSettlement;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -32,6 +36,7 @@ class SystemCompensationExecutor implements CompensationExecutor {
     private static final String NO_CHARGE = RefundStatus.NO_CHARGE.name();
     private static final String NOT_FOUND_PAYMENT = "NOT_FOUND_PAYMENT";
     private static final String ALREADY_CANCELED_PAYMENT = "ALREADY_CANCELED_PAYMENT";
+    private static final String NOT_REFUNDABLE = "NOT_REFUNDABLE";
     // 막는 UPDATE와 승인 시작이 번갈아 이겨도 상태는 CANCELED·APPROVED 쪽으로만 끝난다
     private static final int BLOCK_ATTEMPTS = 3;
 
@@ -40,6 +45,7 @@ class SystemCompensationExecutor implements CompensationExecutor {
     private final PgCallRepository pgCalls;
     private final PaymentOutcomeService outcomes;
     private final RefundResultService results;
+    private final RefundSettlement settlement;
     private final TossPaymentsClient toss;
     private final TossProperties tossProperties;
     private final CompensationProperties properties;
@@ -62,6 +68,10 @@ class SystemCompensationExecutor implements CompensationExecutor {
         for (int i = 0; i < BLOCK_ATTEMPTS; i++) {
             Payment payment = payments.findById(refund.getPaymentId()).orElseThrow();
             long id = payment.getId();
+            if (!refund.getAmount().equals(payment.getAmount())) {
+                fail(refund, RefundIntakeService.PAYMENT_MISMATCH);
+                return;
+            }
             switch (payment.getStatus()) {
                 case CREATED -> {
                     // markCanceled는 그 사이 시작된 APPROVING도 막으므로, 조회 없는 NO_CHARGE는 CREATED에서만 한다
@@ -78,8 +88,12 @@ class SystemCompensationExecutor implements CompensationExecutor {
                     }
                     return;
                 }
-                case APPROVED, PARTIALLY_REFUNDED, REFUNDED -> {
-                    holdForHuman(refund, "결제가 " + payment.getStatus() + " 상태라 자동 처리하지 않는다");
+                case APPROVED -> {
+                    refundApproved(refund, payment);
+                    return;
+                }
+                case PARTIALLY_REFUNDED, REFUNDED -> {
+                    failAlreadyRefunded(refund, payment);
                     return;
                 }
             }
@@ -99,11 +113,7 @@ class SystemCompensationExecutor implements CompensationExecutor {
     private void resolve(Refund refund, Payment payment) {
         ConfirmAttempt attempt = pgCalls.findLatestConfirmAttempt(payment.getId()).orElseThrow();
         Instant asked = Instant.now();
-        long callId =
-                outcomes.insertCall(
-                        payment.getId(), PgCallKind.QUERY, attempt.getPgOrderId(), null);
-        TossResult result = toss.getPayment(payment.getPgPaymentKey());
-        outcomes.recordCall(callId, result);
+        TossResult result = query(payment, attempt);
 
         Instant waitUntil = attempt.getFirstRequestedAt().plus(confirmWindow());
         if (result instanceof TossResult.Declined declined
@@ -125,7 +135,9 @@ class SystemCompensationExecutor implements CompensationExecutor {
             Instant waitUntil) {
         switch (tossPayment.status()) {
             case "DONE" -> cancel(refund, payment, attempt);
-            case "CANCELED" -> succeed(refund, payment);
+            case "CANCELED" ->
+                    results.record(
+                            refund.getId(), RefundStatus.SUCCEEDED, refund.getAmount(), null, null);
             case "ABORTED", "EXPIRED" -> noCharge(refund);
             case "IN_PROGRESS", "READY" -> noChargeAfterWait(refund, asked, waitUntil);
             case "PARTIAL_CANCELED" -> holdForHuman(refund, "토스 결제가 부분 취소 상태다");
@@ -141,12 +153,64 @@ class SystemCompensationExecutor implements CompensationExecutor {
         }
     }
 
-    /** 기존 compensate와 키·사유가 같아야 토스가 같은 요청으로 본다. */
     private void cancel(Refund refund, Payment payment, ConfirmAttempt attempt) {
-        if (!sameAmount(refund, payment)) {
+        TossResult result = requestCancel(payment, attempt);
+        if (result instanceof TossResult.Success || isAlreadyCanceled(result)) {
+            results.record(refund.getId(), RefundStatus.SUCCEEDED, refund.getAmount(), null, null);
+        } else {
+            retryLater(refund);
+        }
+    }
+
+    /**
+     * 승인된 결제의 전액 환불. 토스 취소 뒤 트랜잭션 하나로 결제·항목·분개·결과를 반영한다. 내 취소 내역이 없으면 다른 환불이 돌려준 돈이므로 이 요청의 환불로
+     * 반영하지 않는다. 그 환불이 반영되면 다음 차례에 NOT_REFUNDABLE로 끝난다.
+     */
+    private void refundApproved(Refund refund, Payment payment) {
+        ConfirmAttempt attempt = pgCalls.findLatestConfirmAttempt(payment.getId()).orElseThrow();
+        TossResult result = requestCancel(payment, attempt);
+        if (isAlreadyCanceled(result)) {
+            result = query(payment, attempt);
+        }
+        String transactionKey =
+                result instanceof TossResult.Success success
+                        ? ownCancelKey(success.payment(), refund.getAmount())
+                        : null;
+        if (transactionKey == null) {
+            retryLater(refund);
             return;
         }
-        String key = "cancel-" + attempt.getPgOrderId();
+        settlement.settle(refund.getId(), transactionKey);
+    }
+
+    private static String ownCancelKey(TossPayment payment, long amount) {
+        return payment.cancels().stream()
+                .filter(
+                        c ->
+                                "DONE".equals(c.cancelStatus())
+                                        && PaymentOutcomeService.COMPENSATION_REASON.equals(
+                                                c.cancelReason())
+                                        && c.cancelAmount() == amount
+                                        && c.transactionKey() != null)
+                .map(TossPayment.Cancel::transactionKey)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하면 안 된다. */
+    private void failAlreadyRefunded(Refund refund, Payment payment) {
+        ConfirmAttempt attempt = pgCalls.findLatestConfirmAttempt(payment.getId()).orElseThrow();
+        if (pgCalls.existsByIdempotencyKeyAndOutcomeIn(
+                cancelKey(attempt), List.of(PgCallOutcome.SUCCESS, PgCallOutcome.UNKNOWN))) {
+            holdForHuman(refund, "보상 취소가 토스에 닿았을 수 있는데 결제에 다른 환불이 반영됐다");
+            return;
+        }
+        fail(refund, NOT_REFUNDABLE);
+    }
+
+    /** 기존 compensate와 키·사유가 같아야 토스가 같은 요청으로 본다. */
+    private TossResult requestCancel(Payment payment, ConfirmAttempt attempt) {
+        String key = cancelKey(attempt);
         long callId =
                 outcomes.insertCall(
                         payment.getId(), PgCallKind.CANCEL, attempt.getPgOrderId(), key);
@@ -154,28 +218,34 @@ class SystemCompensationExecutor implements CompensationExecutor {
                 toss.cancel(
                         payment.getPgPaymentKey(), PaymentOutcomeService.COMPENSATION_REASON, key);
         outcomes.recordCall(callId, result);
-        if (result instanceof TossResult.Success
-                || (result instanceof TossResult.Declined declined
-                        && ALREADY_CANCELED_PAYMENT.equals(declined.code()))) {
-            succeed(refund, payment);
-        } else {
-            retryLater(refund);
-        }
+        return result;
     }
 
-    private void succeed(Refund refund, Payment payment) {
-        if (sameAmount(refund, payment)) {
-            results.record(refund.getId(), RefundStatus.SUCCEEDED, refund.getAmount(), null, null);
-        }
+    private TossResult query(Payment payment, ConfirmAttempt attempt) {
+        long callId =
+                outcomes.insertCall(
+                        payment.getId(), PgCallKind.QUERY, attempt.getPgOrderId(), null);
+        TossResult result = toss.getPayment(payment.getPgPaymentKey());
+        outcomes.recordCall(callId, result);
+        return result;
     }
 
-    /** 토스 취소는 전액인데 성공 결과는 요청 금액만 허용한다. 다르면 돈을 움직이지 않고 사람에게 넘긴다. */
-    private boolean sameAmount(Refund refund, Payment payment) {
-        if (refund.getAmount().equals(payment.getAmount())) {
-            return true;
-        }
-        holdForHuman(refund, "요청 금액과 결제 금액이 다르다");
-        return false;
+    private static String cancelKey(ConfirmAttempt attempt) {
+        return "cancel-" + attempt.getPgOrderId();
+    }
+
+    private static boolean isAlreadyCanceled(TossResult result) {
+        return result instanceof TossResult.Declined declined
+                && ALREADY_CANCELED_PAYMENT.equals(declined.code());
+    }
+
+    private void fail(Refund refund, String failureCode) {
+        log.error(
+                "[사람 확인 필요] 시스템 보상을 실행할 수 없어 돈을 움직이지 않고 FAILED로 답한다: refundRequestId={}, paymentId={}, failureCode={}",
+                refund.getRefundRequestId(),
+                refund.getPaymentId(),
+                failureCode);
+        results.record(refund.getId(), RefundStatus.FAILED, 0, failureCode, null);
     }
 
     private void noCharge(Refund refund) {

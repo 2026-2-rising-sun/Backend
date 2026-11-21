@@ -472,6 +472,28 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
     }
 
+    @Test
+    @DisplayName("[REF-LATE-02] 이 보상의 취소가 토스에 닿았을 수 있으면 환불된 결제여도 환불액 0의 FAILED로 답하지 않고 보류한다")
+    void ownCancelMayHaveLandedIsNotFailed(CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        jdbc.update(
+                "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome, requested_at)"
+                        + " VALUES (?, 'CANCEL', ?, ?, 'UNKNOWN', now())",
+                paymentId(c.orderRef()),
+                c.pgOrderId(),
+                "cancel-" + c.pgOrderId());
+        jdbc.update(
+                "UPDATE payment SET status = 'REFUNDED', refunded_amount = ? WHERE order_ref = ?",
+                AMOUNT,
+                c.orderRef());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+        assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
+    }
+
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
     private ApproveCommand approved() {
         ApproveCommand c = newPayment();
@@ -533,6 +555,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     private void awaitBlockedPaymentUpdate() {
         long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (System.nanoTime() < until) {
+            // 트랜잭션 안에서는 pg_stat_activity가 첫 조회 값으로 고정된다
+            jdbc.queryForList("SELECT pg_stat_clear_snapshot()");
             Integer blocked =
                     jdbc.queryForObject(
                             "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"

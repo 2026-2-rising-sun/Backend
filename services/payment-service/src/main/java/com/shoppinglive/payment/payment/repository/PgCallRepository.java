@@ -1,7 +1,9 @@
 package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.PgCall;
+import com.shoppinglive.payment.payment.entity.PgCallOutcome;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,6 +17,9 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
 
         Instant getFirstRequestedAt();
     }
+
+    boolean existsByIdempotencyKeyAndOutcomeIn(
+            String idempotencyKey, Collection<PgCallOutcome> outcomes);
 
     @Query(
             """
