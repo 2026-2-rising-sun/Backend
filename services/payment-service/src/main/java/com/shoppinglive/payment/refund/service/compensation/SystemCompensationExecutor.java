@@ -167,6 +167,10 @@ class SystemCompensationExecutor implements CompensationExecutor {
      * 반영하지 않는다. 그 환불이 반영되면 다음 차례에 NOT_REFUNDABLE로 끝난다.
      */
     private void refundApproved(Refund refund, Payment payment) {
+        if (Boolean.FALSE.equals(tx.execute(s -> limitIsFree(refund)))) {
+            retryLater(refund);
+            return;
+        }
         ConfirmAttempt attempt = pgCalls.findLatestConfirmAttempt(payment.getId()).orElseThrow();
         TossResult result = requestCancel(payment, attempt);
         if (isAlreadyCanceled(result)) {
@@ -181,6 +185,12 @@ class SystemCompensationExecutor implements CompensationExecutor {
             return;
         }
         settlement.settle(refund.getId(), transactionKey);
+    }
+
+    /** 고객 환불의 한도 검사와 같은 결제 행 잠금으로 줄을 세운다. 토스에 갔을 수 있는 다른 환불이 끝나기 전에는 전액 취소를 보내지 않는다. */
+    private boolean limitIsFree(Refund refund) {
+        payments.findForRefund(refund.getPaymentId()).orElseThrow();
+        return refunds.findHoldingLimit(refund.getPaymentId(), refund.getId()).isEmpty();
     }
 
     private static String ownCancelKey(TossPayment payment, long amount) {
