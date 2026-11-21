@@ -653,9 +653,9 @@
 <p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/396">PR #396</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a></p>
 <ul>
 <li>변경·판단(2026-11-21): 시스템 보상 실행기와 재처리 스케줄러를 추가했다. 결제를 막은 뒤 토스 조회로 확정하고, 취소 키는 기존 보상과 같은 <code>cancel-{pgOrderId}</code>다. 금액 불일치와 이미 환불된 결제는 토스 호출 없이 FAILED로 답한다. 토스에 갔을 수 있는 고객 환불이 있으면 끝날 때까지 전액 취소를 보내지 않는다. 독립 리뷰에 따라 잠금 안 환불 재확인, 영구 거절·남의 취소의 사람 확인 보류, 막힌 결제의 거래 키 기록을 더했다.</li>
-<li>검증: 임시 PostgreSQL 17로 payment test 81건, integrationTest 75건, postgresTest 156건, migrationTest 9건 통과. <code>check.sh --base origin/feat/#385-refund-base --external</code>은 #395의 계약 변경으로 전체 빌드가 되어 incomplete(기존 외부 테스트 스킵 5건, 다른 서비스 postgresTest 미실행)이고, <code>check_events.py --samples</code> 표본 46개는 직접 실행해 통과했다.</li>
+<li>검증: 임시 PostgreSQL 17로 payment test 81건, integrationTest 75건, postgresTest 157건, migrationTest 9건 통과. <code>check.sh --base origin/feat/#385-refund-base --external</code>은 #395의 계약 변경으로 전체 빌드가 되어 incomplete(기존 외부 테스트 스킵 5건, 다른 서비스 postgresTest 미실행)이고, <code>check_events.py --samples</code> 표본 46개는 직접 실행해 통과했다.</li>
 <li>미실행·한계: Infra E2E와 실제 토스 호출은 하지 않았다. Core 반영은 #378 병합·#389 해결 뒤 확인한다.</li>
 <li>다음 작업: #387.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>464cd13fecf8681adab706625752395509879354bacb0910e0c8052da7cd559f</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>d56ea0f88762c2cc05e486d8248d031b3bfefb0fc876262d68dc03574d611366</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
