@@ -42,8 +42,12 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 
 ## 시스템 보상과 늦은 승인
 
-- [ ] **REF-LATE-01** `SYSTEM_COMPENSATION` 요청(사유 `LATE_APPROVAL`·`APPROVAL_UNKNOWN` 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 `late-{paymentId}`다. 중복 수신은 1건이다. (EC 28, 37)
-- [ ] **REF-LATE-02** 시스템 보상의 FAILED 뒤에 더 높은 `resultVersion`으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(`failureCode: NO_CHARGE`, `refundedAmount` 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.
+- [x] **REF-LATE-01** `SYSTEM_COMPENSATION` 요청(사유 `LATE_APPROVAL`·`APPROVAL_UNKNOWN` 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 `late-{paymentId}`다. 중복 수신은 1건이다. (EC 28, 37)
+- [x] **REF-LATE-02** 시스템 보상의 FAILED 뒤에 더 높은 `resultVersion`으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(`failureCode: NO_CHARGE`, `refundedAmount` 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.
+- 시스템 보상의 결제 상태별·토스 조회 결과별 처리는 [#386](https://github.com/2026-2-rising-sun/Backend/issues/386)의 표를 따른다. 표 밖 경우는 다음과 같다.
+  - 요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(`PAYMENT_MISMATCH`, `refundedAmount` 0)로 답한다.
+  - 결제가 PARTIALLY_REFUNDED·REFUNDED면 토스 호출 없이 FAILED(`NOT_REFUNDABLE`, `refundedAmount` 0)로 답한다. 그 돈은 다른 환불의 결과라 SUCCEEDED로 보내지 않는다. 단, 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하지 않고 보류해 사람이 확인한다.
+  - APPROVED 취소가 `ALREADY_CANCELED_PAYMENT`인데 토스 취소 내역에 이 보상의 취소가 없으면 다른 환불의 취소로 보고 반영하지 않는다. 그 환불이 결제에 반영되면 `NOT_REFUNDABLE`로 끝난다.
 
 ## 결과 이벤트
 

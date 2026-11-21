@@ -47,8 +47,12 @@
 </ul>
 <h2 id="시스템-보상과-늦은-승인">시스템 보상과 늦은 승인</h2>
 <ul>
-<li>[ ] <strong>REF-LATE-01</strong> <code>SYSTEM_COMPENSATION</code> 요청(사유 <code>LATE_APPROVAL</code>·<code>APPROVAL_UNKNOWN</code> 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 <code>late-{paymentId}</code>다. 중복 수신은 1건이다. (EC 28, 37)</li>
-<li>[ ] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.</li>
+<li>[x] <strong>REF-LATE-01</strong> <code>SYSTEM_COMPENSATION</code> 요청(사유 <code>LATE_APPROVAL</code>·<code>APPROVAL_UNKNOWN</code> 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 <code>late-{paymentId}</code>다. 중복 수신은 1건이다. (EC 28, 37)</li>
+<li>[x] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.</li>
+<li>시스템 보상의 결제 상태별·토스 조회 결과별 처리는 <a href="https://github.com/2026-2-rising-sun/Backend/issues/386">#386</a>의 표를 따른다. 표 밖 경우는 다음과 같다.</li>
+<li>요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(<code>PAYMENT_MISMATCH</code>, <code>refundedAmount</code> 0)로 답한다.</li>
+<li>결제가 PARTIALLY_REFUNDED·REFUNDED면 토스 호출 없이 FAILED(<code>NOT_REFUNDABLE</code>, <code>refundedAmount</code> 0)로 답한다. 그 돈은 다른 환불의 결과라 SUCCEEDED로 보내지 않는다. 단, 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하지 않고 보류해 사람이 확인한다.</li>
+<li>APPROVED 취소가 <code>ALREADY_CANCELED_PAYMENT</code>인데 토스 취소 내역에 이 보상의 취소가 없으면 다른 환불의 취소로 보고 반영하지 않는다. 그 환불이 결제에 반영되면 <code>NOT_REFUNDABLE</code>로 끝난다.</li>
 </ul>
 <h2 id="결과-이벤트">결과 이벤트</h2>
 <ul>
@@ -61,6 +65,6 @@
 <li><code>nextActionAt</code>: null</li>
 <li><code>failureCode</code></li>
 </ul>
-<p>다시 보낼 때 payload는 처음과 같아야 하므로 <code>resolvedAt</code>은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>3d8178b64198324c22de3f9342002b1c976d8f43289ce37667c7b5e6d570f20b</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>다시 보낼 때 payload는 처음과 같아야 하므로 <code>resolvedAt</code>은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>c0bde26c55c573810e9bf68992fd1c7dc5281bd31c07e8108acb779e3797252e</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
