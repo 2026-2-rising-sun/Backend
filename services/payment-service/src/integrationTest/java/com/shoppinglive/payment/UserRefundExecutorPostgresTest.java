@@ -367,6 +367,41 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName(
+            "[REF-EXEC-05] 이미 REFUNDED인 결제의 0원 환불은 SUCCEEDED(0)이고, 금액이 있는 환불과 CANCELED 결제는 FAILED다")
+    void zeroRefundAfterFullRefund() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        jdbc.update(
+                "UPDATE payment SET status = 'REFUNDED', refunded_amount = ? WHERE id = ?",
+                AMOUNT,
+                paymentId);
+
+        Refund zero = receive(orderRef, paymentId, orderRef + "-S1", 0);
+        executor.execute(zero);
+        assertThat(refund(zero.getRefundRequestId()))
+                .containsEntry("status", "SUCCEEDED")
+                .containsEntry("refunded_amount", 0L)
+                .containsEntry("pg_transaction_key", null);
+        assertThat(jdbc.queryForMap("SELECT * FROM payment WHERE id = ?", paymentId))
+                .containsEntry("status", "REFUNDED")
+                .containsEntry("refunded_amount", AMOUNT);
+
+        Refund paid = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        executor.execute(paid);
+        assertFailed(paid, "NOT_REFUNDABLE");
+
+        String canceledRef = newOrderRef();
+        long canceledPayment = approved(canceledRef, true);
+        jdbc.update("UPDATE payment SET status = 'CANCELED' WHERE id = ?", canceledPayment);
+        Refund canceled = receive(canceledRef, canceledPayment, canceledRef + "-S1", 0);
+        executor.execute(canceled);
+        assertFailed(canceled, "NOT_REFUNDABLE");
+
+        verify(toss, never()).cancel(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("[REF-EXEC-05] 금액이 있는 요청의 0원 판매자 줄은 검증과 refund_item에서 빠지고 나머지만 환불한다")
     void mixedZeroSellerLine() throws Exception {
         String orderRef = newOrderRef();
