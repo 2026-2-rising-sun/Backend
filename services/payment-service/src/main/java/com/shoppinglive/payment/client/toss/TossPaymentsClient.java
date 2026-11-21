@@ -88,14 +88,31 @@ public class TossPaymentsClient {
 
     /** 금액을 보내지 않아 전액 취소한다. */
     public TossResult cancel(String paymentKey, String cancelReason, String idempotencyKey) {
+        return cancel(paymentKey, cancelReason, idempotencyKey, null);
+    }
+
+    /**
+     * {@code cancelAmount}가 null이면 전액 취소이고 CANCELED만 Success다. 금액이 있으면 부분 취소이고, 남은 금액을 모두 취소하면
+     * CANCELED, 아니면 PARTIAL_CANCELED가 Success다.
+     */
+    public TossResult cancel(
+            String paymentKey, String cancelReason, String idempotencyKey, Long cancelAmount) {
+        Map<String, Object> body =
+                cancelAmount == null
+                        ? Map.of("cancelReason", cancelReason)
+                        : Map.of("cancelReason", cancelReason, "cancelAmount", cancelAmount);
+        Predicate<String> expected =
+                cancelAmount == null
+                        ? "CANCELED"::equals
+                        : status -> "CANCELED".equals(status) || "PARTIAL_CANCELED".equals(status);
         return call(
                 client ->
                         client.post()
                                 .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
                                 .header(IDEMPOTENCY_KEY, idempotencyKey)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .body(Map.of("cancelReason", cancelReason)),
-                "CANCELED"::equals);
+                                .body(body),
+                expected);
     }
 
     private TossResult call(

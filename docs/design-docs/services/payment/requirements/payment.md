@@ -77,7 +77,7 @@
 
 ## 결과 이벤트
 
-- [x] **PAY-EVENT-01** `PaymentApproved {paymentId, orderRef, amount, approvedAt}`를 `payment.execution-results.v1`에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module `OutboxTransactionIntegrationTest`가 검증한다.
+- [x] **PAY-EVENT-01** `PaymentApproved {paymentId, orderRef, amount, approvedAt}`를 `payment.execution.results.v1`(2026-11-21 점 표기로 변경, #385)에 orderRef 키로 보낸다. 상태 변경과 같은 트랜잭션에서 outbox에 쓴다. 발행 전 재시작 뒤 발행(EC 30)은 common-module `OutboxTransactionIntegrationTest`가 검증한다.
 - [x] **PAY-EVENT-02** 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.
 
 ## 범위 밖

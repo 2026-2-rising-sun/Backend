@@ -19,7 +19,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-/** 실제 PostgreSQL에 V1–V4를 적용하고 V4 제약이 돈·상태 규칙을 DB에서 막는지 확인한다. */
+/** 실제 PostgreSQL에 V1–V5를 적용하고 V4 제약이 돈·상태 규칙을 DB에서 막는지 확인한다. */
 @Tag("postgres")
 @Tag("migration")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -70,7 +70,7 @@ class PaymentSchemaMigrationTest {
     }
 
     @Test
-    @DisplayName("V1–V4가 빈 스키마에 적용되고 옛 결제 테이블 4개는 지워지며 event_outbox는 남는다")
+    @DisplayName("V1–V5가 빈 스키마에 적용되고 옛 결제 테이블 4개는 지워지며 event_outbox는 남는다")
     void migrationsReplaceLegacyTables() {
         assertThat(migrated.success).isTrue();
         assertThat(flyway.info().pending()).isEmpty();
@@ -87,7 +87,10 @@ class PaymentSchemaMigrationTest {
                         "payment_seller_amount",
                         "pg_call",
                         "ledger_journal",
-                        "ledger_entry");
+                        "ledger_entry",
+                        "refund",
+                        "refund_item",
+                        "refund_request_conflict");
     }
 
     @Test
