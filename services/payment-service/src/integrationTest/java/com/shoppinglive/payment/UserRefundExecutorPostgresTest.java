@@ -32,8 +32,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -42,6 +45,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @SpringBootTest(
         properties = {"spring.profiles.active=test", "shoppinglive.outbox.relay.enabled=false"})
 @Tag("postgres")
+@ExtendWith(OutputCaptureExtension.class)
 @EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     static final String SCHEMA =
@@ -635,31 +639,126 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-EXEC-01] NotSent가 첫 시도의 조회 마감을 넘기면 재요청 없이 멈추고 FAILED로 단정하지 않으며 한도를 계속 잡는다")
-    void notSentStopsAtFirstDeadline() throws Exception {
+    @DisplayName(
+            "[REF-EXEC-06] 취소가 모두 NOT_SENT인 채 마감이 지나면 FAILED(PG_UNAVAILABLE)로 끝내고 한도를 풀며 ERROR는 한 번이다")
+    void notSentOnlyFailsAtDeadline(CapturedOutput output) throws Exception {
         String orderRef = newOrderRef();
         long paymentId = approved(orderRef, true);
         Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
-        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.NotSent("연결 실패"));
+        when(toss.cancel(any(), any(), eq(refund.getRefundRequestId()), any()))
+                .thenReturn(new TossResult.NotSent("연결 실패"));
+        when(toss.getPayment(key(orderRef))).thenReturn(new TossResult.NotSent("연결 실패"));
+        executor.execute(refund);
+        expireDeadline(refund);
+        makeDue(refund);
+
+        executor.retryDue();
+        executor.retryDue();
+
+        verify(toss, times(1)).cancel(any(), any(), eq(refund.getRefundRequestId()), any());
+        assertFailed(refund, "PG_UNAVAILABLE");
+        assertNoMoneyMoved(refund, paymentId);
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).hasSize(1);
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        when(toss.cancel(any(), any(), eq(other.getRefundRequestId()), any()))
+                .thenReturn(canceled(other));
+        executor.execute(other);
+        assertThat(refund(other.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] NOT_SENT 뒤 결과 불명 호출이 있으면 마감에도 UNKNOWN으로 멈추고 한도를 잡으며 ERROR는 한 번이다")
+    void unknownCallStaysUnknownAtDeadline(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        when(toss.cancel(any(), any(), eq(refund.getRefundRequestId()), any()))
+                .thenReturn(new TossResult.NotSent("연결 실패"), new TossResult.Unknown("시간 초과"));
         when(toss.getPayment(key(orderRef)))
                 .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
         executor.execute(refund);
-        Object firstDeadline = refund(refund.getRefundRequestId()).get("check_deadline_at");
-        assertThat(firstDeadline).isNotNull();
+        makeDue(refund);
+        executor.retryDue();
+        expireDeadline(refund);
+        makeDue(refund);
+
+        executor.retryDue();
+        executor.retryDue();
+
+        verify(toss, times(2)).cancel(any(), any(), eq(refund.getRefundRequestId()), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        executor.execute(other);
+        assertFailed(other, "OVER_REFUND");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-04] NotSent 뒤 처음 결과 불명이 되면 조회 마감을 그 시점부터 새로 잡는다")
+    void firstUnknownAfterNotSentRestartsDeadline() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenReturn(new TossResult.NotSent("연결 실패"), new TossResult.Unknown("시간 초과"));
+        executor.execute(refund);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = now() + INTERVAL '1' MINUTE WHERE id = ?",
                 refund.getId());
         makeDue(refund);
 
         executor.retryDue();
 
-        verify(toss, times(1)).cancel(any(), any(), any(), any());
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
-        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
-        assertThat(results(orderRef)).isEmpty();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT check_deadline_at > now() + INTERVAL '20' MINUTE FROM refund"
+                                        + " WHERE id = ?",
+                                Boolean.class,
+                                refund.getId()))
+                .isTrue();
+    }
 
-        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
-        executor.execute(other);
-        assertFailed(other, "OVER_REFUND");
+    @Test
+    @DisplayName("[REF-EXEC-06] 조회 중 다른 실행이 선점하면 멈춘 실행은 취소를 다시 보내지 않는다")
+    void staleRecoveryDoesNotResend() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef)))
+                .thenAnswer(
+                        call -> {
+                            jdbc.update(
+                                    "UPDATE refund SET attempt_count = attempt_count + 1 WHERE id = ?",
+                                    refund.getId());
+                            return new TossResult.Success(tossPayment(refund, "DONE", false));
+                        });
+        executor.execute(refund);
+        makeDue(refund);
+
+        executor.retryDue();
+
+        verify(toss, times(1)).cancel(any(), any(), any(), any());
+    }
+
+    private void expireDeadline(Refund refund) {
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+    }
+
+    private static long deadlineLogs(CapturedOutput output, Refund refund) {
+        return output.getAll()
+                .lines()
+                .filter(line -> line.contains("payment.refund.deadline"))
+                .filter(line -> line.contains("refundRequestId=" + refund.getRefundRequestId()))
+                .count();
     }
 }
