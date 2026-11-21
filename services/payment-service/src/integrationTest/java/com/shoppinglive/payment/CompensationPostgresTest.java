@@ -703,6 +703,30 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
                 .count();
     }
 
+    @Test
+    @DisplayName(
+            "[REF-LATE-01][REF-EXEC-06] PG_UNAVAILABLE로 끝난 고객 환불은 토스에 갔을 수 있는 환불이 아니라 APPROVED 보상을 막지 않는다")
+    void pgUnavailableUserRefundDoesNotBlockApproved() throws Exception {
+        ApproveCommand c = approved();
+        Refund failed = receive(c);
+        jdbc.update(
+                "UPDATE refund SET purpose = 'USER_REFUND', status = 'FAILED',"
+                        + " failure_code = 'PG_UNAVAILABLE', result_version = 1,"
+                        + " result_payload = '{}', resolved_at = now(), next_attempt_at = NULL"
+                        + " WHERE id = ?",
+                failed.getId());
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        verify(toss).cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId()));
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
     private ApproveCommand approved() {
         ApproveCommand c = newPayment();
