@@ -61,6 +61,6 @@
 <li><code>nextActionAt</code>: null</li>
 <li><code>failureCode</code></li>
 </ul>
-<p>다시 보낼 때 payload는 처음과 같아야 하므로 <code>resolvedAt</code>은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>3d8178b64198324c22de3f9342002b1c976d8f43289ce37667c7b5e6d570f20b</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>d39b04c2509f4281f817034ea62af5d3a6cf630c3c43681725d8648bafac2812</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

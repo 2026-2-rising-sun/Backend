@@ -1726,7 +1726,7 @@ CREATE INDEX ix_settlement_pending ON settlement_item(seller_id, scheduled_date)
 | --- | --- | --- |
 | 판매자별 금액 합 \= 결제 금액 | 결제 생성 | 합이 다르면 400 `SUM_MISMATCH` |
 | 분개 하나의 차변 합 \= 대변 합 | `Journal.of(...)` 생성자 | 안 맞으면 예외, 저장 안 됨 |
-| 환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤ | 환불 접수. `payment` 행을 `FOR UPDATE`로 잠그고 합을 계산 | 동시 환불 2건이 합쳐 초과하면 한 건은 409 `OVER_REFUND` |
+| 환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤ | 환불 접수. `payment` 행을 `FOR UPDATE`로 잠그고 합을 계산 | 동시 환불 2건이 합쳐 초과하면 한 건은 결과 이벤트 FAILED(`OVER_REFUND`) |
 | 구매확정 판매 금액 \= 판매자 주문 금액 − 성공한 환불 합 | 구매확정 처리. `payment` 행을 `FOR UPDATE`로 잠근다 | 4,000원 환불 후 확정하면 NORMAL 항목은 6,000원 |
 | 확정 시점에 진행 중(PROCESSING·UNKNOWN)이던 환불이 나중에 성공하면 역정산 | 환불 성공 반영. 같은 `payment` 행 잠금 아래에서 그 판매자 주문의 NORMAL 항목이 있으면 REVERSAL 추가 | 확정과 환불 성공이 동시에 와도 둘 중 하나만 금액을 반영 |
 | 수수료 \= `floor(판매 금액 × commission_rate)`(원 미만 버림), 지급 \= 판매 − 수수료. 역정산 수수료 \= `floor(환불 전 남은 판매 × rate) − floor(환불 후 남은 판매 × rate)`(음수로 기록) | 정산 항목 생성 | 10,000원 · 0\.1 → 수수료 1,000\. 3,333원과 6,667원을 나눠 환불하면 역정산 수수료 −334(1,000 − floor(666\.7\)), −666 → 합 −1,000\. 전액 환불 뒤 수수료가 정확히 0 |
@@ -2596,10 +2596,10 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 | 38 | 대사에서 "토스 DONE · 우리 CANCELED" 발견 | APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불) | 거래 대사 | 12 |
 | 환불 | | | | |
 | 39 | 환불 요청 중복(이벤트 재전달·재시도) | 1번만 실행 | `refund_request_id` UNIQUE · `ON CONFLICT DO NOTHING` | 7 |
-| 40 | 동시 부분 환불의 합이 결제 금액 초과 | 한 건 409 `OVER_REFUND` | `payment` 행 FOR UPDATE 후 합 계산 | DDL |
+| 40 | 동시 부분 환불의 합이 결제 금액 초과 | 한 건 결과 이벤트 FAILED(`OVER_REFUND`) | `payment` 행 FOR UPDATE 후 합 계산 | DDL |
 | 41 | 환불 호출 타임아웃 | UNKNOWN → 조회. 이중 환불 없음 | 토스 멱등키 \= `refund_request_id` | 7 |
 | 42 | 환불 실패(토스 4xx) | "환불 실패됨" → 운영자 | 이벤트 \+ 거래 대사 | 7 |
-| 43 | 부분 취소가 안 되는 결제수단에 부분 환불 | 409 `PARTIAL_NOT_ALLOWED` | `partial_cancelable` | 7 |
+| 43 | 부분 취소가 안 되는 결제수단에 부분 환불 | 결과 이벤트 FAILED(`PARTIAL_NOT_ALLOWED`) | `partial_cancelable` | 7 |
 | 재고 · 쿠폰 정합성 | | | | |
 | 44 | 늦은 승인 환불 때 재고 | 변화 없음(이미 반환됨) | 환불 사유로 분기 | 주문 |
 | 45 | 재고 카운터와 예약 행이 어긋남(버그) | 알림. 자동 수정 안 함 | 정기 점검 `reserved = SUM(HELD)` | 주문 |
