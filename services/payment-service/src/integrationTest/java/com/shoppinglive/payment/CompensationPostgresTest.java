@@ -400,6 +400,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
         assertHeld(c, refund);
         verify(toss).getPayment(c.paymentKey());
+        assertThat(secondsToNextAttempt(refund)).as("재시도 없이 사람 확인").isNull();
         assertThat(status(c.orderRef())).isEqualTo("APPROVED");
         assertThat(refundJournals(refund)).isZero();
     }
@@ -567,6 +568,141 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertRefunded(c, refund);
     }
 
+    @Test
+    @DisplayName(
+            "[REF-LATE-02] APPROVED를 읽은 뒤 고객 환불이 반영되면 잠금 안에서 다시 확인해 전액 취소를 보내지 않고 FAILED(NOT_REFUNDABLE)")
+    void partialRefundLandsBeforeLock(CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c);
+
+        CompletableFuture<Void> execution =
+                tx.execute(
+                        s -> {
+                            jdbc.queryForObject(
+                                    "SELECT id FROM payment WHERE order_ref = ? FOR UPDATE",
+                                    Long.class,
+                                    c.orderRef());
+                            CompletableFuture<Void> running =
+                                    CompletableFuture.runAsync(() -> intake.execute(refund));
+                            awaitBlockedPaymentUpdate();
+                            jdbc.update(
+                                    "UPDATE payment SET status = 'PARTIALLY_REFUNDED',"
+                                            + " refunded_amount = 10000 WHERE order_ref = ?",
+                                    c.orderRef());
+                            return running;
+                        });
+        execution.get(10, TimeUnit.SECONDS);
+
+        assertFailed(c, refund, "NOT_REFUNDABLE");
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+        assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"APPROVING", "APPROVED"})
+    @DisplayName("[REF-LATE-01] 취소가 NOT_CANCELABLE_PAYMENT면 재시도하지 않고 사람 확인으로 보류한다")
+    void notCancelableStops(String paymentStatus, CapturedOutput output) throws Exception {
+        ApproveCommand c = paymentStatus.equals("APPROVED") ? approved() : approving();
+        tossQuery(c, new TossResult.Success(done(c)));
+        tossCancel(c, new TossResult.Declined("NOT_CANCELABLE_PAYMENT", "취소 불가", 403));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 재시도 한도를 넘으면 사람 확인 알림을 한 번만 남기고 재시도는 계속한다")
+    void overdueAlertsOnce(CapturedOutput output) throws Exception {
+        ApproveCommand c = approving();
+        when(toss.getPayment(c.paymentKey())).thenReturn(new TossResult.Unknown("HTTP 500", 500));
+        Refund refund = receive(c);
+        jdbc.update("UPDATE refund SET attempt_count = 10 WHERE id = ?", refund.getId());
+
+        intake.execute(refund);
+        assertThat(secondsToNextAttempt(refund)).isPositive();
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(overdueAlerts(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 한도에 닿은 실행이 예외로 끝나도 사람 확인 알림이 남는다")
+    void overdueAlertsWhenAttemptThrows(CapturedOutput output) throws Exception {
+        ApproveCommand c = approving();
+        when(toss.getPayment(c.paymentKey())).thenThrow(new IllegalStateException("조회 실패"));
+        Refund refund = receive(c);
+        jdbc.update("UPDATE refund SET attempt_count = 9 WHERE id = ?", refund.getId());
+
+        intake.execute(refund);
+
+        assertThat(overdueAlerts(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 토스가 이미 CANCELED인 막힌 결제의 SUCCEEDED에 취소 거래 키를 남긴다")
+    void canceledQueryKeepsTransactionKey() throws Exception {
+        ApproveCommand c = approving();
+        tossQuery(c, new TossResult.Success(canceledBy(c, "토스 관리자 취소")));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertThat(transactionKey(refund)).isEqualTo("tx-" + c.orderRef());
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 막힌 결제를 취소한 응답의 거래 키를 SUCCEEDED에 남긴다")
+    void cancelKeepsTransactionKey() throws Exception {
+        ApproveCommand c = approving();
+        tossQuery(c, new TossResult.Success(done(c)));
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertThat(transactionKey(refund)).isEqualTo("tx-" + c.orderRef());
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 막힌 결제의 취소가 ALREADY_CANCELED면 다시 조회한 취소 내역의 거래 키를 남긴다")
+    void alreadyCanceledKeepsTransactionKey() throws Exception {
+        ApproveCommand c = approving();
+        when(toss.getPayment(c.paymentKey()))
+                .thenReturn(new TossResult.Success(done(c)))
+                .thenReturn(
+                        new TossResult.Success(
+                                canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+        tossCancel(c, ALREADY_CANCELED);
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertThat(transactionKey(refund)).isEqualTo("tx-" + c.orderRef());
+    }
+
+    private String transactionKey(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT pg_transaction_key FROM refund WHERE id = ?", String.class, refund.getId());
+    }
+
+    private static long overdueAlerts(CapturedOutput output, Refund refund) {
+        return output.getAll()
+                .lines()
+                .filter(l -> l.contains("[사람 확인 필요]") && l.contains("확정되지 않았다"))
+                .filter(l -> l.contains(refund.getRefundRequestId()))
+                .count();
+    }
+
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
     private ApproveCommand approved() {
         ApproveCommand c = newPayment();
@@ -633,14 +769,14 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
             Integer blocked =
                     jdbc.queryForObject(
                             "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
-                                    + " AND query LIKE '%UPDATE payment%'",
+                                    + " AND query ILIKE '%payment%'",
                             Integer.class);
             if (blocked != null && blocked > 0) {
                 return;
             }
             Thread.onSpinWait();
         }
-        throw new AssertionError("보상의 결제 UPDATE가 잠금을 기다리지 않았다");
+        throw new AssertionError("보상이 결제 행 잠금을 기다리지 않았다");
     }
 
     private void tossQuery(ApproveCommand c, TossResult result) {
