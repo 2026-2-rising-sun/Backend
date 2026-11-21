@@ -496,6 +496,28 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName("[REF-EXEC-04] 토스 취소는 확인됐는데 결제 반영이 계속 실패해도 조회 마감이 지나면 멈춘다")
+    void stopsAtDeadlineWhenSettleKeepsFailing() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef))).thenReturn(canceled(refund));
+        executor.execute(refund);
+        jdbc.update("UPDATE payment SET refunded_amount = ? WHERE id = ?", AMOUNT - 1, paymentId);
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+        makeDue(refund);
+
+        executor.retryDue();
+
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    @Test
     @DisplayName("[REF-EXEC-01] 커밋 뒤 실행되지 못한 환불은 재처리가 집고, 선점된 환불은 다시 실행하지 않으며, 시스템 보상은 집지 않는다")
     void retriesOnlyDueUserRefunds() throws Exception {
         String orderRef = newOrderRef();

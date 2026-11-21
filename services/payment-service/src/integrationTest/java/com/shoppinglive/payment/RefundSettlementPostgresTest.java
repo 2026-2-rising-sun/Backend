@@ -149,6 +149,25 @@ class RefundSettlementPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName("[REF-EXEC-05] 0원 환불은 돈이 움직이지 않으므로 반영을 거부하고 아무것도 바꾸지 않는다")
+    void rejectsZeroAmount() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approvedPayment(orderRef);
+        Refund refund =
+                intake.receive(withAmount(request(orderRef, paymentId, "USER_REFUND"), 0))
+                        .orElseThrow();
+
+        assertThatThrownBy(() -> settlement.settle(refund.getId(), "tx-" + refund.getId()))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "PROCESSING");
+        assertThat(jdbc.queryForMap("SELECT * FROM payment WHERE id = ?", paymentId))
+                .containsEntry("status", "APPROVED")
+                .containsEntry("refunded_amount", 0L);
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    @Test
     @DisplayName("[REF-EXEC-01][REF-EXEC-02] 같은 환불을 동시에 반영해도 돈은 한 번만 움직인다")
     void concurrentSettleMovesMoneyOnce() throws Exception {
         String orderRef = newOrderRef();
