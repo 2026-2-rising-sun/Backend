@@ -116,7 +116,9 @@ class RefundResultRecordedContractTest {
         "user-succeeded,USER_REFUND,CUSTOMER_REQUEST,1,SUCCEEDED,4000,",
         "system-failed,SYSTEM_COMPENSATION,LATE_APPROVAL,1,FAILED,0,REJECT_CARD_COMPANY",
         "system-succeeded-v2,SYSTEM_COMPENSATION,LATE_APPROVAL,2,SUCCEEDED,4000,",
-        "system-no-charge-v2,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,2,NO_CHARGE,0,NO_CHARGE"
+        "system-no-charge-v2,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,2,NO_CHARGE,0,NO_CHARGE",
+        "system-not-refundable,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,1,FAILED,0,NOT_REFUNDABLE",
+        "system-amount-mismatch,SYSTEM_COMPENSATION,LATE_APPROVAL,1,FAILED,0,PAYMENT_MISMATCH"
     })
     @DisplayName("[REF-EXEC-02][REF-EXEC-03][REF-LATE-02] 실행 결과(성공·실패·미승인, 버전 2 포함)도 결과 계약을 지킨다")
     void writesExecutionResultSamples(

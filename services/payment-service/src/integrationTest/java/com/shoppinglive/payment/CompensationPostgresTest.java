@@ -14,12 +14,14 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.shoppinglive.payment.client.toss.TossPayment;
 import com.shoppinglive.payment.client.toss.TossResult;
 import com.shoppinglive.payment.config.PaymentError;
 import com.shoppinglive.payment.config.PaymentException;
 import com.shoppinglive.payment.payment.service.ApprovalResult;
 import com.shoppinglive.payment.payment.service.ApprovalService;
 import com.shoppinglive.payment.payment.service.ApprovalService.ApproveCommand;
+import com.shoppinglive.payment.payment.service.PaymentOutcomeService;
 import com.shoppinglive.payment.refund.entity.Refund;
 import com.shoppinglive.payment.refund.service.RefundIntakeService;
 import com.shoppinglive.payment.refund.service.compensation.CompensationRetryJob;
@@ -28,6 +30,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 시스템 보상(#386): 결제 상태별 처리와 토스 조회 결과별 처리. 토스는 테스트 대역이고 시각은 DB 값을 과거로 넣어 만든다. */
 @ExtendWith(OutputCaptureExtension.class)
@@ -51,6 +56,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     @Autowired RefundIntakeService intake;
     @Autowired CompensationRetryJob retryJob;
     @Autowired ApprovalService approvalService;
+    @Autowired TransactionTemplate tx;
 
     /** 같은 스키마의 다른 테스트가 남긴 보상이 재처리 대상이 되지 않게 한다. */
     @BeforeEach
@@ -327,6 +333,219 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(refundResults(c)).hasSize(1);
     }
 
+    @Test
+    @DisplayName(
+            "[REF-LATE-01][REF-EXEC-02] APPROVED는 cancel-{pgOrderId}로 전액 취소하고 REFUNDED·refund_item·반대 분개·SUCCEEDED를 함께 남긴다")
+    void approvedRefundsInFull() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] APPROVED 취소 응답을 잃고 ALREADY_CANCELED면 조회한 내 취소 내역의 거래 키로 반영한다")
+    void approvedAlreadyCanceledByUsSettles() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, ALREADY_CANCELED);
+        tossQuery(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] APPROVED의 ALREADY_CANCELED가 다른 환불의 취소면 그 돈을 이 요청의 환불로 반영하지 않고 보류한다")
+    void approvedCanceledByOtherRefundIsHeld() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, ALREADY_CANCELED);
+        tossQuery(c, new TossResult.Success(canceledBy(c, "고객 환불 다른-요청")));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+        assertThat(status(c.orderRef())).isEqualTo("APPROVED");
+        assertThat(refundJournals(refund)).isZero();
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] APPROVED 취소가 불명이면 보류하고 같은 키로 다시 보내 한 번만 반영한다")
+    void approvedCancelRetries() throws Exception {
+        ApproveCommand c = approved();
+        when(toss.cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId())))
+                .thenReturn(new TossResult.Unknown("HTTP 500", 500))
+                .thenReturn(
+                        new TossResult.Success(
+                                canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        assertHeld(c, refund);
+
+        makeDue(refund);
+        retryJob.run();
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-01] 막으려는 UPDATE가 그 사이 APPROVED에 져서 0행이면 다시 읽어 전액 환불한다")
+    void blockLosesToApproval() throws Exception {
+        ApproveCommand c = newPayment();
+        ApprovalService.Attempt attempt = (ApprovalService.Attempt) approvalService.start(c);
+        tossCancel(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+        Refund refund = receive(c);
+
+        CompletableFuture<Void> execution =
+                tx.execute(
+                        s -> {
+                            jdbc.queryForObject(
+                                    "SELECT id FROM payment WHERE order_ref = ? FOR UPDATE",
+                                    Long.class,
+                                    c.orderRef());
+                            CompletableFuture<Void> running =
+                                    CompletableFuture.runAsync(() -> intake.execute(refund));
+                            awaitBlockedPaymentUpdate();
+                            outcomes.applyDone(attempt.paymentId(), attempt.pgCallId(), done(c));
+                            return running;
+                        });
+        execution.get(10, TimeUnit.SECONDS);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        assertRefunded(c, refund);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PARTIALLY_REFUNDED", "REFUNDED"})
+    @DisplayName("[REF-LATE-02] 이미 환불이 반영된 결제는 토스를 부르지 않고 FAILED(NOT_REFUNDABLE)와 사람 확인 로그")
+    void alreadyRefundedFails(String paymentStatus, CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        jdbc.update(
+                "UPDATE payment SET status = ?, refunded_amount = ? WHERE order_ref = ?",
+                paymentStatus,
+                paymentStatus.equals("REFUNDED") ? AMOUNT : 1000,
+                c.orderRef());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertFailed(c, refund, "NOT_REFUNDABLE");
+        assertThat(status(c.orderRef())).isEqualTo(paymentStatus);
+        verify(toss, never()).getPayment(anyString());
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+        assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"CREATED", "APPROVING", "APPROVED"})
+    @DisplayName("[REF-LATE-02] 요청 금액이 결제 금액과 다르면 상태와 무관하게 결제를 바꾸지 않고 FAILED(PAYMENT_MISMATCH)")
+    void amountMismatchFails(String paymentStatus, CapturedOutput output) throws Exception {
+        ApproveCommand c =
+                switch (paymentStatus) {
+                    case "APPROVING" -> approving();
+                    case "APPROVED" -> approved();
+                    default -> newPayment();
+                };
+
+        Refund refund = receive(c, AMOUNT - 1);
+        intake.execute(refund);
+
+        assertFailed(c, refund, "PAYMENT_MISMATCH");
+        assertThat(status(c.orderRef())).isEqualTo(paymentStatus);
+        verify(toss, never()).getPayment(c.paymentKey());
+        verify(toss, never()).cancel(eq(c.paymentKey()), anyString(), anyString());
+        assertThat(output.getAll()).contains("[사람 확인 필요]", refund.getRefundRequestId());
+    }
+
+    /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
+    private ApproveCommand approved() {
+        ApproveCommand c = newPayment();
+        when(toss.confirm(eq(c.paymentKey()), eq(c.pgOrderId()), eq(c.amount()), anyString()))
+                .thenReturn(new TossResult.Success(done(c)));
+        approvalService.approve(c);
+        assertThat(status(c.orderRef())).isEqualTo("APPROVED");
+        return c;
+    }
+
+    private static TossPayment canceledBy(ApproveCommand c, String reason) {
+        return new TossPayment(
+                c.paymentKey(),
+                c.pgOrderId(),
+                "CANCELED",
+                c.amount(),
+                null,
+                true,
+                List.of(new TossPayment.Cancel("tx-" + c.orderRef(), reason, c.amount(), "DONE")));
+    }
+
+    private void assertRefunded(ApproveCommand c, Refund refund) {
+        Map<String, Object> row = payment(c.orderRef());
+        assertThat(row.get("status")).isEqualTo("REFUNDED");
+        assertThat(row.get("refunded_amount")).isEqualTo(AMOUNT);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT pg_transaction_key FROM refund WHERE id = ?",
+                                String.class,
+                                refund.getId()))
+                .isEqualTo("tx-" + c.orderRef());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM refund_item WHERE refund_id = ?",
+                                Integer.class,
+                                refund.getId()))
+                .isEqualTo(1);
+        assertThat(refundJournals(refund)).isEqualTo(1);
+    }
+
+    private int refundJournals(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM ledger_journal WHERE ref_type = 'REFUND_SUCCEEDED' AND ref_id = ?",
+                Integer.class,
+                String.valueOf(refund.getId()));
+    }
+
+    private void assertFailed(ApproveCommand c, Refund refund, String failureCode)
+            throws Exception {
+        assertResolved(c, refund, "FAILED", 0);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT failure_code FROM refund WHERE id = ?",
+                                String.class,
+                                refund.getId()))
+                .isEqualTo(failureCode);
+    }
+
+    private void awaitBlockedPaymentUpdate() {
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < until) {
+            Integer blocked =
+                    jdbc.queryForObject(
+                            "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'"
+                                    + " AND query LIKE '%UPDATE payment%'",
+                            Integer.class);
+            if (blocked != null && blocked > 0) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
+        throw new AssertionError("보상의 결제 UPDATE가 잠금을 기다리지 않았다");
+    }
+
     private void tossQuery(ApproveCommand c, TossResult result) {
         when(toss.getPayment(c.paymentKey())).thenReturn(result);
     }
@@ -338,6 +557,10 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
     /** Core가 보내는 모양의 전액 시스템 보상 요청을 접수한다. */
     private Refund receive(ApproveCommand c) throws Exception {
+        return receive(c, AMOUNT);
+    }
+
+    private Refund receive(ApproveCommand c, long amount) throws Exception {
         ObjectNode payload = JSON.createObjectNode();
         payload.put("refundRequestId", UUID.randomUUID().toString());
         payload.put("orderRef", c.orderRef());
@@ -345,14 +568,14 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         payload.put("purpose", "SYSTEM_COMPENSATION");
         payload.put("reason", "APPROVAL_UNKNOWN");
         payload.put("currency", "KRW");
-        payload.put("amount", AMOUNT);
+        payload.put("amount", amount);
         ObjectNode seller = payload.putArray("items").addObject();
         seller.put("sellerOrderNumber", c.orderRef() + "-S1");
-        seller.put("amount", AMOUNT);
+        seller.put("amount", amount);
         ObjectNode item = seller.putArray("orderItems").addObject();
         item.put("orderItemId", 301);
         item.put("quantity", 1);
-        item.put("amount", AMOUNT);
+        item.put("amount", amount);
         payload.put("requestedAt", "2026-11-21T00:59:59.123456789Z");
         return intake.receive(JSON.readTree(JSON.writeValueAsString(payload))).orElseThrow();
     }
