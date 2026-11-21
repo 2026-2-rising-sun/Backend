@@ -34,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class PaymentOutcomeService {
     private static final Logger log = LoggerFactory.getLogger(PaymentOutcomeService.class);
-    static final String COMPENSATION_REASON = "승인 응답 불일치";
+    public static final String COMPENSATION_REASON = "승인 응답 불일치";
 
     private final PaymentRepository payments;
     private final PgCallRepository pgCalls;

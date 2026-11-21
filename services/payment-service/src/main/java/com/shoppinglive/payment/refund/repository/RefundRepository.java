@@ -83,6 +83,22 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("now") Instant now,
             @Param("leaseUntil") Instant leaseUntil);
 
+    /** 이번 선점의 다음 처리 시각을 정한다. null이면 사람 확인까지 재처리하지 않는다. 0이면 다른 실행이 이미 집었거나 끝났다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET next_attempt_at = CAST(:next AS TIMESTAMP WITH TIME ZONE), updated_at = now()
+                     WHERE id = :id AND status = 'PROCESSING' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int reschedule(
+            @Param("id") long id,
+            @Param("attemptCount") int attemptCount,
+            @Param("next") Instant next);
+
     /** 결과 기록. 읽은 상태·버전 그대로일 때만 바꾼다. 0이면 다른 반영이 먼저 했다. */
     @Modifying(clearAutomatically = true)
     @Query(

@@ -125,6 +125,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             nativeQuery = true)
     int markCanceled(@Param("id") long id);
 
+    /** 시스템 보상: CREATED일 때만 막는다. 승인이 그 사이 시작됐으면 0행이라 조회 없는 NO_CHARGE로 가지 않는다. */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE payment SET status = 'CANCELED', updated_at = now()
+                     WHERE id = :id AND status = 'CREATED'
+                    """,
+            nativeQuery = true)
+    int cancelCreated(@Param("id") long id);
+
     // ---- 복구·만료(#349). 아래 SQL은 PostgreSQL 전용이고 테스트도 @Tag("postgres")다 ----
 
     /** APPROVING 정체 → UNKNOWN, 바로 조회. 바깥 조건을 다시 걸어 동시 실행·새 승인 시도를 옮기지 않는다(PAY-RECOVER-01). */

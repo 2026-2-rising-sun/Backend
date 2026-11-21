@@ -160,7 +160,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
     @ParameterizedTest
     @ValueSource(strings = {"IN_PROGRESS", "READY", "NOT_FOUND_PAYMENT"})
-    @DisplayName("[REF-LATE-02] 진행 중·404는 첫 CONFIRM + 2×응답 한도 + 여유 전에는 보류하고, 지난 뒤 다시 조회해 그대로면 NO_CHARGE")
+    @DisplayName(
+            "[REF-LATE-02] 진행 중·404는 첫 CONFIRM + 2×응답 한도 + 여유 전에는 보류하고, 지난 뒤 다시 조회해 그대로면 NO_CHARGE")
     void waitsForConfirmWindowThenNoCharge(String answer) throws Exception {
         ApproveCommand c = approving();
         TossResult result =
