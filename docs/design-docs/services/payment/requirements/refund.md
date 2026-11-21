@@ -44,7 +44,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 ## 시스템 보상과 늦은 승인
 
 - [ ] **REF-LATE-01** `SYSTEM_COMPENSATION` 요청(사유 `LATE_APPROVAL`·`APPROVAL_UNKNOWN` 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 `late-{paymentId}`다. 중복 수신은 1건이다. (EC 28, 37)
-- [ ] **REF-LATE-02** 시스템 보상의 FAILED 뒤에 더 높은 `resultVersion`으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(`failureCode: NO_CHARGE`, `refundedAmount` 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.
+- [ ] **REF-LATE-02** 시스템 보상의 FAILED 뒤에 더 높은 `resultVersion`으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(`failureCode: NO_CHARGE`, `refundedAmount` 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다. 접수에서 실패한 행(`payment_id` 없음, `PAYMENT_NOT_FOUND`·`PAYMENT_ID_REQUIRED`·`PAYMENT_MISMATCH`·`COMPENSATION_IN_PROGRESS`)은 토스를 부른 적이 없으므로 이 전이를 허용하지 않는다.
 
 ## 결과 이벤트
 
@@ -57,4 +57,4 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
   - `nextActionAt`: null
   - `failureCode`
 
-  다시 보낼 때 payload는 처음과 같아야 하므로 `resolvedAt`은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.
+  다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(`resolvedAt` 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.

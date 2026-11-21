@@ -49,7 +49,7 @@
 <h2 id="시스템-보상과-늦은-승인">시스템 보상과 늦은 승인</h2>
 <ul>
 <li>[ ] <strong>REF-LATE-01</strong> <code>SYSTEM_COMPENSATION</code> 요청(사유 <code>LATE_APPROVAL</code>·<code>APPROVAL_UNKNOWN</code> 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 <code>late-{paymentId}</code>다. 중복 수신은 1건이다. (EC 28, 37)</li>
-<li>[ ] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.</li>
+<li>[ ] <strong>REF-LATE-02</strong> 시스템 보상의 FAILED 뒤에 더 높은 <code>resultVersion</code>으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(<code>failureCode: NO_CHARGE</code>, <code>refundedAmount</code> 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다. 접수에서 실패한 행(<code>payment_id</code> 없음, <code>PAYMENT_NOT_FOUND</code>·<code>PAYMENT_ID_REQUIRED</code>·<code>PAYMENT_MISMATCH</code>·<code>COMPENSATION_IN_PROGRESS</code>)은 토스를 부른 적이 없으므로 이 전이를 허용하지 않는다.</li>
 </ul>
 <h2 id="결과-이벤트">결과 이벤트</h2>
 <ul>
@@ -62,6 +62,6 @@
 <li><code>nextActionAt</code>: null</li>
 <li><code>failureCode</code></li>
 </ul>
-<p>다시 보낼 때 payload는 처음과 같아야 하므로 <code>resolvedAt</code>은 DB에 저장한 정밀도로 정한다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>f3727ccfd5450959147048102b99a3d00bd9c35a844fc4849433c20ca25f4318</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>a7724b502c42e28d49ae69f360c7e5ca1a89c27ea9fe25b33d6d04758d122ed5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

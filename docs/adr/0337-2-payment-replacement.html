@@ -19,8 +19,8 @@
 <ul>
 <li>새 설계를 기준으로 Payment 코드·DB·API·이벤트 계약을 교체한다. 기존 동작과 호환을 맞추지 않는다.</li>
 <li>첫 PR에서 기존 결제 코드를 지운다. 이미 적용된 마이그레이션 V1–V3는 고치지 않고, 새 V4가 기존 결제 테이블을 지운 뒤 새 테이블을 만든다. <code>event_outbox</code>(V2·V3)는 공통 outbox가 쓰므로 남긴다.</li>
-<li>API 경로(<code>/v1/internal/payments</code>, <code>/v1/internal/refunds</code>)와 토픽 이름(<code>payment.execution-results.v1</code>, <code>payment.refund-results.v1</code>)은 유지하고 내용을 새 계약으로 바꾼다.</li>
-<li>정정(2026-11-21): 고객 환불은 HTTP <code>/v1/internal/refunds</code>가 아니라 Kafka <code>commerce.refund.requests.v1</code>(<code>purpose: USER_REFUND</code>)로 받는다. Payment 내부 API는 <code>/v1/internal/payments</code>만 남는다. 토픽 이름은 점 표기로 통일한다. 결과 토픽은 <code>payment.execution.results.v1</code>, <code>payment.refund.results.v1</code>이다(#384, #385).</li>
+<li>~~API 경로(<code>/v1/internal/payments</code>, <code>/v1/internal/refunds</code>)와 토픽 이름(<code>payment.execution-results.v1</code>, <code>payment.refund-results.v1</code>)은 유지하고 내용을 새 계약으로 바꾼다.~~ (대체됨: 아래 정정)</li>
+<li>정정(2026-11-21): 고객 환불은 HTTP <code>/v1/internal/refunds</code>가 아니라 Kafka <code>commerce.refund.requests.v1</code>(<code>purpose: USER_REFUND</code>)로 받는다. Payment 내부 API는 <code>/v1/internal/payments</code>만 남는다. 토픽 이름은 점 표기로 통일한다. 결과 토픽은 <code>payment.execution.results.v1</code>, <code>payment.refund.results.v1</code>이다(#384, #385). Core #378이 승인 결과의 점·하이픈 토픽을 함께 소비하는 것은 Payment가 점 표기로 옮기는 동안의 임시 공존이다.</li>
 <li>대안: 새 경로·새 토픽(v2)으로 공존시킨 뒤 기존을 지움. 아키텍처를 새로 설계하므로 공존 비용만 늘어 택하지 않았다.</li>
 </ul>
 <h2 id="영향">영향</h2>
@@ -28,6 +28,6 @@
 <li>CommerceCore 결제 연동이 새 계약으로 바뀔 때(주문 연동 단계)까지 통합 개발 환경의 결제가 동작하지 않는다.</li>
 <li>로컬 Kafka에 옛 형식 메시지가 남아 있으면 토픽을 비운다.</li>
 <li>현재 설계 문서(<code>design-docs/services/payment/*</code>, <code>order-payment.md</code>, <code>refund.md</code>, <code>requirements/order-payment.md</code>)는 교체 PR마다 코드와 함께 바꾼다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>759491b3687fd290bc4d25fc992ad9bbcc362b416c10ab41ba6fed111299c755</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>525e34d785e3b7d592d60b9852d4b19e12e505917ea976eb62729c85126c375a</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

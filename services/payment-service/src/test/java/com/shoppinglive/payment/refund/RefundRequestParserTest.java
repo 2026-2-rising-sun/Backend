@@ -116,4 +116,72 @@ class RefundRequestParserTest {
                         ((ObjectNode) e.get("payload").get("items").get(0).get("orderItems").get(0))
                                 .put("extra", 1));
     }
+
+    private static ObjectNode seller(ObjectNode event, int index) {
+        return (ObjectNode) event.get("payload").get("items").get(index);
+    }
+
+    private static ObjectNode orderItem(ObjectNode event) {
+        return (ObjectNode) seller(event, 0).get("orderItems").get(0);
+    }
+
+    private static void addSeller(ObjectNode event, String number, long itemId, long amount) {
+        ObjectNode added =
+                ((com.fasterxml.jackson.databind.node.ArrayNode) event.get("payload").get("items"))
+                        .addObject();
+        added.put("sellerOrderNumber", number);
+        added.put("amount", amount);
+        ObjectNode item = added.putArray("orderItems").addObject();
+        item.put("orderItemId", itemId);
+        item.put("quantity", 1);
+        item.put("amount", amount);
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-07] 중복 ID·합계 불일치·목적과 사유 조합 위반·날짜가 아닌 requestedAt은 해석할 수 없다")
+    void rejectsOriginalsCoreWouldReject() {
+        rejects(
+                e -> {
+                    ObjectNode duplicate = orderItem(e).deepCopy();
+                    ((com.fasterxml.jackson.databind.node.ArrayNode) seller(e, 0).get("orderItems"))
+                            .add(duplicate);
+                    seller(e, 0).put("amount", 8000);
+                    ((ObjectNode) e.get("payload")).put("amount", 8000);
+                });
+        rejects(
+                e -> {
+                    addSeller(e, "ORDER-302", 301, 1000); // 판매자가 달라도 주문 항목 ID는 전체에서 하나다
+                    ((ObjectNode) e.get("payload")).put("amount", 5000);
+                });
+        rejects(
+                e -> {
+                    addSeller(e, "ORDER-301", 302, 1000);
+                    ((ObjectNode) e.get("payload")).put("amount", 5000);
+                });
+        rejects(e -> orderItem(e).put("amount", 3999));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("amount", 3999));
+        rejects(
+                e -> {
+                    addSeller(e, "ORDER-302", 302, Long.MAX_VALUE);
+                    ((ObjectNode) e.get("payload")).put("amount", 3999);
+                });
+        rejects(e -> ((ObjectNode) e.get("payload")).put("reason", "CUSTOMER_REQUEST"));
+        rejects(e -> ((ObjectNode) e.get("payload")).put("requestedAt", "not-a-date"));
+    }
+
+    @Test
+    @DisplayName("[REF-ACCEPT-07] 0원 항목과 0원 요청은 정상이다")
+    void acceptsZeroAmounts() throws Exception {
+        ObjectNode zeroItem = event();
+        addSeller(zeroItem, "ORDER-302", 302, 0);
+        assertThat(RefundRequestParser.parse(KEY, JSON.writeValueAsString(zeroItem)))
+                .isEqualTo(JSON.readTree(JSON.writeValueAsString(zeroItem)).get("payload"));
+
+        ObjectNode zeroRequest = event();
+        orderItem(zeroRequest).put("amount", 0);
+        seller(zeroRequest, 0).put("amount", 0);
+        ((ObjectNode) zeroRequest.get("payload")).put("amount", 0);
+        assertThat(RefundRequestParser.parse(KEY, JSON.writeValueAsString(zeroRequest)))
+                .isEqualTo(JSON.readTree(JSON.writeValueAsString(zeroRequest)).get("payload"));
+    }
 }
