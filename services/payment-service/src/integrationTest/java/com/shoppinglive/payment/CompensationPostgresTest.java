@@ -877,6 +877,30 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("[REF-EXEC-06] 끝나지 않는 고객 환불을 기다리는 보상도 24시간 상한이 지나면 취소 없이 멈춘다")
+    void waitingCompensationStopsAfterGiveUp(CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        Refund user = receive(c);
+        jdbc.update(
+                "UPDATE refund SET purpose = 'USER_REFUND', status = 'UNKNOWN', next_attempt_at = NULL,"
+                        + " check_deadline_at = now() + INTERVAL '1' DAY WHERE id = ?",
+                user.getId());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.0 * 3600);
+
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(refundStatus(refund)).isEqualTo("UNKNOWN");
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+    }
+
     private void insertCancelCall(ApproveCommand c, String outcome, Integer httpStatus) {
         jdbc.update(
                 "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome,"
