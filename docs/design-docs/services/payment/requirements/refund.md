@@ -37,10 +37,12 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
   - 결제 환불액과 상태(PARTIALLY_REFUNDED/REFUNDED)
   - 분개([LED-REFUND-01](ledger.md))
   - `RefundResultRecorded`(SUCCEEDED, `refundedAmount` = 요청 금액)
-- [x] **REF-EXEC-03** 토스가 거절(4xx)하면 FAILED와 `RefundResultRecorded`(FAILED, `refundedAmount` 0)를 기록한다. (EC 42)
+- [x] **REF-EXEC-03** 이전 호출 없는 첫 호출을 토스가 거절(4xx)하면 FAILED와 `RefundResultRecorded`(FAILED, `refundedAmount` 0)를 기록한다. (EC 42)
 - [x] **REF-EXEC-04** 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다.
 - [x] **REF-EXEC-05** 쿠폰 등으로 실결제액이 0원인 항목의 고객 환불은 정상 요청이다. 전체 `amount`가 0이면 결제 상태만 확인하고(APPROVED·PARTIALLY_REFUNDED·REFUNDED가 아니면 FAILED `NOT_REFUNDABLE`), 토스 호출·분개·결제 변경 없이 SUCCEEDED(`refundedAmount` 0, 거래 키 없음)를 기록한다. 금액이 있는 요청의 0원 판매자 줄은 판매자 주문·누적 한도 검증과 `refund_item`에서 뺀다.
-- [x] **REF-EXEC-06** 고객 환불의 조회 마감까지 취소 호출(`pg_call` CANCEL)이 모두 `NOT_SENT`면 돈이 나가지 않았으므로 FAILED(`PG_UNAVAILABLE`, `refundedAmount` 0)로 끝내 한도를 풀고 ERROR 로그를 한 번 남긴다. SUCCESS·DECLINED·UNKNOWN 호출이 하나라도 있으면 UNKNOWN으로 멈춰 사람이 확인한다. NotSent 뒤 처음 결과 불명이 되면 조회 마감을 그 시점부터 다시 잡는다.
+- [x] **REF-EXEC-06** 인프라·PG 장애(429, 401, 설정성 403, 5xx, 타임아웃, 연결 실패)로는 고객 환불을 FAILED로 끝내지 않고 결과도 보내지 않는다. Core 주문은 환불 처리중으로 남는다. FAILED는 돈이 움직이지 않은 것이 확정된 경우, 즉 토스 호출 전 검증 실패와 이전 호출이 없는 첫 호출의 명확한 거절만이다.
+  - HTTP 응답을 받은 NotSent는 토스에 도달했으므로 UNKNOWN을 유지해 한도를 잡고, 조회에 취소 내역이 없으면 같은 멱등 키·같은 본문으로 다시 요청한다. 응답이 없는 연결 실패만 PROCESSING으로 돌아갈 수 있다.
+  - 첫 시도부터 30분까지는 기존 주기로, 그 뒤 24시간까지는 10분 간격으로 재시도한다. 24시간 상한은 밀리지 않는다. 지나면 UNKNOWN에 `next_attempt_at` NULL로 멈추고 `[사람 확인 필요]` ERROR를 한 번 남긴다. 토스 멱등 키 유효기간(15일)보다 먼저 멈춘다.
 
 ## 시스템 보상과 늦은 승인
 

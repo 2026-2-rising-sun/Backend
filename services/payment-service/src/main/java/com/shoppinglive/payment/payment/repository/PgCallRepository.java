@@ -37,9 +37,6 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
     long countByPaymentIdAndKindAndIdempotencyKey(
             Long paymentId, PgCallKind kind, String idempotencyKey);
 
-    long countByPaymentIdAndKindAndIdempotencyKeyAndOutcome(
-            Long paymentId, PgCallKind kind, String idempotencyKey, PgCallOutcome outcome);
-
     /** 호출 전에 UNKNOWN으로 넣은 행에 결과를 한 번만 채운다. httpStatus는 응답을 받지 못했으면 null이다. */
     @Modifying
     @Query(

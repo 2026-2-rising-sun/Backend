@@ -15,4 +15,8 @@ public record RecoveryProperties(
         // 첫 조회 10초를 지키려면 더 짧아야 한다
         @DefaultValue("5s") Duration pollInterval,
         @DefaultValue("50") int pollBatchSize,
-        @DefaultValue("30m") Duration checkDeadline) {}
+        @DefaultValue("30m") Duration checkDeadline,
+        // 고객 환불 자동 재시도 상한. 토스 멱등 키 유효기간(15일)보다 짧아야 한다
+        @DefaultValue("24h") Duration refundGiveUpAfter,
+        // 첫 시도부터 checkDeadline이 지난 고객 환불의 재시도 간격
+        @DefaultValue("10m") Duration refundSlowRetryInterval) {}
