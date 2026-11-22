@@ -220,7 +220,7 @@ ledger/service       LedgerService                 record(refType, refId, lines)
 <td>우리 키·설정 문제</td>
 </tr>
 <tr>
-<td>HTTP 400 + code ∈ {<code>ALREADY_PROCESSED_PAYMENT</code>, <code>ALREADY_PROCESSING_REQUEST</code>}, HTTP 403 <code>FORBIDDEN_CONSECUTIVE_REQUEST</code>, HTTP 409 <code>IDEMPOTENT_REQUEST_PROCESSING</code></td>
+<td>HTTP 408, HTTP 400 + code ∈ {<code>ALREADY_PROCESSED_PAYMENT</code>, <code>ALREADY_PROCESSING_REQUEST</code>}, HTTP 403 <code>FORBIDDEN_CONSECUTIVE_REQUEST</code>, HTTP 409 <code>IDEMPOTENT_REQUEST_PROCESSING</code></td>
 <td><code>Unknown</code></td>
 <td>PAY-PG-02. 앞선 요청이 처리 중일 수 있다. 409는 같은 멱등 키 요청이 처리 중이다(<a href="https://docs.tosspayments.com/reference/using-api/idempotency-key">토스 멱등 키</a>)</td>
 </tr>
@@ -772,6 +772,6 @@ record Line(LedgerAccount account, long debit, long credit, String sellerId) {}
 <li>옛 이벤트는 호환을 깨고 지운다(위 "바뀌는 점" 아래 문단).</li>
 </ol>
 <h2 id="참고">참고</h2>
-<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>bfd27b6eb4c5708c6fd8a68c5135d2c9c56f12d8a6bf89485cabcc8f822a0e27</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a> · <a href="../../../../../design-docs/services/payment/requirements/ledger.html">원장 요구사항</a> · ADR <a href="../../../../../adr/0337-3-payment-result-delivery.html">0337-3</a>·<a href="../../../../../adr/0337-4-ledger-double-entry.html">0337-4</a>·<a href="../../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a> · 목표 설계 <a href="../../../../../design-docs/services/payment/design.html#f2"><code>#f2</code></a>·<a href="../../../../../design-docs/services/payment/design.html#f4"><code>#f4</code></a>·<a href="../../../../../design-docs/services/payment/design.html#contract"><code>#contract</code></a></p><p class="muted fingerprint">MD SHA-256: <code>ccadceada04dd6b4ce8916b07e4a8e0cf4219057839e617f35d4214869630be7</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
