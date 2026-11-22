@@ -65,8 +65,12 @@ Java 21, 새 격리 DB·브로커 주소와 테스트 계정을 명시해 아래
 
 전체 실제 앱의 Core → CDC → Kafka → Catalog 종단, Live Redis 업무 회귀, 실제 토스·운영 환경은 이번에 실행하지 않았다. API·이벤트 계약과 업무 로직 변경은 없다. 공용 컨테이너·기존 볼륨·기본 Docker context는 변경하지 않고 이번 검증 project만 정리한다. 로컬 로그·XML 집계는 Git에서 제외되는 `build/local-middleware-validation/`에 보관한다.
 
-## 저장 상태
+## 게시와 병합
 
-별도 작업 트리의 미커밋 변경이다. 커밋·푸시·PR·병합·배포는 수행하지 않았다. GitHub 이슈는 진행 상태로 남긴다.
+초기 로컬 완료 보고 때는 별도 작업 트리의 미커밋 변경이었다. 이후 사용자가 커밋·푸시·PR·병합까지 승인해 두 저장소 변경을 게시했다. 배포와 기존 개발 볼륨 전환은 수행하지 않는다.
 
-[완료 계획](plans/completed/388-local-middleware/README.md)은 로컬 구현·검증 범위이며 두 저장소 공유 브랜치 반영 완료를 뜻하지 않는다.
+Infra [PR #63](https://github.com/2026-2-rising-sun/Infra/pull/63)은 검토 head `dc9305143e1fdc1549040a1163f4779cf38b18c3`를 고정해 main에 squash 병합했다. 병합 커밋은 `854c23f1c0016a07c2c0ef6b5372f26dce4326c4`이며 tree가 검토 head와 같음을 확인했다. 게시된 자동 검사는 라벨 2건으로 모두 통과했으며, 기능 검증은 위의 로컬 실행 결과다. 미해결 리뷰 스레드는 없었다.
+
+Backend [PR #397](https://github.com/2026-2-rising-sun/Backend/pull/397)의 초기 head는 `95697267390510cdeff89a91a567364f0fd8652c`, base는 dev `9b807f91e02483c6ecf9b089ea42fa1f85b5f099`다. 게시한 제목·본문 전체를 다시 읽고 변경 전후, Infra 선행 적용, 기존 환경변수 우선순위, 로컬 검증과 미실행 범위가 구분되는지 확인했다. PR 본문의 워크로그 링크는 커밋에 고정한 GitHub 링크로 연결한다. 초기의 미커밋·공유 브랜치 반영 전 설명은 이 절과 완료 계획에서 과거 시점으로 정정했다.
+
+이후 문서만 갱신하며 Java 소스·설정은 위 821건 검증 결과를 유지한다. Backend의 최종 head·CI·리뷰·병합 커밋은 [PR #397](https://github.com/2026-2-rising-sun/Backend/pull/397)의 게시 결과를 기준으로 확인한다. [완료 계획](plans/completed/388-local-middleware/README.md)은 미들웨어·하네스 통일 범위이며 실제 앱 CDC 종단·운영 검증 완료를 뜻하지 않는다.

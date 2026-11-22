@@ -19,9 +19,9 @@
 <li>[x] 격리 PostgreSQL·Redis·Kafka와 변경 대상 하네스 검증</li>
 <li>[x] 결과·한계를 기록하고 완료 조건 대조</li>
 </ul>
-<p>로컬 구현·검증을 완료했다. 초기 환경 실패를 보존하고 새 환경 재검증 821건의 실패·오류·스킵0을 확인했다. 두 저장소 공유 브랜치 반영과 실제 앱 CDC 종단·운영 검증은 수행하지 않았다.</p>
+<p>로컬 구현·검증을 완료했다. 초기 환경 실패를 보존하고 새 환경 재검증 821건의 실패·오류·스킵0을 확인했다. 이후 사용자가 병합까지 승인해 Infra PR #63과 Backend PR #397로 게시했다. 공유 브랜치 반영 결과는 작업 기록의 게시와 병합 절에서 연결하며 실제 앱 CDC 종단·운영 검증은 수행하지 않았다.</p>
 <h2 id="완료-조건">완료 조건</h2>
 <p>Backend 중복 미들웨어 선언이 제거되고, CommerceCore·Payment와 실행 안내가 Infra를 가리킨다. 새 볼륨 DB 생성과 기존 데이터·소유자 보존, 테스트 Redis 격리를 실제 확인한다. MD·HTML 최신성·링크와 검사 선택을 확인하고 미실행 범위를 기록한다. 실제 서비스 종단·운영 검증과 GitHub 병합은 별도다.</p>
-<p>설정 구조는 <a href="../../../../design-docs/flows/local-environment.html">로컬 환경</a>, 실행 결과·저장 상태는 <a href="../../../2026-11-22-local-middleware.html">작업 기록</a>에 둔다.</p><p class="muted fingerprint">MD SHA-256: <code>9af8492995e2f5cf1121b1ab2162d7f5951361bec6260f8c3cb1479080d4f3de</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>설정 구조는 <a href="../../../../design-docs/flows/local-environment.html">로컬 환경</a>, 실행 결과·저장 상태는 <a href="../../../2026-11-22-local-middleware.html">작업 기록</a>에 둔다.</p><p class="muted fingerprint">MD SHA-256: <code>6ad41a6905060d52b25ac005396657aedc0a8c9d4a637dd177200c6085cc9a61</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
