@@ -85,6 +85,10 @@ class TossUserRefundExecutor implements UserRefundExecutor {
                 return;
             }
             Refund refund = refunds.findById(id).orElseThrow();
+            // 다시 읽기 전에 멈췄다면 다음 실행의 번호를 자기 증표로 쓰게 되므로 내가 올린 번호인지 확인한다
+            if (refund.getAttemptCount() != due.getAttemptCount() + 1) {
+                return;
+            }
             if (refund.getStatus() == RefundStatus.PROCESSING) {
                 first(refund);
             } else if (refund.getStatus() == RefundStatus.UNKNOWN) {

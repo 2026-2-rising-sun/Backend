@@ -648,6 +648,7 @@
 <li>검증: 임시 PostgreSQL 17과 가짜 토스로 Payment test·integrationTest·postgresTest·migrationTest와 <code>check.sh --base origin/feat/#385-refund-base --external</code>을 통과했고 최종 수치는 PR 본문에 있다.</li>
 <li>미실행·한계: 이 PR 단독의 Infra E2E는 실행하지 않았다. 토스 sandbox 부분·전액 취소는 #378+#396 임시 통합 E2E에서 확인됐다(2026-11-21). <code>payment.refund.deadline</code> 알림 연결은 #387에 남았다.</li>
 <li>다음 작업: #386 시스템 보상 실행, #387 환불 미확정 알림.</li>
+<li>6차 리뷰 반영(2026-11-22): <code>claim</code> 뒤 다시 읽은 <code>attempt_count</code>가 직전 값 + 1일 때만 진행한다. 멈춘 실행이 다음 실행의 번호를 자기 증표로 써서 취소를 다시 보내던 경로를 Red 테스트(호출 2회)로 재현한 뒤 막았다. 고객 <code>admit</code>의 <code>holdProcessing</code>을 지우면 <code>staleValidationFailureKeepsNewerReservation</code>이 실패하는 것을 변이로 확인하고 되돌렸다. 검증: Payment test 80, integrationTest 75, postgresTest 127, migrationTest 9, 실패·스킵 0.</li>
 </ul>
 <h2 id="386-시스템-보상-요청-실행">#386 시스템 보상 요청 실행</h2>
 <p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/396">PR #396</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a></p>
@@ -656,6 +657,6 @@
 <li>검증: 임시 PostgreSQL 17로 payment test 82건, integrationTest 75건, postgresTest 183건, migrationTest 9건 통과. <code>check.sh --base origin/feat/#385-refund-base --external</code>은 #395의 계약 변경으로 전체 빌드가 되어 incomplete(기존 외부 테스트 스킵 5건, 다른 서비스 postgresTest 미실행)이고, <code>check_events.py --samples</code> 표본 46개는 직접 실행해 통과했다.</li>
 <li>미실행·한계: Infra E2E와 실제 토스 호출은 하지 않았다. Core 반영은 #378 병합·#389 해결 뒤 확인한다.</li>
 <li>다음 작업: #387.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>4c9336e008b7617c303f27c519f0482778e676d1dabf483f2a88a0c750a080d4</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>73a3c5684b105d958962ba136bc0b7dbdced4e20d28b1a434d13eda2f38d834d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
