@@ -100,23 +100,6 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("attemptCount") int attemptCount,
             @Param("next") Instant next);
 
-    /**
-     * 토스에 취소가 갔을 수 있는 상태로 표시한다. 조회 마감은 처음 한 번만 정한다. 0이면 이미 확정됐다. 혼자 불리면 자기 트랜잭션으로 커밋해 토스 호출 전에 남는다.
-     */
-    @Transactional
-    @Modifying(clearAutomatically = true)
-    @Query(
-            value =
-                    """
-                    UPDATE refund
-                       SET status = 'UNKNOWN',
-                           check_deadline_at = COALESCE(check_deadline_at, :deadline),
-                           updated_at = now()
-                     WHERE id = :id AND status IN ('PROCESSING','UNKNOWN')
-                    """,
-            nativeQuery = true)
-    int markUnknown(@Param("id") long id, @Param("deadline") Instant deadline);
-
     /** 결제 잠금 뒤 이 실행의 선점이 살아 있는 PROCESSING인지 확인하며 트랜잭션 끝까지 행을 잠근다. 0이면 다른 실행이 선점했거나 이미 끝났다. */
     @Modifying(clearAutomatically = true)
     @Query(
