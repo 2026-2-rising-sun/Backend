@@ -901,6 +901,204 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         verify(toss, never()).cancel(anyString(), anyString(), anyString());
     }
 
+    @Test
+    @DisplayName("[REF-EXEC-01] 결제 잠금을 기다리는 사이 다른 실행이 선점하면 멈췄던 실행은 호출 기록도 취소도 남기지 않는다")
+    void staleRunWaitingForLockCannotCancel() throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c);
+
+        runBlockedAtPaymentLock(c, refund, () -> bumpAttempt(refund));
+
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+        assertThat(pgCalls(c.orderRef())).noneMatch(call -> call.startsWith("CANCEL"));
+        assertHeld(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 잠금을 기다리는 사이 다른 실행이 24시간 상한으로 멈췄으면 멈췄던 실행은 취소를 보내지 못한다")
+    void staleRunCannotCancelAfterGiveUpStop() throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c);
+
+        runBlockedAtPaymentLock(
+                c,
+                refund,
+                () ->
+                        jdbc.update(
+                                "UPDATE refund SET attempt_count = attempt_count + 1, status = 'UNKNOWN',"
+                                        + " next_attempt_at = NULL,"
+                                        + " check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                                refund.getId()));
+
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+        assertThat(secondsToNextAttempt(refund)).isNull();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] APPROVED 재조회 중 다른 실행이 선점하면 멈췄던 실행은 같은 키로도 다시 보내지 않는다")
+    void staleRunAfterQueryCannotResend() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+        Refund refund = receive(c);
+        intake.execute(refund);
+        when(toss.getPayment(c.paymentKey()))
+                .thenAnswer(
+                        inv -> {
+                            bumpAttempt(refund);
+                            return new TossResult.Success(done(c));
+                        });
+
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss, times(1)).cancel(eq(c.paymentKey()), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] 막힌 결제를 조회하는 사이 다른 실행이 선점하면 멈췄던 실행은 취소를 보내지 않는다")
+    void staleBlockedRunCannotCancel() throws Exception {
+        ApproveCommand c = approving();
+        Refund refund = receive(c);
+        when(toss.getPayment(c.paymentKey()))
+                .thenAnswer(
+                        inv -> {
+                            bumpAttempt(refund);
+                            return new TossResult.Success(done(c));
+                        });
+
+        intake.execute(refund);
+
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] 조회 중 다른 실행이 선점하면 멈췄던 실행은 NO_CHARGE 결과를 쓰지 않는다")
+    void staleRunCannotRecordResult() throws Exception {
+        ApproveCommand c = approving();
+        Refund refund = receive(c);
+        when(toss.getPayment(c.paymentKey()))
+                .thenAnswer(
+                        inv -> {
+                            bumpAttempt(refund);
+                            return new TossResult.Success(withStatus(c, "ABORTED"));
+                        });
+
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] APPROVED 재시도의 조회가 실패하면 취소 없음으로 보지 않고 다시 보내지 않는다")
+    void approvedQueryFailureDoesNotResend() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+        tossQuery(c, new TossResult.Unknown("HTTP 503", 503));
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss).getPayment(c.paymentKey());
+        verify(toss, times(1)).cancel(eq(c.paymentKey()), anyString(), anyString());
+        assertHeld(c, refund);
+        assertThat(secondsToNextAttempt(refund)).isPositive();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] APPROVED 재시도가 상한을 지나면 조회가 DONE이어도 다시 보내지 않고 멈춘다")
+    void approvedNoResendAfterGiveUp(CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+        tossQuery(c, new TossResult.Success(done(c)));
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss).getPayment(c.paymentKey());
+        verify(toss, times(1)).cancel(eq(c.paymentKey()), anyString(), anyString());
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 상한 뒤 반영이 예외로 실패해도 다시 보내지 않고 멈추며 사람 확인 ERROR는 한 번이다")
+    void settleFailureAfterGiveUpStops(CapturedOutput output) throws Exception {
+        ApproveCommand c = approved();
+        ApproveCommand other = approved();
+        Refund taken = receive(other);
+        jdbc.update(
+                "UPDATE refund SET pg_transaction_key = ?, next_attempt_at = NULL WHERE id = ?",
+                "tx-" + c.orderRef(),
+                taken.getId());
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+        tossQuery(
+                c,
+                new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss, times(1)).cancel(eq(c.paymentKey()), anyString(), anyString());
+        assertThat(refundStatus(refund)).isEqualTo("UNKNOWN");
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+        assertThat(status(c.orderRef())).isEqualTo("APPROVED");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 다음 처리 시각은 24시간 상한을 넘지 않는다")
+    void nextAttemptIsCappedAtDeadline() throws Exception {
+        ApproveCommand c = approving();
+        tossQuery(c, new TossResult.Unknown("HTTP 500", 500));
+        Refund refund = receive(c);
+        intake.execute(refund);
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() + INTERVAL '5' SECOND WHERE id = ?",
+                refund.getId());
+
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT next_attempt_at <= check_deadline_at FROM refund WHERE id = ?",
+                                Boolean.class,
+                                refund.getId()))
+                .isTrue();
+    }
+
+    /** 실행이 결제 행 잠금을 기다리는 동안 {@code whileBlocked}를 하고, 잠금을 풀어 실행을 끝까지 기다린다. */
+    private void runBlockedAtPaymentLock(ApproveCommand c, Refund refund, Runnable whileBlocked)
+            throws Exception {
+        CompletableFuture<Void> execution =
+                tx.execute(
+                        s -> {
+                            jdbc.queryForObject(
+                                    "SELECT id FROM payment WHERE order_ref = ? FOR UPDATE",
+                                    Long.class,
+                                    c.orderRef());
+                            CompletableFuture<Void> running =
+                                    CompletableFuture.runAsync(() -> intake.execute(refund));
+                            awaitBlockedPaymentUpdate();
+                            whileBlocked.run();
+                            return running;
+                        });
+        execution.get(10, TimeUnit.SECONDS);
+    }
+
+    private void bumpAttempt(Refund refund) {
+        jdbc.update(
+                "UPDATE refund SET attempt_count = attempt_count + 1 WHERE id = ?", refund.getId());
+    }
+
     private void insertCancelCall(ApproveCommand c, String outcome, Integer httpStatus) {
         jdbc.update(
                 "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome,"
