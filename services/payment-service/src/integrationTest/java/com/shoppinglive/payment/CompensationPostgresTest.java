@@ -818,7 +818,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-EXEC-06] 첫 토스 호출부터 24시간이 지나면 마지막 조회 뒤 UNKNOWN으로 멈추고 사람 확인 ERROR를 한 번 남긴다")
+    @DisplayName("[REF-EXEC-06] 첫 예약부터 24시간이 지나면 마지막 조회 뒤 UNKNOWN으로 멈추고 사람 확인 ERROR를 한 번 남긴다")
     void stopsAfterGiveUp(CapturedOutput output) throws Exception {
         ApproveCommand c = approving();
         when(toss.getPayment(c.paymentKey())).thenReturn(new TossResult.Unknown("HTTP 500", 500));
