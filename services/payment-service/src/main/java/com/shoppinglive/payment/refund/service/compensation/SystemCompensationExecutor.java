@@ -214,7 +214,7 @@ class SystemCompensationExecutor implements CompensationExecutor {
     private void refundApproved(Refund claimed, Payment payment) {
         switch (tx.execute(s -> admit(claimed))) {
             case WAIT -> {
-                retryLater(claimed);
+                retryLater(refunds.findById(claimed.getId()).orElseThrow());
                 return;
             }
             case ALREADY_REFUNDED -> {
@@ -286,14 +286,15 @@ class SystemCompensationExecutor implements CompensationExecutor {
         if (locked.getStatus() != PaymentStatus.APPROVED || locked.getRefundedAmount() != 0) {
             return Admission.ALREADY_REFUNDED;
         }
-        // APPROVED에 남은 SUCCEEDED는 0원 환불뿐이라 돈이 겹치지 않는다
-        if (refunds.findHoldingLimit(refund.getPaymentId(), refund.getId()).stream()
-                .anyMatch(other -> other.getStatus() == RefundStatus.UNKNOWN)) {
-            return Admission.WAIT;
+        // 기다리는 동안에도 24시간 상한이 돌도록 먼저 예약한다
+        if (refunds.markUnknown(refund.getId(), giveUpAt()) == 0) {
+            return Admission.CLOSED;
         }
-        return refunds.markUnknown(refund.getId(), giveUpAt()) == 1
-                ? Admission.FREE
-                : Admission.CLOSED;
+        // APPROVED에 남은 SUCCEEDED는 0원 환불뿐이라 돈이 겹치지 않는다
+        return refunds.findHoldingLimit(refund.getPaymentId(), refund.getId()).stream()
+                        .anyMatch(other -> other.getStatus() == RefundStatus.UNKNOWN)
+                ? Admission.WAIT
+                : Admission.FREE;
     }
 
     private static String ownCancelKey(TossPayment payment, long amount) {

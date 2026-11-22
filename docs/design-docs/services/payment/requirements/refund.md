@@ -51,7 +51,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 - 시스템 보상의 결제 상태별·토스 조회 결과별 처리는 [#386](https://github.com/2026-2-rising-sun/Backend/issues/386)의 표를 따른다. 표 밖 경우는 다음과 같다.
   - 요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(`PAYMENT_MISMATCH`, `refundedAmount` 0)로 답한다.
   - 결제가 PARTIALLY_REFUNDED·REFUNDED면 토스 호출 없이 FAILED(`NOT_REFUNDABLE`, `refundedAmount` 0)로 답한다. 그 돈은 다른 환불의 결과라 SUCCEEDED로 보내지 않는다. 단, 이 보상의 취소가 토스에 닿았을 수 있으면 환불액 0으로 답하지 않고 보류해 사람이 확인한다.
-  - APPROVED 결제는 결제 행 잠금 안에서 상태와 `refunded_amount = 0`을 다시 확인한다. 그 사이 환불이 반영됐으면 전액 취소를 보내지 않고 `NOT_REFUNDABLE`로 답한다. 토스에 갔을 수 있는 다른 환불이 있으면 끝날 때까지 기다린다.
+  - APPROVED 결제는 결제 행 잠금 안에서 상태와 `refunded_amount = 0`을 다시 확인한다. 그 사이 환불이 반영됐으면 전액 취소를 보내지 않고 `NOT_REFUNDABLE`로 답한다. 토스에 갔을 수 있는 다른 환불이 있으면 끝날 때까지 기다리되, 기다리는 시간도 아래 24시간 상한에 포함한다.
   - 토스 장애(429, 401, 설정성 403, 5xx, 타임아웃, 연결 실패)로는 시스템 보상을 FAILED로 끝내지 않고 결과도 보내지 않는다. 토스를 부르기 전에 UNKNOWN으로 한도를 잡고, 이전 취소가 토스에 닿았을 수 있으면(응답을 받은 NotSent 포함) 조회해 취소 내역이 없을 때만 같은 키·같은 본문으로 다시 보낸다.
   - 시스템 보상의 FAILED는 돈이 움직이지 않은 것이 확정된 호출 전 판정(`PAYMENT_MISMATCH`, `NOT_REFUNDABLE`, 접수 단계 코드)뿐이다. 토스 거절로는 FAILED를 보내지 않는다.
   - 재시도는 30초부터 두 배씩 늘려 10분 간격까지 간다. 첫 토스 호출부터 24시간(`refundGiveUpAfter`)이 지나면 새 취소를 보내지 않고 마지막 조회 뒤 UNKNOWN + `next_attempt_at` NULL로 멈추며 `[사람 확인 필요]` ERROR를 한 번 남긴다. 토스 멱등 키 유효기간(15일)보다 먼저 멈추기 위해서다.
