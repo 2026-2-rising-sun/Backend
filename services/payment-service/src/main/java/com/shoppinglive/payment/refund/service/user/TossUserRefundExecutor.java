@@ -81,7 +81,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         try {
             Instant now = Instant.now();
             Refund due = refunds.findById(id).orElseThrow();
-            if (refunds.claim(id, now, now.plus(retryDelay(due, now))) == 0) {
+            if (refunds.claim(id, now, nextAttempt(due, now)) == 0) {
                 return;
             }
             Refund refund = refunds.findById(id).orElseThrow();
@@ -95,16 +95,20 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         }
     }
 
-    /** 조회 마감은 첫 시도 + 상한으로 고정돼 있어 첫 시도 시각을 따로 저장하지 않고 되짚는다. */
-    private Duration retryDelay(Refund refund, Instant now) {
+    /** 조회 마감은 첫 시도 + 상한으로 고정돼 있어 첫 시도 시각을 되짚는다. 다음 시각은 상한을 넘지 않아 멈춤과 ERROR가 늦지 않는다. */
+    private Instant nextAttempt(Refund refund, Instant now) {
         Instant deadline = refund.getCheckDeadlineAt();
         if (deadline == null) {
-            return LEASE;
+            return now.plus(LEASE);
         }
         Instant firstAttempt = deadline.minus(recovery.refundGiveUpAfter());
-        return now.isBefore(firstAttempt.plus(recovery.checkDeadline()))
-                ? LEASE
-                : recovery.refundSlowRetryInterval();
+        Instant next =
+                now.plus(
+                        now.isBefore(firstAttempt.plus(recovery.checkDeadline()))
+                                ? LEASE
+                                : recovery.refundSlowRetryInterval());
+        // 이미 지난 상한을 넣으면 다른 실행이 곧바로 다시 집는다
+        return now.isBefore(deadline) && next.isAfter(deadline) ? deadline : next;
     }
 
     private record CancelCall(String paymentKey, Long cancelAmount, long callId) {}
@@ -113,11 +117,19 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         Instant deadline = refund.getCheckDeadlineAt();
         if (deadline != null && !Instant.now().isBefore(deadline)) {
             // 연결 실패가 상한까지 이어졌다. 돈이 안 나갔다고 단정하지 않고 한도를 잡은 채 마지막 조회 뒤 멈춘다
-            refunds.markUnknown(refund.getId(), deadline);
+            if (refunds.reserve(refund.getId(), refund.getAttemptCount(), deadline) == 0) {
+                return;
+            }
             recover(refunds.findById(refund.getId()).orElseThrow());
             return;
         }
-        CancelCall call = tx.execute(s -> admit(refund.getId()));
+        CancelCall call =
+                tx.execute(
+                        s ->
+                                admit(
+                                        refund.getId(),
+                                        refund.getPaymentId(),
+                                        refund.getAttemptCount()));
         if (call == null) {
             return;
         }
@@ -161,12 +173,13 @@ class TossUserRefundExecutor implements UserRefundExecutor {
     }
 
     /** 결제 행 잠금 안에서 검사하고 UNKNOWN으로 예약한다. 검사에 걸리면 FAILED 결과를 쓰고 null이다. */
-    private CancelCall admit(long id) {
-        Refund refund = refunds.findById(id).orElseThrow();
-        if (refund.getStatus() != RefundStatus.PROCESSING) {
+    private CancelCall admit(long id, long paymentId, int attemptCount) {
+        Payment payment = payments.findForRefund(paymentId).orElseThrow();
+        // 잠금을 기다리는 사이 선점을 잃었을 수 있어 잠금 뒤에 확인한다
+        if (refunds.holdProcessing(id, attemptCount) == 0) {
             return null;
         }
-        Payment payment = payments.findForRefund(refund.getPaymentId()).orElseThrow();
+        Refund refund = refunds.findById(id).orElseThrow();
         String failure = validate(refund, payment);
         if (failure != null) {
             log.warn(
@@ -184,16 +197,17 @@ class TossUserRefundExecutor implements UserRefundExecutor {
         // 금액은 둘 다 바뀌지 않는 값이라 재요청 본문도 같다. 전액은 금액을 보내지 않아야 부분 취소 불가 결제도 취소된다
         Long cancelAmount =
                 refund.getAmount().equals(payment.getAmount()) ? null : refund.getAmount();
+        if (refunds.reserve(id, attemptCount, Instant.now().plus(recovery.refundGiveUpAfter()))
+                == 0) {
+            return null;
+        }
         long callId =
                 calls.insertCall(
                         payment.getId(),
                         PgCallKind.CANCEL,
                         payment.getPgOrderId(),
                         refund.getRefundRequestId());
-        CancelCall call = new CancelCall(payment.getPgPaymentKey(), cancelAmount, callId);
-        return refunds.markUnknown(id, Instant.now().plus(recovery.refundGiveUpAfter())) == 1
-                ? call
-                : null;
+        return new CancelCall(payment.getPgPaymentKey(), cancelAmount, callId);
     }
 
     private String validate(Refund refund, Payment payment) {
@@ -263,7 +277,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             try {
                 confirm(refund, found.payment());
                 return;
-            } catch (IllegalStateException e) {
+            } catch (RuntimeException e) {
                 if (!expired) {
                     throw e;
                 }
