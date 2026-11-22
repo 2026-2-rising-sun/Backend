@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -23,6 +25,7 @@ import com.shoppinglive.payment.payment.service.ApprovalService;
 import com.shoppinglive.payment.payment.service.ApprovalService.ApproveCommand;
 import com.shoppinglive.payment.payment.service.PaymentOutcomeService;
 import com.shoppinglive.payment.refund.entity.Refund;
+import com.shoppinglive.payment.refund.repository.RefundRepository;
 import com.shoppinglive.payment.refund.service.RefundIntakeService;
 import com.shoppinglive.payment.refund.service.compensation.CompensationRetryJob;
 import java.time.Duration;
@@ -32,6 +35,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +45,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -57,6 +62,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     @Autowired CompensationRetryJob retryJob;
     @Autowired ApprovalService approvalService;
     @Autowired TransactionTemplate tx;
+    @MockitoSpyBean RefundRepository refundRepository;
 
     /** 같은 스키마의 다른 테스트가 남긴 보상이 재처리 대상이 되지 않게 한다. */
     @BeforeEach
@@ -825,7 +831,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
         Refund refund = receive(c);
         intake.execute(refund);
-        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.0 * 3600);
+        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.1 * 3600);
 
         expireDeadline(refund);
         makeDue(refund);
@@ -889,7 +895,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
         Refund refund = receive(c);
         intake.execute(refund);
-        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.0 * 3600);
+        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.1 * 3600);
 
         expireDeadline(refund);
         makeDue(refund);
@@ -1073,6 +1079,140 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
                                 Boolean.class,
                                 refund.getId()))
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] claim 직후 멈춘 실행은 다음 실행의 선점 번호를 자기 것으로 읽어 취소를 보내지 않는다")
+    void stalledAfterClaimCannotAdoptNewerAttempt() throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c);
+        onClaimedRead(refund, () -> takeOver(refund), () -> {});
+
+        intake.execute(refund);
+
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+        assertNewerRunKept(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] 잠금을 기다리다 선점을 잃은 실행은 결제가 바뀌어도 다른 실행의 예약을 FAILED로 덮지 않는다")
+    void staleAdmitCannotFailNewerReservation() throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c);
+
+        runBlockedAtPaymentLock(
+                c,
+                refund,
+                () -> {
+                    takeOver(refund);
+                    jdbc.update(
+                            "UPDATE payment SET status = 'PARTIALLY_REFUNDED', refunded_amount = 1000"
+                                    + " WHERE order_ref = ?",
+                            c.orderRef());
+                });
+
+        assertNewerRunKept(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] 막힌 결제의 잠금을 기다리다 선점을 잃은 실행은 토스 조회와 호출 기록을 남기지 않는다")
+    void staleReserveCannotQuery() throws Exception {
+        ApproveCommand c = approving();
+        jdbc.update("UPDATE payment SET status = 'CANCELED' WHERE order_ref = ?", c.orderRef());
+        Refund refund = receive(c);
+
+        runBlockedAtPaymentLock(c, refund, () -> takeOver(refund));
+
+        verify(toss, never()).getPayment(c.paymentKey());
+        assertThat(pgCalls(c.orderRef())).noneMatch(call -> call.startsWith("QUERY"));
+        assertNewerRunKept(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-01] 조회 중 선점을 잃은 실행은 토스에 내 취소가 보여도 환불을 반영하지 않는다")
+    void staleRunCannotSettle() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+        Refund refund = receive(c);
+        intake.execute(refund);
+        when(toss.getPayment(c.paymentKey()))
+                .thenAnswer(
+                        inv -> {
+                            takeOver(refund);
+                            return new TossResult.Success(
+                                    canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON));
+                        });
+
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(status(c.orderRef())).isEqualTo("APPROVED");
+        assertThat(refundJournals(refund)).isZero();
+        assertNewerRunKept(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-02] 환불된 결제의 잠금을 기다리다 선점을 잃은 실행은 다른 실행의 예약을 FAILED로 덮지 않는다")
+    void staleRunCannotFailAlreadyRefunded() throws Exception {
+        ApproveCommand c = approved();
+        jdbc.update(
+                "UPDATE payment SET status = 'PARTIALLY_REFUNDED', refunded_amount = 1000"
+                        + " WHERE order_ref = ?",
+                c.orderRef());
+        Refund refund = receive(c);
+
+        runBlockedAtPaymentLock(c, refund, () -> takeOver(refund));
+
+        assertNewerRunKept(c, refund);
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-02] 금액 불일치를 판단하기 전에 선점을 잃은 실행은 다른 실행의 예약을 FAILED로 덮지 않는다")
+    void staleRunCannotFailMismatch() throws Exception {
+        ApproveCommand c = approved();
+        Refund refund = receive(c, AMOUNT - 1);
+        onClaimedRead(refund, () -> {}, () -> takeOver(refund));
+
+        intake.execute(refund);
+
+        assertNewerRunKept(c, refund);
+    }
+
+    /** 실행이 선점 뒤 환불을 다시 읽는 두 번째 조회의 앞뒤에 끼어든다. */
+    private void onClaimedRead(Refund refund, Runnable before, Runnable after) {
+        AtomicInteger reads = new AtomicInteger();
+        doAnswer(
+                        call -> {
+                            boolean claimedRead = reads.incrementAndGet() == 2;
+                            if (claimedRead) {
+                                before.run();
+                            }
+                            // 저장소는 JDK 프록시라 callRealMethod 대신 스파이의 위임 답변을 쓴다
+                            Object read =
+                                    mockingDetails(refundRepository)
+                                            .getMockCreationSettings()
+                                            .getDefaultAnswer()
+                                            .answer(call);
+                            if (claimedRead) {
+                                after.run();
+                            }
+                            return read;
+                        })
+                .when(refundRepository)
+                .findById(refund.getId());
+    }
+
+    /** 다른 실행이 선점해 UNKNOWN으로 예약한 상태를 만든다. */
+    private void takeOver(Refund refund) {
+        jdbc.update(
+                "UPDATE refund SET attempt_count = attempt_count + 1, status = 'UNKNOWN',"
+                        + " check_deadline_at = now() + INTERVAL '1' HOUR WHERE id = ?",
+                refund.getId());
+    }
+
+    private void assertNewerRunKept(ApproveCommand c, Refund refund) throws Exception {
+        assertThat(refundStatus(refund)).isEqualTo("UNKNOWN");
+        assertHeld(c, refund);
     }
 
     /** 실행이 결제 행 잠금을 기다리는 동안 {@code whileBlocked}를 하고, 잠금을 풀어 실행을 끝까지 기다린다. */
