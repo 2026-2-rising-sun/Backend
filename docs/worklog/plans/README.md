@@ -1,5 +1,6 @@
 # 실행 계획
 
+- [#388 로컬 미들웨어 통일](completed/388-local-middleware/README.md): Infra·Backend 실행 환경과 하네스 통일, 검증·게시 결과 연결.
 여러 단계·의존성·불확실성이 있는 작업은 `active/<이슈>-<주제>/README.md`에서 목표·범위·진행 상태·검증·관련 자료를 연결한다. 내용이 필요한 판단·조사 자료만 같은 폴더에 추가한다.
 
 진행 작업: [#337 결제 재설계](active/337-payment-redesign/README.md) · [#331 감사 보완·범위 정정](active/331-order-audit-fixes/README.md) · [#333 Product](active/333-product-module/README.md) · [#334 SKU](active/334-sku-module/README.md) · [#332 Cart](active/332-cart-module/README.md). 각 모듈 독립 구현과 공유 통합 검증을 구분한다.

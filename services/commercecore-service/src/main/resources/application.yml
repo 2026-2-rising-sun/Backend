@@ -93,17 +93,17 @@ commerce:
   commission-rate: ${COMMERCE_COMMISSION_RATE:}
 
 ---
-# 새 서비스의 빈 전용 DB만 사용한다. 기존 commerce DB로 자동 연결하지 않는다.
+# Infra 로컬 미들웨어의 commercecore DB를 사용한다. 기존 commerce DB로 연결하지 않는다.
 spring:
   config:
     activate:
       on-profile: local
   kafka:
-    bootstrap-servers: localhost:${KAFKA_PORT:59092}
+    bootstrap-servers: localhost:${KAFKA_PORT:29092}
   datasource:
-    url: ${COMMERCECORE_DATABASE_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:56432}/commercecore}
-    username: ${POSTGRES_USER:msa}
-    password: ${POSTGRES_PASSWORD:msa-local-only}
+    url: ${COMMERCECORE_DATABASE_URL:jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/commercecore}
+    username: ${POSTGRES_USER:shoppinglive}
+    password: ${POSTGRES_PASSWORD:changeme}
 
 shoppinglive:
   security:

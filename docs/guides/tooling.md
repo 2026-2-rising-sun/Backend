@@ -81,6 +81,8 @@ Catalog·CommerceCore·Payment·Live의 `postgresTest`가 `postgres` 단독 업�
 
 ## PostgreSQL·Redis 환경
 
+공통 로컬 미들웨어와 테스트 DB·Redis 준비는 [Infra local](https://github.com/2026-2-rising-sun/Infra/blob/main/local/README.md)이 원본이다. [Backend 실행 안내](../../scripts/local/README.md)에 저장소별 실행 위치와 환경변수 예시가 있다. 기본 PostgreSQL은 5432, 앱 Redis는 6379, `tests` 프로필의 테스트 Redis는 56379다. 사용자 지정 포트·계정은 Infra `local/.env`와 맞춘다. 기존 DB에 필요한 이름만 추가하는 방법도 Infra 안내를 따른다.
+
 외부 테스트는 데이터를 삭제·초기화할 수 있으므로 해당 작업 전용의 격리된 DB·Redis를 준비한다. 실제 연결 설정과 테스트의 실행 조건을 읽고 사용한다.
 
 | 서비스 | PostgreSQL 선택과 연결 설정 |

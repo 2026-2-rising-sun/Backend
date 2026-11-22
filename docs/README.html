@@ -41,6 +41,10 @@
 <td>작업·코드·테스트 기준</td>
 <td><a href="guides/workflow.md">작업 절차</a>, <a href="guides/code.md">코드</a>, <a href="guides/tests.md">테스트</a>, <a href="guides/contracts.md">계약</a>, <a href="guides/tooling.md">도구</a>, <a href="guides/writing.md">작성</a></td>
 </tr>
+<tr>
+<td>로컬 미들웨어·앱·테스트 연결</td>
+<td><a href="design-docs/flows/local-environment.html">로컬 실행 환경</a>, <a href="../scripts/local/README.md">실행 명령</a></td>
+</tr>
 </tbody>
 </table></div>
 <h2 id="전체-구조">전체 구조</h2>
@@ -115,6 +119,6 @@
 <li>완료한 계획만 <code>worklog/plans/completed/</code>로 옮긴다. 미완료 범위와 과거 실행 근거는 보존한다.</li>
 </ol>
 <h2 id="자동-검사와-사람의-검토">자동 검사와 사람의 검토</h2>
-<p>문서 검사는 로컬 링크·앵커·요구사항 구조·MD/HTML 쌍과 생성 최신성을 확인한다. 검사 통과가 코드와의 의미 일치나 실제 DB·브로커·PG 실행을 증명하지는 않는다. 화면과 내용은 별도로 검토한다. 훅·가드·MCP는 현재 연결하지 않았다.</p><p class="muted fingerprint">MD SHA-256: <code>8ead5b5387fe6ff3bca150720626f695a99aa229d3a33945244da309f33963a1</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>문서 검사는 로컬 링크·앵커·요구사항 구조·MD/HTML 쌍과 생성 최신성을 확인한다. 검사 통과가 코드와의 의미 일치나 실제 DB·브로커·PG 실행을 증명하지는 않는다. 화면과 내용은 별도로 검토한다. 훅·가드·MCP는 현재 연결하지 않았다.</p><p class="muted fingerprint">MD SHA-256: <code>687771fb5e4f046070eed79e6587910fd97e9c3649da53cdfd0b2045fa56c1a3</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
