@@ -12,6 +12,5 @@ public record CompensationProperties(
         // 첫 CONFIRM + 2×응답 한도 뒤에 토스 반영이 늦는 경우를 덮는 여유
         @DefaultValue("30s") Duration confirmGrace,
         @DefaultValue("30s") Duration retryBase,
-        @DefaultValue("10m") Duration retryMax,
-        // 30초부터 두 배씩이면 약 1시간 뒤다. 알림만 남기고 재시도는 멈추지 않는다
+        // 30초부터 두 배씩(상한 refundSlowRetryInterval)이면 약 1시간 뒤다. 알림만 남기고 재시도는 24시간 상한까지 계속한다
         @DefaultValue("10") int humanCheckAfter) {}

@@ -83,19 +83,6 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("now") Instant now,
             @Param("leaseUntil") Instant leaseUntil);
 
-    /** 시스템 보상의 재시도 한도 알림을 한 번만 남기려고 그 시각을 기록한다. 보상은 UNKNOWN을 쓰지 않아 이 컬럼이 비어 있다. */
-    @Transactional
-    @Modifying(clearAutomatically = true)
-    @Query(
-            value =
-                    """
-                    UPDATE refund SET check_deadline_at = :now, updated_at = now()
-                     WHERE id = :id AND purpose = 'SYSTEM_COMPENSATION' AND status = 'PROCESSING'
-                       AND check_deadline_at IS NULL
-                    """,
-            nativeQuery = true)
-    int markCompensationOverdue(@Param("id") long id, @Param("now") Instant now);
-
     /** 이번 선점의 다음 처리 시각을 정한다. null이면 사람 확인까지 재처리하지 않는다. 0이면 다른 실행이 이미 집었거나 끝났다. */
     @Transactional
     @Modifying(clearAutomatically = true)
@@ -104,7 +91,8 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
                     """
                     UPDATE refund
                        SET next_attempt_at = CAST(:next AS TIMESTAMP WITH TIME ZONE), updated_at = now()
-                     WHERE id = :id AND status = 'PROCESSING' AND attempt_count = :attemptCount
+                     WHERE id = :id AND status IN ('PROCESSING','UNKNOWN')
+                       AND attempt_count = :attemptCount
                     """,
             nativeQuery = true)
     int reschedule(

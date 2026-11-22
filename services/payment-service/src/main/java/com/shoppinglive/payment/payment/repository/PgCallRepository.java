@@ -2,9 +2,7 @@ package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.PgCall;
 import com.shoppinglive.payment.payment.entity.PgCallKind;
-import com.shoppinglive.payment.payment.entity.PgCallOutcome;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -19,8 +17,18 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
         Instant getFirstRequestedAt();
     }
 
-    boolean existsByPaymentIdAndIdempotencyKeyAndOutcomeIn(
-            Long paymentId, String idempotencyKey, Collection<PgCallOutcome> outcomes);
+    /** 이 키의 취소가 토스에 닿았을 수 있다. 응답을 받은 NotSent(429·401 등)도 처리되지 않았다는 보장이 없어 포함한다. */
+    @Query(
+            """
+            SELECT COUNT(c) > 0 FROM PgCall c
+             WHERE c.paymentId = :paymentId AND c.idempotencyKey = :idempotencyKey
+               AND (c.outcome IN (com.shoppinglive.payment.payment.entity.PgCallOutcome.SUCCESS,
+                                  com.shoppinglive.payment.payment.entity.PgCallOutcome.UNKNOWN)
+                    OR (c.outcome = com.shoppinglive.payment.payment.entity.PgCallOutcome.NOT_SENT
+                        AND c.httpStatus IS NOT NULL))
+            """)
+    boolean cancelMayHaveLanded(
+            @Param("paymentId") long paymentId, @Param("idempotencyKey") String idempotencyKey);
 
     @Query(
             """
