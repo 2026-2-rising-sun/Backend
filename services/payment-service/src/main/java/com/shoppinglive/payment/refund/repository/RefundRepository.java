@@ -117,6 +117,35 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             nativeQuery = true)
     int markUnknown(@Param("id") long id, @Param("deadline") Instant deadline);
 
+    /** 결제 잠금 뒤 이 실행의 선점이 살아 있는 PROCESSING인지 확인하며 트랜잭션 끝까지 행을 잠근다. 0이면 다른 실행이 선점했거나 이미 끝났다. */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund SET updated_at = now()
+                     WHERE id = :id AND status = 'PROCESSING' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int holdProcessing(@Param("id") long id, @Param("attemptCount") int attemptCount);
+
+    /** 이 실행의 선점일 때만 토스에 갔을 수 있는 상태로 예약한다. 조회 마감은 처음 한 번만 정한다. 0이면 호출 기록도 토스 호출도 하지 않는다. */
+    @Transactional
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE refund
+                       SET status = 'UNKNOWN',
+                           check_deadline_at = COALESCE(check_deadline_at, :deadline),
+                           updated_at = now()
+                     WHERE id = :id AND status = 'PROCESSING' AND attempt_count = :attemptCount
+                    """,
+            nativeQuery = true)
+    int reserve(
+            @Param("id") long id,
+            @Param("attemptCount") int attemptCount,
+            @Param("deadline") Instant deadline);
+
     /**
      * 첫 취소가 토스에 가지 않았을 때 예약을 풀어 다음 실행이 다시 검증하게 한다. 조회 마감은 첫 시도 기준으로 유지한다. 그 사이 다른 실행이 선점했으면 ({@code
      * attempt_count}가 다르면) 그 실행의 예약이므로 풀지 않는다.

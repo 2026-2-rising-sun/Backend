@@ -19,14 +19,18 @@ import com.shoppinglive.payment.payment.dto.SellerAmountRequest;
 import com.shoppinglive.payment.refund.entity.Refund;
 import com.shoppinglive.payment.refund.service.user.UserRefundExecutor;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -66,6 +70,7 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Autowired UserRefundExecutor executor;
+    @Autowired DataSource dataSource;
     @MockitoBean TossPaymentsClient toss;
 
     /** retryDue는 스키마 전체의 due 행을 집으므로 앞 테스트가 남긴 행을 대상에서 뺀다. */
@@ -846,6 +851,218 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
 
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
         assertThat(results(orderRef)).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "[REF-EXEC-01][REF-ACCEPT-03] 잠금을 기다리다 선점을 잃은 실행은 예약·호출하지 않고, 새 실행의 호출 중 한도도 풀리지 않는다")
+    void staleExecutionCannotReserve() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = twoSellerPayment(orderRef);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 8000);
+        AtomicInteger calls = new AtomicInteger();
+        CountDownLatch second = new CountDownLatch(1);
+        when(toss.cancel(any(), any(), eq(refund.getRefundRequestId()), any()))
+                .thenAnswer(
+                        call -> {
+                            if (calls.incrementAndGet() == 1) {
+                                second.await(1, TimeUnit.SECONDS);
+                                return new TossResult.Unknown("시간 초과");
+                            }
+                            second.countDown();
+                            return new TossResult.NotSent("연결 실패");
+                        });
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try (Connection lock = lockPayment(paymentId)) {
+            Future<?> stale = pool.submit(() -> executor.execute(refund));
+            awaitLockWaiters(1);
+            makeDue(refund);
+            Future<?> newer = pool.submit(() -> executor.retryDue());
+            awaitLockWaiters(2);
+            lock.rollback();
+            stale.get(20, TimeUnit.SECONDS);
+            newer.get(20, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(calls).hasValue(1);
+        assertThat(cancelCalls(refund)).isEqualTo(1);
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 8000);
+        executor.execute(other);
+        assertFailed(other, "OVER_REFUND");
+        verify(toss, never()).cancel(any(), any(), eq(other.getRefundRequestId()), any());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 24시간 상한으로 멈춘 뒤 잠금을 기다리던 실행은 취소를 보내지 않는다")
+    void staleExecutionCannotSendAfterStop(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.NotSent("연결 실패"));
+        when(toss.getPayment(key(orderRef))).thenReturn(new TossResult.NotSent("연결 실패"));
+        executor.execute(refund);
+
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try (Connection lock = lockPayment(paymentId)) {
+            makeDue(refund);
+            Future<?> stale = pool.submit(() -> executor.retryDue());
+            awaitLockWaiters(1);
+            expireDeadline(refund);
+            makeDue(refund);
+            executor.retryDue();
+            lock.rollback();
+            stale.get(20, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        verify(toss, times(1)).cancel(any(), any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 상한 뒤 반영이 DB 예외로 실패해도 재전송 없이 멈추고 마감 ERROR는 한 번이다")
+    void settleDatabaseFailureStopsAtDeadline(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        String otherRef = newOrderRef();
+        Refund holder = receive(otherRef, approved(otherRef, true), otherRef + "-S1", 4000);
+        jdbc.update(
+                "UPDATE refund SET pg_transaction_key = ?, next_attempt_at = NULL WHERE id = ?",
+                "tx-" + refund.getId(),
+                holder.getId());
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef))).thenReturn(canceled(refund));
+        executor.execute(refund);
+        expireDeadline(refund);
+        makeDue(refund);
+
+        executor.retryDue();
+        executor.retryDue();
+
+        verify(toss, times(1)).cancel(any(), any(), eq(refund.getRefundRequestId()), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 다음 처리 시각은 24시간 상한을 넘지 않는다")
+    void nextAttemptIsCappedAtDeadline() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
+        executor.execute(refund);
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() + INTERVAL '2' MINUTE WHERE id = ?",
+                refund.getId());
+        makeDue(refund);
+
+        executor.retryDue();
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT next_attempt_at <= check_deadline_at FROM refund WHERE id = ?",
+                                Boolean.class,
+                                refund.getId()))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-04] 조회 실패는 취소 없음이 아니므로 마감 전에도 재요청하지 않는다")
+    void queryFailureIsNotNoCancel() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(
+                        new TossResult.Unknown("시간 초과"),
+                        new TossResult.NotSent("HTTP 429", 429),
+                        new TossResult.Declined("NOT_FOUND_PAYMENT", "없음", 404));
+        executor.execute(refund);
+
+        for (int i = 0; i < 3; i++) {
+            makeDue(refund);
+            executor.retryDue();
+        }
+
+        verify(toss, times(3)).getPayment(key(orderRef));
+        verify(toss, times(1)).cancel(any(), any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    private long twoSellerPayment(String orderRef) {
+        payments.create(
+                new CreatePaymentRequest(
+                        orderRef,
+                        UUID.fromString(BUYER),
+                        AMOUNT,
+                        OffsetDateTime.now().plusMinutes(10),
+                        List.of(
+                                new SellerAmountRequest(
+                                        orderRef + "-S1",
+                                        UUID.randomUUID(),
+                                        10000L,
+                                        new BigDecimal("0.1000")),
+                                new SellerAmountRequest(
+                                        orderRef + "-S2",
+                                        UUID.randomUUID(),
+                                        20000L,
+                                        new BigDecimal("0.1000")))));
+        long paymentId =
+                jdbc.queryForObject(
+                        "SELECT id FROM payment WHERE order_ref = ?", Long.class, orderRef);
+        approve(paymentId, orderRef, true);
+        return paymentId;
+    }
+
+    /** 실행이 결제 잠금 앞에서 멈춘 상황을 만든다. pg_call FK는 막지 않는 잠금이다. 호출자가 rollback으로 푼다. */
+    private Connection lockPayment(long paymentId) throws Exception {
+        Connection connection = dataSource.getConnection();
+        connection.setAutoCommit(false);
+        try (PreparedStatement lock =
+                connection.prepareStatement(
+                        "SELECT id FROM payment WHERE id = ? FOR NO KEY UPDATE")) {
+            lock.setLong(1, paymentId);
+            lock.executeQuery();
+        }
+        return connection;
+    }
+
+    private void awaitLockWaiters(int expected) throws Exception {
+        for (int i = 0; i < 200; i++) {
+            Integer waiting =
+                    jdbc.queryForObject(
+                            "SELECT count(*) FROM pg_stat_activity"
+                                    + " WHERE datname = current_database() AND wait_event_type = 'Lock'",
+                            Integer.class);
+            if (waiting >= expected) {
+                return;
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("결제 잠금 대기가 " + expected + "건이 되지 않았다");
+    }
+
+    private int cancelCalls(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM pg_call WHERE kind = 'CANCEL' AND idempotency_key = ?",
+                Integer.class,
+                refund.getRefundRequestId());
     }
 
     private long secondsUntilNextAttempt(Refund refund) {

@@ -99,6 +99,32 @@ class TossPaymentsClientTest {
     }
 
     @Test
+    @DisplayName("[PAY-PG-03][REF-EXEC-06] JSON code가 있는 HTTP 408은 승인·취소 모두 처리 여부를 모르는 Unknown이다")
+    void requestTimeoutWithCodeIsUnknown() {
+        String body = "{\"code\":\"REQUEST_TIMEOUT\",\"message\":\"시간 초과\"}";
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(
+                        org.springframework.test.web.client.response.MockRestResponseCreators
+                                .withStatus(org.springframework.http.HttpStatus.REQUEST_TIMEOUT)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(body));
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andRespond(
+                        org.springframework.test.web.client.response.MockRestResponseCreators
+                                .withStatus(org.springframework.http.HttpStatus.REQUEST_TIMEOUT)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .body(body));
+
+        TossResult confirm = client.confirm("pk-1", "o-1", 1000, "key-1");
+        TossResult cancel = client.cancel("pk-1", "고객 환불", "r-1", 1000L);
+
+        assertThat(confirm).isInstanceOf(TossResult.Unknown.class);
+        assertThat(cancel).isInstanceOf(TossResult.Unknown.class);
+        assertThat(confirm.httpStatus()).isEqualTo(408);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("[REF-EXEC-04] 조회 응답의 취소 내역(거래 키·사유·금액·상태)을 읽고, 내역이 없으면 빈 목록이다")
     void readsCancels() {
         server.expect(requestTo(BASE + "/v1/payments/pk-1"))
