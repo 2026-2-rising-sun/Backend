@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>2026-11-22 로컬 미들웨어 통일</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-22-local-middleware.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#범위와-기준">범위와 기준</a></li>
+<li><a href="#변경">변경</a></li>
+<li><a href="#검증">검증</a><ul>
+<li><a href="#미들웨어설정">미들웨어·설정</a></li>
+<li><a href="#초기-실패와-재검증-환경">초기 실패와 재검증 환경</a></li>
+<li><a href="#최종-java-결과">최종 Java 결과</a></li>
+<li><a href="#하네스문서와-한계">하네스·문서와 한계</a></li>
+</ul>
+</li>
+<li><a href="#저장-상태">저장 상태</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>2026-11-22 로컬 미들웨어 통일</h1><h2 id="범위와-기준">범위와 기준</h2>
+<p><a href="https://github.com/2026-2-rising-sun/Backend/issues/388">Backend #388</a>을 재사용하고 <a href="https://github.com/2026-2-rising-sun/Infra/issues/62">Infra #62</a>를 생성했다. Infra를 공통 실행 기준으로 사용하고 Backend의 중복 Compose·DB 초기화 SQL을 제거한다. 사용자가 Infra 변경과 Payment 로컬 설정·문서 변경을 명시적으로 허용했다. 서비스 업무 로직·API·이벤트 계약은 변경하지 않는다.</p>
+<p>기준은 Backend <code>9b807f91e02483c6ecf9b089ea42fa1f85b5f099</code>와 Infra <code>54d7161838d3520cf44b35c1cc2f8e1fbc9712e6</code>이다. 원본 Backend의 미커밋 변경을 보존하기 위해 각각 <code>refactor/#388-local-middleware</code>, <code>refactor/#62-local-middleware</code> 작업 트리에서 수행한다. 새 에이전트는 실행하지 않았다.</p>
+<h2 id="변경">변경</h2>
+<ul>
+<li>CommerceCore·Payment local 기본 연결값을 PostgreSQL5432·Kafka29092·shoppinglive 계정으로 맞췄다. 기존 명시 환경변수와 Payment <code>.env</code>가 우선하므로 전환 시 확인하도록 안내한다.</li>
+<li>Infra에서 업무 DB와 테스트·병렬 작업용 DB를 준비한다. 초기화 SQL은 기존 DB를 보존하고 빠진 이름만 생성하도록 변경했다.</li>
+<li>Infra <code>tests</code> 프로필의 Redis56379를 앱 Redis6379와 분리했다.</li>
+<li>Backend 실행 안내·도구·작업 절차·AGENTS와 <a href="../design-docs/flows/local-environment.html">로컬 환경 MD·HTML</a>을 같은 기준으로 연결한다. 과거 실행 기록의 포트는 변경하지 않는다.</li>
+<li>로컬 도구 제거가 전체 서비스 빌드를 선택하던 검사 분기를 로컬 도구 검사로 연결했다.</li>
+</ul>
+<h2 id="검증">검증</h2>
+<h3 id="미들웨어설정">미들웨어·설정</h3>
+<p>Infra Compose의 기본·tests·cdc·tools 구성을 해석하고 shell 구문을 확인했다. 기존 <code>local/cdc/test_config.py</code> 7건이 실패·오류·스킵 없이 통과했다. 토픽·CDC·기존 격리 Compose 및 Kubernetes overlay 구성이 유지됨을 확인하는 정적 검사다.</p>
+<p>Infra Compose를 해석한 뒤 고정 컨테이너명·네트워크·볼륨명·호스트 포트만 독립 project로 바꿔 검증했다. Docker Desktop의 <code>shoppinglive-local-388</code>에서 PostgreSQL25462·Kafka49062·테스트 Redis56362를 사용했다.</p>
+<ul>
+<li>새 볼륨에서 업무·이전 서비스·테스트·병렬 작업용 DB 18개가 생성됐다.</li>
+<li>업무 DB에 표본 데이터를 넣고 테스트 DB 소유자를 바꾼 뒤, DB 하나를 제거하고 초기화를 2회 재실행했다. 표본 데이터·기존 소유자가 유지되고 누락 DB만 추가됐다. 잘못된 DB 이름은 실패로 거절했다.</li>
+<li>테스트 Redis에만 <code>FLUSHDB</code>를 실행한 뒤 앱 Redis의 같은 이름 키가 보존됐다.</li>
+<li><code>kafka-init</code>이 토픽 11개를 생성했고 전체 스택 <code>up -d --wait</code>도 통과했다. CDC connector는 이번에 실행·등록하지 않았다.</li>
+<li>Spring YAML 로더·환경 해석기로 Core·Payment 각각 local 기본값 4개와 명시 환경 재정의 4개를 확인했다. 실제 local 앱 기동 검증과는 구분한다.</li>
+</ul>
+<h3 id="초기-실패와-재검증-환경">초기 실패와 재검증 환경</h3>
+<p>초기 하네스 실행에서 Core 단위 188건은 통과했지만 통합 288건 중 외부 Kafka 2건이 AdminClient 토픽 생성 타임아웃으로 실패했다. 같은 시점 브로커의 내부 heartbeat 지연을 관찰했다. 이어진 PostgreSQL 회귀는 JVM이 응답을 기다리는 동안 서버 연결은 ClientRead 대기 상태여서 중단했다. PostgreSQL 회귀 완료·Payment 검사·직렬화 표본 검사는 이 실행에서 성공으로 집계하지 않는다. 공용 자원은 건드리지 않고 이 작업에서 시작한 검증 프로세스만 종료했다. 근본 원인은 확정하지 않았다.</p>
+<p>별도 Lima Docker socket에서 새 project <code>shoppinglive-local-388-db</code>의 PostgreSQL25562와 <code>shoppinglive-local-388-kafka</code>의 Kafka49162를 준비했다. 기존 CDC·환불 검증 컨테이너는 재사용하지 않았다. 새 워크트리 경로는 Lima에 mount되지 않아 초기 <code>kafka-init</code>이 파일 누락으로 종료127을 반환했다. 동일 원본 스크립트·토픽 목록을 새 검증 컨테이너에 복사해 재실행했고 11개 토픽이 생성됐다. 호스트 Java의 JDBC 연결·커밋 10회와 Kafka metadata 조회를 확인한 뒤 회귀를 다시 시작했다.</p>
+<p>초기 미들웨어 검증 준비 중 <code>DROP DATABASE</code>를 다른 SQL과 같은 요청에 넣어 트랜잭션 오류가 났다. 독립 요청으로 나눠 위 데이터·소유자 보존 검증을 다시 수행했다. 이 오류는 DB 초기화 스크립트의 실행 결과와 구분한다.</p>
+<h3 id="최종-java-결과">최종 Java 결과</h3>
+<p>Java 21, 새 격리 DB·브로커 주소와 테스트 계정을 명시해 아래 작업을 <code>--rerun-tasks --no-daemon --max-workers=2 --console=plain</code>으로 실행했다. 변경 대상 코드는 재검증 중 수정하지 않았다.</p>
+<pre><code class="language-sh">./gradlew :services:commercecore-service:build :services:payment-service:build \
+  :services:commercecore-service:postgresTest :services:payment-service:postgresTest \
+  --rerun-tasks --no-daemon --max-workers=2 --console=plain
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>서비스</th>
+<th>작업</th>
+<th>실행</th>
+<th>실패</th>
+<th>오류</th>
+<th>스킵</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CommerceCore</td>
+<td>test</td>
+<td>188</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>CommerceCore</td>
+<td>integrationTest</td>
+<td>288</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>CommerceCore</td>
+<td>postgresTest</td>
+<td>151</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Payment</td>
+<td>test</td>
+<td>54</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Payment</td>
+<td>integrationTest</td>
+<td>75</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Payment</td>
+<td>postgresTest</td>
+<td>65</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+</tbody>
+</table></div>
+<p>총 821건이며 Core 외부 Kafka 2건도 실제 브로커에서 실행됐다. build에 연결된 포맷 검사도 통과했다. 실패했던 초기 실행과 합산하지 않는다.</p>
+<h3 id="하네스문서와-한계">하네스·문서와 한계</h3>
+<p>검사 선택기 46건, 인증 도구 3건이 실패·오류·스킵 없이 통과했다. 이벤트 계약 9개·예시 27개·현재 코드 직렬화 표본 28개가 검사됐다. 표본 검사는 실제 서비스 간 전달 증거가 아니다.</p>
+<p>문서 270개 오류0, API MD·HTML 10쌍과 설계·기록 MD·HTML 112쌍 불일치0, 최종 diff 공백 검사 통과를 확인했다. 대표 로컬 환경 HTML은 Orca 브라우저에서 1440px·390px, 목차 이동과 콘솔을 확인했다. 페이지 가로 넘침·콘솔 오류는 없었고 좁은 화면의 표는 내부에서 가로 이동한다. 문서 결과 기록·계획 이동 뒤에는 문서 검사만 다시 수행하고 Java 검증을 반복하지 않았다.</p>
+<p>전체 실제 앱의 Core → CDC → Kafka → Catalog 종단, Live Redis 업무 회귀, 실제 토스·운영 환경은 이번에 실행하지 않았다. API·이벤트 계약과 업무 로직 변경은 없다. 공용 컨테이너·기존 볼륨·기본 Docker context는 변경하지 않고 이번 검증 project만 정리한다. 로컬 로그·XML 집계는 Git에서 제외되는 <code>build/local-middleware-validation/</code>에 보관한다.</p>
+<h2 id="저장-상태">저장 상태</h2>
+<p>별도 작업 트리의 미커밋 변경이다. 커밋·푸시·PR·병합·배포는 수행하지 않았다. GitHub 이슈는 진행 상태로 남긴다.</p>
+<p><a href="plans/completed/388-local-middleware/README.html">완료 계획</a>은 로컬 구현·검증 범위이며 두 저장소 공유 브랜치 반영 완료를 뜻하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>57845d630a997adf08ca76063b12636acf0317655ea235dcd4fbe860ad3d0191</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

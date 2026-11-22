@@ -9,6 +9,7 @@
 | 중요한 결정과 대안 | [ADR 목록](adr/README.md) |
 | 실제 변경·검증·남은 일 | [워크로그](worklog/README.md) |
 | 작업·코드·테스트 기준 | [작업 절차](guides/workflow.md), [코드](guides/code.md), [테스트](guides/tests.md), [계약](guides/contracts.md), [도구](guides/tooling.md), [작성](guides/writing.md) |
+| 로컬 미들웨어·앱·테스트 연결 | [로컬 실행 환경](design-docs/flows/local-environment.md), [실행 명령](../scripts/local/README.md) |
 
 ## 전체 구조
 

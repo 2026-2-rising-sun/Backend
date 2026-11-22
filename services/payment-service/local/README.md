@@ -15,10 +15,10 @@ Payment를 로컬에서 띄우고 내부 API로 결제 생성 → 결제창 → 
 1. Infra 저장소에서 로컬 스택을 띄운다. Postgres 5432(`shoppinglive-postgres`), Kafka 29092, 가짜 토스 `toss-mock`(localhost:59080)이 함께 뜬다. 자세한 내용은 [Infra local README](https://github.com/2026-2-rising-sun/Infra/blob/main/local/README.md)에 있다. payment DB가 없으면 그 문서의 "서비스별 DB 생성"대로 만든다. `down -v`는 다른 서비스 데이터까지 지우므로 쓰지 않는다.
 
    ```bash
-   docker compose -f local/docker-compose.yml up -d   # Infra 저장소 루트에서
+   docker compose --env-file local/.env -f local/docker-compose.yml up -d   # Infra 저장소 루트에서
    ```
 
-   `scripts/local/msa-compose.yml`(Postgres 56432, Kafka 59092)을 쓰면 `.env`의 DB·Kafka 네 줄을 지우고, 가짜 토스만 Infra에서 `docker compose -f local/docker-compose.yml up -d toss-mock`으로 띄운다.
+   미들웨어는 Infra Compose 하나로 실행한다. 이전 Backend 격리 스택을 사용했다면 앱을 중지하고 DB·Kafka 연결값을 Infra 기준으로 바꾼다. 이전 볼륨의 데이터는 자동 이전하지 않는다.
 2. `cp services/payment-service/.env.example services/payment-service/.env` 후 `PAYMENT_DB_PASSWORD`를 Infra `local/.env`의 `POSTGRES_PASSWORD`와 같게 쓴다(다르면 `password authentication failed`). 모드 B는 토스 키도 채운다. `.env`는 커밋하지 않는다.
 3. 앱을 띄운다. 프로필이 토스 대상을 정한다. local 프로필이 `.env`를 읽는다.
 

@@ -36,6 +36,7 @@ scripts/render-api-docs.sh --check      # API MD·HTML 최신성 확인
 | 작업 시작·동기화·검증·인계 | [작업 절차](docs/guides/workflow.md)의 해당 단계 |
 | 코드 수정·리팩토링 | [코드 기준](docs/guides/code.md), 해당 [모듈 문서](docs/design-docs/README.md) |
 | 테스트·검증 범위 결정 | [테스트 기준](docs/guides/tests.md), [도구](docs/guides/tooling.md)의 해당 환경 |
+| 로컬 앱 실행·미들웨어·외부 테스트 준비 | [로컬 환경](docs/design-docs/flows/local-environment.md), [실행 명령](scripts/local/README.md). 미들웨어와 DB 초기화는 Infra `local/`을 사용한다. |
 | API·이벤트 | [계약 기준](docs/guides/contracts.md), 해당 계약과 생산자·소비자 구현 |
 | DB·상태·서비스 간 흐름 | [아키텍처](ARCHITECTURE.md), 해당 서비스·모듈 ERD·업무 설명과 [설계 문서](docs/design-docs/README.md) |
 | 이슈·브랜치·커밋·PR | [작성 기준](docs/guides/writing.md), [템플릿](docs/templates/README.md) 중 작성할 종류 |
