@@ -639,37 +639,6 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName(
-            "[REF-EXEC-06] 취소가 모두 NOT_SENT인 채 마감이 지나면 FAILED(PG_UNAVAILABLE)로 끝내고 한도를 풀며 ERROR는 한 번이다")
-    void notSentOnlyFailsAtDeadline(CapturedOutput output) throws Exception {
-        String orderRef = newOrderRef();
-        long paymentId = approved(orderRef, true);
-        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
-        when(toss.cancel(any(), any(), eq(refund.getRefundRequestId()), any()))
-                .thenReturn(new TossResult.NotSent("연결 실패"));
-        when(toss.getPayment(key(orderRef))).thenReturn(new TossResult.NotSent("연결 실패"));
-        executor.execute(refund);
-        expireDeadline(refund);
-        makeDue(refund);
-
-        executor.retryDue();
-        executor.retryDue();
-
-        verify(toss, times(1)).cancel(any(), any(), eq(refund.getRefundRequestId()), any());
-        assertFailed(refund, "PG_UNAVAILABLE");
-        assertNoMoneyMoved(refund, paymentId);
-        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
-        assertThat(results(orderRef)).hasSize(1);
-        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
-
-        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
-        when(toss.cancel(any(), any(), eq(other.getRefundRequestId()), any()))
-                .thenReturn(canceled(other));
-        executor.execute(other);
-        assertThat(refund(other.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
-    }
-
-    @Test
     @DisplayName("[REF-EXEC-06] NOT_SENT 뒤 결과 불명 호출이 있으면 마감에도 UNKNOWN으로 멈추고 한도를 잡으며 ERROR는 한 번이다")
     void unknownCallStaysUnknownAtDeadline(CapturedOutput output) throws Exception {
         String orderRef = newOrderRef();
@@ -700,32 +669,6 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-EXEC-04] NotSent 뒤 처음 결과 불명이 되면 조회 마감을 그 시점부터 새로 잡는다")
-    void firstUnknownAfterNotSentRestartsDeadline() throws Exception {
-        String orderRef = newOrderRef();
-        long paymentId = approved(orderRef, true);
-        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
-        when(toss.cancel(any(), any(), any(), any()))
-                .thenReturn(new TossResult.NotSent("연결 실패"), new TossResult.Unknown("시간 초과"));
-        executor.execute(refund);
-        jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() + INTERVAL '1' MINUTE WHERE id = ?",
-                refund.getId());
-        makeDue(refund);
-
-        executor.retryDue();
-
-        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT check_deadline_at > now() + INTERVAL '20' MINUTE FROM refund"
-                                        + " WHERE id = ?",
-                                Boolean.class,
-                                refund.getId()))
-                .isTrue();
-    }
-
-    @Test
     @DisplayName("[REF-EXEC-06] 조회 중 다른 실행이 선점하면 멈춘 실행은 취소를 다시 보내지 않는다")
     void staleRecoveryDoesNotResend() throws Exception {
         String orderRef = newOrderRef();
@@ -746,6 +689,171 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
         executor.retryDue();
 
         verify(toss, times(1)).cancel(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 429 취소 뒤 마감 조회도 429면 FAILED가 아니고 결과 없이 한도를 잡으며 같은 키만 쓴다")
+    void http429StaysUnknownThroughDeadline(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenReturn(new TossResult.NotSent("HTTP 429", 429));
+        when(toss.getPayment(key(orderRef))).thenReturn(new TossResult.NotSent("HTTP 429", 429));
+
+        executor.execute(refund);
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        expireDeadline(refund);
+        makeDue(refund);
+        executor.retryDue();
+        executor.retryDue();
+
+        verify(toss, times(1))
+                .cancel(key(orderRef), reason(refund), refund.getRefundRequestId(), 20000L);
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        executor.execute(other);
+        assertFailed(other, "OVER_REFUND");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 429 뒤 조회에서 취소 내역을 찾으면 재요청 없이 SUCCEEDED다")
+    void http429ThenCancelFound() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenReturn(new TossResult.NotSent("HTTP 429", 429));
+        when(toss.getPayment(key(orderRef))).thenReturn(canceled(refund));
+
+        executor.execute(refund);
+        makeDue(refund);
+        executor.retryDue();
+
+        verify(toss, times(1)).cancel(any(), any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 첫 시도부터 30분까지는 기존 주기, 그 뒤에는 10분 간격으로 재시도한다")
+    void retriesEveryTenMinutesAfterThirtyMinutes() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any())).thenReturn(new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
+        executor.execute(refund);
+
+        makeDue(refund);
+        executor.retryDue();
+        assertThat(secondsUntilNextAttempt(refund)).isBetween(120L, 181L);
+
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() + INTERVAL '23' HOUR WHERE id = ?",
+                refund.getId());
+        makeDue(refund);
+        executor.retryDue();
+        assertThat(secondsUntilNextAttempt(refund)).isBetween(540L, 601L);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 24시간 상한은 NotSent 뒤 결과 불명으로 밀리지 않고, 지나면 멈추며 ERROR는 한 번이다")
+    void stopsAtTwentyFourHoursWithoutExtension(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenReturn(new TossResult.NotSent("연결 실패"), new TossResult.Unknown("시간 초과"));
+        when(toss.getPayment(key(orderRef)))
+                .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
+        executor.execute(refund);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT check_deadline_at BETWEEN now() + INTERVAL '23' HOUR"
+                                        + " + INTERVAL '59' MINUTE AND now() + INTERVAL '24' HOUR"
+                                        + " FROM refund WHERE id = ?",
+                                Boolean.class,
+                                refund.getId()))
+                .isTrue();
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() + INTERVAL '1' HOUR WHERE id = ?",
+                refund.getId());
+        Object deadline = refund(refund.getRefundRequestId()).get("check_deadline_at");
+        makeDue(refund);
+        executor.retryDue();
+        assertThat(refund(refund.getRefundRequestId()).get("check_deadline_at"))
+                .isEqualTo(deadline);
+
+        expireDeadline(refund);
+        makeDue(refund);
+        executor.retryDue();
+        executor.retryDue();
+
+        verify(toss, times(2)).cancel(any(), any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 연결 실패만 이어져도 FAILED가 아니고 상한에서 UNKNOWN으로 멈춰 한도를 잡는다")
+    void connectionFailuresNeverFail(CapturedOutput output) throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        when(toss.cancel(any(), any(), eq(refund.getRefundRequestId()), any()))
+                .thenReturn(new TossResult.NotSent("연결 실패"));
+        when(toss.getPayment(key(orderRef))).thenReturn(new TossResult.NotSent("연결 실패"));
+
+        executor.execute(refund);
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "PROCESSING");
+        makeDue(refund);
+        executor.retryDue();
+        expireDeadline(refund);
+        makeDue(refund);
+        executor.retryDue();
+
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(results(orderRef)).isEmpty();
+        assertThat(deadlineLogs(output, refund)).isEqualTo(1);
+
+        Refund other = receive(orderRef, paymentId, orderRef + "-S1", 20000);
+        executor.execute(other);
+        assertFailed(other, "OVER_REFUND");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 이전 호출이 있으면 PROCESSING에서 받은 거절도 FAILED로 끝내지 않는다")
+    void declinedAfterEarlierCallIsNotFailed() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund refund = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        when(toss.cancel(any(), any(), any(), any()))
+                .thenReturn(
+                        new TossResult.NotSent("연결 실패"),
+                        new TossResult.Declined("NOT_CANCELABLE_AMOUNT", "거절", 400));
+
+        executor.execute(refund);
+        makeDue(refund);
+        executor.retryDue();
+
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(results(orderRef)).isEmpty();
+    }
+
+    private long secondsUntilNextAttempt(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT CAST(EXTRACT(EPOCH FROM next_attempt_at - now()) AS BIGINT)"
+                        + " FROM refund WHERE id = ?",
+                Long.class,
+                refund.getId());
     }
 
     private void expireDeadline(Refund refund) {
