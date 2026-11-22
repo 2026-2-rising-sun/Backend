@@ -409,6 +409,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     @DisplayName("[REF-LATE-01] APPROVED 취소가 불명이면 보류하고 같은 키로 다시 보내 한 번만 반영한다")
     void approvedCancelRetries() throws Exception {
         ApproveCommand c = approved();
+        tossQuery(c, new TossResult.Success(done(c)));
         when(toss.cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId())))
                 .thenReturn(new TossResult.Unknown("HTTP 500", 500))
                 .thenReturn(
@@ -620,7 +621,7 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         ApproveCommand c = approving();
         when(toss.getPayment(c.paymentKey())).thenReturn(new TossResult.Unknown("HTTP 500", 500));
         Refund refund = receive(c);
-        jdbc.update("UPDATE refund SET attempt_count = 10 WHERE id = ?", refund.getId());
+        jdbc.update("UPDATE refund SET attempt_count = 9 WHERE id = ?", refund.getId());
 
         intake.execute(refund);
         assertThat(secondsToNextAttempt(refund)).isPositive();
@@ -705,26 +706,212 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
     @Test
     @DisplayName(
-            "[REF-LATE-01][REF-EXEC-06] PG_UNAVAILABLE로 끝난 고객 환불은 토스에 갔을 수 있는 환불이 아니라 APPROVED 보상을 막지 않는다")
-    void pgUnavailableUserRefundDoesNotBlockApproved() throws Exception {
+            "[REF-LATE-01][REF-EXEC-06] 토스 장애로 UNKNOWN인 고객 환불이 있으면 보상은 취소를 보내지 않고 기다리고, 그 환불이 반영되면 이중 취소 없이 NOT_REFUNDABLE")
+    void unknownUserRefundHoldsCompensation() throws Exception {
         ApproveCommand c = approved();
-        Refund failed = receive(c);
+        Refund user = receive(c);
         jdbc.update(
-                "UPDATE refund SET purpose = 'USER_REFUND', status = 'FAILED',"
-                        + " failure_code = 'PG_UNAVAILABLE', result_version = 1,"
-                        + " result_payload = '{}', resolved_at = now(), next_attempt_at = NULL"
-                        + " WHERE id = ?",
-                failed.getId());
-        tossCancel(
+                "UPDATE refund SET purpose = 'USER_REFUND', status = 'UNKNOWN', next_attempt_at = NULL,"
+                        + " check_deadline_at = now() + INTERVAL '1' DAY WHERE id = ?",
+                user.getId());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        assertHeld(c, refund);
+        makeDue(refund);
+        retryJob.run();
+        assertHeld(c, refund);
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+
+        jdbc.update(
+                "UPDATE refund SET status = 'SUCCEEDED', refunded_amount = amount, result_version = 1,"
+                        + " result_payload = '{}', resolved_at = now() WHERE id = ?",
+                user.getId());
+        jdbc.update(
+                "UPDATE payment SET status = 'REFUNDED', refunded_amount = amount WHERE order_ref = ?",
+                c.orderRef());
+        makeDue(refund);
+        retryJob.run();
+
+        assertFailed(c, refund, "NOT_REFUNDABLE");
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName(
+            "[REF-EXEC-06] APPROVED 취소가 HTTP 응답을 받은 NotSent(429)면 UNKNOWN으로 두고, 다음 차례에 조회해 내 취소가 있으면 다시 보내지 않고 반영한다")
+    void approvedNotSentQueriesBeforeResend() throws Exception {
+        ApproveCommand c = approved();
+        tossCancel(c, new TossResult.NotSent("HTTP 429", 429));
+        tossQuery(
                 c,
                 new TossResult.Success(canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
 
         Refund refund = receive(c);
         intake.execute(refund);
+        assertThat(refundStatus(refund)).isEqualTo("UNKNOWN");
+        assertThat(refundResults(c)).isEmpty();
 
-        verify(toss).cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId()));
+        makeDue(refund);
+        retryJob.run();
+
         assertResolved(c, refund, "SUCCEEDED", AMOUNT);
         assertRefunded(c, refund);
+        verify(toss, times(1))
+                .cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId()));
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 조회에 취소 내역이 없을 때만 같은 키·같은 사유로 다시 취소한다")
+    void approvedNotSentResendsSameKeyAfterQuery() throws Exception {
+        ApproveCommand c = approved();
+        when(toss.cancel(eq(c.paymentKey()), anyString(), eq("cancel-" + c.pgOrderId())))
+                .thenReturn(new TossResult.NotSent("HTTP 401", 401))
+                .thenReturn(
+                        new TossResult.Success(
+                                canceledBy(c, PaymentOutcomeService.COMPENSATION_REASON)));
+        tossQuery(c, new TossResult.Success(done(c)));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        verify(toss, never()).getPayment(c.paymentKey());
+        makeDue(refund);
+        retryJob.run();
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        verify(toss).getPayment(c.paymentKey());
+        var reason = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(toss, times(2))
+                .cancel(eq(c.paymentKey()), reason.capture(), eq("cancel-" + c.pgOrderId()));
+        assertThat(reason.getAllValues()).containsOnly(PaymentOutcomeService.COMPENSATION_REASON);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] HTTP 응답을 받은 NotSent 기록이 있으면 환불된 결제여도 환불액 0의 FAILED로 끝내지 않는다")
+    void respondedNotSentIsNotFailed() throws Exception {
+        ApproveCommand c = approved();
+        insertCancelCall(c, "NOT_SENT", 429);
+        jdbc.update(
+                "UPDATE payment SET status = 'REFUNDED', refunded_amount = amount WHERE order_ref = ?",
+                c.orderRef());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertHeld(c, refund);
+        assertThat(secondsToNextAttempt(refund)).isNull();
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 응답 없는 연결 실패는 토스에 닿지 않았으므로 환불된 결제를 NOT_REFUNDABLE로 끝낼 수 있다")
+    void connectionFailureCanFail() throws Exception {
+        ApproveCommand c = approved();
+        insertCancelCall(c, "NOT_SENT", null);
+        jdbc.update(
+                "UPDATE payment SET status = 'REFUNDED', refunded_amount = amount WHERE order_ref = ?",
+                c.orderRef());
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertFailed(c, refund, "NOT_REFUNDABLE");
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 첫 토스 호출부터 24시간이 지나면 마지막 조회 뒤 UNKNOWN으로 멈추고 사람 확인 ERROR를 한 번 남긴다")
+    void stopsAfterGiveUp(CapturedOutput output) throws Exception {
+        ApproveCommand c = approving();
+        when(toss.getPayment(c.paymentKey())).thenReturn(new TossResult.Unknown("HTTP 500", 500));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        assertThat(secondsToDeadline(refund)).isBetween(23.9 * 3600, 24.0 * 3600);
+
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(refundStatus(refund)).isEqualTo("UNKNOWN");
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(refundResults(c)).isEmpty();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+
+        clearInvocations(toss);
+        retryJob.run();
+        verify(toss, never()).getPayment(any());
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 상한이 지나면 조회가 DONE이어도 취소를 새로 보내지 않고 멈춘다")
+    void noCancelAfterGiveUp(CapturedOutput output) throws Exception {
+        ApproveCommand c = approving();
+        tossQuery(c, new TossResult.Success(done(c)));
+        tossCancel(c, new TossResult.Unknown("HTTP 500", 500));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss, times(1)).cancel(eq(c.paymentKey()), anyString(), anyString());
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("[REF-EXEC-06] 상한이 지난 실행이 예외로 끝나도 멈추고 사람 확인 ERROR를 남긴다")
+    void stopsWhenLastAttemptThrows(CapturedOutput output) throws Exception {
+        ApproveCommand c = approving();
+        when(toss.getPayment(c.paymentKey()))
+                .thenReturn(new TossResult.Unknown("HTTP 500", 500))
+                .thenThrow(new IllegalStateException("조회 실패"));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+        expireDeadline(refund);
+        makeDue(refund);
+        retryJob.run();
+
+        assertThat(secondsToNextAttempt(refund)).isNull();
+        assertThat(giveUpAlerts(output, refund)).isEqualTo(1);
+    }
+
+    private void insertCancelCall(ApproveCommand c, String outcome, Integer httpStatus) {
+        jdbc.update(
+                "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome,"
+                        + " http_status, requested_at) VALUES (?, 'CANCEL', ?, ?, ?, ?, now())",
+                paymentId(c.orderRef()),
+                c.pgOrderId(),
+                "cancel-" + c.pgOrderId(),
+                outcome,
+                httpStatus);
+    }
+
+    private String refundStatus(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT status FROM refund WHERE id = ?", String.class, refund.getId());
+    }
+
+    private Double secondsToDeadline(Refund refund) {
+        return jdbc.queryForObject(
+                "SELECT EXTRACT(EPOCH FROM check_deadline_at - now()) FROM refund WHERE id = ?",
+                Double.class,
+                refund.getId());
+    }
+
+    private void expireDeadline(Refund refund) {
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+    }
+
+    private static long giveUpAlerts(CapturedOutput output, Refund refund) {
+        return output.getAll()
+                .lines()
+                .filter(l -> l.contains("[사람 확인 필요]") && l.contains("자동 재시도 상한"))
+                .filter(l -> l.contains(refund.getRefundRequestId()))
+                .count();
     }
 
     /** 실제 승인 흐름으로 APPROVED·승인 분개까지 만든다. */
@@ -849,14 +1036,9 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(results.get(0).get("payload").get("status").asText()).isEqualTo(status);
     }
 
-    /** 결과를 보내지 않고 PROCESSING으로 남아 있다. */
+    /** 결과를 보내지 않고 진행 중으로 남아 있다. */
     private void assertHeld(ApproveCommand c, Refund refund) throws Exception {
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT status FROM refund WHERE id = ?",
-                                String.class,
-                                refund.getId()))
-                .isEqualTo("PROCESSING");
+        assertThat(refundStatus(refund)).isIn("PROCESSING", "UNKNOWN");
         assertThat(refundResults(c)).isEmpty();
     }
 
