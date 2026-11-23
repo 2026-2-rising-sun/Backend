@@ -2,22 +2,28 @@ package com.shoppinglive.common.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +36,7 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
@@ -43,6 +50,7 @@ class ConsumerErrorHandlersKafkaTest {
     static final String DLT = "dlt-proof.orders.v1.test.dlt";
     static final ConcurrentLinkedQueue<String> processed = new ConcurrentLinkedQueue<>();
     static final AtomicInteger dbAttempts = new AtomicInteger();
+    static final AtomicInteger dltFailures = new AtomicInteger();
     static final java.util.concurrent.ConcurrentHashMap<String, AtomicInteger> attempts =
             new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -82,6 +90,44 @@ class ConsumerErrorHandlersKafkaTest {
         awaitProcessed("flaky-db");
         awaitProcessed("good-after-db");
         assertThat(dbAttempts.get()).isGreaterThan(3);
+    }
+
+    @Test
+    @DisplayName("DLT 전송이 실패하면 원본 offset을 넘기지 않고, 복구된 뒤 DLT로 보내고 뒤 메시지를 처리한다")
+    void dltSendFailureKeepsOffsetAndRecoversBeforeNextMessage() throws Exception {
+        dltFailures.set(2);
+        template.send(TOPIC, "k9", "bad-dlt-fail").get();
+        template.send(TOPIC, "k10", "good-after-dlt-fail").get();
+        awaitProcessed("good-after-dlt-fail");
+        var dead = readDlt("bad-dlt-fail");
+        assertThat(dead.value()).isEqualTo("bad-dlt-fail");
+        // 처음 시도 1회와 DLT 전송 실패 2회: 같은 메시지를 세 번 받았다
+        assertThat(attempts.get("bad-dlt-fail").get()).isGreaterThanOrEqualTo(3);
+        assertThat(dltFailures.get()).isZero();
+    }
+
+    @Test
+    @DisplayName("로그에는 토픽·파티션·offset·원인 클래스만 남고 메시지 원문은 남지 않으며 DLT 메시지에는 원문이 있다")
+    void logDoesNotContainRawPayload() throws Exception {
+        var logger =
+                (ch.qos.logback.classic.Logger)
+                        LoggerFactory.getLogger(ConsumerErrorHandlers.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            template.send(TOPIC, "k11", "boom-SECRET-7731").get();
+            template.send(TOPIC, "k12", "json-SECRET-8842").get();
+            template.send(TOPIC, "k13", "good-after-secret").get();
+            awaitProcessed("good-after-secret");
+            assertThat(readDlt("boom-SECRET-7731").value()).contains("SECRET-7731");
+            assertThat(readDlt("json-SECRET-8842").value()).contains("SECRET-8842");
+            var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+            assertThat(messages).anyMatch(m -> m.contains(ConsumerErrorHandlers.DLT_MARKER));
+            assertThat(messages).noneMatch(m -> m.contains("SECRET"));
+        } finally {
+            logger.detachAppender(appender);
+        }
     }
 
     private void awaitProcessed(String value) throws InterruptedException {
@@ -133,8 +179,30 @@ class ConsumerErrorHandlersKafkaTest {
         }
 
         @Bean
+        KafkaTemplate<String, String> dltTemplate(
+                @Value("${spring.kafka.bootstrap-servers}") String bootstrap) {
+            return new KafkaTemplate<>(
+                    new DefaultKafkaProducerFactory<>(
+                            Map.of(
+                                    ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap,
+                                    ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                                            StringSerializer.class,
+                                    ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                                            StringSerializer.class))) {
+                @Override
+                public CompletableFuture<SendResult<String, String>> send(
+                        ProducerRecord<String, String> record) {
+                    if (dltFailures.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0)
+                        return CompletableFuture.failedFuture(new KafkaException("DLT 전송 실패(테스트)"));
+                    return super.send(record);
+                }
+            };
+        }
+
+        @Bean
         ConcurrentKafkaListenerContainerFactory<String, String> listenerFactory(
-                KafkaTemplate<String, String> template,
+                @org.springframework.beans.factory.annotation.Qualifier("dltTemplate")
+                        KafkaTemplate<String, String> dltTemplate,
                 @Value("${spring.kafka.bootstrap-servers}") String bootstrap) {
             var factory = new ConcurrentKafkaListenerContainerFactory<String, String>();
             factory.setConsumerFactory(
@@ -155,7 +223,7 @@ class ConsumerErrorHandlersKafkaTest {
             factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
             factory.setCommonErrorHandler(
                     ConsumerErrorHandlers.deadLettering(
-                            template, ".test.dlt", Duration.ofMillis(10)));
+                            dltTemplate, ".test.dlt", Duration.ofMillis(10)));
             return factory;
         }
 
@@ -167,10 +235,13 @@ class ConsumerErrorHandlersKafkaTest {
 
     static class Listener {
         @KafkaListener(topics = TOPIC, groupId = "dlt-proof", containerFactory = "listenerFactory")
-        void on(String value) {
+        void on(String value) throws Exception {
             attempts.computeIfAbsent(value, k -> new AtomicInteger()).incrementAndGet();
+            if (value.startsWith("bad-")) throw new ContractViolationException("계약 위반");
+            if (value.startsWith("boom-")) throw new IllegalStateException("코드 실패: " + value);
+            if (value.startsWith("json-"))
+                throw new com.fasterxml.jackson.core.JsonParseException(null, "bad token " + value);
             switch (value) {
-                case "bad-contract" -> throw new ContractViolationException("계약 위반");
                 case "boom" -> throw new IllegalStateException("코드 실패");
                 case "flaky-db" -> {
                     if (dbAttempts.incrementAndGet() <= 3)
