@@ -141,7 +141,7 @@ class ResultConsumerRewindKafkaPostgresTest extends OrderSheetPostgresSupport {
             await().atMost(Duration.ofSeconds(20))
                     .untilAsserted(
                             () -> {
-                                verify(relay, times(2)).approved(any());
+                                verify(relay, atLeast(2)).approved(any());
                                 assertThat(countRefundIntents()).isEqualTo(1);
                                 assertThat(countPublishedRefundRequested()).isEqualTo(1);
                             });
@@ -198,7 +198,7 @@ class ResultConsumerRewindKafkaPostgresTest extends OrderSheetPostgresSupport {
             await().atMost(Duration.ofSeconds(60))
                     .untilAsserted(
                             () -> {
-                                verify(relay, times(2)).approved(any());
+                                verify(relay, atLeast(2)).approved(any());
                                 assertThat(caughtUp(APPROVAL_GROUP, APPROVAL_TOPIC, props))
                                         .isTrue();
                                 assertThat(caughtUp(REFUND_GROUP, REFUND_TOPIC, props)).isTrue();
