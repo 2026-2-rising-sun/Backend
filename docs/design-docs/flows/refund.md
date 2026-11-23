@@ -2,6 +2,8 @@
 
 <!-- visual: relations -->
 
+> 주의: #378은 dev에 병합됐다. 이 문서의 "미병합" 설명은 과거 기준이며 #384에서 현재 구현으로 고친다. 그 전까지 동작 규칙은 [환불 요구사항](../services/payment/requirements/refund.md)과 이슈 본문을 따른다.
+
 기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 Core 코드. [#378](https://github.com/2026-2-rising-sun/Backend/pull/378)(head `228f33faaa5e9519ffd74ec12b2878825fa85dde`)은 미병합 Draft이며 아래 목표 흐름은 dev 동작이 아니다. Payment 환불 연동 완료나 실제 금전 환불을 확인한 문서가 아니다.
 
 [시각 자료](refund.html) · [주문·결제](order-payment.md) · [확인 근거와 잔여 과제](../../worklog/2026-11-20-cdc-refund-status.md)
