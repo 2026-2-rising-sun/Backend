@@ -1,11 +1,24 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — Phase 1 dev 병합, 2026-11-20 실제 토스 sandbox E2E(주문 → 승인) 확인. Phase 2는 Core 정리(#377·#389·#390) 남음. Phase 3 이슈 생성(#384–#387, #370)
+상태: 진행 중 — Phase 1 완료. Phase 2·3의 남은 일을 서비스별 이슈로 마무리하는 중이다.
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: [결제](../../../../design-docs/services/payment/requirements/payment.md) · [원장](../../../../design-docs/services/payment/requirements/ledger.md) · [환불](../../../../design-docs/services/payment/requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../../adr/0337-5-pg-timeout-and-unknown.md)
 Phase 문서: [Phase 1 결제 1차](phase1-payment.md)
 자료: [목표 설계와 작은 판단](decision.md) · [Payment 도메인 홈](../../../../design-docs/services/payment/overview.md)(새 설계와 현재 코드 문서 목록) · [목표 설계](../../../../design-docs/services/payment/design.html)(그림·예시. 원본은 요구사항 MD와 ADR)
+
+## 기준 문서
+
+같은 내용을 여러 곳에 복사하지 않는다. 아래 표의 기준 문서만 고치고 다른 곳에서는 링크한다.
+
+| 알고 싶은 것 | 기준 |
+|---|---|
+| 범위, 서비스 소유, 작업 순서 | 이 문서 |
+| 이슈별 완료 조건 | 각 GitHub 이슈 본문 |
+| 이슈 진행 상태 | GitHub 이슈의 열림·닫힘과 [#337](https://github.com/2026-2-rising-sun/Backend/issues/337) 체크리스트 |
+| 요구사항 | [결제](../../../../design-docs/services/payment/requirements/payment.md) · [원장](../../../../design-docs/services/payment/requirements/ledger.md) · [환불](../../../../design-docs/services/payment/requirements/refund.md) |
+| API·이벤트 | `contracts/` |
+| 되돌리기 어려운 결정 | `docs/adr/` |
 
 ## 목표와 범위
 
@@ -14,7 +27,8 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 - **이 계획이 맡는 것**: Payment 전체(Phase 1·3·후순위)와 결제에 연관된 주문 흐름(Phase 2 주문 연동). 결제와 주문이 겹치는 설계는 이 계획이 우선한다.
 - **도메인 분리**: Phase 2는 #337의 하위 이슈로 두되 `service:commercecore` 라벨, 별도 Phase 문서, 별도 세션으로 진행한다. 두 도메인은 계약(`contracts/`)과 ADR로만 잇는다.
 - **CommerceCore 범위**: 재고·쿠폰, 주문 모듈 구조(#331).
-- **범위 밖**(만들지 않음, 필요하면 별도 요구사항): 토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커, 토스 지급대행 실연동·셀러 등록(지급은 Mock), 스케줄러 분산 락, Redis 등 경합 최적화.
+- **서비스 소유**: 서비스마다 독립 팀이 맡는다고 가정한다. 이슈 하나는 소유 서비스 하나의 구현만 요구하고, 서비스 사이의 약속은 `contracts/`와 ADR로 잇는다.
+- **범위 밖**(만들지 않음, 필요하면 별도 요구사항): 토스 호출 동시 실행 수 제한(벌크헤드)·웹훅, 토스 지급대행 실연동·셀러 등록(지급은 Mock), 스케줄러 분산 락, Redis 등 경합 최적화.
 
 ## 로드맵
 
@@ -27,15 +41,50 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | | 결제 생성·결제창·조회 API | #348 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 완료 (PR #354·#355) |
 | | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 완료 (PR #353·#356–#358, 토스 샌드박스 확인 #366) |
 | | 결과 불명 복구와 만료 | #349 | PAY-RECOVER·EXPIRE | 완료 (PR #359) |
-| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | #343·#365·#377·#389·#390(CommerceCore) | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 진행 중 — 주문서 결제 중계·`PaymentApproved` 소비는 dev에 있고, 토스 결제창 → Commerce → Payment는 2026-11-20 실제 토스 sandbox로 확인했다. 남은 일: 시스템 보상 상태(#377), 결과 소비자 DLT(#389), 옛 결제 경로 정리(#390) |
-| **3 환불** | Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다 | #384 계약 → #385 기반 → #370·#386 → #387 (Core: #367·#369·#345) | REF-*, LED-REFUND-01 | 대기 — 계약(#384)과 문서 갱신 먼저 |
-| 후순위 | 대사 → 정산 → 지급 → 선택(서킷 브레이커·2차 PG·웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
+| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | 완료 #343·#365·#383, 남음 #377·#389·#390 | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 진행 중 |
+| **3 환불** | Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다 | 완료 #385·#370·#386, 남음은 아래 표 | REF-*, LED-REFUND-01 | 진행 중 |
+| 다음 범위 | 토스 장애 때 새 결제를 Mock 2차 PG로 보낸다 | #400 | 착수 때 요구사항 갱신 | 대기 |
+| 후순위 | 대사 → 정산 → 지급 → 선택(웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
+
+### Phase 2·3의 남은 일
+
+| 소유 | 이슈 | 끝나면 달라지는 것 | 선행 |
+|---|---|---|---|
+| 공유 계약 | #384 | 환불 요청·결과 계약과 ADR이 현재 구현과 맞는다 | #377 |
+| Payment | #398 | 승인 429 뒤 이중 청구와 미환불이 생기지 않는다 | 없음 |
+| Payment | #401 | 토스의 환불 진행 중 응답이 실패로 끝나지 않는다 | 없음 |
+| Payment | #402 | 환불 소비자가 확정 계약과 공통 오류 처리기를 쓴다 | #384, #389 |
+| Payment | #387 | 오래 미확정인 결제·환불 건수를 지표로 낸다 | 없음 |
+| Payment | #369 | 24시간 상한에 걸린 환불을 사람이 재개할 수 있다 | 없음 |
+| CommerceCore | #377 | 보상 대기 주문이 있어도 새 구매를 할 수 있다 | 없음 |
+| CommerceCore | #389 | 처리 못 할 메시지가 DLT로 가고 뒤 메시지가 막히지 않는다 | 없음 |
+| CommerceCore | #390 | 옛 Payment 호출과 하이픈 토픽 구독이 사라진다 | 없음 |
+| CommerceCore | #399 | 앞선 환불이 미확정이어도 남은 상품을 환불할 수 있다 | #377, #390, #401 |
+| CommerceCore | #367 | 구매자 일반 환불의 Core 완료 조건을 확인한다 | 없음 |
+| CommerceCore | #345 | 일부 수량 환불의 남은 조건을 확인한다 | #399 |
+| Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·30일 보관·Slack 알림이 동작한다 | 미확정 알림만 #387 |
+| Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | 구매자가 결제·환불 상태를 구분하고 남은 상품을 환불한다 | Backend·Infra 완료 |
+
+작업 순서:
+
+1. 선행이 없는 Payment, CommerceCore, Infra DLT 작업을 서비스별로 병렬 진행한다.
+2. #377 뒤에 #384로 계약을 확정하고, #384와 #389 뒤에 #402를 진행한다.
+3. #377, #390, #401 뒤에 #399를 진행한다.
+4. #387 지표로 Infra #64의 미확정 알림을 넣는다.
+5. #345를 확인해 닫고, Backend·Infra가 끝나면 Frontend #89를 연동한다.
+
+이번 범위의 종료 기준:
+
+- 위 표의 이슈가 모두 닫힌다.
+- dev와 Infra main으로 주문 → 승인 → 부분·전체 환불 E2E가 통과한다.
+- 승인 429, 미확정 환불 중 다른 상품 환불, DLT 유입 알림을 실제 실행으로 확인한다.
+- 흐름 문서, ADR, 계약, 이 문서가 현재 구현과 맞는다. 끝나면 계획을 `completed/`로 옮긴다.
 
 모든 Phase의 이슈는 #337의 GitHub 하위 이슈로 연결하고, #337 본문의 로드맵 체크리스트에 추가한다. 이슈 하나 = 확인 가능한 기능 하나(PR 1–4개). PR은 자기 이슈를 `Refs`로 연결하고 그 이슈의 마지막 PR에서 `Closes`한다.
 
 ### Phase별 구체화
 
-- **큰 그림은 이 README와 #337 하나가 맡는다.** 모든 Phase의 목표·범위·순서·의존만 쓰고 세부는 쓰지 않는다. #337 본문의 로드맵 체크리스트는 이 표와 같이 갱신한다.
+- **큰 그림은 이 README와 #337 하나가 맡는다.** 모든 Phase의 목표·범위·순서·의존만 쓰고 세부는 쓰지 않는다. #337의 체크리스트는 진행 상태만 보여 주고, 범위와 순서는 이 문서를 링크한다.
 - **상세 설계는 Phase별로 쓴다.** API·DB·이벤트·PR 블록·종료 검증은 그 Phase를 시작할 때 `phase<n>-<주제>.md`(필요하면 이슈별 파일)에 쓰고, 구현하면서 바뀌면 고친다.
 - Phase마다 하위 이슈를 만들고, 그 Phase 문서와 요구사항을 구체화하는 **문서 PR을 먼저** 올린다(작으면 첫 구현 PR에 넣는다). Phase 1은 #339가 그 역할을 하고 [phase1-payment.md](phase1-payment.md)가 그 결과다. 끝난 Phase 문서는 지우지 않고 계획과 함께 `completed/`로 간다.
 - 구현 PR 본문에는 그 PR의 요구사항 ID와 동작, 구현 방식, 아키텍처·성능 변경점, 학습 포인트(핵심 문법 예시)를 쓴다.
@@ -92,27 +141,25 @@ gh pr edit <내-PR> --base dev && gh pr ready <내-PR>
 끝: PR 게이트 결과(검사 출력 요약, ID→테스트 표)를 보고한다. 커밋·푸시·PR 생성은 지시가 있을 때만.
 ```
 
-## Phase 2 이후 (큰 그림. 상세는 착수 때 Phase 문서 PR로 쓴다)
+## 이후 범위 (상세는 착수 때 Phase 문서 PR로 쓴다)
 
-| Phase | PR (예상) |
+| 범위 | PR (예상) |
 |---|---|
-| 2 주문 연동 | 착수 때 Commerce 쪽 설계. 결제 생성 호출·재시도, 승인 중계와 "결제 확인 중" 잠금, `PaymentApproved` 소비, 정체 해소 조회(원본 `#commerce`·`#checkout`). 기존 CommerceCore 결제 코드(재전달·소비자·만료 배치)를 고쳐 쓸지 교체할지 먼저 정한다(원본 `#commerce` 대응표). 끝에 토스 테스트 키로 결제위젯 → Commerce → Payment 수동 확인 |
-| 3 환불 | 문서 PR(#384: 고객 환불 HTTP → Kafka 전환을 ADR 0337-2·design.md·refund.md에 반영) → #385 V5 + 요청 소비·결과 발행·DLT(REF-LATE-02, REF-EVENT-01) → #370 구매자 환불 실행·복구(REF-ACCEPT-*·REF-EXEC-*, LED-REFUND-01) · #386 시스템 보상 실행(REF-LATE-01 포함) → #387 장기 미확정 알림. Core 쪽은 #378에 있음 |
-| 후순위 | 대사: V6 + 원장 대사 → 거래 대사·자동 보정(EC 38). 정산: V7 + `PurchaseConfirmed` → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 서킷 브레이커 → 2차 PG → 웹훅 |
+| 서킷 브레이커·Mock 2차 PG | #400. Payment가 PG를 고른다. 결제창 연동에 Core·Frontend 변경이 필요하면 착수 때 서비스별 이슈로 나눈다 |
+| 후순위 | 대사: V6 + 원장 대사 → 거래 대사·자동 보정(EC 38). 정산: V7 + `PurchaseConfirmed` → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 웹훅 |
 
 ## Commerce 의존
 
-| 필요한 것 | 담당 | 시점 |
+| 필요한 것 | 소유 | 상태 |
 |---|---|---|
-| 새 생성·승인 API 호출, `PaymentApproved` 소비 | Phase 2 주문 연동. [#331](https://github.com/2026-2-rising-sun/Backend/issues/331)의 Order 구조 위에서 진행하고, 겹치는 결제 흐름은 이 설계를 따른다 | CommerceCore #343·#365로 dev에 들어갔다. 주문서 결제 중계(`HttpPaymentRelayClient`)는 새 API를 부른다. 옛 `HttpPaymentClient` 경로는 #347(PR #352) 병합 뒤 지운 API를 불러 동작하지 않는다 |
-| `RefundRequested` 발행, 환불 API 호출 | Phase 3 환불 주문 연동 | Phase 3 |
-| `PurchaseConfirmed` 발행 | #331 | 정산 착수 때 |
+| 새 생성·승인 API 호출, `PaymentApproved` 소비 | CommerceCore | dev 병합 |
+| `commerce.refund.requests.v1` 발행, `payment.refund.results.v1` 소비 | CommerceCore | dev 병합. 계약 확정은 #384 |
+| `PurchaseConfirmed` 발행 | CommerceCore | 정산 착수 때 |
 
 Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 
 ## 인계
 
-- 완료: Payment 목표 설계 HTML, 요구사항 3개, ADR 0337-1–5 채택, 이 계획, Phase 1 구현(PR #352–#359)과 토스 샌드박스 확인 도구(#366). 결과는 [Phase 1 문서](phase1-payment.md#종료-검증)에 있다.
-- 남은 일: Phase 1 PR 병합(위 "스택 PR" 순서) → Phase 2 남은 일(로드맵 표) → Phase 3 환불.
-- 조율: [#343](https://github.com/2026-2-rising-sun/Backend/pull/343)(Order)이 기존 Payment 코드·`V4`·`contracts/api/payment-service.yaml`을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·`payment_order_control`·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 `V4`를 그대로 쓴다. 남은 채 병합되면 `V5`로 옮기고 그 테이블도 함께 지운다. 답을 기다리지 않고 기존 코드 삭제를 먼저 진행하며, 충돌은 그 PR이 맞춘다(2026-11-15 결정). 결과: #343은 Payment 스키마를 바꾸지 않고 병합됐고 Phase 1 스키마는 `V4`를 그대로 쓴다.
+- 완료: 목표 설계, 요구사항, ADR, Phase 1 구현과 토스 샌드박스 확인, Core 결제 중계, Payment 환불 실행(#385·#370·#386).
+- 남은 일: 위 [Phase 2·3의 남은 일](#phase-23의-남은-일).
 - 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.
