@@ -981,11 +981,9 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         accept(number);
         expiry(number);
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("order.status").value("COMPENSATION_PENDING"));
+                .andExpect(status().isNoContent());
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("order.status").value("COMPENSATION_PENDING"));
+                .andExpect(status().isNoContent());
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
         assertThat(available(501)).isEqualTo(18);
         assertThat(reserved(501)).isEqualTo(2);

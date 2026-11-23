@@ -51,7 +51,7 @@ public class PurchaseGuard {
     public void requireNoActive(String member) {
         Integer active =
                 jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM orders WHERE member_id=? AND status IN ('PENDING_PAYMENT','PAYMENT_CONFIRMING','COMPENSATION_PENDING')",
+                        "SELECT COUNT(*) FROM orders WHERE member_id=? AND status IN ('PENDING_PAYMENT','PAYMENT_CONFIRMING')",
                         Integer.class,
                         member);
         if (active != null && active > 0) {
