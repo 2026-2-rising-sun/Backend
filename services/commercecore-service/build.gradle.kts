@@ -2,6 +2,12 @@ plugins { id("org.springframework.boot") }
 
 dependencies {
     implementation(project(":common-module"))
+    // 루트 빌드는 implementation에만 Boot BOM을 건다. Lombok 버전도 같은 BOM에서 받는다.
+    val boot = platform("org.springframework.boot:spring-boot-dependencies:3.5.16")
+    compileOnly(boot)
+    annotationProcessor(boot)
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")
     testImplementation(testFixtures(project(":common-module")))
