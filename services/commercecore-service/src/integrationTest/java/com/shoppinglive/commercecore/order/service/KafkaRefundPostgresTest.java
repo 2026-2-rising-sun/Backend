@@ -630,6 +630,39 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(available(501)).isEqualTo(20);
     }
 
+    @Test
+    @DisplayName("처리 중·미확정 환불 금액은 표시 환불 가능 금액과 수량에서 빠지고 FAILED 뒤 다시 풀린다")
+    void displayedAmountsExcludeHeldAndReleaseOnFailure() throws Exception {
+        String n = paid(false);
+        String execution = UUID.randomUUID().toString();
+        refunds.request(MEMBER_A, n, "display-unknown", quantity(n, 1));
+        apply(result(requestIdByKey("display-unknown"), "UNKNOWN", 1, execution));
+        var held = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(held.refundable()).isTrue();
+        assertThat(held.heldQuantity()).isEqualTo(1);
+        assertThat(held.refundableQuantity()).isEqualTo(2);
+        assertThat(held.refundAmount()).isEqualTo(8000L);
+        assertThat(held.remainingRefundableAmount()).isEqualTo(8000L);
+        apply(result(requestIdByKey("display-unknown"), "FAILED", 2, execution));
+        var released = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(released.heldQuantity()).isZero();
+        assertThat(released.refundableQuantity()).isEqualTo(3);
+        assertThat(released.refundAmount()).isEqualTo(12000L);
+        assertThat(released.remainingRefundableAmount()).isEqualTo(12000L);
+    }
+
+    @Test
+    @DisplayName("쿠폰 주문에서 표시 환불 가능 금액은 전체 환불이 접수하는 금액과 같다")
+    void displayedAmountMatchesAcceptedAmountWithCoupon() throws Exception {
+        String n = paid(true);
+        refunds.request(MEMBER_A, n, "coupon-one", quantity(n, 1));
+        var shown = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(shown.refundAmount()).isEqualTo(6000L);
+        assertThat(shown.remainingRefundableAmount()).isEqualTo(6000L);
+        assertThat(refunds.request(MEMBER_A, n, "coupon-rest", all()).refund().refundAmount())
+                .isEqualTo(shown.refundAmount());
+    }
+
     String twoItems() {
         String n =
                 relay.create(
