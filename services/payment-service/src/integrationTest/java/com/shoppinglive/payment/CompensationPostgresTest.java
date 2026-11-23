@@ -116,6 +116,11 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
                                 String.class,
                                 c.orderRef()))
                 .isEqualTo(c.pgOrderId());
+        // 같은 결제의 새 승인 시도는 토스를 부르지 않고 불명 대기로 답한다(새 주문번호·새 키를 쓰지 않는다)
+        assertThat(approvalService.approve(c))
+                .isEqualTo(new ApprovalResult.Pending(paymentId(c.orderRef())));
+        verify(toss, times(2))
+                .confirm(c.paymentKey(), c.pgOrderId(), c.amount(), "confirm-" + c.pgOrderId());
         tossQuery(c, new TossResult.Success(withStatus(c, "CANCELED")));
 
         Refund refund = receive(c);
