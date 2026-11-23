@@ -24,7 +24,7 @@ Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환�
 
 ## 시스템 응답 유실과 보상 fence
 
-최초 승인 처리 시작부터600초 무응답 또는 명시적 승인 UNKNOWN에서 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·고정UUID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다. 사용자 CANCEL_PENDING으로 바꾸지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 재고·쿠폰 예약을 유지한다. 단순 HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 기존 PROCESSING에서 첫 처리 시작의600초 기한까지 기다린다. 재시도로 기한을 늘리지 않는다.
+최초 승인 처리 시작부터600초 무응답 또는 명시적 승인 UNKNOWN에서 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·고정UUID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 재고·쿠폰 예약을 유지한다. 단순 HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 기존 PROCESSING에서 첫 처리 시작의600초 기한까지 기다린다. 재시도로 기한을 늘리지 않는다.
 
 보상 행은 완료 뒤에도 정상 승인 재개를 차단하는 영속 fence다. 승인 API 재진입, checkout, dispatcher 재전달과 만료/취소는 이를 확인한다. 송신 직전에는 같은 그룹 잠금 아래 `approval_send_started_at`을 기록하는 조건부 송신 시작 TX를 커밋한다. 이 지점보다 보상이 먼저면 HTTP를 보내지 않으며, 시작권한 커밋 뒤의 호출은 이미 진행 중인 호출로 분류한다. DB 잠금을 HTTP 동안 유지하지 않는다. 이미 시작된 HTTP와 보상 접수의 경합은 늦은 승인 사실을 저장하되 기존 요청ID의 보상으로 수렴시킨다. 새 `late-*` 요청을 만들거나 정상 PAID로 부활시키지 않는다.
 
@@ -40,15 +40,15 @@ NO_CHARGE는 Payment가 미승인과 향후 승인 불가를 확정한 결과다
 
 ## 사용자 전체·선택·부분수량 환불
 
-`POST /v1/payment-groups/{number}/refunds`는 기존 API 토글을 유지한다. 본문 생략은 잔여 전량, `items[{orderId,quantity?}]`는 선택 항목·부분수량, `cartItemIds`는 저장 출처와 유일하게 연결된 항목의 잔여 전량이다. 직접 구매도 orderId로 선택한다. 두 방식 혼용·중복ID·빈/null 배열·소수·알 수 없는 필드는400, 예상금액 불일치·수량/금액 초과·다른 미완료 요청·보상 fence는409다.
+`POST /v1/payment-groups/{number}/refunds`는 기존 API 토글을 유지한다. 본문 생략은 잔여 전량, `items[{orderId,quantity?}]`는 선택 항목·부분수량, `cartItemIds`는 저장 출처와 유일하게 연결된 항목의 잔여 전량이다. 직접 구매도 orderId로 선택한다. 두 방식 혼용·중복ID·빈/null 배열·소수·알 수 없는 필드는400, 예상금액 불일치·수량/금액 초과·보상 fence·이전 정책의 CANCEL_PENDING은409다. 같은 결제의 다른 미완료 환불은 접수를 막지 않는다.
 
-신규 접수는 소유권·PAID/PARTIALLY_REFUNDED·저장 승인시각부터168시간 미만·잔여 수량·실결제액을 그룹 잠금 아래 확인한다. 같은 결제의 PROCESSING/UNKNOWN은 하나만 허용한다. 미확정 병렬 부분환불의 금액 재배분 정책을 새로 도입하지 않는다.
+신규 접수는 소유권·PAID/PARTIALLY_REFUNDED·저장 승인시각부터168시간 미만·잔여 수량·실결제액을 그룹 잠금 아래 확인한다. 잔여 수량은 구매 수량에서 성공·PROCESSING·UNKNOWN 수량을 뺀 값이고, 금액 한도도 같은 기준의 잔액이다. 다른 항목이나 같은 항목의 나머지 수량은 앞선 결과를 기다리지 않는다.
 
-금액은 `min(단가×이번수량, 항목실결제액−성공환불누계)`다. 4,000×3−쿠폰2,000의 순차1개 환불은4,000/4,000/2,000이다. 원문·이전 항목 상태·요청수량·금액을 `refund_request/refund_target_order`에 저장하고 그룹과 대상 항목만 CANCEL_PENDING으로 바꾸며 공통 intent/Outbox도 같은 TX에 저장한다. 비대상 항목은 유지한다.
+금액은 `min(단가×이번수량, 항목실결제액−성공환불누계)`다. 4,000×3−쿠폰2,000의 순차1개 환불은4,000/4,000/2,000이다. 원문·이전 항목 상태·요청수량·금액을 `refund_request/refund_target_order`에 저장하고 공통 intent/Outbox도 같은 TX에 저장한다. 주문 항목과 결제 묶음 상태는 바꾸지 않는다. 주문 상태는 성공으로 확정된 사실(PAID, PARTIALLY_REFUNDED, REFUNDED)만 가진다.
 
 회원+Idempotency-Key는 묶음·입력방식·정렬된ID·명시/생략 수량·expectedAmount로 고정한다. 같은 원문 재조회는 상태/기간 검사 전에 처리하며 남은 수량을 다시 확장하지 않는다. 같은 키 다른 원문은409다. 접수201은 금전 성공이 아니다.
 
-UNKNOWN은 수량·금액 예약과 CANCEL_PENDING을 유지한다. SUCCEEDED만 이번 수량을 restock하고 누적 수량으로 항목·그룹의 PARTIALLY_REFUNDED/REFUNDED를 계산한다. 쿠폰은 전수량 성공 시 `used_payment_group_id`를 대조해 원 만료를 유지하여 한 번 복원한다. 확정 FAILED는 저장한 이전 항목 상태와 성공 누계에 따른 그룹 상태로 돌아가며 재고·쿠폰을 변경하지 않는다.
+UNKNOWN은 수량·금액 예약을 유지한다. SUCCEEDED만 이번 수량을 restock하고 누적 수량으로 항목·그룹의 PARTIALLY_REFUNDED/REFUNDED를 계산한다. 쿠폰은 전수량 성공 시 `used_payment_group_id`를 대조해 원 만료를 유지하여 한 번 복원한다. 확정 FAILED는 예약만 해제한다. 성공 누계에 따라 그룹 상태(PAID 또는 PARTIALLY_REFUNDED)를 다시 계산하며 재고·쿠폰을 변경하지 않는다.
 
 ## 결과 검증과 전달
 
@@ -60,9 +60,9 @@ UNKNOWN은 수량·금액 예약과 CANCEL_PENDING을 유지한다. SUCCEEDED만
 
 ## 호환·설정·Frontend 영향
 
-policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 토글은 legacy HTTP에만 적용한다. 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
+policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. 이전 정책의 CANCEL_PENDING 행은 마이그레이션하지 않고, 결과 반영이 PAID·PARTIALLY_REFUNDED·REFUNDED로 끝낸다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 토글은 legacy HTTP에만 적용한다. 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
 
-Frontend는 새 주문/항목 COMPENSATION_PENDING, CANCEL_PENDING과 PARTIALLY_REFUNDED, `payment.compensation{requestId,status,outcome,completedAt}`, `refundRequestId`, 요청 targets.quantity와 환불 가능 누계 필드를 처리해야 한다. UNKNOWN이나201/202를 성공으로 표시하지 않아야 한다. Frontend 파일은 수정하지 않았다.
+Frontend는 새 주문/항목 COMPENSATION_PENDING, PARTIALLY_REFUNDED와 이전 정책 데이터의 CANCEL_PENDING, `payment.compensation{requestId,status,outcome,completedAt}`, `refundRequestId`, 요청 targets.quantity와 환불 가능 누계 필드를 처리해야 한다. UNKNOWN이나201/202를 성공으로 표시하지 않아야 한다. Frontend 파일은 수정하지 않았다.
 
 V115는 신규 intent/결과event 원장·이전 항목 상태·CANCEL_PENDING CHECK를 추가한다. 기존 PK·금액·Cart 출처와 V104~V106은 보존한다. 이미 다른 과거 migration을 적용한 운영 환경의 이행·배포를 검증했다고 주장하지 않는다. 검증 수치·실패·중단·Kafka/PG 미실행은 최신 워크로그에서 확인한다.
 

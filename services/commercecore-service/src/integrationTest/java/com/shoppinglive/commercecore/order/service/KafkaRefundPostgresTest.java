@@ -901,6 +901,31 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
+    @DisplayName("다른 항목의 동시 환불은 서로 막지 않고 두 항목의 금액 합계는 실결제액과 같다")
+    void concurrentDifferentItemsBothAccepted() throws Exception {
+        String n = twoItems();
+        var one =
+                new RefundSelection(
+                        "ITEMS", List.of(new RefundSelection.Item(orderOf(n, 501L), 2)), List.of(), null);
+        var two =
+                new RefundSelection(
+                        "ITEMS", List.of(new RefundSelection.Item(orderOf(n, 502L), 1)), List.of(), null);
+        var gate = new CyclicBarrier(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var a = pool.submit(() -> { gate.await(); return refunds.request(MEMBER_A, n, "item-a", one).created(); });
+            var b = pool.submit(() -> { gate.await(); return refunds.request(MEMBER_A, n, "item-b", two).created(); });
+            assertThat(a.get(20, TimeUnit.SECONDS)).isTrue();
+            assertThat(b.get(20, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=?",
+                                Long.class,
+                                id(n)))
+                .isEqualTo(11000L);
+    }
+
+    @Test
     @DisplayName("동시 부분환불과 전체 잔여 환불의 금액 합계는 실결제액을 넘지 않는다")
     void concurrentAmountNeverExceedsPaid() throws Exception {
         String n = paid(true);

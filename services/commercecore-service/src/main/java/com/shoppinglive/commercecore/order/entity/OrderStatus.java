@@ -20,7 +20,10 @@ public enum OrderStatus {
     REFUNDED,
     /** 일부 항목 또는 수량의 환불이 성공했다. */
     PARTIALLY_REFUNDED,
-    /** 사용자 환불 결과를 기다리며 대상 수량과 금액을 보존한다. */
+    /**
+     * 이전 정책의 사용자 환불 결과 대기. 새 환불은 쓰지 않고 기존 행의 결과 반영만 이 상태를 처리한다.
+     * 진행 상태는 refund_request가 가진다.
+     */
     CANCEL_PENDING;
 
     /** 결제 흐름의 최종 확정 상태인가. PAID · FAILED · CANCELLED · EXPIRED · REFUNDED 는 더 이상 상태 변경 없음. */

@@ -113,13 +113,6 @@ public class KafkaRefundService {
                             Set.of(OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED)
                                     .contains(group.getStatus()),
                             "결제 완료된 주문만 환불할 수 있습니다.");
-                    require(
-                            jdbc.queryForObject(
-                                            "SELECT COUNT(*) FROM refund_request WHERE payment_group_id=? AND status IN ('PROCESSING','UNKNOWN')",
-                                            Long.class,
-                                            group.getId())
-                                    == 0,
-                            "같은 결제의 미완료 환불이 있습니다.");
                     var binding = relay.binding(group.getId());
                     require(
                             binding != null
@@ -170,7 +163,7 @@ public class KafkaRefundService {
                                     Set.of(OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED)
                                             .contains(o.getStatus()),
                                     "항목을 환불할 수 없는 상태입니다.");
-                            long paid = o.getPayableAmount() - succeededAmount(o.getId());
+                            long paid = o.getPayableAmount() - committedAmount(o.getId());
                             long money =
                                     OrderRefundAmounts.refund(o.getUnitPrice(), quantity, paid);
                             amount = Math.addExact(amount, money);
@@ -205,14 +198,7 @@ public class KafkaRefundService {
                                 Timestamp.from(now),
                                 target.quantity(),
                                 o.getStatus().name());
-                        require(
-                                orders.transitionStatus(
-                                                o.getId(), o.getStatus().name(), "CANCEL_PENDING")
-                                        == 1,
-                                "주문 항목 상태가 변경되었습니다.");
                     }
-                    group.transition(OrderStatus.CANCEL_PENDING);
-                    groups.saveAndFlush(group);
                     save(
                             group,
                             id,
@@ -533,16 +519,24 @@ public class KafkaRefundService {
     }
 
     private void applyUser(PaymentGroup group, long id, String status, JsonNode result) {
-        require(group.getStatus() == OrderStatus.CANCEL_PENDING, "사용자 환불 대기 주문이 아닙니다.");
+        // CANCEL_PENDING은 이전 정책의 미완료 데이터에만 남는다. 새 환불은 주문 상태를 바꾸지 않는다.
+        require(
+                Set.of(
+                                OrderStatus.PAID,
+                                OrderStatus.PARTIALLY_REFUNDED,
+                                OrderStatus.CANCEL_PENDING)
+                        .contains(group.getStatus()),
+                "환불 가능한 주문 상태가 아닙니다.");
         if (!status.equals("UNKNOWN")) {
             var targets =
                     jdbc.queryForList(
-                            "SELECT t.order_id,t.quantity,t.previous_status,COALESCE(o.sku_id,o.sales_info_id) AS sku_id,o.quantity AS original_quantity FROM refund_target_order t JOIN orders o ON o.id=t.order_id WHERE t.refund_request_id=? ORDER BY COALESCE(o.sku_id,o.sales_info_id),o.id",
+                            "SELECT t.order_id,t.quantity,t.previous_status,o.status AS current_status,COALESCE(o.sku_id,o.sales_info_id) AS sku_id,o.quantity AS original_quantity FROM refund_target_order t JOIN orders o ON o.id=t.order_id WHERE t.refund_request_id=? ORDER BY COALESCE(o.sku_id,o.sales_info_id),o.id",
                             id);
             for (var target : targets) {
                 long orderId = ((Number) target.get("order_id")).longValue();
                 int q = ((Number) target.get("quantity")).intValue();
-                String next = (String) target.get("previous_status");
+                String current = (String) target.get("current_status");
+                String next = current;
                 if (status.equals("SUCCEEDED")) {
                     int total = succeededQuantity(orderId) + q;
                     require(
@@ -553,10 +547,13 @@ public class KafkaRefundService {
                                     ? "REFUNDED"
                                     : "PARTIALLY_REFUNDED";
                     skus.restock(((Number) target.get("sku_id")).longValue(), q);
+                } else if (current.equals("CANCEL_PENDING")) {
+                    next = (String) target.get("previous_status");
                 }
-                require(
-                        orders.transitionStatus(orderId, "CANCEL_PENDING", next) == 1,
-                        "환불 대상 상태가 변경되었습니다.");
+                if (!next.equals(current))
+                    require(
+                            orders.transitionStatus(orderId, current, next) == 1,
+                            "환불 대상 상태가 변경되었습니다.");
             }
         }
         jdbc.update(
@@ -586,7 +583,7 @@ public class KafkaRefundService {
                             ? OrderStatus.REFUNDED
                             : successes > 0 ? OrderStatus.PARTIALLY_REFUNDED : OrderStatus.PAID);
             groups.saveAndFlush(group);
-            if (remaining == 0)
+            if (status.equals("SUCCEEDED") && remaining == 0)
                 coupons.restoreForOrder(group.getMemberId(), group.getCouponId(), group.getId());
             if (status.equals("SUCCEEDED"))
                 events.refunded(group.getId(), id, result.path("amount").longValue());
@@ -674,8 +671,23 @@ public class KafkaRefundService {
                 orderId);
     }
 
+    /** 성공·처리 중·미확정 수량을 모두 뺀 환불 가능 수량. 호출 전 결제 묶음 잠금을 확보한다. */
     private int remaining(Order order) {
-        return order.getQuantity() - succeededQuantity(order.getId());
+        return order.getQuantity() - committedQuantity(order.getId());
+    }
+
+    private int committedQuantity(long orderId) {
+        return jdbc.queryForObject(
+                "SELECT COALESCE(SUM(t.quantity),0) FROM refund_target_order t JOIN refund_request r ON r.id=t.refund_request_id WHERE t.order_id=? AND r.status IN ('SUCCESS','PROCESSING','UNKNOWN')",
+                Integer.class,
+                orderId);
+    }
+
+    private long committedAmount(long orderId) {
+        return jdbc.queryForObject(
+                "SELECT COALESCE(SUM(t.refund_amount),0) FROM refund_target_order t JOIN refund_request r ON r.id=t.refund_request_id WHERE t.order_id=? AND r.status IN ('SUCCESS','PROCESSING','UNKNOWN')",
+                Long.class,
+                orderId);
     }
 
     private PaymentGroup owned(String member, String number) {

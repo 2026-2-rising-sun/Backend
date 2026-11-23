@@ -33,7 +33,7 @@ Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka �
 
 | 구분 | 현재 구현 | 완료 전제 |
 |---|---|---|
-| 사용자 환불 | 사용자 요청은 CANCEL_PENDING, 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED | 원요청·금액·대상과 맞는 결과만 반영 |
+| 사용자 환불 | 주문 상태는 PAID·PARTIALLY_REFUNDED를 유지하고 진행은 refund_request가 가진다. 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED | 원요청·금액·대상과 맞는 결과만 반영 |
 | 시스템 보상 | 명시적 Payment UNKNOWN 또는 최초 PROCESSING부터 600초 경과는 COMPENSATION_PENDING | 시작 때 재고·쿠폰을 해제하지 않고 성공 결과 뒤 한 번 해제·CANCELLED |
 | 공통 요청/결과 | commerce.refund.requests.v1 → payment.refund.results.v1 | dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현 |
 | 종료 뒤 승인 | 주문 부활 없이 고정된 요청 ID로 보상 재요청·대조 | 원결제 ID 연결과 결과 원문 검증 유지 |

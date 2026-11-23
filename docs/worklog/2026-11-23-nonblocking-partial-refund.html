@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>같은 결제의 부분 환불 비차단 (#399, #345)</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-23-nonblocking-partial-refund.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#범위와-기준">범위와 기준</a></li>
+<li><a href="#결정">결정</a></li>
+<li><a href="#검증">검증</a></li>
+<li><a href="#미실행한계">미실행·한계</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>같은 결제의 부분 환불 비차단 (#399, #345)</h1><h2 id="범위와-기준">범위와 기준</h2>
+<ul>
+<li>기준: base <code>refactor/#402-refund-consumer</code>(2aea45c6, PR #411). 브랜치 <code>feat/#399-nonblocking-refund</code>.</li>
+<li>Payment 코드는 바꾸지 않았다. Core의 접수·결과 반영·계약 설명만 바꿨다.</li>
+<li>기존 <code>CANCEL_PENDING</code> 행은 마이그레이션하지 않는다. 결과 반영이 기존 상태와 새 상태를 모두 처리한다.</li>
+</ul>
+<h2 id="결정">결정</h2>
+<ul>
+<li>주문 항목·묶음 상태는 확정 사실만 가진다(<code>PAID</code>, <code>PARTIALLY_REFUNDED</code>, <code>REFUNDED</code>). 진행 상태는 <code>refund_request</code>가 가진다.</li>
+<li>잔여 수량 = 구매 수량 - 성공 - PROCESSING - UNKNOWN. 금액 한도도 같은 기준의 잔액이다. 묶음 잠금 아래 계산한다.</li>
+<li>쿠폰은 누적 전량 성공 때만 한 번 복원한다. 중복·역순 결과로 다시 복원되지 않는다.</li>
+<li><code>refundable-targets</code>는 기존 <code>heldQuantity</code>, <code>refundableQuantity</code>, <code>remainingRefundableAmount</code>를 그대로 쓴다. 새 필드는 없다.</li>
+</ul>
+<h2 id="검증">검증</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>commercecore-service:postgresTest --tests '*KafkaRefundPostgresTest'</code> (실패 테스트 선확인 후)</td>
+<td>실패 21/60 확인, 구현 후 61/61 통과</td>
+</tr>
+<tr>
+<td><code>commercecore-service:postgresTest</code> 전체</td>
+<td>204건 중 1건 실패: <code>ResultConsumerRewindKafkaPostgresTest</code>(#389). 단독 실행은 통과. 공유 EmbeddedKafka 컨텍스트에서 <code>PaymentRelayService</code> 스파이 호출 횟수가 누적되는 격리 문제로 보인다. 이 PR에서 고치지 않았다</td>
+</tr>
+<tr>
+<td><code>scripts/check-docs.sh</code></td>
+<td>문서 278개, 오류 0</td>
+</tr>
+<tr>
+<td><code>render-api-docs.sh --check</code>, <code>render_design_docs.py --check</code></td>
+<td>불일치 0</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="미실행한계">미실행·한계</h2>
+<ul>
+<li>전체 <code>build</code>의 <code>integrationTest</code>와 <code>scripts/check.sh --external</code>은 위 #389 테스트 때문에 통과하지 않았다.</li>
+<li>실제 토스 환불은 호출하지 않았다. 외부 결제 환불 검증은 없다.</li>
+<li>이전 정책 <code>CANCEL_PENDING</code> 행의 결과 반영은 테스트로 시뮬레이션했다(SUCCEEDED, FAILED).</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>fa9c96f24c98daa3b0cb666c162ab92e3a79efc7e5a16c374be0ad66bf4c54ef</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>
