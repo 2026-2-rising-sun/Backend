@@ -27,6 +27,9 @@ payment:
     base-url: ${PAYMENT_TOSS_BASE_URL:https://api.tosspayments.com}
     # 비어 있으면 기동은 하고 토스 호출은 NotSent다(TossClientConfiguration).
     secret-key: ${PAYMENT_TOSS_SECRET_KEY:}
+  refunds:
+    # commerce.refund.requests.v1 소비자. 끄면 요청이 쌓이기만 한다.
+    consumer-enabled: ${PAYMENT_REFUND_CONSUMER_ENABLED:true}
 shoppinglive:
   outbox:
     relay:

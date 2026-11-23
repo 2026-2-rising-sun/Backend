@@ -79,6 +79,7 @@
 <li><a href="#337-결제-1차-문서-마감">#337 결제 1차 문서 마감</a></li>
 <li><a href="#337-로컬-기본-가짜-토스와-실제-토스-전환-플래그">#337 로컬 기본 가짜 토스와 실제 토스 전환 플래그</a></li>
 <li><a href="#384-환불-결과-이벤트-계약-확정">#384 환불 결과 이벤트 계약 확정</a></li>
+<li><a href="#385-환불-요청-소비와-결과-발행-기반">#385 환불 요청 소비와 결과 발행 기반</a></li>
 </ul>
 </li>
 </ul>
@@ -628,6 +629,15 @@
 <li>검증: <code>scripts/check.sh --base origin/dev</code> docs·api-docs·design-docs·api·events 통과, gradle build 성공(기존 외부 테스트 스킵으로 incomplete), <code>check_events.py --samples</code> 표본 33개 통과, 상태별 규칙 음성 검사 8건 거부 확인.</li>
 <li>미실행·한계: postgresTest(외부 DB) 미실행. 실제 Core 소비자 통과는 #385 구현과 #378 병합 뒤 확인한다.</li>
 <li>다음 작업: #385 환불 요청 소비와 결과 발행.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>6700a3e4fedc15b722768a73a05a5c649c9ae159d4715c38234f5a415ab19558</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="385-환불-요청-소비와-결과-발행-기반">#385 환불 요청 소비와 결과 발행 기반</h2>
+<p>관련 작업: <a href="https://github.com/2026-2-rising-sun/Backend/pull/394">PR #394</a> · <a href="../design-docs/services/payment/requirements/refund.html">환불 요구사항</a> · <a href="../design-docs/services/payment/overview.html#payment-환불-실행">Payment 모듈</a></p>
+<ul>
+<li>변경·판단(2026-11-21): <code>commerce.refund.requests.v1</code> 소비자, V5 <code>refund</code>·<code>refund_request_conflict</code>, 접수 서비스, DLT(<code>{topic}.payment.dlt</code>)를 추가하고 <code>PaymentApproved</code> 토픽을 점 표기로 바꿨다. 결과에는 요청 원문을 그대로 싣고, 같은 요청 ID의 다른 본문에는 결과를 보내지 않는다(#389). 실행(토스 취소)은 목적별 분기만 두고 #370·#386에 넘겼다. Lombok을 Payment에 추가했다.</li>
+<li>검증: 임시 PostgreSQL 17 + EmbeddedKafka로 payment postgresTest 75건·migrationTest 9건 통과, <code>check.sh --base docs/#384-refund-contract --external</code>(기존 외부 테스트 스킵으로 incomplete), 표본 34개 통과.</li>
+<li>미실행·한계: Infra 로컬 스택 E2E 미실행(스택 중지, 5432 충돌). Core 반영은 #378 병합·#389 해결 뒤 확인한다. Infra <code>topics.tsv</code>에 DLT 토픽 추가 요청이 남았다.</li>
+<li>리뷰 반영(2026-11-21): 파서가 중복 <code>orderItemId</code>·합계 불일치·보상+<code>CUSTOMER_REQUEST</code>·날짜가 아닌 <code>requestedAt</code>을 DLT로 보내고 0원은 통과시킨다. FAILED 뒤 전이는 조건부 UPDATE에서 접수 실패 행을 제외한다. 실제 핸들러의 제한 재시도·DB 장애 재시도와 동시 수신을 테스트했다. payment test 77건·integrationTest 75건·postgresTest 87건·migrationTest 9건·표본 43개 통과. <code>check.sh --external</code>은 기존 Core·Notification 스킵과 다른 서비스 postgresTest 미실행으로 incomplete다.</li>
+<li>다음 작업: #370 고객 환불 실행, #386 시스템 보상 실행, #378 병합 뒤 이 PR 병합.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>e1279c3e68bdab7f5a64e8577542000cb12e3365288a07a530635f881b607918</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

@@ -99,6 +99,34 @@ class TossPaymentsClientTest {
     }
 
     @Test
+    @DisplayName(
+            "[REF-EXEC-02] 부분 취소는 cancelAmount를 보내고 CANCELED·PARTIAL_CANCELED면 Success, 금액이 없으면 전액 취소 본문 그대로다")
+    void partialCancelSendsAmount() {
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andExpect(header("Idempotency-Key", "r-1"))
+                .andExpect(
+                        content().json("{\"cancelReason\":\"고객 환불\",\"cancelAmount\":4000}", true))
+                .andRespond(
+                        withSuccess(payment("PARTIAL_CANCELED", ""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andExpect(
+                        content().json("{\"cancelReason\":\"고객 환불\",\"cancelAmount\":11000}", true))
+                .andRespond(withSuccess(payment("CANCELED", ""), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/v1/payments/pk-1/cancel"))
+                .andExpect(content().json("{\"cancelReason\":\"보상\"}", true))
+                .andRespond(
+                        withSuccess(payment("PARTIAL_CANCELED", ""), MediaType.APPLICATION_JSON));
+
+        assertThat(client.cancel("pk-1", "고객 환불", "r-1", 4000L))
+                .isInstanceOf(TossResult.Success.class);
+        assertThat(client.cancel("pk-1", "고객 환불", "r-2", 11000L))
+                .isInstanceOf(TossResult.Success.class);
+        // 전액 취소를 요청했는데 부분 취소 상태면 결과를 모른다
+        assertThat(client.cancel("pk-1", "보상", "r-3", null)).isInstanceOf(TossResult.Unknown.class);
+        server.verify();
+    }
+
+    @Test
     @DisplayName("PAY-PG-04 조회는 Basic 인증으로 호출하고 Idempotency-Key 없이 어떤 상태든 Success로 돌려준다")
     void getPaymentSendsAuthWithoutIdempotencyKey() {
         server.expect(requestTo(BASE + "/v1/payments/pk-1"))

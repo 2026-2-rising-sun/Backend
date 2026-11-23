@@ -2,3 +2,6 @@
 payment:
   recovery:
     enabled: false
+  # 컨텍스트를 띄우는 테스트마다 환불 요청 소비자가 붙지 않게 끈다. Kafka 테스트만 켠다.
+  refunds:
+    consumer-enabled: false
