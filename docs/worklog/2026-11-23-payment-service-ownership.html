@@ -6,6 +6,7 @@
 </style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-23-payment-service-ownership.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
 <ul>
 <li><a href="#337-재설계-로드맵을-서비스-소유-기준으로-정리">#337 재설계 로드맵을 서비스 소유 기준으로 정리</a></li>
+<li><a href="#337-commercecore-작업-순서-보정">#337 CommerceCore 작업 순서 보정</a></li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>2026-11-23 결제 재설계 서비스 소유 정리</h1><h2 id="337-재설계-로드맵을-서비스-소유-기준으로-정리">#337 재설계 로드맵을 서비스 소유 기준으로 정리</h2>
@@ -14,6 +15,13 @@
 <li>검증: <code>scripts/check-docs.sh</code>와 설계 문서 HTML 최신성 검사를 실행했다. #377 전에 <code>paymentId</code>를 필수로 바꾸면 Core 계약 테스트의 보상 요청과 충돌하는 것을 코드로 확인해 순서에 반영했다.</li>
 <li>미실행·한계: 문서 변경이라 서비스 테스트와 E2E는 실행하지 않았다.</li>
 <li>다음 작업: 실행 계획의 작업 순서대로 서비스별 이슈를 진행한다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>f217104f6d3fe526e7dbc4734aa2e5b16b3855bf83e0147e23f23269a4d40fd4</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul>
+<h2 id="337-commercecore-작업-순서-보정">#337 CommerceCore 작업 순서 보정</h2>
+<ul>
+<li>변경·판단: #389와 #390이 같은 소비자 설정을 고치고 #390이 #377의 결제 코드와 겹쳐 CommerceCore 순서를 #377 → #390 → #389로 정했다.</li>
+<li>검증: <code>scripts/check-docs.sh</code>와 설계 문서 HTML 최신성 검사를 실행했다. 겹치는 위치는 코드로 확인했다.</li>
+<li>미실행·한계: 문서 변경이라 서비스 테스트와 E2E는 실행하지 않았다.</li>
+<li>다음 작업: #377부터 진행한다.</li>
+</ul><p class="muted fingerprint">MD SHA-256: <code>861c3ee3a33e00de662129202b143ebe9eb13a4a1f2b0454c93dd3ac96b80e83</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
