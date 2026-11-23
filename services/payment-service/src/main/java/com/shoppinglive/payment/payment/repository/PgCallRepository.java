@@ -17,7 +17,7 @@ public interface PgCallRepository extends JpaRepository<PgCall, Long> {
         Instant getFirstRequestedAt();
     }
 
-    /** 이 키의 취소가 토스에 닿았을 수 있다. 응답을 받은 NotSent(429·401 등)도 처리되지 않았다는 보장이 없어 포함한다. */
+    /** 이 키의 취소가 토스에 닿았을 수 있다. 응답을 받은 NotSent(401 등)도 처리되지 않았다는 보장이 없어 포함한다. */
     @Query(
             """
             SELECT COUNT(c) > 0 FROM PgCall c

@@ -197,12 +197,9 @@ public class TossPaymentsClient {
         if (statusCode == 401) {
             return rejectedByOurConfiguration("HTTP 401", statusCode);
         }
-        if (statusCode == 429) {
-            return new TossResult.NotSent("HTTP 429", statusCode);
-        }
-        if (statusCode == 408) {
-            // 시간 초과는 토스가 처리했는지 알 수 없다. 본문의 code와 무관하게 거절로 보지 않는다
-            return new TossResult.Unknown("HTTP 408", statusCode);
+        if (statusCode == 408 || statusCode == 429) {
+            // 시간 초과·호출 제한은 토스가 처리했는지 알 수 없다. 본문의 code와 무관하게 거절로 보지 않는다(#398)
+            return new TossResult.Unknown("HTTP " + statusCode, statusCode);
         }
         TossError error = readOrNull(response, TossError.class);
         if (error == null || error.code() == null || error.code().isBlank()) {
