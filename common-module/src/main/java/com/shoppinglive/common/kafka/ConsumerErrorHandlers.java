@@ -66,14 +66,15 @@ public final class ConsumerErrorHandlers {
         DefaultErrorHandler handler =
                 new DefaultErrorHandler(
                         (record, e) -> {
+                            // 원문과 예외 메시지는 로그에 남기지 않는다. 원문은 DLT 메시지에만 있다.
+                            // 예외 메시지(Jackson 등)에는 입력 조각이 들어갈 수 있으므로 클래스 이름만 쓴다.
                             log.error(
-                                    "{} topic={} partition={} offset={} cause={} raw={}",
+                                    "{} topic={} partition={} offset={} cause={}",
                                     DLT_MARKER,
                                     record.topic(),
                                     record.partition(),
                                     record.offset(),
-                                    rootCause(e).toString(),
-                                    record.value());
+                                    rootCause(e).getClass().getName());
                             deadLetters.accept(record, e);
                         },
                         limited);
