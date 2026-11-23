@@ -22,7 +22,7 @@
 <li><a href="#인계">인계</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Phase 1 구현·검증 완료, PR #352–#359·#366 병합 대기(2026-11-18). Phase 2는 CommerceCore에서 대부분 구현
+</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Phase 1 dev 병합, 2026-11-20 실제 토스 sandbox E2E(주문 → 승인) 확인. Phase 2는 Core 정리(#377·#389·#390) 남음. Phase 3 이슈 생성(#384–#387, #370)
 관련 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/337">#337 재설계</a>(상위). 하위 이슈는 로드맵 표에 있다.
 관련 요구사항: <a href="../../../../design-docs/services/payment/requirements/payment.html">결제</a> · <a href="../../../../design-docs/services/payment/requirements/ledger.html">원장</a> · <a href="../../../../design-docs/services/payment/requirements/refund.html">환불</a>
 관련 결정: <a href="../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../adr/0337-2-payment-replacement.html">0337-2</a> · <a href="../../../../adr/0337-3-payment-result-delivery.html">0337-3</a> · <a href="../../../../adr/0337-4-ledger-double-entry.html">0337-4</a> · <a href="../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a>
@@ -61,42 +61,42 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <td>기존 코드 삭제</td>
 <td>#347</td>
 <td>—</td>
-<td>구현 완료, 병합 대기 (PR #352)</td>
+<td>완료 (PR #352)</td>
 </tr>
 <tr>
 <td></td>
 <td>결제 생성·결제창·조회 API</td>
 <td>#348</td>
 <td>PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH</td>
-<td>구현 완료, 병합 대기 (PR #354·#355)</td>
+<td>완료 (PR #354·#355)</td>
 </tr>
 <tr>
 <td></td>
 <td>토스 승인과 원장 분개</td>
 <td>#338</td>
 <td>PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01</td>
-<td>구현 완료, 병합 대기 (PR #353·#356–#358, 토스 샌드박스 확인 #366)</td>
+<td>완료 (PR #353·#356–#358, 토스 샌드박스 확인 #366)</td>
 </tr>
 <tr>
 <td></td>
 <td>결과 불명 복구와 만료</td>
 <td>#349</td>
 <td>PAY-RECOVER·EXPIRE</td>
-<td>구현 완료, 병합 대기 (PR #359)</td>
+<td>완료 (PR #359)</td>
 </tr>
 <tr>
 <td><strong>2 주문 연동</strong></td>
 <td>Commerce가 새 결제 API·이벤트를 쓴다</td>
-<td>#343·#365(CommerceCore)</td>
+<td>#343·#365·#377·#389·#390(CommerceCore)</td>
 <td>CommerceCore 문서(<a href="../../../../design-docs/flows/order-payment.html">주문·결제 흐름</a>)</td>
-<td>진행 중 — 주문서 결제 중계·<code>PaymentApproved</code> 소비는 dev에 있음. 남은 일: 옛 <code>HttpPaymentClient</code>·<code>PaymentExecutionResolved</code> 소비 경로 정리, 토스 결제창 → Commerce → Payment 수동 확인</td>
+<td>진행 중 — 주문서 결제 중계·<code>PaymentApproved</code> 소비는 dev에 있고, 토스 결제창 → Commerce → Payment는 2026-11-20 실제 토스 sandbox로 확인했다. 남은 일: 시스템 보상 상태(#377), 결과 소비자 DLT(#389), 옛 결제 경로 정리(#390)</td>
 </tr>
 <tr>
 <td><strong>3 환불</strong></td>
-<td>환불 접수·실행·늦은 승인 환불 + 환불 주문 연동</td>
-<td>착수 때</td>
+<td>Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다</td>
+<td>#384 계약 → #385 기반 → #370·#386 → #387 (Core: #367·#369·#345)</td>
 <td>REF-*, LED-REFUND-01</td>
-<td>대기</td>
+<td>대기 — 계약(#384)과 문서 갱신 먼저</td>
 </tr>
 <tr>
 <td>후순위</td>
@@ -194,7 +194,7 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 </tr>
 <tr>
 <td>3 환불</td>
-<td>R1 V5 + 접수 API(REF-ACCEPT-<em>) → R2 실행·결과 이벤트(REF-EXEC-01–03, REF-EVENT-01, LED-REFUND-01) → R3 복구·늦은 승인 소비(REF-EXEC-04, REF-LATE-</em>) → Commerce 환불 연동</td>
+<td>문서 PR(#384: 고객 환불 HTTP → Kafka 전환을 ADR 0337-2·design.md·refund.md에 반영) → #385 V5 + 요청 소비·결과 발행·DLT(REF-LATE-02, REF-EVENT-01) → #370 구매자 환불 실행·복구(REF-ACCEPT-<em>·REF-EXEC-</em>, LED-REFUND-01) · #386 시스템 보상 실행(REF-LATE-01 포함) → #387 장기 미확정 알림. Core 쪽은 #378에 있음</td>
 </tr>
 <tr>
 <td>후순위</td>
@@ -236,6 +236,6 @@ Phase 문서: <a href="phase1-payment.html">Phase 1 결제 1차</a>
 <li>남은 일: Phase 1 PR 병합(위 "스택 PR" 순서) → Phase 2 남은 일(로드맵 표) → Phase 3 환불.</li>
 <li>조율: <a href="https://github.com/2026-2-rising-sun/Backend/pull/343">#343</a>(Order)이 기존 Payment 코드·<code>V4</code>·<code>contracts/api/payment-service.yaml</code>을 바꾼다. 2026-11-15 그 PR에서 Payment 부분(종료 통지 API·<code>payment_order_control</code>·보상 환불 필드)을 빼 달라고 요청했다. 빠지면 Phase 1 스키마는 <code>V4</code>를 그대로 쓴다. 남은 채 병합되면 <code>V5</code>로 옮기고 그 테이블도 함께 지운다. 답을 기다리지 않고 기존 코드 삭제를 먼저 진행하며, 충돌은 그 PR이 맞춘다(2026-11-15 결정). 결과: #343은 Payment 스키마를 바꾸지 않고 병합됐고 Phase 1 스키마는 <code>V4</code>를 그대로 쓴다.</li>
 <li>결제 재설계가 끝나면 <code>design-docs/services/payment/design.html</code> 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7a48238224dcd1a43fe435955b141645414c8f29192e2853e49304a58bf947d0</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>bf902eb60e2004deb9d33448b14394909263910308105d22fc594f7a701be5fa</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
