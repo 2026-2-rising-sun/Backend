@@ -10,8 +10,6 @@ import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.common.core.BusinessException;
 import java.time.Clock;
 import java.time.Instant;
@@ -30,7 +28,6 @@ class RefundableTargetsTest {
     private final PaymentClient attempts = mock(PaymentClient.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final PaymentGroup group = mock(PaymentGroup.class);
-    private final PaymentExecution payment = mock(PaymentExecution.class);
     private final Instant now = Instant.parse("2026-10-17T00:00:00Z");
     private final RefundQueryService service =
             new RefundQueryService(
@@ -45,11 +42,7 @@ class RefundableTargetsTest {
     void setUp() {
         when(groups.findByGroupNumberAndMemberId("PG", "buyer")).thenReturn(Optional.of(group));
         when(group.getId()).thenReturn(10L);
-        when(group.getPaymentId()).thenReturn(20L);
         when(group.getStatus()).thenReturn(OrderStatus.PAID);
-        when(attempts.get(20L)).thenReturn(payment);
-        when(payment.getStatus()).thenReturn(PaymentStatus.SUCCESS);
-        when(payment.getResolvedAt()).thenReturn(now.minusSeconds(60));
         when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<Long>>any(), eq(10L)))
                 .thenReturn(List.of());
     }
@@ -67,58 +60,21 @@ class RefundableTargetsTest {
     }
 
     @Test
-    @DisplayName("본인 주문의 할인 반영 금액을 제공하고 직접 주문은 선택 환불에서 제외한다")
-    void includesDiscountedAmountsAndExcludesDirectOrders() {
+    @DisplayName("이전 정책 주문은 Payment를 호출하지 않고 환불 불가 사유를 반환한다")
+    void legacyGroupsAreUnavailableWithoutPaymentCall() {
         doReturn(List.of(order(1, 101L), order(2, null)))
                 .when(orders)
                 .findByPaymentGroupIdOrderByIdAsc(10L);
         var targets = service.refundableTargets("buyer", "PG");
-        assertThat(targets.getFirst().refundable()).isTrue();
-        assertThat(targets.getFirst().refundAmount()).isEqualTo(900L);
-        assertThat(targets.getFirst().quantity()).isEqualTo(2);
-        assertThat(targets.getFirst().unitPrice()).isEqualTo(500);
-        assertThat(targets.getFirst().refundableQuantity()).isEqualTo(2);
-        assertThat(targets.get(1).unavailableReason()).isEqualTo("CART_ITEM_UNAVAILABLE");
-    }
-
-    @Test
-    @DisplayName("실패하지 않은 기존 환불 대상은 제외하고 나머지 상품은 선택 가능하다")
-    void excludesExistingRequestsAndAllowsRemainingItems() {
-        doReturn(List.of(order(1, 101L), order(2, 102L)))
-                .when(orders)
-                .findByPaymentGroupIdOrderByIdAsc(10L);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<Long>>any(), eq(10L)))
-                .thenReturn(List.of(1L));
-        var targets = service.refundableTargets("buyer", "PG");
-        assertThat(targets.getFirst().unavailableReason()).isEqualTo("ALREADY_REQUESTED");
-        assertThat(targets.getFirst().heldQuantity()).isEqualTo(2);
-        assertThat(targets.getFirst().remainingRefundableAmount()).isZero();
-        assertThat(targets.get(1).refundable()).isTrue();
-    }
-
-    @Test
-    @DisplayName("장바구니 항목에 주문이 여러 개 연결되면 모호한 선택을 허용하지 않는다")
-    void excludesAmbiguousCartLinks() {
-        doReturn(List.of(order(1, 101L), order(2, 101L)))
-                .when(orders)
-                .findByPaymentGroupIdOrderByIdAsc(10L);
-        assertThat(service.refundableTargets("buyer", "PG"))
+        assertThat(targets).hasSize(2);
+        verifyNoInteractions(attempts);
+        assertThat(targets)
                 .allSatisfy(
-                        target ->
-                                assertThat(target.unavailableReason())
-                                        .isEqualTo("CART_ITEM_AMBIGUOUS"));
-    }
-
-    @Test
-    @DisplayName("168시간 경계와 미완료 결제는 선택 환불 불가 이유를 반환한다")
-    void rejectsExpiredAndUnpaidGroups() {
-        doReturn(List.of(order(1, 101L))).when(orders).findByPaymentGroupIdOrderByIdAsc(10L);
-        when(payment.getResolvedAt()).thenReturn(now.minusSeconds(168 * 3600));
-        assertThat(service.refundableTargets("buyer", "PG").getFirst().unavailableReason())
-                .isEqualTo("REFUND_WINDOW_EXPIRED");
-        when(group.getStatus()).thenReturn(OrderStatus.PENDING_PAYMENT);
-        assertThat(service.refundableTargets("buyer", "PG").getFirst().unavailableReason())
-                .isEqualTo("PAYMENT_NOT_COMPLETED");
+                        target -> {
+                            assertThat(target.refundable()).isFalse();
+                            assertThat(target.unavailableReason())
+                                    .isEqualTo("LEGACY_REFUND_UNAVAILABLE");
+                        });
     }
 
     @Test
