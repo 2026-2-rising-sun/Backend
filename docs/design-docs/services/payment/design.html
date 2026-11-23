@@ -186,7 +186,7 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
   .flow-card { padding: 4px 14px 14px; }
 }
 </style>
-<!-- md-sha256: 612cbc2911dd525b5553ab014e03f0e388f24ce391c5fb58910aa3b711080e6b -->
+<!-- md-sha256: 73b5d3e2d043220f7c2bc25e939e4509b27c7013df988418c3f29ffa52d4e740 -->
 </head>
 <body>
 <a href="design.md">MD 원본</a>
@@ -905,7 +905,7 @@ PG 입금과 PG 수수료는 기록하지 않습니다(<a href="#f9">흐름 9</a
   <text x="405" y="283" text-anchor="middle" class="tev">⑥ 환불 요청됨 (늦은 승인)</text>
   <!-- 7 환불 실행 -->
   <line x1="290" y1="330" x2="516" y2="330" class="sync" marker-end="url(#a1)"/>
-  <text x="403" y="323" text-anchor="middle" class="t">⑦ 환불 실행 · 동기 접수</text>
+  <text x="403" y="323" text-anchor="middle" class="t">⑦ 환불 실행 · Kafka 접수</text>
   <!-- 8 환불 결과 -->
   <line x1="520" y1="370" x2="296" y2="370" class="evl" marker-end="url(#a2)"/>
   <text x="405" y="363" text-anchor="middle" class="tev">⑧ 환불 성공·실패</text>
@@ -1336,7 +1336,7 @@ UPDATE orders SET status = 'CANCELLED'
 <dl class="qa">
   <dt>상황</dt><dd>구매자가 상품 일부나 전체의 환불을 요청합니다. 고객은 카드를 다시 긁지 않습니다. <strong>서버가 토스 취소 API를 호출합니다.</strong></dd>
   <dt>누가 정하나</dt><dd>환불해도 되는지는 <strong>Commerce가 정합니다.</strong> 배송 단계와 판매자 승인을 아는 곳이 Commerce이기 때문입니다. Payment는 승인된 환불을 <strong>실행만</strong> 합니다.</dd>
-  <dt>환불 실행을 부르는 곳</dt><dd><strong>실행은 하나, 시작점은 둘입니다.</strong> 둘 다 Commerce가 정합니다. ① "환불 승인됨"(고객 요청, 금액·판매자 주문 지정, 동기 접수). ② "환불 요청됨"(늦은 승인, 흐름 6, 전액, outbox 이벤트). 사유는 <code>refund.reason</code>에 남깁니다. ②의 환불 요청 ID는 <code>late-{결제 ID}</code>로 고정이라, 이벤트가 두 번 와도 환불은 한 번입니다.</dd>
+  <dt>환불 실행을 부르는 곳</dt><dd><strong>실행은 하나, 시작점은 둘입니다.</strong> 둘 다 Commerce가 정합니다. 두 시작점 모두 Kafka <code>commerce.refund.requests.v1</code>의 "환불 요청됨" 하나로 오고 <code>purpose</code>로 구분합니다. ① 고객 환불(<code>USER_REFUND</code>, 금액·판매자 주문 지정). ② 시스템 보상(<code>SYSTEM_COMPENSATION</code>, 늦은 승인·승인 결과 불명, 흐름 6, 전액). 결과는 <code>payment.refund.results.v1</code>의 "환불 결과 기록됨" 하나입니다. 환불 요청 ID로 한 번만 접수하므로 이벤트가 두 번 와도 환불은 한 번입니다. 늦은 승인의 요청 ID는 <code>late-{결제 ID}</code>입니다.</dd>
   <dt>대사와 다른 점</dt><dd>늦은 승인은 승인 이벤트를 받은 Commerce가 <strong>그 자리에서</strong> 판단합니다. 거래 대사는 Payment가 아예 모르는 승인(확인 포기 등)을 <strong>다음 날 찾아 APPROVED로 맞추는</strong> 안전망입니다. 맞추면 "결제 승인됨"이 나가고, 같은 판단을 탑니다.</dd>
   <dt>사고 1: 과다 환불</dt><dd>부분 환불 요청 두 개가 동시에 들어옵니다. 각각 "합계가 결제 금액 이하"인지 확인하고 둘 다 통과합니다. 결제 금액보다 많이 환불됩니다. 막는 방법: 결제 행의 환불 누적액을 조건부 UPDATE로 늘립니다.</dd>
   <dt>사고 2: 이중 환불</dt><dd>타임아웃 후 재시도하면 같은 환불이 두 번 실행됩니다. 막는 방법: 토스 취소 요청에 멱등키 헤더를 붙입니다. 같은 키로 다시 보내면 토스가 중복 취소하지 않습니다. 토스 문서 기준으로 멱등키는 <strong>처음 요청한 날부터 15일</strong> 유효하고 최대 300자입니다. 멱등키·API 키·주소·메서드가 같은 요청이 다시 오면 처리하지 않고 첫 응답을 그대로 돌려줍니다. 15일이 지난 재시도는 새 요청이 되므로, 오래된 환불은 다시 보내기 전에 조회부터 합니다.</dd>
@@ -1344,7 +1344,7 @@ UPDATE orders SET status = 'CANCELLED'
   <dt>결과 불명</dt><dd>승인과 같습니다. 취소 응답이 없으면 UNKNOWN으로 두고, 토스 결제 조회로 취소 내역을 확인합니다.</dd>
 </dl>
 <div class="board">
-<div class="row"><div class="zone" data-z="Commerce"><div class="st evt">환불 승인됨<small>발송 전 자동 · 발송 후 판매자 승인</small></div></div><span class="ar">동기 접수</span><div class="zone" data-z="Payment"><div class="st cmd">환불 실행<small>환불 요청 ID·금액·판매자 주문 번호</small></div><span class="ar"></span><div class="st agg">환불<small>규칙: 누적 환불 ≤ 결제 금액 · 요청 ID당 1건</small></div><span class="ar"></span><div class="st evt">환불 접수됨<small>PROCESSING</small></div></div><span class="ar">POST /cancel · 멱등키</span><div class="st ext">토스페이먼츠<small>외부 시스템</small></div></div>
+<div class="row"><div class="zone" data-z="Commerce"><div class="st evt">환불 요청됨 (USER_REFUND)<small>발송 전 자동 · 발송 후 판매자 승인</small></div></div><span class="ar">Kafka 접수</span><div class="zone" data-z="Payment"><div class="st cmd">환불 실행<small>환불 요청 ID·금액·판매자 주문 번호</small></div><span class="ar"></span><div class="st agg">환불<small>규칙: 누적 환불 ≤ 결제 금액 · 요청 ID당 1건</small></div><span class="ar"></span><div class="st evt">환불 접수됨<small>PROCESSING</small></div></div><span class="ar">POST /cancel · 멱등키</span><div class="st ext">토스페이먼츠<small>외부 시스템</small></div></div>
 <div class="row"><span class="lbl">토스 응답이 200이면</span><span class="ar">토스 → 200</span><div class="st evt">환불 완료됨</div><span class="ar"></span><div class="st pol">원장 기록<small>모든 환불 · 차) 구매자 예수금 · 대) PG 보관금. 구매확정 뒤 환불이면 역정산(흐름 10)이 먼저 예수금으로 되돌려 놓음</small></div></div>
 <div class="row"><span class="lbl">늦은 승인이면 (흐름 6에서)</span><div class="zone" data-z="Commerce"><div class="st evt ghost">환불 요청됨<small>사유 LATE_APPROVAL · 전액 · 이벤트</small></div></div><span class="ar"></span><div class="st cmd ghost">환불 실행<small>위와 같은 규칙·멱등키</small></div></div>
 <div class="row"><div class="st evt ghost">환불 완료됨</div><span class="ar ev">환불 완료됨 (사유 포함)</span><div class="zone" data-z="Commerce"><div class="st pol">주문 환불 처리<small>재고 복구 시점은 Commerce가 정함 · 사유가 LATE_APPROVAL이면 주문은 이미 닫혀 있으니 건드리지 않고 고객 알림만</small></div></div></div>
@@ -2034,7 +2034,7 @@ CREATE INDEX ix_settlement_pending ON settlement_item(seller_id, scheduled_date)
 <tbody>
 <tr><td>판매자별 금액 합 = 결제 금액</td><td>결제 생성</td><td>합이 다르면 400 <code>SUM_MISMATCH</code></td></tr>
 <tr><td>분개 하나의 차변 합 = 대변 합</td><td><code>Journal.of(...)</code> 생성자</td><td>안 맞으면 예외, 저장 안 됨</td></tr>
-<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 409 <code>OVER_REFUND</code></td></tr>
+<tr><td>환불 합(진행 중 포함) ≤ 결제 금액, 판매자 주문별로도 ≤</td><td>환불 접수. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠그고 합을 계산</td><td>동시 환불 2건이 합쳐 초과하면 한 건은 결과 이벤트 FAILED(<code>OVER_REFUND</code>)</td></tr>
 <tr><td>구매확정 판매 금액 = 판매자 주문 금액 − 성공한 환불 합</td><td>구매확정 처리. <code>payment</code> 행을 <code>FOR UPDATE</code>로 잠근다</td><td>4,000원 환불 후 확정하면 NORMAL 항목은 6,000원</td></tr>
 <tr><td>확정 시점에 진행 중(PROCESSING·UNKNOWN)이던 환불이 나중에 성공하면 역정산</td><td>환불 성공 반영. 같은 <code>payment</code> 행 잠금 아래에서 그 판매자 주문의 NORMAL 항목이 있으면 REVERSAL 추가</td><td>확정과 환불 성공이 동시에 와도 둘 중 하나만 금액을 반영</td></tr>
 <tr><td>수수료 = <code>floor(판매 금액 × commission_rate)</code>(원 미만 버림), 지급 = 판매 − 수수료. 역정산 수수료 = <code>floor(환불 전 남은 판매 × rate) − floor(환불 후 남은 판매 × rate)</code>(음수로 기록)</td><td>정산 항목 생성</td><td>10,000원 · 0.1 → 수수료 1,000. 3,333원과 6,667원을 나눠 환불하면 역정산 수수료 −334(1,000 − floor(666.7)), −666 → 합 −1,000. 전액 환불 뒤 수수료가 정확히 0</td></tr>
@@ -2114,7 +2114,6 @@ UPDATE payment SET refunded_amount = refunded_amount + :amt,
 <tr><td><code>POST /internal/payments/{orderRef}/checkouts</code></td><td>구매자가 "결제 다시 하기"(거절·결제창 닫힘 뒤)</td><td>결제 시도(결제창) 하나를 새로 만든다. <code>checkout_seq</code>를 올리고 새 <code>pgOrderId</code> 발급</td><td>201 <code>{pgOrderId, amount, expiresAt}</code></td><td>409 <code>PAYMENT_CLOSED</code>(CREATED 아님·만료) · 404 <code>NOT_READY</code>(결제 생성 요청이 아직 도착 전)</td></tr>
 <tr><td><code>POST /internal/payments/{orderRef}/approval</code></td><td>구매자의 승인 요청을 중계</td><td>승인(흐름 2). 토스 confirm 호출. 응답 대기 8초</td><td>200 <code>APPROVED</code> · 202 <code>PENDING</code>(헤더 <code>Location: /internal/payments/{orderRef}</code>)</td><td>422 <code>DECLINED {code, message}</code>(다시 결제 가능) · 404 · 403 <code>BUYER_MISMATCH</code> · 409 <code>PAYMENT_CLOSED</code> · 400 <code>AMOUNT_MISMATCH</code> · 400 <code>ORDER_ID_MISMATCH</code>(<code>pgOrderId</code>가 경로의 <code>orderRef</code> 것이 아님)</td></tr>
 <tr><td><code>GET /internal/payments/{orderRef}</code></td><td><strong>필수.</strong> 주문이 "결제 확인 중"으로 10초 넘게 머물 때(정체 해소). 운영·조사에도 씀</td><td>상태 조회. 구매자 화면은 Commerce 주문 상태를 봅니다</td><td>200 <code>{paymentId, status, amount, refundedAmount, pgOrderId, approvedAt}</code></td><td>404</td></tr>
-<tr><td><code>POST /internal/refunds</code></td><td>고객 환불 승인 직후</td><td>환불 접수(흐름 7). 저장 후 바로 응답, 토스 호출은 뒤에서. 결과는 이벤트로</td><td>202 <code>{refundId, status: PROCESSING}</code> · 200(같은 <code>refundRequestId</code>)</td><td>404 <code>PAYMENT_NOT_FOUND</code> · 400 <code>ITEMS_REQUIRED</code>(<code>items</code> 필수, 환불 금액 = items 합) · 409 <code>REFUND_REQUEST_CONFLICT</code>(같은 <code>refundRequestId</code>에 다른 본문) · 400 <code>UNKNOWN_SELLER_ORDER</code>(이 결제에 없는 판매자 주문) · 409 <code>OVER_REFUND</code> · 409 <code>PARTIAL_NOT_ALLOWED</code> · 409 <code>NOT_REFUNDABLE</code>(APPROVED·PARTIALLY_REFUNDED 아님)</td></tr>
 <tr><td><code>POST /webhooks/{pg}</code></td><td>(Commerce 아님) PG가 직접 호출</td><td>본문을 믿지 않고 PG에 다시 조회해 흐름 4와 같은 경로로 반영. 토스는 선택, <strong>Stripe를 붙이면 필수</strong></td><td>200</td><td>서명 검증 실패 401(Stripe). 토스 웹훅은 서명이 없으므로 본문을 믿지 않고 재조회하는 것이 방어입니다</td></tr>
 </tbody></table></div>
 
@@ -2133,11 +2132,7 @@ POST /internal/payments/OD-20261110-K7Q2M9XA/approval   (서비스 토큰)
 → 200 { "paymentId": 1001, "status": "APPROVED" }
 → 422 { "status": "DECLINED", "code": "REJECT_CARD_PAYMENT", "message": "..." }
 → 202 { "paymentId": 1001, "status": "PENDING" }
-
-POST /internal/refunds                       (서비스 토큰)
-{ "refundRequestId": "RA-555", "orderRef": "OD-20261110-K7Q2M9XA", "reason": "CUSTOMER_REQUEST",
-  "items": [ { "sellerOrderNumber": "OD-20261110-K7Q2M9XA-S2", "amount": 10000 } ] }
-→ 202 { "refundId": 77, "status": "PROCESSING" }</pre>
+</pre>
 
 <h4>Commerce가 프론트에 여는 API</h4>
 <p>요청·응답·오류 코드 전체는 <a href="#commerce">Commerce 도메인</a>에 있습니다. 결제와 직접 닿는 것은 <code>POST /orders</code>, <code>/payment/checkouts</code>, <code>/payment/approval</code>, <code>/cancel</code>, <code>GET /orders/{no}</code> 다섯 개입니다. 경로 이름은 주문 연동 단계에서 Commerce 담당과 확정합니다. 승인 중계는 잠금이 0행이면 다시 읽어 PAID → 완료, 결제 확인 중 → 확인 중(새로고침·더블 클릭), 만료·취소 → 409로 답합니다.</p>
@@ -2147,7 +2142,7 @@ POST /internal/refunds                       (서비스 토큰)
 <li><strong>confirm의 0행 원인 판별.</strong> 조건부 UPDATE가 0행이면 한 번 더 읽어 이유를 고릅니다. 이미 APPROVED면 200을 다시 줍니다(재시도·새로고침 대비).</li>
 <li><strong>결제 확인 중 정체 해소.</strong> 202를 준 뒤 토스가 거절하거나, Commerce가 잠근 직후 죽으면 주문이 "결제 확인 중"에 남습니다. 거절은 이벤트가 없으므로 Commerce가 모릅니다. 그대로 두면 재시도·취소가 모두 409라서 구매자는 만료(T + 3분)까지 갇힙니다. 그래서 <code>GET /orders/{no}</code>가 들어왔을 때 결제 확인 중으로 10초(Commerce 타임아웃) 넘게 머문 주문이면(<code>confirming_started_at</code> 기준) Payment <code>GET /internal/payments/{orderRef}</code>를 부릅니다. <code>CREATED</code> → 결제 대기로 되돌림, <code>APPROVED</code> → 결제 완료 처리 함수(Kafka 지연도 여기서 풀림), <code>APPROVING</code>·<code>UNKNOWN</code> → 그대로(결과는 이벤트나 다음 조회로), <code>CANCELED</code> → 그대로(곧 만료 배치가 닫음), 404 → 결제 생성 재시도 대상으로 둠(<code>payment_id</code> NULL). 거절 이벤트를 새로 만들지 않는 이유: 한 주문에 시도가 여러 번이면 옛 시도의 거절 이벤트가 새 시도를 되돌릴 수 있습니다.</li>
 <li><strong>금액 검증은 Payment에 남깁니다.</strong> Commerce가 넘기는 <code>amount</code>는 프론트(successUrl)에서 온 값이라 여전히 믿을 수 없습니다.</li>
-<li><strong>늦은 승인 환불은 API가 아닙니다.</strong> Commerce가 이벤트로 보냅니다(<a href="#contract">이벤트 계약</a>). 처리 코드는 <code>POST /internal/refunds</code>와 같은 서비스 메서드입니다.</li>
+<li><strong>환불은 API가 아닙니다.</strong> 고객 환불과 시스템 보상 모두 Commerce가 Kafka <code>commerce.refund.requests.v1</code>로 보내고, 결과는 <code>payment.refund.results.v1</code>으로 받습니다(<a href="#contract">이벤트 계약</a>). 업무 실패는 HTTP 응답 코드 대신 결과의 <code>status: FAILED</code>와 <code>failureCode</code>로 알립니다. 정정(2026-11-21): 이전 설계의 <code>POST /internal/refunds</code>는 없앴습니다(#384).</li>
 </ul>
 </section>
 
@@ -2474,7 +2469,7 @@ UPDATE member_coupon SET status = 'AVAILABLE', order_id = NULL WHERE order_id = 
 <h4>구매확정 · 환불 (결제와 맞닿는 부분만)</h4>
 <ul>
 <li><strong>구매확정:</strong> <code>UPDATE seller_order SET status = 'PURCHASE_CONFIRMED', purchase_confirmed_at = now() WHERE seller_order_number = :sno AND status = 'ORDERED'</code>. 주문이 PAID일 때만 받습니다. 1행이면 같은 트랜잭션에서 outbox "구매확정됨" <code>{sellerOrderNumber, sellerId, confirmedAt}</code>을 씁니다(흐름 10). 0행이면 이미 확정된 것이므로 200을 다시 줍니다.</li>
-<li><strong>고객 환불:</strong> 환불 접수·승인 화면은 범위 밖입니다. 승인되면 Commerce가 <code>refund_request</code>(REQUESTED)를 저장하고 <code>POST /internal/refunds</code>를 부릅니다. <code>refundRequestId</code>는 Commerce 환불 요청 ID, <code>items</code>는 판매자 주문별 금액입니다. 결과는 "환불 성공됨·실패됨" 이벤트로 받습니다. 전액 환불이 끝나면 주문을 <code>REFUNDED</code>로 바꿉니다.</li>
+<li><strong>고객 환불:</strong> 환불 접수·승인 화면은 범위 밖입니다. 승인되면 Commerce가 환불 요청 원문과 "환불 요청됨"(<code>commerce.refund.requests.v1</code>, <code>purpose: USER_REFUND</code>) outbox를 함께 저장합니다. <code>refundRequestId</code>는 Commerce 환불 요청 ID, <code>items</code>는 판매자 주문별 금액입니다. 결과는 "환불 결과 기록됨"(<code>payment.refund.results.v1</code>) 이벤트로 받습니다. 전액 환불이 끝나면 주문을 <code>REFUNDED</code>로 바꿉니다.</li>
 </ul>
 
 <h4>프론트 API (Commerce)</h4>
@@ -2662,9 +2657,8 @@ stateDiagram-v2
 <thead><tr><th>이벤트 (eventType)</th><th>토픽 · 키</th><th>방향</th><th>payload</th><th>받는 쪽의 한 번만 반영</th></tr></thead>
 <tbody>
 <tr><td>결제 승인됨 <code>PaymentApproved</code></td><td><code>payment.execution-results.v1</code> · orderRef</td><td>Payment → Commerce</td><td>paymentId, orderRef, amount, approvedAt</td><td>동기 200과 같은 함수로 <code>UPDATE orders SET PAID WHERE status IN (결제 대기, 결제 확인 중)</code>. 0행이면 다시 읽어 PAID(같은 결제)는 무시, 닫힌 주문이면 "환불 요청됨" 발행. Payment는 판단 없이 항상 보낸다</td></tr>
-<tr><td>환불 성공됨 <code>RefundSucceeded</code></td><td><code>payment.refund-results.v1</code> · orderRef</td><td>Payment → Commerce</td><td>refundId, refundRequestId, reason, items[{sellerOrderNumber, amount}], amount, completedAt</td><td><code>refundRequestId</code>로 환불 승인 행을 조건부 UPDATE. reason이 LATE_APPROVAL이면 고객 알림만</td></tr>
-<tr><td>환불 실패됨 <code>RefundFailed</code></td><td><code>payment.refund-results.v1</code> · orderRef</td><td>Payment → Commerce</td><td>refundId, refundRequestId, reason, failureCode</td><td>같음. 운영 알림</td></tr>
-<tr><td>환불 요청됨 <code>RefundRequested</code></td><td><code>commerce.refund-requests.v1</code> · orderRef</td><td>Commerce → Payment</td><td>refundRequestId <code>late-{paymentId}</code>, paymentId, orderRef, reason LATE_APPROVAL</td><td><code>INSERT INTO refund … ON CONFLICT DO NOTHING</code> → 0행이면 이미 받은 요청이므로 끝. <code>refund_item</code>은 Payment가 <code>payment_seller_amount</code> 전체로 만든다(전액)</td></tr>
+<tr><td>환불 결과 기록됨 <code>RefundResultRecorded</code></td><td><code>payment.refund.results.v1</code> · orderRef</td><td>Payment → Commerce</td><td>받은 요청 payload 그대로 + executionId(UUID, 요청당 고정), resultVersion(1부터), status(SUCCEEDED·FAILED·NO_CHARGE), refundedAmount, resolvedAt, nextActionAt(null), failureCode</td><td>요청 원문·executionId·resultVersion으로 검증해 한 번만 반영. 같은 버전은 같은 payload. Payment는 UNKNOWN을 보내지 않고, 같은 요청 ID에 다른 본문이 오면 결과를 보내지 않는다(Core가 거부하면 파티션이 막힘)</td></tr>
+<tr><td>환불 요청됨 <code>RefundRequested</code></td><td><code>commerce.refund.requests.v1</code> · orderRef</td><td>Commerce → Payment</td><td>refundRequestId, orderRef, paymentId, purpose(USER_REFUND·SYSTEM_COMPENSATION), reason, currency, amount, items, requestedAt</td><td><code>refund_request_id</code>로 <code>INSERT … ON CONFLICT DO NOTHING</code> → 0행이면 같은 본문은 저장 결과 재발행, 다른 본문은 충돌 기록만. 결제가 없거나 paymentId가 없거나 다르면 FAILED. 해석할 수 없으면 <code>commerce.refund.requests.v1.payment.dlt</code></td></tr>
 <tr><td>구매확정됨 <code>PurchaseConfirmed</code></td><td><code>commerce.purchase-confirmations.v1</code> · sellerOrderNumber</td><td>Commerce → Payment</td><td>sellerOrderNumber, sellerId, confirmedAt</td><td><code>INSERT INTO settlement_item … ON CONFLICT DO NOTHING</code>(UNIQUE <code>(kind, source_id)</code>) → 0행이면 끝. 판매 금액 = <code>payment_seller_amount.amount</code> − 그 판매자 주문의 <strong>성공한</strong> 환불 합. 수수료율은 <code>payment_seller_amount</code>의 복사값</td></tr>
 <tr><td>지급 완료됨 <code>PayoutCompleted</code></td><td><code>payment.payout-results.v1</code> · sellerId</td><td>Payment → Notification</td><td>payoutId, sellerId, amount, payoutDate</td><td>알림만. <code>eventId</code> 중복은 알림 쪽 규칙</td></tr>
 </tbody></table></div>
@@ -2729,10 +2723,10 @@ stateDiagram-v2
 <tr><td>38</td><td>대사에서 "토스 DONE · 우리 CANCELED" 발견</td><td>APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불)</td><td>거래 대사</td><td><a href="#f12">12</a></td></tr>
 <tr><th colspan="5">환불</th></tr>
 <tr><td>39</td><td>환불 요청 중복(이벤트 재전달·재시도)</td><td>1번만 실행</td><td><code>refund_request_id</code> UNIQUE · <code>ON CONFLICT DO NOTHING</code></td><td><a href="#f7">7</a></td></tr>
-<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 409 <code>OVER_REFUND</code></td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
+<tr><td>40</td><td>동시 부분 환불의 합이 결제 금액 초과</td><td>한 건 결과 이벤트 FAILED(<code>OVER_REFUND</code>)</td><td><code>payment</code> 행 FOR UPDATE 후 합 계산</td><td><a href="#ddl">DDL</a></td></tr>
 <tr><td>41</td><td>환불 호출 타임아웃</td><td>UNKNOWN → 조회. 이중 환불 없음</td><td>토스 멱등키 = <code>refund_request_id</code></td><td><a href="#f7">7</a></td></tr>
 <tr><td>42</td><td>환불 실패(토스 4xx)</td><td>"환불 실패됨" → 운영자</td><td>이벤트 + 거래 대사</td><td><a href="#f7">7</a></td></tr>
-<tr><td>43</td><td>부분 취소가 안 되는 결제수단에 부분 환불</td><td>409 <code>PARTIAL_NOT_ALLOWED</code></td><td><code>partial_cancelable</code></td><td><a href="#f7">7</a></td></tr>
+<tr><td>43</td><td>부분 취소가 안 되는 결제수단에 부분 환불</td><td>결과 이벤트 FAILED(<code>PARTIAL_NOT_ALLOWED</code>)</td><td><code>partial_cancelable</code></td><td><a href="#f7">7</a></td></tr>
 <tr><th colspan="5">재고 · 쿠폰 정합성</th></tr>
 <tr><td>44</td><td>늦은 승인 환불 때 재고</td><td>변화 없음(이미 반환됨)</td><td>환불 사유로 분기</td><td><a href="#checkout">주문</a></td></tr>
 <tr><td>45</td><td>재고 카운터와 예약 행이 어긋남(버그)</td><td>알림. 자동 수정 안 함</td><td>정기 점검 <code>reserved = SUM(HELD)</code></td><td><a href="#checkout">주문</a></td></tr>
