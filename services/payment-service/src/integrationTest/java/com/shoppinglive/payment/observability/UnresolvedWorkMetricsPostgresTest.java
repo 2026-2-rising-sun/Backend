@@ -23,7 +23,8 @@ import org.springframework.test.context.DynamicPropertySource;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class UnresolvedWorkMetricsPostgresTest {
-    static final String SCHEMA = "payment_unresolved_" + UUID.randomUUID().toString().replace("-", "");
+    static final String SCHEMA =
+            "payment_unresolved_" + UUID.randomUUID().toString().replace("-", "");
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry p) {
@@ -51,14 +52,16 @@ class UnresolvedWorkMetricsPostgresTest {
         jdbc.update("DELETE FROM payment");
         registry = new SimpleMeterRegistry();
         // 캐시를 끄고 매 조회를 실제 DB 값으로 본다
-        metrics = new UnresolvedWorkMetrics(dataSource, registry, Duration.ofMinutes(30), Duration.ZERO);
+        metrics =
+                new UnresolvedWorkMetrics(
+                        dataSource, registry, Duration.ofMinutes(30), Duration.ZERO);
     }
 
     @Test
     @DisplayName("불명이 된 지 12분을 넘긴 UNKNOWN 결제만 센다")
     void countsUnknownPaymentsPastTwelveMinutes() {
-        insertPayment("PU-OLD", "UNKNOWN", "now() + INTERVAL '17' MINUTE");   // 불명 13분째
-        insertPayment("PU-NEW", "UNKNOWN", "now() + INTERVAL '25' MINUTE");   // 불명 5분째
+        insertPayment("PU-OLD", "UNKNOWN", "now() + INTERVAL '17' MINUTE"); // 불명 13분째
+        insertPayment("PU-NEW", "UNKNOWN", "now() + INTERVAL '25' MINUTE"); // 불명 5분째
 
         assertThat(count("payment_unknown")).isEqualTo(1.0);
     }
@@ -68,7 +71,8 @@ class UnresolvedWorkMetricsPostgresTest {
     void countsPendingCompensationsPastTwelveMinutes() {
         long old = insertPayment("PC-OLD", "CANCELED", "now()");
         long fresh = insertPayment("PC-NEW", "CANCELED", "now()");
-        insertRefund(old, "SYSTEM_COMPENSATION", "PROCESSING", "now() - INTERVAL '13' MINUTE", true);
+        insertRefund(
+                old, "SYSTEM_COMPENSATION", "PROCESSING", "now() - INTERVAL '13' MINUTE", true);
         insertRefund(fresh, "SYSTEM_COMPENSATION", "UNKNOWN", "now() - INTERVAL '1' MINUTE", true);
 
         assertThat(count("compensation_pending")).isEqualTo(1.0);
@@ -89,7 +93,8 @@ class UnresolvedWorkMetricsPostgresTest {
         insertRefund(null, "USER_REFUND", "UNKNOWN", "now() - INTERVAL '13' MINUTE", true);
         assertThat(count("refund_unknown")).isEqualTo(1.0);
 
-        jdbc.update("UPDATE refund SET status = 'SUCCEEDED', result_version = 1, result_payload = '{}'");
+        jdbc.update(
+                "UPDATE refund SET status = 'SUCCEEDED', result_version = 1, result_payload = '{}'");
 
         assertThat(count("refund_unknown")).isEqualTo(0.0);
     }
@@ -102,7 +107,9 @@ class UnresolvedWorkMetricsPostgresTest {
         jdbc.update(
                 "INSERT INTO payment (order_ref, buyer_id, amount, status, expires_at, pg_provider,"
                         + " check_deadline_at, created_at, updated_at) VALUES (?, ?, 10000, ?,"
-                        + " now() + INTERVAL '1' DAY, 'TOSS', " + checkDeadline + ", now(), now())",
+                        + " now() + INTERVAL '1' DAY, 'TOSS', "
+                        + checkDeadline
+                        + ", now(), now())",
                 orderRef,
                 UUID.randomUUID().toString(),
                 status);
@@ -111,14 +118,23 @@ class UnresolvedWorkMetricsPostgresTest {
     }
 
     /** 생성 시각 기준 12분 판단을 쓰므로 created_at을 과거로 둘 수 있게 시각식을 받는다. */
-    private void insertRefund(Long paymentId, String purpose, String status, String createdAt, boolean retryScheduled) {
+    private void insertRefund(
+            Long paymentId,
+            String purpose,
+            String status,
+            String createdAt,
+            boolean retryScheduled) {
         jdbc.update(
                 "INSERT INTO refund (refund_request_id, execution_id, payment_id, purpose, amount,"
                         + " request_payload, status, result_version, refunded_amount, attempt_count,"
                         + " next_attempt_at, check_deadline_at, created_at, updated_at)"
-                        + " VALUES (?, ?, ?, ?, 1000, '{}', ?, " + (status.equals("SUCCEEDED") ? 1 : 0)
-                        + ", 0, 1, " + (retryScheduled ? "now()" : "NULL") + ", now() + INTERVAL '1' HOUR, "
-                        + createdAt + ", now())",
+                        + " VALUES (?, ?, ?, ?, 1000, '{}', ?, "
+                        + (status.equals("SUCCEEDED") ? 1 : 0)
+                        + ", 0, 1, "
+                        + (retryScheduled ? "now()" : "NULL")
+                        + ", now() + INTERVAL '1' HOUR, "
+                        + createdAt
+                        + ", now())",
                 UUID.randomUUID().toString(),
                 UUID.randomUUID(),
                 paymentId,

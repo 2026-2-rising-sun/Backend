@@ -57,6 +57,10 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
   - 재시도는 30초부터 두 배씩 늘려 10분 간격까지 간다. 이 보상의 첫 예약(토스를 부르기 전 UNKNOWN 전환, 고객 환불 대기 포함)부터 24시간(`refundGiveUpAfter`)이 지나면 새 취소를 보내지 않고 마지막 조회 뒤 UNKNOWN + `next_attempt_at` NULL로 멈추며 `[사람 확인 필요]` ERROR를 한 번 남긴다. 첫 예약은 첫 토스 호출보다 이르거나 같아서 취소 키를 쓰는 기간은 24시간 이하이고, 토스 멱등 키 유효기간(15일) 안에 멈춘다. 모든 상태 변경과 취소는 이 실행이 선점한 `attempt_count`를 조건으로 해, 멈췄다 깨어난 실행은 호출 기록·취소·결과를 남기지 못한다.
   - APPROVED 취소가 `ALREADY_CANCELED_PAYMENT`인데 토스 취소 내역에 이 보상의 취소가 없거나, 취소가 `NOT_CANCELABLE_PAYMENT`면 재시도하지 않고 결과를 보류해 사람이 확인한다. SUCCEEDED로 보내지 않는다.
 
+## 운영 관측
+
+- [x] **REF-OBS-01** 기준 시간(12분)을 넘겨 확정되지 않은 건수를 `shoppinglive.payment.unresolved.count`로 낸다. `kind`는 `refund_unknown`(결과를 모르는 고객 환불), `compensation_pending`(PROCESSING·UNKNOWN인 시스템 보상)이다. 24시간 상한으로 `next_attempt_at`이 NULL로 멈춘 건도 사람이 볼 대상이므로 포함하고, 확정되면 빠진다. 지표에 결제키·주문번호·고객 정보를 넣지 않는다. 알림 규칙은 Infra #64가 맡는다(#387).
+
 ## 결과 이벤트
 
 - [ ] **REF-EVENT-01** `RefundResultRecorded`는 상태 변경과 같은 트랜잭션에 공통 outbox로 기록하고, `payment.refund.results.v1`에 orderRef 키로 보낸다. payload는 받은 요청 payload 그대로에 다음 7개 필드를 더한 것이다.

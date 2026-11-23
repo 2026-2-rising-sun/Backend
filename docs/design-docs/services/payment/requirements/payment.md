@@ -74,6 +74,7 @@
 - [x] **PAY-RECOVER-04** 조회 마감이 지나면 조회를 멈추고 알림(ERROR 로그)을 남긴다. 이후는 거래 대사가 맡는다.
 - [x] **PAY-EXPIRE-01** 만료 시각이 지난 CREATED 결제는 CANCELED가 된다. 승인과 동시에 일어나도 한쪽만 반영된다. (EC 31, 35)
 - [x] **PAY-RECOVER-05** 여러 인스턴스가 같은 결제를 동시에 처리해도 상태 변경·분개·이벤트는 1번이다.
+- [x] **PAY-RECOVER-06** 불명이 된 지 12분을 넘긴 UNKNOWN 결제 수를 `shoppinglive.payment.unresolved.count{kind=payment_unknown}` 지표로 낸다. 확정되면 빠진다. 알림 규칙은 Infra #64가 맡는다(#387).
 
 ## 결과 이벤트
 
