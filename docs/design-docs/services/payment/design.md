@@ -703,6 +703,8 @@ Commerce에 알리나이벤트로는 알리지 않습니다. Commerce는 중계�
 | --- | --- | --- |
 | 연결 실패 (connect timeout, connection refused) | **안 갔음**. TCP 연결 전 | UNKNOWN 아님. 결제는 CREATED 그대로. 재시도하거나 "잠시 후 다시" 응답. **구현 규칙: 연결 단계 예외(연결 타임아웃, 연결 거부)만 여기로 보냅니다.** 요청을 보내기 시작한 뒤의 끊김(connection reset, 읽기 타임아웃)이나 종류를 모르는 예외는 모두 UNKNOWN입니다. 애매하면 UNKNOWN. 이 분류가 틀리면 돈은 나갔는데 결제가 CREATED로 돌아가고, 대사에서야 발견됩니다 |
 | 읽기 타임아웃, 응답 중 끊김, 5xx | 갔을 수 있음 | ① 같은 멱등키로 다시 보냄 → ② 그래도 모르면 **UNKNOWN** → 조회 |
+| 429 (호출 제한), 408 | 갔을 수 있음. 토스가 처리하지 않았다고 보장하지 않음 | 5xx와 같다. ① 같은 멱등키로 다시 보냄 → ② 그래도 모르면 **UNKNOWN**(`pg_order_id` 유지) → 조회. CREATED로 되돌리면 뒤의 시스템 보상이 토스 조회 없이 NO_CHARGE로 끝난다(#398) |
+| 401, 400 `INVALID_API_KEY`, 설정 403 | 처리하지 않았다고 본다. 우리 인증·설정 문제로 거부된 응답 | "보내지 않음". 결제는 CREATED로 돌아가고 `pg_order_id`를 지운다 |
 | 400 ALREADY\_PROCESSED\_PAYMENT · ALREADY\_PROCESSING\_REQUEST | 갔음, 결과는 응답에 없음 | **UNKNOWN** → 조회 (흐름 3\) |
 
 
