@@ -2558,7 +2558,7 @@ components:
         cartItemId: {type: [integer, 'null'], format: int64}
         productName: {type: string}
         quantity: {type: integer, minimum: 1}
-        refundAmount: {type: integer, format: int64, minimum: 0, description: 대상 주문 전체 수량의 할인 반영 금액}
+        refundAmount: {type: integer, format: int64, minimum: 0, description: 현재 환불 가능한 할인 반영 금액. 항목 실결제액에서 성공·처리 중·미확정 금액을 뺀 값이며 remainingRefundableAmount와 같다}
         unitPrice: {type: integer, format: int64, minimum: 0}
         succeededQuantity: {type: integer, minimum: 0}
         heldQuantity: {type: integer, minimum: 0}

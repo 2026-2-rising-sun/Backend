@@ -1502,7 +1502,7 @@ commercecore.refunds.api-enabled=true일 때만 제공한다. 본인 결제 묶�
 | data&#91;&#93;.cartItemId | &#91;&#x27;integer&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
 | data&#91;&#93;.productName | string | 필수 |  | — |
 | data&#91;&#93;.quantity | integer | 필수 |  | {&quot;minimum&quot;: 1} |
-| data&#91;&#93;.refundAmount | integer | 필수 | 대상 주문 전체 수량의 할인 반영 금액 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| data&#91;&#93;.refundAmount | integer | 필수 | 현재 환불 가능한 할인 반영 금액. 항목 실결제액에서 성공·처리 중·미확정 금액을 뺀 값이며 remainingRefundableAmount와 같다 | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data&#91;&#93;.unitPrice | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data&#91;&#93;.succeededQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
 | data&#91;&#93;.heldQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
@@ -3944,7 +3944,8 @@ components:
           type: integer
           format: int64
           minimum: 0
-          description: 대상 주문 전체 수량의 할인 반영 금액
+          description: 현재 환불 가능한 할인 반영 금액. 항목 실결제액에서 성공·처리 중·미확정 금액을 뺀 값이며 remainingRefundableAmount와
+            같다
         unitPrice:
           type: integer
           format: int64
@@ -4796,4 +4797,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `ca0131b20a912284d12c43603b95f39914baee07697282331fbf95e085226be2`
+입력 SHA-256: `500b7d1bdb015686b05a2801ac54f1e313b48d426b06a40589770c924e906fc6`
