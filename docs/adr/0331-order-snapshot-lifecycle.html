@@ -20,6 +20,7 @@
 <li><a href="#2026-11-15-최신-기한-요구와-미구현">2026-11-15 최신 기한 요구와 미구현</a></li>
 <li><a href="#2026-11-16-별도-처리-기한과-commerce-소유-경계">2026-11-16 별도 처리 기한과 Commerce 소유 경계</a></li>
 <li><a href="#2026-11-16-팀원-계약의-commerce-중계-구현">2026-11-16 팀원 계약의 Commerce 중계 구현</a></li>
+<li><a href="#2026-11-21-정정-수수료율-기본값">2026-11-21 정정: 수수료율 기본값</a></li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>ADR 0331: 주문서 생성 시점의 주문·스냅샷·재고 선점</h1><p>결정 상태: 핵심 정책 및 후속 U2/U3 채택. U1도 단가 우선/남은 실결제액 상한으로 채택됐다. 물리 PK/테이블명 보존 확장안은 구현 착수 지시에서 채택됐다.</p>
@@ -111,6 +112,8 @@
 <p>후속 구현은 새 <code>/v1/order-sheets</code>에서 준비 성공 PENDING 유지와 인증 후 PROCESSING 진입을 분리한다. Core seller_order에 팀원 설계의 정렬 번호·할인 후 금액·commerce.commission-rate 설정을 생성 시 보존한다. 설정 숫자 기본값은 정하지 않는다. V106은 기존 V104/V105와 과거 데이터를 덮어쓰지 않는다.</p>
 <p>PREPARE/APPROVAL 영속 원문을 기존 HTTP 전달표에 저장하고 legacy 전달기와 대상을 분리한다. 승인 접수 TX에 상태/600초 기한/전달 기록을 함께 저장하며 HTTP는 TX 밖이다. 새 이벤트 소비는 팀원 source/schema/key와 원결제/금액을 검증한다. 늦은 승인에는 새 원결제용 payment_relay_refund와 RefundRequested outbox를 같은 TX에 저장하며 환불 결과를 별도 확정한다. legacy REQUIRED를 임의 새 원결제 환불로 이관하지 않는다.</p>
 <p>사용자600/600·확정 실패 FAILED를 적용한다. 팀원 목표의 Commerce T+3분/거절 후 PENDING 복귀 제안은 채택하지 않는다. Payment CREATED expiresAt은 원래 준비 기한이며 APPROVING/UNKNOWN 실패 기한이 아니다. 주문 만료 후에도 미확정 결제는 조회하고 실패를 추정하지 않는다.</p>
-<p>앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. <a href="../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 범위</a>.</p><p class="muted fingerprint">MD SHA-256: <code>50592a4cbd320c49a6bf84cb82af0147bd1a4bb81dc1e89709e8913fe23b5c48</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>앞 절의 "새 중계·outbox 미완"은 이전 축소 커밋의 상태다. 현재 Core 중계/계약 대역 검증과 실제 Payment 생성·조회·checkout 확인을 제공한다. 실제 승인·환불 endpoint/event와 운영 이행·호출자 전환은 남아 계획을 active로 유지한다. <a href="../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">현재 범위</a>.</p>
+<h2 id="2026-11-21-정정-수수료율-기본값">2026-11-21 정정: 수수료율 기본값</h2>
+<p>위 "설정 숫자 기본값은 정하지 않는다"를 바꾼다. <code>commerce.commission-rate</code>의 기본값은 0.1(전 판매자 공통 10%)이다. 값이 없어 로컬 새 주문서 생성이 500으로 실패했다(#383). 판매자별·상품별 요율은 만들지 않는다. 운영 값은 <code>COMMERCE_COMMISSION_RATE</code>로 바꾼다. 결제 담당 결정.</p><p class="muted fingerprint">MD SHA-256: <code>c59c02b7dca34c494c8424c0ea5aee24cabc357fe381d48dd58cafcf178f3198</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
