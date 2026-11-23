@@ -354,7 +354,8 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                 .isEqualTo(state.processingExpiresAt());
         assertThatThrownBy(() -> relay.acceptApproval(MEMBER_A, number, "other", request(number)))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
-        assertThat(deliveries.relay(id(number), "APPROVAL").requestId()).isEqualTo(accepted.requestId());
+        assertThat(deliveries.relay(id(number), "APPROVAL").requestId())
+                .isEqualTo(accepted.requestId());
     }
 
     @Test

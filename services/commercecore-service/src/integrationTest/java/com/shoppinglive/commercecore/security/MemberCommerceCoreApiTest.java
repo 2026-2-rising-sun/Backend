@@ -255,7 +255,9 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                         .getContentAsString();
         String number = mapper.readTree(result).get("orderNumber").asText();
         // 옛 구 API 결제 시작 경로는 제거되어 주문 소유와 무관하게 404다.
-        mvc.perform(post("/v1/orders/{number}/payments", number).header("Authorization", bearer(MEMBER_A)))
+        mvc.perform(
+                        post("/v1/orders/{number}/payments", number)
+                                .header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/v1/orders").header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isOk())

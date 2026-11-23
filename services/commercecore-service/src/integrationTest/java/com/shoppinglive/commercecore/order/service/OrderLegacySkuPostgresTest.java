@@ -162,18 +162,24 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
                                         "/v1/payment-groups/" + number + "/payments")
                                 .header("Authorization", bearer(MEMBER_A))
                                 .header("X-Idempotency-Key", "pay-legacy"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isNotFound());
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isNotFound());
         mvc.perform(
                         org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
                                         "/v1/payment-groups/" + number + "/refunds")
                                 .header("Authorization", bearer(MEMBER_A))
                                 .header("Idempotency-Key", "refund-legacy"))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isConflict());
         mvc.perform(
                         org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
                                         "/v1/payment-groups/" + number + "/refundable-targets")
                                 .header("Authorization", bearer(MEMBER_A)))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isOk())
                 .andExpect(
                         org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
                                         "$.data[0].unavailableReason")
@@ -182,7 +188,9 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
                         org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
                                         "/v1/payment-groups/" + number)
                                 .header("Authorization", bearer(MEMBER_A)))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isOk());
         jdbc.update(
                 "UPDATE payment_group SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
                 order.getPaymentGroup().getId());

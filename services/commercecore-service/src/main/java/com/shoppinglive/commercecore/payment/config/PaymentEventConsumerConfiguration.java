@@ -66,7 +66,8 @@ public class PaymentEventConsumerConfiguration {
 
     @Bean
     PaymentResultConsumer paymentResultConsumer(
-            ObjectMapper mapper, com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
+            ObjectMapper mapper,
+            com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
         return new PaymentResultConsumer(mapper, relay);
     }
 
@@ -75,7 +76,8 @@ public class PaymentEventConsumerConfiguration {
         private final com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay;
 
         PaymentResultConsumer(
-                ObjectMapper mapper, com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
+                ObjectMapper mapper,
+                com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
             this.mapper = mapper;
             this.relay = relay;
         }

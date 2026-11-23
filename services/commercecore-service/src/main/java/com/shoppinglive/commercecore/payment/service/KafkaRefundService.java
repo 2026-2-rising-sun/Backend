@@ -28,7 +28,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 신규 주문서의 공통 Kafka 환불. 외부 금전 실행과 로컬 자원 반영을 분리한다. */
 @Service
 public class KafkaRefundService {
-    public record RequestResult(com.shoppinglive.commercecore.payment.dto.RefundView refund, boolean created) {}
+    public record RequestResult(
+            com.shoppinglive.commercecore.payment.dto.RefundView refund, boolean created) {}
 
     private final JdbcTemplate jdbc;
     private final PaymentGroupRepository groups;
@@ -81,8 +82,7 @@ public class KafkaRefundService {
         return owned(member, number).isOrderSheet();
     }
 
-    public RequestResult request(
-            String member, String number, String key, RefundSelection input) {
+    public RequestResult request(String member, String number, String key, RefundSelection input) {
         if (key == null || key.isBlank() || key.length() > 64)
             throw invalid("Idempotency-Key는 1~64자여야 합니다.");
         var found = owned(member, number);
