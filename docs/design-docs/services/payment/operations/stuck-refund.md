@@ -30,10 +30,10 @@ SELECT refund_request_id, purpose, status, amount, attempt_count, created_at, ch
 | 확인 | 재개해도 되는 경우 | 멈추고 보고하는 경우 |
 |---|---|---|
 | `created_at` | 14일 이내. 토스 멱등 키 유효기간(15일) 안이다 | 14일을 넘김. 같은 키로 다시 보낼 수 없다. 제품 결정이 필요하다 |
-| 결제 상태(`payment.status`) | `APPROVED`·`PARTIALLY_REFUNDED` | `CANCELED`·`REFUNDED` 등. 돈이 이미 돌아갔을 수 있다 |
-| 토스 결제 상세의 취소 내역 | 이 환불의 취소(사유 `고객 환불 {refund_request_id}`)가 있거나 없음 | 같은 금액의 다른 사유 취소만 있음. 누가 취소했는지 먼저 확인한다 |
+| 결제 상태(`payment.status`) | 고객 환불은 `APPROVED`·`PARTIALLY_REFUNDED`, 시스템 보상은 `APPROVED`. 보상은 환불액이 0이 아니면 재개해도 `NOT_REFUNDABLE` 또는 보류로 끝난다 | `CANCELED`·`REFUNDED` 등. 돈이 이미 돌아갔을 수 있다 |
+| 토스 결제 상세의 취소 내역 | 이 건의 취소가 있거나 없음. 고객 환불은 사유 `고객 환불 {refund_request_id}`, 금액은 환불 금액이다. 시스템 보상은 사유 `승인 응답 불일치`, 금액은 결제 전액이다 | 같은 금액이지만 다른 사유의 취소만 있음. 누가 취소했는지 먼저 확인한다 |
 
-재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키 `refund_request_id`와 같은 금액으로 다시 취소를 보낸다. 그래서 재개는 중복 환불을 만들지 않는다.
+재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키로 다시 취소를 보낸다. 키는 고객 환불이 `refund_request_id`, 시스템 보상이 `cancel-{pg_order_id}`다. 그래서 재개는 중복 환불을 만들지 않는다.
 
 ## 3. 재개
 

@@ -46,17 +46,17 @@
 </tr>
 <tr>
 <td>결제 상태(<code>payment.status</code>)</td>
-<td><code>APPROVED</code>·<code>PARTIALLY_REFUNDED</code></td>
+<td>고객 환불은 <code>APPROVED</code>·<code>PARTIALLY_REFUNDED</code>, 시스템 보상은 <code>APPROVED</code>. 보상은 환불액이 0이 아니면 재개해도 <code>NOT_REFUNDABLE</code> 또는 보류로 끝난다</td>
 <td><code>CANCELED</code>·<code>REFUNDED</code> 등. 돈이 이미 돌아갔을 수 있다</td>
 </tr>
 <tr>
 <td>토스 결제 상세의 취소 내역</td>
-<td>이 환불의 취소(사유 <code>고객 환불 {refund_request_id}</code>)가 있거나 없음</td>
-<td>같은 금액의 다른 사유 취소만 있음. 누가 취소했는지 먼저 확인한다</td>
+<td>이 건의 취소가 있거나 없음. 고객 환불은 사유 <code>고객 환불 {refund_request_id}</code>, 금액은 환불 금액이다. 시스템 보상은 사유 <code>승인 응답 불일치</code>, 금액은 결제 전액이다</td>
+<td>같은 금액이지만 다른 사유의 취소만 있음. 누가 취소했는지 먼저 확인한다</td>
 </tr>
 </tbody>
 </table></div>
-<p>재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키 <code>refund_request_id</code>와 같은 금액으로 다시 취소를 보낸다. 그래서 재개는 중복 환불을 만들지 않는다.</p>
+<p>재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키로 다시 취소를 보낸다. 키는 고객 환불이 <code>refund_request_id</code>, 시스템 보상이 <code>cancel-{pg_order_id}</code>다. 그래서 재개는 중복 환불을 만들지 않는다.</p>
 <h2 id="3-재개">3. 재개</h2>
 <p>재개할 행이 1번 조회의 결과에 있는 것만 실행한다. 목록 전체를 재개하려면 아래 SQL을 그대로 쓴다. 특정 건만 재개하려면 <code>WHERE</code> 끝에 <code>AND refund_request_id IN ('...')</code>를 더한다. 실행 전에 영향 행 수가 1번 조회의 건수와 같은지 본다.</p>
 <pre><code class="language-sql">UPDATE refund
@@ -80,6 +80,6 @@
 <li>지표 <code>shoppinglive.payment.unresolved.count{kind=refund_unknown}</code>가 내려갔는지 본다.</li>
 <li>확정된 건은 <code>payment.refund.results.v1</code>에 결과가 나갔는지 본다(orderRef 키).</li>
 </ol>
-<p>재개를 되돌리는 SQL은 없다. 실행기가 같은 멱등 키로 다시 보낸 취소만 토스에 남는다. 취소가 잘못됐다면 토스에서 직접 되돌리고 원장 정정을 요청한다.</p><p class="muted fingerprint">MD SHA-256: <code>f4a78aa0834b7a823b6b92b82830ca87a3be11685e04e9f81ce44d6dca3baa8c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>재개를 되돌리는 SQL은 없다. 실행기가 같은 멱등 키로 다시 보낸 취소만 토스에 남는다. 취소가 잘못됐다면 토스에서 직접 되돌리고 원장 정정을 요청한다.</p><p class="muted fingerprint">MD SHA-256: <code>80d810bcc684011123a9fc6562185f0ce8d71c90cae7d21f692e120139912cfa</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

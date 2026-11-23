@@ -2,6 +2,7 @@ package com.shoppinglive.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
@@ -12,7 +13,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.shoppinglive.payment.client.toss.TossPayment;
 import com.shoppinglive.payment.client.toss.TossPaymentsClient;
 import com.shoppinglive.payment.client.toss.TossResult;
+import com.shoppinglive.payment.payment.service.PaymentOutcomeService;
 import com.shoppinglive.payment.refund.entity.Refund;
+import com.shoppinglive.payment.refund.service.compensation.CompensationRetryJob;
 import com.shoppinglive.payment.refund.service.user.UserRefundExecutor;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -47,6 +50,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @EnabledIfEnvironmentVariable(named = "PAYMENT_TEST_POSTGRES_URL", matches = ".+")
 class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
     static final String SCHEMA = "payment_runbook_" + UUID.randomUUID().toString().replace("-", "");
+    static final String COMPENSATION_REASON = PaymentOutcomeService.COMPENSATION_REASON;
     static final String RUNBOOK = "docs/design-docs/services/payment/operations/stuck-refund.md";
 
     @DynamicPropertySource
@@ -66,6 +70,7 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Autowired UserRefundExecutor executor;
+    @Autowired CompensationRetryJob retryJob;
     @MockitoBean TossPaymentsClient toss;
 
     @BeforeEach
@@ -151,6 +156,132 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
                     .cancel(pk("RB-RESTART"), reason(refund), refund.getRefundRequestId(), 4000L);
         }
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-02] 재개된 시스템 보상은 토스 조회부터 하고 취소가 없을 때만 같은 키로 다시 보내며, 재개 즉시 멈추지 않는다")
+    void resumedCompensationQueriesFirstThenResendsSameKey() throws Exception {
+        String orderRef = "RB-COMP-" + UUID.randomUUID().toString().substring(0, 8);
+        Refund refund = stuckCompensation(orderRef);
+        String key = "cancel-PO-" + orderRef;
+        jdbc.update(sql("resume-stuck-refund"));
+
+        Map<String, Object> row = refund(refund.getRefundRequestId());
+        assertThat(row)
+                .containsEntry("status", "UNKNOWN")
+                .containsEntry("amount", AMOUNT)
+                .containsEntry("refunded_amount", 0L)
+                .containsEntry("result_version", 0);
+        assertThat(row.get("next_attempt_at")).isNotNull();
+
+        // 재개 직후 첫 실행: 조회가 실패하면 멈추지 않고 다음 실행을 예약한다. 취소는 다시 보내지 않는다
+        when(toss.getPayment(pk(orderRef))).thenReturn(new TossResult.Unknown("시간 초과"));
+        makeDue(refund);
+        retryJob.run();
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNotNull();
+        verify(toss, times(1)).cancel(any(), any(), any());
+
+        // 다음 실행: 조회에 이 보상의 취소가 없으니 같은 키로 다시 보낸다
+        when(toss.getPayment(pk(orderRef)))
+                .thenReturn(new TossResult.Success(paymentWith(orderRef, "DONE", false)));
+        when(toss.cancel(eq(pk(orderRef)), eq(COMPENSATION_REASON), eq(key)))
+                .thenReturn(compensationCanceled(orderRef));
+        makeDue(refund);
+        retryJob.run();
+
+        InOrder order = inOrder(toss);
+        order.verify(toss, atLeastOnce()).getPayment(pk(orderRef));
+        order.verify(toss).cancel(pk(orderRef), COMPENSATION_REASON, key);
+        verify(toss, times(2)).cancel(any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    @Test
+    @DisplayName("[REF-LATE-02] 재개된 시스템 보상은 이미 이 보상의 취소가 토스에 있으면 재요청 없이 결과를 반영한다")
+    void resumedCompensationSettlesWithoutResendWhenCancelExists() throws Exception {
+        String orderRef = "RB-COMPOK-" + UUID.randomUUID().toString().substring(0, 8);
+        Refund refund = stuckCompensation(orderRef);
+        jdbc.update(sql("resume-stuck-refund"));
+
+        when(toss.getPayment(pk(orderRef)))
+                .thenReturn(new TossResult.Success(compensationCanceledPayment(orderRef)));
+        makeDue(refund);
+        retryJob.run();
+
+        verify(toss, times(1)).cancel(any(), any(), any());
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+    }
+
+    /**
+     * 승인된 결제에 시스템 보상을 접수하고, 첫 취소가 불명으로 끝난 뒤 마감이 지나 멈춘 상태(UNKNOWN, next_attempt_at NULL)로 만든다. 취소
+     * 사유는 보상 사유, 키는 cancel-{pg_order_id}다.
+     */
+    private Refund stuckCompensation(String orderRef) throws Exception {
+        long paymentId = newPayment(orderRef);
+        jdbc.update(
+                "UPDATE payment SET status = 'APPROVED', partial_cancelable = true, pg_payment_key = ?,"
+                        + " pg_order_id = ? WHERE id = ?",
+                pk(orderRef),
+                "PO-" + orderRef,
+                paymentId);
+        jdbc.update(
+                "INSERT INTO pg_call (payment_id, kind, pg_order_id, outcome, requested_at, responded_at)"
+                        + " VALUES (?, 'CONFIRM', ?, 'SUCCESS', now(), now())",
+                paymentId,
+                "PO-" + orderRef);
+        ObjectNode request = request(orderRef, paymentId, "SYSTEM_COMPENSATION");
+        request.put("amount", AMOUNT);
+        ObjectNode item = (ObjectNode) request.get("items").get(0);
+        item.put("amount", AMOUNT);
+        ((ObjectNode) item.get("orderItems").get(0)).put("amount", AMOUNT);
+        Refund refund = intake.receive(copy(request)).orElseThrow();
+
+        when(toss.getPayment(pk(orderRef)))
+                .thenReturn(new TossResult.Success(paymentWith(orderRef, "DONE", false)));
+        when(toss.cancel(eq(pk(orderRef)), eq(COMPENSATION_REASON), eq("cancel-PO-" + orderRef)))
+                .thenReturn(new TossResult.Unknown("시간 초과"));
+        makeDue(refund);
+        retryJob.run();
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+
+        // 조회 마감이 지난 뒤 재처리: 취소가 없으니 재요청 없이 멈춘다
+        jdbc.update(
+                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+        makeDue(refund);
+        retryJob.run();
+        assertThat(refund(refund.getRefundRequestId()).get("next_attempt_at")).isNull();
+        assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+        verify(toss, times(1)).cancel(any(), any(), any());
+        return refund;
+    }
+
+    private void makeDue(Refund refund) {
+        jdbc.update(
+                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                refund.getId());
+    }
+
+    private static TossPayment paymentWith(String orderRef, String status, boolean withCancel) {
+        return new TossPayment(pk(orderRef), orderRef, status, AMOUNT, null, true, List.of());
+    }
+
+    private static TossPayment compensationCanceledPayment(String orderRef) {
+        return new TossPayment(
+                pk(orderRef),
+                orderRef,
+                "CANCELED",
+                AMOUNT,
+                null,
+                true,
+                List.of(
+                        new TossPayment.Cancel(
+                                "tx-" + orderRef, COMPENSATION_REASON, AMOUNT, "DONE")));
+    }
+
+    private static TossResult compensationCanceled(String orderRef) {
+        return new TossResult.Success(compensationCanceledPayment(orderRef));
     }
 
     /** 운영 문서의 SQL 블록. 마커 뒤 첫 sql 블록을 그대로 읽는다. */
