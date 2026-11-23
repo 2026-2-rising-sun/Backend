@@ -24,6 +24,9 @@ import com.shoppinglive.payment.refund.service.user.UserRefundExecutor;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -143,7 +146,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
 
     private void makeDue(Refund refund) {
         jdbc.update(
-                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
     }
 
@@ -569,7 +573,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
                 .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
         executor.execute(refund);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
         makeDue(refund);
 
@@ -592,7 +597,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
         executor.execute(refund);
         jdbc.update("UPDATE payment SET refunded_amount = ? WHERE id = ?", AMOUNT - 1, paymentId);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
         makeDue(refund);
 
@@ -792,7 +798,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
         assertThat(secondsUntilNextAttempt(refund)).isBetween(120L, 181L);
 
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() + INTERVAL '23' HOUR WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofHours(23))),
                 refund.getId());
         makeDue(refund);
         executor.retryDue();
@@ -810,16 +817,18 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
         when(toss.getPayment(key(orderRef)))
                 .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
         executor.execute(refund);
+        Instant now = Instant.now();
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT check_deadline_at BETWEEN now() + INTERVAL '23' HOUR"
-                                        + " + INTERVAL '59' MINUTE AND now() + INTERVAL '24' HOUR"
-                                        + " FROM refund WHERE id = ?",
+                                "SELECT check_deadline_at BETWEEN ? AND ? FROM refund WHERE id = ?",
                                 Boolean.class,
+                                Timestamp.from(now.plus(Duration.ofMinutes(23 * 60 + 59))),
+                                Timestamp.from(now.plus(Duration.ofHours(24))),
                                 refund.getId()))
                 .isTrue();
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() + INTERVAL '1' HOUR WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofHours(1))),
                 refund.getId());
         Object deadline = refund(refund.getRefundRequestId()).get("check_deadline_at");
         makeDue(refund);
@@ -999,7 +1008,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
                 .thenReturn(new TossResult.Success(tossPayment(refund, "DONE", false)));
         executor.execute(refund);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() + INTERVAL '2' MINUTE WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofMinutes(2))),
                 refund.getId());
         makeDue(refund);
 
@@ -1112,7 +1122,8 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
             awaitLockWaiters(1);
             jdbc.update(
                     "UPDATE refund SET status = 'UNKNOWN', attempt_count = attempt_count + 1,"
-                            + " check_deadline_at = now() + INTERVAL '1' HOUR WHERE id = ?",
+                            + " check_deadline_at = ? WHERE id = ?",
+                    Timestamp.from(Instant.now().plus(Duration.ofHours(1))),
                     refund.getId());
             try (PreparedStatement full =
                     lock.prepareStatement(
@@ -1195,16 +1206,18 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     private long secondsUntilNextAttempt(Refund refund) {
-        return jdbc.queryForObject(
-                "SELECT CAST(EXTRACT(EPOCH FROM next_attempt_at - now()) AS BIGINT)"
-                        + " FROM refund WHERE id = ?",
-                Long.class,
-                refund.getId());
+        Timestamp at =
+                jdbc.queryForObject(
+                        "SELECT next_attempt_at FROM refund WHERE id = ?",
+                        Timestamp.class,
+                        refund.getId());
+        return Duration.between(Instant.now(), at.toInstant()).getSeconds();
     }
 
     private void expireDeadline(Refund refund) {
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
     }
 

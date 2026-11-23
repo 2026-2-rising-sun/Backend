@@ -29,7 +29,9 @@ import com.shoppinglive.payment.refund.entity.Refund;
 import com.shoppinglive.payment.refund.repository.RefundRepository;
 import com.shoppinglive.payment.refund.service.RefundIntakeService;
 import com.shoppinglive.payment.refund.service.compensation.CompensationRetryJob;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -221,7 +223,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         assertThat(secondsToNextAttempt(refund)).isPositive();
 
         jdbc.update(
-                "UPDATE pg_call SET requested_at = now() - INTERVAL '1' HOUR WHERE payment_id = ?",
+                "UPDATE pg_call SET requested_at = ? WHERE payment_id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofHours(1))),
                 paymentId(c.orderRef()));
         makeDue(refund);
         retryJob.run();
@@ -235,7 +238,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     void unknownQueryNeverBecomesNoCharge() throws Exception {
         ApproveCommand c = approving();
         jdbc.update(
-                "UPDATE pg_call SET requested_at = now() - INTERVAL '1' HOUR WHERE payment_id = ?",
+                "UPDATE pg_call SET requested_at = ? WHERE payment_id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofHours(1))),
                 paymentId(c.orderRef()));
         when(toss.getPayment(c.paymentKey()))
                 .thenReturn(new TossResult.Unknown("HTTP 500", 500))
@@ -542,10 +546,11 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         ApproveCommand c = approved();
         jdbc.update(
                 "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome, requested_at)"
-                        + " VALUES (?, 'CANCEL', ?, ?, 'UNKNOWN', now())",
+                        + " VALUES (?, 'CANCEL', ?, ?, 'UNKNOWN', ?)",
                 paymentId(c.orderRef()),
                 c.pgOrderId(),
-                "cancel-" + c.pgOrderId());
+                "cancel-" + c.pgOrderId(),
+                Timestamp.from(Instant.now()));
         jdbc.update(
                 "UPDATE payment SET status = 'REFUNDED', refunded_amount = ? WHERE order_ref = ?",
                 AMOUNT,
@@ -750,7 +755,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         Refund user = receive(c);
         jdbc.update(
                 "UPDATE refund SET purpose = 'USER_REFUND', status = 'UNKNOWN', next_attempt_at = NULL,"
-                        + " check_deadline_at = now() + INTERVAL '1' DAY WHERE id = ?",
+                        + " check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofDays(1))),
                 user.getId());
 
         Refund refund = receive(c);
@@ -922,7 +928,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         Refund user = receive(c);
         jdbc.update(
                 "UPDATE refund SET purpose = 'USER_REFUND', status = 'UNKNOWN', next_attempt_at = NULL,"
-                        + " check_deadline_at = now() + INTERVAL '1' DAY WHERE id = ?",
+                        + " check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofDays(1))),
                 user.getId());
 
         Refund refund = receive(c);
@@ -965,7 +972,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
                         jdbc.update(
                                 "UPDATE refund SET attempt_count = attempt_count + 1, status = 'UNKNOWN',"
                                         + " next_attempt_at = NULL,"
-                                        + " check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                                        + " check_deadline_at = ? WHERE id = ?",
+                                Timestamp.from(Instant.now().minusSeconds(1)),
                                 refund.getId()));
 
         verify(toss, never()).cancel(anyString(), anyString(), anyString());
@@ -1099,7 +1107,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
         Refund refund = receive(c);
         intake.execute(refund);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() + INTERVAL '5' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plusSeconds(5)),
                 refund.getId());
 
         makeDue(refund);
@@ -1238,7 +1247,8 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     private void takeOver(Refund refund) {
         jdbc.update(
                 "UPDATE refund SET attempt_count = attempt_count + 1, status = 'UNKNOWN',"
-                        + " check_deadline_at = now() + INTERVAL '1' HOUR WHERE id = ?",
+                        + " check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().plus(Duration.ofHours(1))),
                 refund.getId());
     }
 
@@ -1274,12 +1284,13 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     private void insertCancelCall(ApproveCommand c, String outcome, Integer httpStatus) {
         jdbc.update(
                 "INSERT INTO pg_call (payment_id, kind, pg_order_id, idempotency_key, outcome,"
-                        + " http_status, requested_at) VALUES (?, 'CANCEL', ?, ?, ?, ?, now())",
+                        + " http_status, requested_at) VALUES (?, 'CANCEL', ?, ?, ?, ?, ?)",
                 paymentId(c.orderRef()),
                 c.pgOrderId(),
                 "cancel-" + c.pgOrderId(),
                 outcome,
-                httpStatus);
+                httpStatus,
+                Timestamp.from(Instant.now()));
     }
 
     private String refundStatus(Refund refund) {
@@ -1288,15 +1299,20 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
     }
 
     private Double secondsToDeadline(Refund refund) {
-        return jdbc.queryForObject(
-                "SELECT EXTRACT(EPOCH FROM check_deadline_at - now()) FROM refund WHERE id = ?",
-                Double.class,
-                refund.getId());
+        Timestamp at =
+                jdbc.queryForObject(
+                        "SELECT check_deadline_at FROM refund WHERE id = ?",
+                        Timestamp.class,
+                        refund.getId());
+        return at == null
+                ? null
+                : Duration.between(Instant.now(), at.toInstant()).toMillis() / 1000.0;
     }
 
     private void expireDeadline(Refund refund) {
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
     }
 
@@ -1451,14 +1467,19 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
     private void makeDue(Refund refund) {
         jdbc.update(
-                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
     }
 
     private Double secondsToNextAttempt(Refund refund) {
-        return jdbc.queryForObject(
-                "SELECT EXTRACT(EPOCH FROM next_attempt_at - now()) FROM refund WHERE id = ?",
-                Double.class,
-                refund.getId());
+        Timestamp at =
+                jdbc.queryForObject(
+                        "SELECT next_attempt_at FROM refund WHERE id = ?",
+                        Timestamp.class,
+                        refund.getId());
+        return at == null
+                ? null
+                : Duration.between(Instant.now(), at.toInstant()).toMillis() / 1000.0;
     }
 }
