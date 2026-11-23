@@ -39,7 +39,7 @@ class RefundRequestedEventContractTest {
                 path.toFile(),
                 Map.of(
                         "contract",
-                        "commerce-refund-requests-legacy.yaml",
+                        "commerce-refund-requests.yaml",
                         "message",
                         "RefundRequested",
                         "payload",

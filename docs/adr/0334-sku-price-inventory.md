@@ -51,7 +51,7 @@ Inventory 채팅에서 사용자 직접 답변으로 확정된 내용을 보존�
 - 재고 10개에서 주문 2개분을 예약하면 `available=8`, `reserved=2`다. 결제 성공 시 `8/0`, 결제 전 취소 또는 확정 실패로 예약을 해제하면 `10/0`이다.
 - 결제 전 취소·만료는 예약 수량을 판매 가능 수량으로 돌린다.
 - 결제 완료 주문은 **환불 성공해야 취소가 확정**된다. 이 경우 취소 확정 시 복구와 환불 성공 후 복구는 같은 시점이며, 두 정책으로 다시 나눠 묻지 않는다. 이미 결제 때 소진된 수량을 판매 가능 수량에 한 번 복구하므로 예약 해제와 구분한다.
-- 현행 [RefundOutcomeService](../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/RefundOutcomeService.java)는 환불 성공 시 주문을 `PAID → REFUNDED`로 전이하고 판매 가능 수량을 복구한다. 사용자의 업무상 취소 정의를 주문 enum 통합 승인으로 확대하지 않는다.
+- #390에서 삭제된 옛 `RefundOutcomeService`는 환불 성공 시 주문을 `PAID → REFUNDED`로 전이하고 판매 가능 수량을 복구한다. 사용자의 업무상 취소 정의를 주문 enum 통합 승인으로 확대하지 않는다.
 
 ### 별도 예약 테이블 없이 Order에서 중복 적용을 막는다
 

@@ -43,11 +43,8 @@ abstract class OrderSheetPostgresSupport extends CommerceCoreSecurityTestSupport
     @Autowired OrderSheetService sheets;
     @Autowired OrderSheetLifecycleService lifecycle;
     @Autowired PaymentGroupService legacyGroups;
-    @Autowired PaymentGroupRepository groups;
     @Autowired PaymentDeliveryStore deliveries;
-    @Autowired PaymentDispatcher dispatcher;
-    @Autowired PaymentClient client;
-    @Autowired PaymentResultHandler handler;
+    @Autowired PaymentGroupRepository groups;
     @Autowired MockMvc mvc;
 
     @BeforeEach

@@ -25,69 +25,6 @@ public class PaymentDeliveryStore {
         this.time = time;
     }
 
-    @Transactional(propagation = Propagation.MANDATORY)
-    public PaymentExecution payment(
-            Long orderId,
-            Long groupId,
-            String number,
-            long amount,
-            String key,
-            PaymentScenario scenario) {
-        String requestId = UUID.randomUUID().toString();
-        Instant now = time.now();
-        long id =
-                insert(
-                        requestId, "PAYMENT", orderId, groupId, number, amount, key, null, null,
-                        now);
-        var command = new PaymentCommand(requestId, id, orderId, groupId, number, amount, scenario);
-        jdbc.update(
-                "UPDATE payment_delivery_request SET payment_id=?,command=? WHERE id=?",
-                id,
-                json(command),
-                id);
-        return new PaymentExecution(
-                requestId,
-                id,
-                orderId,
-                groupId,
-                number,
-                amount,
-                scenario == null ? PaymentScenario.INSTANT_SUCCESS : scenario,
-                PaymentStatus.PROCESSING,
-                now,
-                null,
-                now);
-    }
-
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void refund(
-            long refundId, Long paymentId, Long orderId, Long groupId, String number, long amount) {
-        if (!jdbc.queryForList(
-                        "SELECT id FROM payment_delivery_request WHERE core_refund_request_id=?",
-                        Long.class,
-                        refundId)
-                .isEmpty()) return;
-        String requestId = UUID.randomUUID().toString();
-        long id =
-                insert(
-                        requestId,
-                        "REFUND",
-                        orderId,
-                        groupId,
-                        number,
-                        amount,
-                        "refund-" + refundId,
-                        paymentId,
-                        refundId,
-                        time.now());
-        jdbc.update(
-                "UPDATE payment_delivery_request SET command=? WHERE id=?",
-                json(
-                        new RefundCommand(
-                                requestId, refundId, paymentId, orderId, groupId, number, amount)),
-                id);
-    }
-
     private long insert(
             String requestId,
             String kind,
@@ -196,38 +133,6 @@ public class PaymentDeliveryStore {
                                 r.getString(6)));
     }
 
-    public PaymentExecution payment(long id) {
-        var rows =
-                jdbc.queryForList(
-                        "SELECT * FROM payment_delivery_request WHERE kind='PAYMENT' AND payment_id=?",
-                        id);
-        if (rows.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND, "결제를 찾을 수 없습니다.");
-        var row = rows.getFirst();
-        if (row.get("result") != null)
-            return read((String) row.get("result"), PaymentExecution.class);
-        var c = read((String) row.get("command"), PaymentCommand.class);
-        Instant at = instant(row.get("requested_at"));
-        return new PaymentExecution(
-                c.requestId(),
-                c.paymentId(),
-                c.orderId(),
-                c.paymentGroupId(),
-                c.referenceNumber(),
-                c.amount(),
-                c.scenario() == null ? PaymentScenario.INSTANT_SUCCESS : c.scenario(),
-                PaymentStatus.PROCESSING,
-                at,
-                null,
-                at);
-    }
-
-    public String key(long id) {
-        return jdbc.queryForObject(
-                "SELECT request_key FROM payment_delivery_request WHERE kind='PAYMENT' AND payment_id=?",
-                String.class,
-                id);
-    }
-
     public Delivery get(String requestId) {
         var rows =
                 jdbc.query(
@@ -243,38 +148,6 @@ public class PaymentDeliveryStore {
                         requestId);
         if (rows.isEmpty()) throw new BusinessException(ErrorCode.CONFLICT, "저장된 전달 요청이 없습니다.");
         return rows.getFirst();
-    }
-
-    public Delivery byPayment(long id) {
-        return get(
-                jdbc.queryForObject(
-                        "SELECT request_id FROM payment_delivery_request WHERE kind='PAYMENT' AND payment_id=?",
-                        String.class,
-                        id));
-    }
-
-    public Delivery byRefund(long id) {
-        return get(
-                jdbc.queryForObject(
-                        "SELECT request_id FROM payment_delivery_request WHERE core_refund_request_id=?",
-                        String.class,
-                        id));
-    }
-
-    public List<Delivery> due(boolean includeRefunds) {
-        String kind = includeRefunds ? " AND kind IN ('PAYMENT','REFUND')" : " AND kind='PAYMENT'";
-        return jdbc.query(
-                "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP"
-                        + kind
-                        + " ORDER BY id LIMIT 100",
-                (r, n) ->
-                        new Delivery(
-                                r.getLong(1),
-                                r.getString(2),
-                                r.getString(3),
-                                r.getString(4),
-                                r.getString(5),
-                                r.getString(6)));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

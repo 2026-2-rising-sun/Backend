@@ -219,6 +219,6 @@ class CommerceCoreStateTransitionTest
         mvc.perform(
                         post("/v1/orders/{number}/payments", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isNotFound());
     }
 }

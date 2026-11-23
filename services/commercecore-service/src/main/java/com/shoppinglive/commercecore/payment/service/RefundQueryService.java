@@ -6,13 +6,11 @@ import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.payment.dto.*;
-import com.shoppinglive.commercecore.payment.entity.PaymentStatus;
 import com.shoppinglive.commercecore.payment.entity.RefundStatus;
 import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository;
 import com.shoppinglive.commercecore.payment.repository.RefundQueryRepository.RequestRow;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
-import java.time.Clock;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,30 +21,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class RefundQueryService {
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
-    private final PaymentClient attempts;
     private final RefundQueryRepository repository;
-    private final Clock clock;
 
     @Autowired
     public RefundQueryService(
             PaymentGroupRepository groups,
             OrderJpaRepository orders,
-            PaymentClient attempts,
             RefundQueryRepository repository) {
-        this(groups, orders, attempts, repository, Clock.systemUTC());
-    }
-
-    RefundQueryService(
-            PaymentGroupRepository groups,
-            OrderJpaRepository orders,
-            PaymentClient attempts,
-            RefundQueryRepository repository,
-            Clock clock) {
         this.groups = groups;
         this.orders = orders;
-        this.attempts = attempts;
         this.repository = repository;
-        this.clock = clock;
     }
 
     public List<RefundableTarget> refundableTargets(String memberId, String groupNumber) {
@@ -57,69 +41,35 @@ public class RefundQueryService {
                                         new BusinessException(
                                                 ErrorCode.NOT_FOUND, "결제 묶음을 찾을 수 없습니다."));
         if (group.isOrderSheet()) return repository.sheetTargets(group);
-        List<Order> groupOrders = orders.findByPaymentGroupIdOrderByIdAsc(group.getId());
-        PaymentExecution attempt =
-                group.getPaymentId() == null ? null : attempts.get(group.getPaymentId());
-        String groupReason = null;
-        if (group.getStatus() != OrderStatus.PAID
-                || groupOrders.stream()
-                        .anyMatch(
-                                order ->
-                                        order.getStatus() != OrderStatus.PAID
-                                                && order.getStatus() != OrderStatus.REFUNDED)) {
-            groupReason = "PAYMENT_NOT_COMPLETED";
-        } else if (attempt == null
-                || attempt.getStatus() != PaymentStatus.SUCCESS
-                || attempt.getResolvedAt() == null) {
-            groupReason = "PAYMENT_NOT_COMPLETED";
-        } else if (!RefundWindowPolicy.isOpen(clock.instant(), attempt.getResolvedAt())) {
-            groupReason = "REFUND_WINDOW_EXPIRED";
-        }
+        // 이전 정책 주문은 Payment 결과를 조회하지 않고 환불 불가 사유만 돌려준다.
         Set<Long> requestedIds = new HashSet<>(repository.requestedOrderIds(group.getId()));
-        Map<Long, Long> cartCounts =
-                groupOrders.stream()
-                        .filter(order -> order.getSourceCartItemId() != null)
-                        .collect(
-                                Collectors.groupingBy(
-                                        Order::getSourceCartItemId, Collectors.counting()));
-        String reasonForGroup = groupReason;
-        return groupOrders.stream()
+        return orders.findByPaymentGroupIdOrderByIdAsc(group.getId()).stream()
                 .map(
-                        order -> {
-                            String reason = reasonForGroup;
-                            if (reason == null
-                                    && (order.getStatus() == OrderStatus.REFUNDED
-                                            || requestedIds.contains(order.getId())))
-                                reason = "ALREADY_REQUESTED";
-                            if (reason == null && order.getSourceCartItemId() == null)
-                                reason = "CART_ITEM_UNAVAILABLE";
-                            if (reason == null && cartCounts.get(order.getSourceCartItemId()) != 1L)
-                                reason = "CART_ITEM_AMBIGUOUS";
-                            return new RefundableTarget(
-                                    order.getId(),
-                                    order.getSourceCartItemId(),
-                                    order.getProductNameSnapshot(),
-                                    order.getQuantity(),
-                                    order.getPayableAmount(),
-                                    reason == null,
-                                    reason,
-                                    order.getUnitPrice(),
-                                    order.getStatus() == OrderStatus.REFUNDED
-                                            ? order.getQuantity()
-                                            : 0,
-                                    order.getStatus() != OrderStatus.REFUNDED
-                                                    && requestedIds.contains(order.getId())
-                                            ? order.getQuantity()
-                                            : 0,
-                                    order.getStatus() == OrderStatus.REFUNDED
-                                                    || requestedIds.contains(order.getId())
-                                            ? 0
-                                            : order.getQuantity(),
-                                    order.getStatus() == OrderStatus.REFUNDED
-                                                    || requestedIds.contains(order.getId())
-                                            ? 0
-                                            : order.getPayableAmount());
-                        })
+                        order ->
+                                new RefundableTarget(
+                                        order.getId(),
+                                        order.getSourceCartItemId(),
+                                        order.getProductNameSnapshot(),
+                                        order.getQuantity(),
+                                        order.getPayableAmount(),
+                                        false,
+                                        "LEGACY_REFUND_UNAVAILABLE",
+                                        order.getUnitPrice(),
+                                        order.getStatus() == OrderStatus.REFUNDED
+                                                ? order.getQuantity()
+                                                : 0,
+                                        order.getStatus() != OrderStatus.REFUNDED
+                                                        && requestedIds.contains(order.getId())
+                                                ? order.getQuantity()
+                                                : 0,
+                                        order.getStatus() == OrderStatus.REFUNDED
+                                                        || requestedIds.contains(order.getId())
+                                                ? 0
+                                                : order.getQuantity(),
+                                        order.getStatus() == OrderStatus.REFUNDED
+                                                        || requestedIds.contains(order.getId())
+                                                ? 0
+                                                : order.getPayableAmount()))
                 .toList();
     }
 

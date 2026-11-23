@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.shoppinglive.commercecore.payment.dto.DevPaymentScenarioRegistry;
 import com.shoppinglive.commercecore.support.CommerceCoreSecurityTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,15 +22,15 @@ class DevScenarioIsolationTest extends CommerceCoreSecurityTestSupport {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
 
-    @DisplayName("dev 환경은 플래그와 판매자 토큰이 있어도 결제 시나리오를 활성화할 수 없다")
+    @DisplayName("옛 Payment 시나리오 API는 플래그와 판매자 토큰이 있어도 노출되지 않는다")
     @Test
     void externalDevCannotEnableScenarioEvenWithFlagAndSellerToken() throws Exception {
-        assertThat(context.getBeansOfType(DevPaymentScenarioRegistry.class)).isEmpty();
+        assertThat(context.containsBean("paymentScenarioController")).isFalse();
         mvc.perform(
                         put("/v1/dev/payment-scenarios/any")
                                 .header("Authorization", sellerBearer())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"scenario\":\"INSTANT_SUCCESS\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is4xxClientError());
     }
 }

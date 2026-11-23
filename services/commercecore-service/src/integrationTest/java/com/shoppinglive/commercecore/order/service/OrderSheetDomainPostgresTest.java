@@ -134,7 +134,6 @@ class OrderSheetDomainPostgresTest extends OrderSheetPostgresSupport {
                 .andExpect(
                         org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
                                 .isNotFound());
-        dispatcher.recover();
         assertNoFinancialExecution();
     }
 

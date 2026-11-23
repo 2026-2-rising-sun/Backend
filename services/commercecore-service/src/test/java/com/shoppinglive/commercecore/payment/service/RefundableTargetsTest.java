@@ -11,9 +11,7 @@ import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.common.core.BusinessException;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,18 +23,14 @@ import org.springframework.jdbc.core.RowMapper;
 class RefundableTargetsTest {
     private final PaymentGroupRepository groups = mock(PaymentGroupRepository.class);
     private final OrderJpaRepository orders = mock(OrderJpaRepository.class);
-    private final PaymentClient attempts = mock(PaymentClient.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final PaymentGroup group = mock(PaymentGroup.class);
-    private final Instant now = Instant.parse("2026-10-17T00:00:00Z");
     private final RefundQueryService service =
             new RefundQueryService(
                     groups,
                     orders,
-                    attempts,
                     new com.shoppinglive.commercecore.payment.repository.RefundQueryRepository(
-                            jdbc),
-                    Clock.fixed(now, ZoneOffset.UTC));
+                            jdbc));
 
     @BeforeEach
     void setUp() {
@@ -67,7 +61,6 @@ class RefundableTargetsTest {
                 .findByPaymentGroupIdOrderByIdAsc(10L);
         var targets = service.refundableTargets("buyer", "PG");
         assertThat(targets).hasSize(2);
-        verifyNoInteractions(attempts);
         assertThat(targets)
                 .allSatisfy(
                         target -> {

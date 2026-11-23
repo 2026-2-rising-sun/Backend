@@ -5,7 +5,6 @@ import com.shoppinglive.commercecore.order.service.PaymentGroupService.Creation;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.GroupResponse;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Quote;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
-import com.shoppinglive.commercecore.payment.dto.PaymentAttemptResponse;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import com.shoppinglive.common.security.AuthenticatedUser;
@@ -90,28 +89,6 @@ public class PaymentGroupController {
     public GroupResponse get(
             @AuthenticationPrincipal AuthenticatedUser member, @PathVariable String number) {
         return service.get(member.memberId(), number);
-    }
-
-    @PostMapping("/v1/payment-groups/{number}/payments")
-    public ResponseEntity<PaymentAttemptResponse> pay(
-            @AuthenticationPrincipal AuthenticatedUser member,
-            @PathVariable String number,
-            @RequestHeader("X-Idempotency-Key") String key,
-            @RequestBody(required = false) Map<String, Object> input) {
-        if (input != null && !input.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "결제 요청 본문은 비어 있어야 합니다.");
-        }
-        var attempt = service.start(member.memberId(), number, key);
-        return ResponseEntity.status(attempt.getStatus().isTerminal() ? 200 : 202)
-                .body(PaymentAttemptResponse.from(attempt));
-    }
-
-    @GetMapping("/v1/payment-groups/{number}/payments/{id}")
-    public PaymentAttemptResponse payment(
-            @AuthenticationPrincipal AuthenticatedUser member,
-            @PathVariable String number,
-            @PathVariable Long id) {
-        return PaymentAttemptResponse.from(service.payment(member.memberId(), number, id));
     }
 
     @PostMapping("/v1/payment-groups/{number}/cancel")
