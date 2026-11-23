@@ -290,8 +290,8 @@ components:
         failureCode:
           description: >-
             FAILED·NO_CHARGE일 때 사유 코드, SUCCEEDED면 null. NO_CHARGE면 NO_CHARGE. Payment 접수 단계 코드는
-            PAYMENT_NOT_FOUND·PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH·COMPENSATION_IN_PROGRESS다. 실행 단계 코드(OVER_REFUND·PARTIAL_NOT_ALLOWED·UNKNOWN_SELLER_ORDER·NOT_REFUNDABLE와 토스 거절 코드)는
-            환불 요구사항 REF-ACCEPT-03·04·REF-EXEC-03을 따른다.
+            PAYMENT_NOT_FOUND·PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH·COMPENSATION_IN_PROGRESS다. 실행 단계 코드(OVER_REFUND·PARTIAL_NOT_ALLOWED·UNKNOWN_SELLER_ORDER·NOT_REFUNDABLE와 이전 호출이 없는 첫 호출의 토스 거절 코드)는
+            환불 요구사항 REF-ACCEPT-03·04·REF-EXEC-03을 따른다. 토스 장애로는 고객 환불 결과를 보내지 않는다(REF-EXEC-06).
           type:
           - string
           - 'null'

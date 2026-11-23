@@ -44,6 +44,8 @@ abstract class ApprovalPostgresTestSupport {
         p.add("spring.datasource.username", () -> System.getenv("PAYMENT_TEST_POSTGRES_USER"));
         p.add("spring.datasource.password", () -> System.getenv("PAYMENT_TEST_POSTGRES_PASSWORD"));
         p.add("spring.datasource.hikari.maximum-pool-size", () -> 20);
+        // 캐시된 컨텍스트마다 20개를 미리 열면 환불 테스트 컨텍스트가 더해질 때 max_connections(100)를 넘는다
+        p.add("spring.datasource.hikari.minimum-idle", () -> 2);
         p.add("spring.flyway.schemas", () -> SCHEMA);
         p.add("payment.core-service-token", () -> "payment-approval-postgres-test-credential-32");
         p.add("spring.kafka.bootstrap-servers", () -> "localhost:1");

@@ -200,6 +200,10 @@ public class TossPaymentsClient {
         if (statusCode == 429) {
             return new TossResult.NotSent("HTTP 429", statusCode);
         }
+        if (statusCode == 408) {
+            // 시간 초과는 토스가 처리했는지 알 수 없다. 본문의 code와 무관하게 거절로 보지 않는다
+            return new TossResult.Unknown("HTTP 408", statusCode);
+        }
         TossError error = readOrNull(response, TossError.class);
         if (error == null || error.code() == null || error.code().isBlank()) {
             return new TossResult.Unknown("HTTP " + statusCode + " 오류 code를 읽지 못함", statusCode);

@@ -111,6 +111,42 @@ class RefundResultRecordedContractTest {
                         RefundResultRecorded.envelope(result, Instant.now())));
     }
 
+    @org.junit.jupiter.api.Test
+    @DisplayName("[REF-EXEC-05] 0원 고객 환불의 SUCCEEDED(refundedAmount 0)도 결과 계약을 지킨다")
+    void writesZeroRefundSample() throws Exception {
+        JsonNode request =
+                MAPPER.readTree(
+                        """
+                        {"refundRequestId":"x-user-zero","orderRef":"PG-22222222-2222-4222-8222-222222222222",
+                         "paymentId":7001,"purpose":"USER_REFUND","reason":"CUSTOMER_REQUEST","currency":"KRW",
+                         "amount":0,"items":[{"sellerOrderNumber":"ORDER-301","amount":0,
+                         "orderItems":[{"orderItemId":301,"quantity":1,"amount":0}]}],
+                         "requestedAt":"2026-11-21T00:59:59.123456789Z"}
+                        """);
+        JsonNode result =
+                RefundResultRecorded.result(
+                        request,
+                        UUID.randomUUID(),
+                        1,
+                        RefundStatus.SUCCEEDED,
+                        0,
+                        Instant.now(),
+                        null);
+
+        Path directory = Path.of("build/contract-samples");
+        Files.createDirectories(directory);
+        MAPPER.writeValue(
+                directory.resolve("RefundResultRecorded-user-zero-succeeded.json").toFile(),
+                Map.of(
+                        "contract",
+                        "payment-refund-results.yaml",
+                        "message",
+                        "RefundResultRecorded",
+                        "payload",
+                        RefundResultRecorded.envelope(result, Instant.now())));
+        assertThat(result.get("refundedAmount").longValue()).isZero();
+    }
+
     @ParameterizedTest(name = "{0}")
     @CsvSource({
         "user-succeeded,USER_REFUND,CUSTOMER_REQUEST,1,SUCCEEDED,4000,",

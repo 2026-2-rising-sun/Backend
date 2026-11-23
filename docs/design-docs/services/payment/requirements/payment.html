@@ -97,7 +97,7 @@
 <h2 id="pg-응답-분류">PG 응답 분류</h2>
 <ul>
 <li>[x] <strong>PAY-PG-01</strong> 연결 타임아웃(3초)·연결 거부, 그리고 우리 설정 문제나 호출 제한으로 토스가 처리하지 않은 응답(401, 429, 400 <code>INVALID_API_KEY</code>, 403 중 <code>INCORRECT_BASIC_AUTH_FORMAT</code>·<code>API_KEY_ACCESS_DENIED</code>)은 "보내지 않음"이다. 401·429는 본문 code와 관계없다. 시크릿 키가 설정되지 않았으면 서비스는 기동하되 토스를 호출하지 않고 "보내지 않음"으로 돌려준다. 구매자에게 카드 거절로 보이지 않게 한다. 그 밖의 403(카드 거절 등)은 "거절"이다.</li>
-<li>[x] <strong>PAY-PG-02</strong> 그 밖의 4xx는 "거절"이다. 단 <code>ALREADY_PROCESSED_PAYMENT</code>·<code>ALREADY_PROCESSING_REQUEST</code>·<code>FORBIDDEN_CONSECUTIVE_REQUEST</code>(연속 요청 제한)·409 <code>IDEMPOTENT_REQUEST_PROCESSING</code>(같은 멱등 키 요청이 처리 중)은 "불명"이다. 409는 <a href="https://docs.tosspayments.com/reference/using-api/idempotency-key">토스 멱등 키 문서</a>가 이전 멱등 요청이 처리 중이니 다시 요청해 응답을 확인하라고 안내한다(2026-11-15 확인).</li>
+<li>[x] <strong>PAY-PG-02</strong> 그 밖의 4xx는 "거절"이다. 단 408(요청 시간 초과)·<code>ALREADY_PROCESSED_PAYMENT</code>·<code>ALREADY_PROCESSING_REQUEST</code>·<code>FORBIDDEN_CONSECUTIVE_REQUEST</code>(연속 요청 제한)·409 <code>IDEMPOTENT_REQUEST_PROCESSING</code>(같은 멱등 키 요청이 처리 중)은 "불명"이다. 409는 <a href="https://docs.tosspayments.com/reference/using-api/idempotency-key">토스 멱등 키 문서</a>가 이전 멱등 요청이 처리 중이니 다시 요청해 응답을 확인하라고 안내한다(2026-11-15 확인).</li>
 <li>[x] <strong>PAY-PG-03</strong> 읽기 타임아웃·응답 중 끊김·5xx·분류하지 못한 예외는 "불명"이다(애매하면 불명).</li>
 <li>[x] <strong>PAY-PG-04</strong> 승인·조회·취소 모두 Basic 인증과 <code>Idempotency-Key</code>(승인·취소)를 보내고, 읽기 타임아웃은 60초다.</li>
 </ul>
@@ -116,6 +116,6 @@
 <li>[x] <strong>PAY-EVENT-02</strong> 이벤트 계약 YAML에 예시가 있고, 실제 발행 객체로 만든 표본이 계약 검사를 통과한다.</li>
 </ul>
 <h2 id="범위-밖">범위 밖</h2>
-<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>376a9136c1179f1d4445f06641788b52addf076933c2d9c6f1ad4662cfcd49a2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>토스 호출 동시 실행 수 제한(벌크헤드)·웹훅·2차 PG·서킷 브레이커(필요할 때 별도 요구사항), 주문 만료와 재고 반환(Commerce).</p><p class="muted fingerprint">MD SHA-256: <code>b69616137cdfe55f85b8839d1a62196b49a011b7b99b07bcd80d6cf8c0496dae</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
