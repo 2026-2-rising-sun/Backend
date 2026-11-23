@@ -119,22 +119,17 @@ class RefundIntakePostgresTest extends RefundPostgresTestSupport {
 
     @Test
     @DisplayName(
-            "[REF-ACCEPT-05] paymentId가 없거나 결제와 다르면 FAILED(PAYMENT_ID_REQUIRED·PAYMENT_MISMATCH)를 보낸다")
-    void paymentIdMissingOrMismatched() throws Exception {
+            "[REF-ACCEPT-05] paymentId가 결제와 다르면 FAILED(PAYMENT_MISMATCH)를 보낸다. paymentId 누락은 파서가 DLT로 보낸다")
+    void paymentIdMismatched() throws Exception {
         String orderRef = newOrderRef();
         long paymentId = newPayment(orderRef);
-        ObjectNode missing = request(orderRef, null, "SYSTEM_COMPENSATION");
         ObjectNode mismatched = request(orderRef, paymentId + 1000, "USER_REFUND");
 
-        intake.receive(missing);
         intake.receive(mismatched);
 
         List<JsonNode> results = results(orderRef);
-        assertThat(results).hasSize(2);
-        assertCoreShape(results.get(0), missing, "FAILED", "PAYMENT_ID_REQUIRED");
-        // 요청에 없던 paymentId를 결과에 채우지 않는다
-        assertThat(results.get(0).at("/payload").has("paymentId")).isFalse();
-        assertCoreShape(results.get(1), mismatched, "FAILED", "PAYMENT_MISMATCH");
+        assertThat(results).hasSize(1);
+        assertCoreShape(results.get(0), mismatched, "FAILED", "PAYMENT_MISMATCH");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT refunded_amount FROM payment WHERE id = ?",

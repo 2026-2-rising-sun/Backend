@@ -129,6 +129,24 @@ class RefundKafkaPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName("[REF-ACCEPT-07] paymentId가 없는 요청은 결과 없이 재시도 없이 DLT로 가고 뒤 메시지는 계속 처리된다")
+    void missingPaymentIdIsDeadLetteredWithoutRetry() throws Exception {
+        String invalid = newOrderRef();
+        String next = newOrderRef();
+        ObjectNode request = request(invalid, 7001L, "USER_REFUND");
+        request.remove("paymentId");
+
+        send(invalid, envelope(invalid, request));
+        send(next, envelope(next, request(next, 7001L, "USER_REFUND")));
+
+        assertThat(poll(DLT, invalid, 1)).hasSize(1);
+        assertThat(poll(RESULTS, next, 1)).hasSize(1);
+        // 같은 파티션에서 앞선 메시지가 결과를 만들었다면 뒤 결과보다 먼저 보였어야 한다
+        assertThat(records(RESULTS, invalid, 0, Duration.ofSeconds(1))).isEmpty();
+        assertThat(refundCount(request.get("refundRequestId").asText())).isZero();
+    }
+
+    @Test
     @DisplayName("[REF-ACCEPT-07] DB 장애는 제한 횟수를 넘어도 DLT로 보내지 않고 재시도해 복구되면 처리한다")
     void databaseOutageRetriesPastLimit() throws Exception {
         String orderRef = newOrderRef();

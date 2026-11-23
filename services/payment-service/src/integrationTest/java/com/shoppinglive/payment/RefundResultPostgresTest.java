@@ -130,7 +130,6 @@ class RefundResultPostgresTest extends RefundPostgresTestSupport {
         List<ObjectNode> failed =
                 List.of(
                         request(missingRef, 7001L, "SYSTEM_COMPENSATION"),
-                        request(orderRef, null, "SYSTEM_COMPENSATION"),
                         request(orderRef, paymentId + 1000, "SYSTEM_COMPENSATION"),
                         request(orderRef, paymentId, "SYSTEM_COMPENSATION"));
 

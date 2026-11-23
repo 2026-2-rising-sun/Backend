@@ -32,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RefundIntakeService {
     static final String PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
-    static final String PAYMENT_ID_REQUIRED = "PAYMENT_ID_REQUIRED";
     public static final String PAYMENT_MISMATCH = "PAYMENT_MISMATCH";
     static final String COMPENSATION_IN_PROGRESS = "COMPENSATION_IN_PROGRESS";
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -101,13 +100,10 @@ public class RefundIntakeService {
         }
     }
 
-    /** 요청을 이 결제에 묶을 수 없으면 실패 코드. 요청에 없는 paymentId는 결과에도 채우지 않는다. */
+    /** 요청을 이 결제에 묶을 수 없으면 실패 코드. 요청의 paymentId는 파서가 항상 채워 둔다(#402). */
     private static String identityFailure(JsonNode request, Long paymentId) {
         if (paymentId == null) {
             return PAYMENT_NOT_FOUND;
-        }
-        if (!request.has("paymentId")) {
-            return PAYMENT_ID_REQUIRED;
         }
         return request.get("paymentId").longValue() == paymentId ? null : PAYMENT_MISMATCH;
     }

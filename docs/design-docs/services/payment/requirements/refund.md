@@ -17,7 +17,6 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 - [x] **REF-ACCEPT-04** 실행 전에 결제와 요청을 맞춰 보고, 맞지 않으면 돈을 움직이지 않고 FAILED다. 부분 취소가 안 되는 결제의 부분 환불은 `PARTIAL_NOT_ALLOWED`, 이 결제에 없는 판매자 주문은 `UNKNOWN_SELLER_ORDER`, 환불할 수 없는 결제 상태는 `NOT_REFUNDABLE`이다. (EC 43)
 - [x] **REF-ACCEPT-05** 다음 경우는 돈을 움직이지 않고 FAILED로 저장해 보내고, ERROR 로그를 남긴다.
   - `orderRef`로 결제를 찾지 못함: `PAYMENT_NOT_FOUND`
-  - 요청에 `paymentId`가 없음: `PAYMENT_ID_REQUIRED`
   - `paymentId`가 그 결제와 다름: `PAYMENT_MISMATCH`
 
   `items`가 없는 요청처럼 계약을 어긴 메시지는 REF-ACCEPT-07을 따른다.

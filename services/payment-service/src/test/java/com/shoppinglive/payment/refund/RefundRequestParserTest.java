@@ -173,7 +173,8 @@ class RefundRequestParserTest {
     @DisplayName("[REF-ACCEPT-07] paymentId가 없거나 계약 밖 사유면 해석할 수 없다(#384 계약: 사유 3개, paymentId 필수)")
     void rejectsMissingPaymentIdAndReasonsOutsideContract() {
         rejects(e -> ((ObjectNode) e.get("payload")).remove("paymentId"));
-        for (String reason : new String[] {"ORDER_EXPIRED", "ORDER_CANCELLED", "APPROVAL_RESPONSE_LOST"}) {
+        for (String reason :
+                new String[] {"ORDER_EXPIRED", "ORDER_CANCELLED", "APPROVAL_RESPONSE_LOST"}) {
             rejects(
                     e -> {
                         ((ObjectNode) e.get("payload")).put("reason", reason);

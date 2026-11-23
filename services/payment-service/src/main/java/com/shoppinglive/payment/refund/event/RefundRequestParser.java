@@ -29,9 +29,10 @@ public final class RefundRequestParser {
                     "aggregateId",
                     "occurredAt",
                     "payload");
-    // 결과에 그대로 실리므로 Core 결과 소비자가 받는 요청 필드만 허용한다. paymentId만 선택이다
+    // 결과에 그대로 실리므로 Core 결과 소비자가 받는 요청 필드만 허용한다. #384 계약: paymentId는 필수다.
     private static final Set<String> REQUIRED =
             Set.of(
+                    "paymentId",
                     "refundRequestId",
                     "orderRef",
                     "purpose",
@@ -47,13 +48,7 @@ public final class RefundRequestParser {
     private static final Pattern REFUND_REQUEST_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private static final Set<String> PURPOSES = Set.of("USER_REFUND", "SYSTEM_COMPENSATION");
     private static final Set<String> REASONS =
-            Set.of(
-                    "CUSTOMER_REQUEST",
-                    "APPROVAL_RESPONSE_LOST",
-                    "APPROVAL_UNKNOWN",
-                    "LATE_APPROVAL",
-                    "ORDER_EXPIRED",
-                    "ORDER_CANCELLED");
+            Set.of("CUSTOMER_REQUEST", "APPROVAL_UNKNOWN", "LATE_APPROVAL");
 
     private RefundRequestParser() {}
 
@@ -75,11 +70,7 @@ public final class RefundRequestParser {
         JsonNode payload = event.path("payload");
         require(payload.isObject(), "payload가 객체가 아닙니다.");
         payload.fieldNames()
-                .forEachRemaining(
-                        f ->
-                                require(
-                                        REQUIRED.contains(f) || f.equals("paymentId"),
-                                        "모르는 payload 필드: " + f));
+                .forEachRemaining(f -> require(REQUIRED.contains(f), "모르는 payload 필드: " + f));
         REQUIRED.forEach(f -> require(payload.has(f), "필수 payload 필드가 없습니다: " + f));
 
         String orderRef = payload.path("orderRef").asText();
@@ -108,9 +99,7 @@ public final class RefundRequestParser {
         require("KRW".equals(payload.path("currency").asText()), "currency가 KRW가 아닙니다.");
         require(isTimestamp(payload.path("requestedAt")), "requestedAt이 시각이 아닙니다.");
         require(isMoney(payload.path("amount")), "amount가 0 이상 정수가 아닙니다.");
-        if (payload.has("paymentId")) {
-            require(isPositiveId(payload.get("paymentId")), "paymentId가 양의 정수가 아닙니다.");
-        }
+        require(isPositiveId(payload.path("paymentId")), "paymentId가 양의 정수가 아닙니다.");
         requireItems(payload.path("items"), payload.path("amount").longValue());
         return payload;
     }

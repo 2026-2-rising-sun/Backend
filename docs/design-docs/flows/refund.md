@@ -54,6 +54,6 @@ Payment 결과 계약은 [payment-refund-results.yaml](../../../contracts/events
 | 결과 불명 | 결과 없음 | Payment는 UNKNOWN을 보내지 않는다(`status`는 SUCCEEDED·FAILED·NO_CHARGE). 확정될 때 보낸다. `nextActionAt`은 항상 null이다. |
 | 미승인 종료 | NO_CHARGE | 시스템 보상만 쓴다. `failureCode: NO_CHARGE`, 환불 금액 0. |
 
-Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 계약보다 넓게 받으며(#402에서 좁힌다), 계약 밖 요청은 FAILED(`PAYMENT_ID_REQUIRED`)로 답할 수 있다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.
+Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 #402에서 계약만 받는다(paymentId 필수, 사유 3개). 계약 밖 요청은 결과를 만들지 않고 DLT로 보낸다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.
 
 [현재 Core 모듈](../services/commercecore/order/overview.md) · [Payment 소유 설계](../services/payment/overview.md) · [계약 원본](../../../contracts/events). Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.
