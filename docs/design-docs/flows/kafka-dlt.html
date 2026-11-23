@@ -53,8 +53,9 @@
 <li><strong>대상 없는 메시지</strong>(주문·환불 요청이 없는 결과 등): 원본 토픽·partition·offset, 판단 근거, 폐기 시각을 워크로그에 남기고 DLT에서 폐기한다. 근거 없는 폐기는 하지 않는다.</li>
 </ol>
 <h2 id="중복-안전성">중복 안전성</h2>
-<p>되감기와 재발행은 같은 결과를 다시 받게 한다. 결제 승인은 <code>paymentId</code>로, 환불 결과는 환불 요청 ID로 중복을 걸러 한 번만 반영한다. 근거 테스트는 <code>PaymentRelayKafkaPostgresTest</code>의 "새 승인 중복을 실제 Kafka로 소비" 시나리오다.</p>
-<p>이 PR은 실행 중인 격리 환경에서 되감기를 실제로 돌려 보지 않았다. 되감기 실행 확인은 배포 전 격리 환경 절차로 남긴다.</p>
-<p><a href="kafka-dlt.html">시각 자료</a> · <a href="order-payment.html">주문·결제</a> · <a href="refund.html">환불</a></p><p class="muted fingerprint">MD SHA-256: <code>41641b5611817c799a47546730583ad228ca381e6f2a8a5b30e7eb2f22289e87</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>되감기와 재발행은 같은 결과를 다시 받게 한다. 결제 승인은 <code>paymentId</code>로, 환불 결과는 환불 요청 ID로 중복을 걸러 한 번만 반영한다. 근거 테스트는 <code>ResultConsumerRewindKafkaPostgresTest</code>다. EmbeddedKafka와 격리 PostgreSQL에서 실제 승인·환불 결과 소비자를 띄워 같은 결과를 두 번씩 보낸 뒤, 두 소비자 그룹(<code>commercecore-payment-results-v1</code>, <code>commercecore-common-refund-results-v1</code>)의 offset을 AdminClient로 처음으로 되감고 다시 시작한다. 되감기 전후의 주문 상태, 환불 상태, 재고(available/reserved), 환불 intent 수, 발행된 <code>RefundRequested</code> outbox 수가 같아야 하며, 두 그룹이 토픽 끝까지 따라잡아야 통과한다.</p>
+<p>실행 명령: <code>set -a &amp;&amp; source &lt;test-db.env&gt; &amp;&amp; set +a &amp;&amp; ./gradlew :services:commercecore-service:postgresTest --tests '*ResultConsumerRewindKafkaPostgresTest*'</code></p>
+<p>한계: 쿠폰 사용 수는 이 테스트에서 검증하지 않는다. 배포 전 대량 되감기는 운영 토픽 길이와 그룹 lag에 따라 시간이 걸리므로 격리 환경에서 먼저 확인한다.</p>
+<p><a href="kafka-dlt.html">시각 자료</a> · <a href="order-payment.html">주문·결제</a> · <a href="refund.html">환불</a></p><p class="muted fingerprint">MD SHA-256: <code>68f0f73a25d4452093598269eb64214f691ad65c165126b2e4a12a7503e352e4</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

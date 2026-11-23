@@ -29,8 +29,10 @@ DLT partition은 -1로 두어 Kafka가 key로 고른다. 로그에는 `EVENT_SEN
 
 ## 중복 안전성
 
-되감기와 재발행은 같은 결과를 다시 받게 한다. 결제 승인은 `paymentId`로, 환불 결과는 환불 요청 ID로 중복을 걸러 한 번만 반영한다. 근거 테스트는 `PaymentRelayKafkaPostgresTest`의 "새 승인 중복을 실제 Kafka로 소비" 시나리오다.
+되감기와 재발행은 같은 결과를 다시 받게 한다. 결제 승인은 `paymentId`로, 환불 결과는 환불 요청 ID로 중복을 걸러 한 번만 반영한다. 근거 테스트는 `ResultConsumerRewindKafkaPostgresTest`다. EmbeddedKafka와 격리 PostgreSQL에서 실제 승인·환불 결과 소비자를 띄워 같은 결과를 두 번씩 보낸 뒤, 두 소비자 그룹(`commercecore-payment-results-v1`, `commercecore-common-refund-results-v1`)의 offset을 AdminClient로 처음으로 되감고 다시 시작한다. 되감기 전후의 주문 상태, 환불 상태, 재고(available/reserved), 환불 intent 수, 발행된 `RefundRequested` outbox 수가 같아야 하며, 두 그룹이 토픽 끝까지 따라잡아야 통과한다.
 
-이 PR은 실행 중인 격리 환경에서 되감기를 실제로 돌려 보지 않았다. 되감기 실행 확인은 배포 전 격리 환경 절차로 남긴다.
+실행 명령: `set -a && source <test-db.env> && set +a && ./gradlew :services:commercecore-service:postgresTest --tests '*ResultConsumerRewindKafkaPostgresTest*'`
+
+한계: 쿠폰 사용 수는 이 테스트에서 검증하지 않는다. 배포 전 대량 되감기는 운영 토픽 길이와 그룹 lag에 따라 시간이 걸리므로 격리 환경에서 먼저 확인한다.
 
 [시각 자료](kafka-dlt.html) · [주문·결제](order-payment.md) · [환불](refund.md)
