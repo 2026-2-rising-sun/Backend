@@ -41,7 +41,7 @@ Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(Com
 | 팀 | 먼저 읽을 것 | 바로 시작할 수 있는 이슈 |
 |---|---|---|
 | Payment | [환불 요구사항](../../../../design-docs/services/payment/requirements/refund.md), [결제 요구사항](../../../../design-docs/services/payment/requirements/payment.md) | #398, #401, #387, #369 |
-| CommerceCore | 각 이슈 본문, [이벤트 계약](../../../../../contracts/events/commerce-refund-requests.yaml) | #377, #389, #390, #367 |
+| CommerceCore | 각 이슈 본문, [이벤트 계약](../../../../../contracts/events/commerce-refund-requests.yaml) | #377, #367 |
 | Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·보관·유입 알림 |
 | Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | Backend·Infra 완료 후 |
 
@@ -106,8 +106,8 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | Payment | #387 | 오래 미확정인 결제·환불 건수를 지표로 낸다 | 없음 |
 | Payment | #369 | 24시간 상한에 걸린 환불을 사람이 재개할 수 있다 | 없음 |
 | CommerceCore | #377 | 보상 대기 주문이 있어도 새 구매를 할 수 있다 | 없음 |
-| CommerceCore | #389 | 처리 못 할 메시지가 DLT로 가고 뒤 메시지가 막히지 않는다 | 없음 |
-| CommerceCore | #390 | 옛 Payment 호출과 하이픈 토픽 구독이 사라진다 | 없음 |
+| CommerceCore | #389 | 처리 못 할 메시지가 DLT로 가고 뒤 메시지가 막히지 않는다 | #390 |
+| CommerceCore | #390 | 옛 Payment 호출과 하이픈 토픽 구독이 사라진다 | #377 |
 | CommerceCore | #399 | 앞선 환불이 미확정이어도 남은 상품을 환불할 수 있다 | #377, #390, #401 |
 | CommerceCore | #367 | 구매자 일반 환불의 Core 완료 조건을 확인한다 | 없음 |
 | CommerceCore | #345 | 일부 수량 환불의 남은 조건을 확인한다 | #399 |
@@ -117,10 +117,11 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 작업 순서:
 
 1. 선행이 없는 Payment, CommerceCore, Infra DLT 작업을 서비스별로 병렬 진행한다.
-2. #377 뒤에 #384로 계약을 확정하고, #384와 #389 뒤에 #402를 진행한다.
-3. #377, #390, #401 뒤에 #399를 진행한다.
-4. #387 지표로 Infra #64의 미확정 알림을 넣는다.
-5. #345를 확인해 닫고, Backend·Infra가 끝나면 Frontend #89를 연동한다.
+2. CommerceCore는 #377 → #390 → #389 순서로 진행한다. 같은 결제 코드와 소비자 설정을 고쳐 병렬로 하면 충돌한다.
+3. #377 뒤에 #384로 계약을 확정하고, #384와 #389 뒤에 #402를 진행한다.
+4. #377, #390, #401 뒤에 #399를 진행한다.
+5. #387 지표로 Infra #64의 미확정 알림을 넣는다.
+6. #345를 확인해 닫고, Backend·Infra가 끝나면 Frontend #89를 연동한다.
 
 이번 범위의 종료 기준:
 
