@@ -34,7 +34,7 @@ class RefundResultRecordedContractTest {
                 MAPPER.readTree(
                         """
                         {"refundRequestId":"b1111111-1111-4111-8111-111111111111",
-                         "orderRef":"PG-22222222-2222-4222-8222-222222222222",
+                         "orderRef":"PG-22222222-2222-4222-8222-222222222222","paymentId":7001,
                          "purpose":"SYSTEM_COMPENSATION","reason":"APPROVAL_UNKNOWN","currency":"KRW",
                          "amount":4000,"items":[{"sellerOrderNumber":"ORDER-301","amount":4000,
                          "orderItems":[{"orderItemId":301,"quantity":1,"amount":4000}]}],
@@ -44,7 +44,7 @@ class RefundResultRecordedContractTest {
                 RefundResultRecorded.failed(
                         request,
                         UUID.fromString("d1111111-1111-4111-8111-000000000001"),
-                        "PAYMENT_ID_REQUIRED",
+                        "PAYMENT_NOT_FOUND",
                         Instant.parse("2026-11-21T01:00:01.123456Z"));
         EventEnvelope<JsonNode> event =
                 RefundResultRecorded.envelope(result, Instant.parse("2026-11-21T01:00:01Z"));
