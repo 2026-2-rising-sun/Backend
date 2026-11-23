@@ -9,6 +9,7 @@
 | 상품·판매·쿠폰 조회 사본 | [Catalog 동기화](flows/catalog-sync.md) |
 | JWT·서버 세션 확인 | [인증](flows/authentication.md) |
 | 방송·채팅·알림 전달 | [방송·알림](flows/live-notification.md) |
+| Core 결제 결과 소비 실패(DLT) 처리 | [Kafka DLT](flows/kafka-dlt.md) |
 | 로컬 미들웨어·서비스별 DB·검증 환경 | [로컬 실행 환경](flows/local-environment.md) |
 
 ## 서비스별 설계

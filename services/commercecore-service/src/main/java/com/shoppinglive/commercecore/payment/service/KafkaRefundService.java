@@ -353,7 +353,7 @@ public class KafkaRefundService {
 
     public boolean result(String key, JsonNode incoming) {
         JsonNode event = tree(json(incoming));
-        require(
+        contract(
                 event.path("eventType").asText().equals("RefundResultRecorded")
                         && event.path("schemaVersion").isInt()
                         && event.path("schemaVersion").intValue() == 1
@@ -361,7 +361,7 @@ public class KafkaRefundService {
                 "환불 결과 봉투가 올바르지 않습니다.");
         uuid(event.path("eventId"));
         instant(event.path("occurredAt"));
-        require(event.isObject() && event.size() == 7, "환불 결과 봉투 필드가 올바르지 않습니다.");
+        contract(event.isObject() && event.size() == 7, "환불 결과 봉투 필드가 올바르지 않습니다.");
         JsonNode result = event.path("payload");
         Set<String> resultFields =
                 Set.of(
@@ -381,24 +381,24 @@ public class KafkaRefundService {
                         "resolvedAt",
                         "nextActionAt",
                         "failureCode");
-        require(result.isObject(), "환불 결과 본문이 필요합니다.");
+        contract(result.isObject(), "환불 결과 본문이 필요합니다.");
         result.fieldNames()
                 .forEachRemaining(
-                        field -> require(resultFields.contains(field), "지원하지 않는 결과 필드입니다."));
+                        field -> contract(resultFields.contains(field), "지원하지 않는 결과 필드입니다."));
         for (String field : resultFields)
-            if (!field.equals("paymentId")) require(result.has(field), "필수 결과 필드가 없습니다: " + field);
-        require(
+            if (!field.equals("paymentId")) contract(result.has(field), "필수 결과 필드가 없습니다: " + field);
+        contract(
                 result.path("failureCode").isNull()
                         || result.path("failureCode").isTextual()
                                 && !result.path("failureCode").asText().isBlank()
                                 && result.path("failureCode").asText().length() <= 100,
                 "실패 사유 형식이 올바르지 않습니다.");
         String requestId = result.path("refundRequestId").asText();
-        require(
+        contract(
                 result.path("refundRequestId").isTextual()
                         && result.path("refundRequestId").asText().matches("[A-Za-z0-9_-]{1,64}"),
                 "환불 요청 ID 형식이 올바르지 않습니다.");
-        require(
+        contract(
                 key != null
                         && key.equals(event.path("aggregateId").asText())
                         && key.equals(result.path("orderRef").asText()),
@@ -407,7 +407,7 @@ public class KafkaRefundService {
                 jdbc.queryForList(
                         "SELECT payment_group_id FROM core_refund_intent WHERE refund_request_id=?",
                         requestId);
-        require(!found.isEmpty(), "저장된 환불 요청이 없습니다.");
+        contract(!found.isEmpty(), "저장된 환불 요청이 없습니다.");
         var group =
                 groups.findById(((Number) found.getFirst().get("payment_group_id")).longValue())
                         .orElseThrow();
@@ -731,28 +731,35 @@ public class KafkaRefundService {
 
     private static Instant instant(JsonNode value) {
         try {
-            require(value.isTextual(), "결과 시각이 필요합니다.");
+            contract(value.isTextual(), "결과 시각이 필요합니다.");
             return Instant.parse(value.asText());
         } catch (java.time.format.DateTimeParseException e) {
-            throw conflict("결과 시각 형식이 올바르지 않습니다.");
+            throw new com.shoppinglive.common.kafka.ContractViolationException(
+                    "결과 시각 형식이 올바르지 않습니다.");
         }
     }
 
     private static void uuid(JsonNode value) {
         try {
-            require(
+            contract(
                     value.isTextual()
                             && UUID.fromString(value.asText())
                                     .toString()
                                     .equalsIgnoreCase(value.asText()),
                     "결과 식별자가 UUID 형식이 아닙니다.");
         } catch (RuntimeException e) {
-            throw conflict("결과 식별자가 UUID 형식이 아닙니다.");
+            throw new com.shoppinglive.common.kafka.ContractViolationException(
+                    "결과 식별자가 UUID 형식이 아닙니다.");
         }
     }
 
     private static void require(boolean condition, String message) {
         if (!condition) throw conflict(message);
+    }
+
+    /** 소비 메시지의 계약 위반. 재시도 없이 DLT로 보낸다. */
+    private static void contract(boolean condition, String message) {
+        if (!condition) throw new com.shoppinglive.common.kafka.ContractViolationException(message);
     }
 
     private static BusinessException conflict(String message) {
