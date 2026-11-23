@@ -1021,7 +1021,6 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> relayDispatcher.checkout(MEMBER_A, n))
                 .isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> prepare(false)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "no-user-refund", all()))
                 .isInstanceOf(BusinessException.class);
         assertThat(lifecycle.expire(id(n))).isFalse();
@@ -1031,6 +1030,24 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(reserved(501)).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("보상 대기 주문이 있어도 같은 회원은 새 주문을 만들 수 있고 결제 대기 주문은 1건만 허용한다")
+    void compensationPendingAllowsNewPurchaseWithOneActive() throws Exception {
+        String old = prepare(true);
+        relay.approvalUnknown(accept(old), Map.of("code", "UNKNOWN"));
+        assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        String fresh = prepare(false);
+        assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(relay.active(MEMBER_A).orElseThrow().order().orderNumber()).isEqualTo(fresh);
+        assertThatThrownBy(() -> prepare(false)).isInstanceOf(BusinessException.class);
+        assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
     }
 
     @ParameterizedTest
