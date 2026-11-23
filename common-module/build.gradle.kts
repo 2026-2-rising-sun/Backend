@@ -19,6 +19,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     compileOnly("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
     testRuntimeOnly("com.h2database:h2")
     testFixturesApi("org.springframework.security:spring-security-oauth2-jose")
     testFixturesImplementation(
