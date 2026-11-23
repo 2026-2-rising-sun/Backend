@@ -3,9 +3,9 @@ package com.shoppinglive.catalog.product.entity;
 import com.shoppinglive.catalog.product.dto.PublicProductDetail;
 
 /**
- * 주문 화면 진입 전 수량 사전 확인 결과. 조회 시점 스냅샷일 뿐 재고를 잡아두지 않는다.
+ * 주문 화면 진입 전 수량 사전 확인 결과. 사본 재고로 수량을 거절하지 않으며 Core 주문 생성이 최종 판단한다.
  *
- * @param reason 주문 불가 사유. 주문 가능하면 {@code null}
+ * @param reason 주문 불가 사유. 사전 확인을 허용하면 {@code null}
  */
 public record PurchaseCheck(
         Long productId,
@@ -25,18 +25,13 @@ public record PurchaseCheck(
     }
 
     public static PurchaseCheck of(PublicProductDetail detail, int quantity) {
-        Reason reason =
-                !detail.product().isSaleEnabled()
-                        ? Reason.SALE_SUSPENDED
-                        : !detail.purchasable()
-                                ? Reason.SOLD_OUT
-                                : quantity > detail.maxQuantity() ? Reason.EXCEEDS_STOCK : null;
+        Reason reason = !detail.product().isSaleEnabled() ? Reason.SALE_SUSPENDED : null;
         return new PurchaseCheck(
                 detail.product().getId(),
                 quantity,
                 reason == null,
                 reason,
-                detail.maxQuantity(),
+                reason == null ? 999999999 : 0,
                 detail.salesInfo().price());
     }
 }

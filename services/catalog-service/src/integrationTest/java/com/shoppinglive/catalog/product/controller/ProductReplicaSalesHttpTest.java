@@ -104,7 +104,7 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("기본 목록은 재고 0을 반환하고 판매중·품절 상태와 구매 불가를 유지한다")
+    @DisplayName("기본 목록은 재고 0과 표시 상태를 보존하면서 Core 확인 진입을 허용한다")
     void zeroStockPreservesSalesStatusAndPreventsPurchase() throws Exception {
         for (SalesStatus salesStatus :
                 new SalesStatus[] {SalesStatus.ON_SALE, SalesStatus.SOLD_OUT}) {
@@ -115,8 +115,25 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
                     .andExpect(jsonPath("$.data.items[0].productId").value(id))
                     .andExpect(jsonPath("$.data.items[0].available").value(0))
                     .andExpect(jsonPath("$.data.items[0].salesStatus").value(salesStatus.name()))
-                    .andExpect(jsonPath("$.data.items[0].purchasable").value(false));
+                    .andExpect(jsonPath("$.data.items[0].purchasable").value(true));
         }
+    }
+
+    @Test
+    @DisplayName("사본 재고 0과 수량 초과는 Core의 최신 확인을 막지 않는다")
+    void staleInventoryDoesNotRejectPurchaseCheck() throws Exception {
+        long id = product("stale");
+        sales(id, SalesStatus.SOLD_OUT, 0);
+        mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "6"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.orderable").value(true))
+                .andExpect(jsonPath("$.data.reason").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.data.maxQuantity").value(999999999));
+        mvc.perform(get("/v1/products/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.available").value(0))
+                .andExpect(jsonPath("$.data.salesStatus").value("SOLD_OUT"))
+                .andExpect(jsonPath("$.data.purchasable").value(true));
     }
 
     private long product(String name) {

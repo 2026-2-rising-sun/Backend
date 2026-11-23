@@ -10,6 +10,7 @@
 <li><a href="#필드와-불변조건">필드와 불변조건</a></li>
 <li><a href="#근거와-검증-범위">근거와 검증 범위</a></li>
 <li><a href="#통합-등록-표시명-372">통합 등록 표시명 (#372)</a></li>
+<li><a href="#catalog-cdc-revision-v109">Catalog CDC revision (V109)</a></li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>SKU 데이터 모델</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 560" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="Product 1" data-target="SKU 0..N"><title>Product 1 → SKU 0..N: product_id 논리 참조. 상품 선저장 허용, 옵션 없는 판매 단위도 기본 SKU 필요. FK·상품당 단일 SKU UNIQUE 없음.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="기존 Sales 1" data-target="기본 SKU 1"><title>기존 Sales 1 → 기본 SKU 1: sales_info.id를 sku.id로 보존하고 재고·가격·버전을 백필. Cart 이행은 product_id만으로 SKU 전체를 JOIN하지 않음.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="SKU 1" data-target="Order 항목 0..N"><title>SKU 1 → Order 항목 0..N: 거래 식별자와 당시 단가/수량을 보존. 현재가 변경으로 기존 주문 금액을 바꾸지 않음.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="SKU 1" data-target="Catalog 판매 사본 1"><title>SKU 1 → Catalog 판매 사본 1: sales-info의 salesId는 SKU ID의 호환 이름. 버전은 SKU별 비교, productId가 같아도 다른 SKU를 덮어쓰지 않음.</title><path class="connector" d="M565,290 L190,375" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="327.5">4</text></g><g><title>Product 1</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">Product 1</tspan></text></g><g><title>SKU 0..N</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">SKU 0..N</tspan></text></g><g><title>기존 Sales 1</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">기존 Sales 1</tspan></text></g><g><title>기본 SKU 1</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">기본 SKU 1</tspan></text></g><g><title>SKU 1</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">SKU 1</tspan></text></g><g><title>Order 항목 0..N</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Order 항목 0..N</tspan></text></g><g><title>Catalog 판매 사본 1</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">Catalog 판매 사본 1</tspan></text></g></svg></div></section><p>통합 감사 기준은 <a href="https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8">Order <code>5048413b</code></a>이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다.</p>
@@ -112,7 +113,7 @@
 <tr>
 <td>이벤트 버전</td>
 <td>snapshot_version&gt;0</td>
-<td>최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. 일반 SKU version은 V107에서 제거한다. Catalog product_sales.version은 이 snapshot_version의 사본이며 유지한다.</td>
+<td>최종 표시 가격·available·상태가 바뀐 커밋에서 증가. reserved만 소진하면 표시 이벤트 없음. 일반 SKU version은 V107에서 제거한다. 구 Catalog 경로는 이 snapshot_version을 사용한다. 새 CDC 경로는 metadata_version/inventory_version을 독립 저장한다.</td>
 </tr>
 <tr>
 <td>이름 사본</td>
@@ -137,6 +138,46 @@
 </ul>
 <p>H2 업무 테스트와 Catalog H2 이행 테스트를 실제 PostgreSQL의 잠금·시퀀스·트랜잭션 DDL 증거로 확대하지 않는다. 기존 단일 SKU API는 새 원본으로 연결했다. 공개 다중 SKU·대표가·가격순·Live 다중 SKU 활성화는 보류다.</p>
 <h2 id="통합-등록-표시명-372">통합 등록 표시명 (#372)</h2>
-<p>V108은 sku.option_label VARCHAR(255)를 추가한다. 기존 SKU는 null이다. 신규 통합 등록은 SKU ID를 서버에서 발급하고 다중 SKU 표시명의 정규화·중복을 서비스에서 검증한다. 가격·재고·판매 상태와 같은 sku 행에 저장하며 이벤트 최신성은 기존 snapshot_version을 유지한다.</p><p class="muted fingerprint">MD SHA-256: <code>9f088e94afe6c0df550e77e8360c37a1a2fc2f5824763ada4e5e5ac8fcfb200d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>V108은 sku.option_label VARCHAR(255)를 추가한다. 기존 SKU는 null이다. 신규 통합 등록은 SKU ID를 서버에서 발급하고 다중 SKU 표시명의 정규화·중복을 서비스에서 검증한다. 가격·재고·판매 상태와 같은 sku 행에 저장하며 이벤트 최신성은 기존 snapshot_version을 유지한다.</p>
+<h2 id="catalog-cdc-revision-v109">Catalog CDC revision (V109)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>SKU 열</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>metadata_version &gt;=0</td>
+<td>가격·판매의도 메타데이터 revision</td>
+</tr>
+<tr>
+<td>metadata_product_version</td>
+<td>메타데이터 변경 시 참조한 Product 버전. 재적재 원문 보존</td>
+</tr>
+<tr>
+<td>metadata_updated_at</td>
+<td>메타데이터 변경 시각. 순수 수량 변경은 건드리지 않음</td>
+</tr>
+<tr>
+<td>inventory_version &gt;=0</td>
+<td>모든 available/reserved 변경의 영속 dirty revision</td>
+</tr>
+<tr>
+<td>inventory_published_version, 기본-1</td>
+<td>마지막 Outbox 저장 완료 revision. inventory_version보다 작으면 배치 대상</td>
+</tr>
+<tr>
+<td>inventory_changed_at</td>
+<td>현재 inventory revision의 영속 capturedAt</td>
+</tr>
+<tr>
+<td>deleted_at</td>
+<td>SKU 삭제 표현용 tombstone, 현재 판매자 SKU 삭제 API는 없음</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="../../../../../services/commercecore-service/src/main/resources/db/migration/V109__catalog_snapshot_revisions.sql">V109</a>는 기존 수량·이벤트 버전을 보존한다. 행 잠금 아래 Outbox append와 inventory_published_version 변경을 한 TX에 넣는다. 새 외부 테이블/FK나 주문 예약 정책을 추가하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>ed9e7bf874d35ce5b8d59d8c78f0657f43f51d6c0f1fdfd8508794b08670963e</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

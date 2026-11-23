@@ -1,6 +1,6 @@
 # Product 모듈
 
-Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 기준은 `cc91c09b` 위의 이 워크트리 구현이며 배포/운영 DB 적용 결과는 아니다. SKU #334의 가격·재고·개별 상태 구현과 후속 Order 연결은 별도로 통합한다.
+Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 현재 기준은 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`다. #372 통합 상품/SKU 등록과 #379 CDC 경로가 병합됐으며 [상위 동기화 흐름](../../../flows/catalog-sync.md)을 따른다. 아래 #333 당시 설명은 초기 설계 배경이고 운영 DB 적용 결과가 아니다.
 
 - [ERD 원본](erd.md) · [ERD HTML](erd.html)
 - [상태 원본](overview.md) · [상태 HTML](overview.html)
@@ -13,7 +13,7 @@ MD가 원본이고 HTML은 저장소 렌더러로 생성한다. 실제 테스트
 
 <!-- visual: relations -->
 
-기준: `cc91c09b` 위 Product #333 구현. ProductLifecycleService와 ProductTradingService, Catalog의 최소 제어 반영을 설명한다. SKU/Order의 후속 연결은 통합 대상이며 운영 배포 완료를 뜻하지 않는다.
+ProductLifecycleService와 ProductTradingService의 상태 경계를 설명한다. 현재 Catalog에는 최소 제어뿐 아니라 상품·SKU 전체 스냅샷과 독립 재고 버전을 전달한다. 운영 배포 완료를 뜻하지 않는다.
 
 [시각 자료](overview.html)
 
@@ -77,3 +77,22 @@ initialSkuCount는 통합 등록의 불변 초기 SKU 수다. 이후 Product sna
 ### 적용 순서
 
 Catalog V4와 소비자·조회 보호를 먼저 모든 인스턴스에 적용한다. 이어 Core V108과 새 생산자를 모든 인스턴스에 적용한 뒤 통합 등록 API 트래픽을 연다. initialSkuCount를 모르는 구형 Catalog가 실행 중인 채로 통합 등록을 열면 부분 수신 보호가 보장되지 않는다. 실제 배포는 이번 로컬 구현 검증에 포함하지 않는다.
+
+## Catalog CDC 상품 스냅샷
+
+`ProductInfoEventPublisher`는 상품 저장과 같은 TX에서 `commerce.catalog.snapshots.v1`의 ProductSnapshotChanged를 저장한다. key/aggregateId는 product:{id}, metadataVersion은 Product의 JPA version(최초0)이다. 이미지 ID/URL·설명·카테고리·판매자·판매 제어·삭제 이력·initialSkuCount를 모두 담는다. timestamp는 flush 후 DB 저장 정밀도로 읽어 재적재 같은 버전과 원문을 일치시킨다. 구 commerce.product-info.v1에 이중 발행하지 않는다. 삭제 Product는 재적재에서도 남고 복원 기능을 추가하지 않는다.
+
+## 통합 등록 직후의 CDC·알림 분포
+
+상품1개와 SKU N개를 등록하면 같은 업무 TX의 Outbox는 상품 CDC1건·SKU 메타데이터 CDC N건·기존 SalesRegistered N건이다. SKU2개이면 총5건이며 타입·토픽·키가 서로 달라 중복 메타데이터 발행이 아니다.
+
+| 타입 | 토픽 | 키 | 등록 직후 건수 |
+|---|---|---|---|
+| ProductSnapshotChanged | commerce.catalog.snapshots.v1 | product:{productId} |1 |
+| SkuSnapshotChanged | commerce.catalog.snapshots.v1 | sku:{skuId} | SKU별1 |
+| SalesRegistered | commerce.sales-info.v1 | SKU ID 숫자 문자열 | SKU별1 |
+| InventorySnapshotChanged | commerce.catalog.snapshots.v1 | sku:{skuId} |0. 영속 dirty revision을 기본60초 배치가 합쳐 발행 |
+
+일반/claim relay는 Catalog CDC 행을 배제하고 기존 판매 알림만 전송한다. Product/SKU CDC 또는 기존 판매 알림 Outbox 저장이 실패하면 이미지 메타데이터·상품·모든 SKU·완료 멱등 응답·Outbox는 함께 롤백한다. 별도 TX의 미완료 파일 복구 위치는 보존하고 참조 없는 파일을 정리하며 같은 요청으로 재시도할 수 있다.
+
+실제 PostgreSQL CHECK 장애 주입과 일반/claim relay의 EmbeddedKafka 판매 알림 수신 범위는 [상품 등록 회귀 후속 기록](../../../../worklog/2026-11-20-product-bundle-cdc-regressions.md)을 따른다. 이 relay 검사는 CDC 메시지 수동 재발행이나 실제 앱→CDC→Catalog 종단 증거가 아니다.

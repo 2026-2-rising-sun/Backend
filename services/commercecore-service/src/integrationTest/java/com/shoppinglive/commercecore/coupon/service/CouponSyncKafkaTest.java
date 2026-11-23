@@ -17,10 +17,12 @@ import com.shoppinglive.common.outbox.OutboxProperties;
 import com.shoppinglive.common.outbox.OutboxRelay;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -75,6 +77,7 @@ class CouponSyncKafkaTest extends CommerceCoreSecurityTestSupport {
             }
         }
         var topics = List.of(CouponDisplayEventPublisher.TOPIC, SalesInfoEventContract.TOPIC_NAME);
+        List<TopicPartition> partitions = new ArrayList<>();
         try (var admin = AdminClient.create(Map.of("bootstrap.servers", broker))) {
             for (String topic : topics) {
                 try {
@@ -84,6 +87,24 @@ class CouponSyncKafkaTest extends CommerceCoreSecurityTestSupport {
                 } catch (java.util.concurrent.ExecutionException exception) {
                     if (!(exception.getCause() instanceof TopicExistsException)) throw exception;
                 }
+            }
+            // 이미 존재하는 토픽은 파티션 수가 다를 수 있다. 두 토픽의 전체 메타데이터를 확인한다.
+            var descriptions =
+                    admin.describeTopics(topics).allTopicNames().get(10, TimeUnit.SECONDS);
+            assertThat(descriptions.keySet()).containsExactlyInAnyOrderElementsOf(topics);
+            for (String topic : topics) {
+                var actualPartitions = descriptions.get(topic).partitions();
+                assertThat(actualPartitions).as(topic).isNotEmpty();
+                assertThat(
+                                actualPartitions.stream()
+                                        .map(partition -> partition.partition())
+                                        .toList())
+                        .as(topic)
+                        .containsExactlyInAnyOrderElementsOf(
+                                IntStream.range(0, actualPartitions.size()).boxed().toList());
+                actualPartitions.forEach(
+                        partition ->
+                                partitions.add(new TopicPartition(topic, partition.partition())));
             }
         }
         long product = UUID.randomUUID().getMostSignificantBits() >>> 1;
@@ -102,11 +123,14 @@ class CouponSyncKafkaTest extends CommerceCoreSecurityTestSupport {
                                 StringDeserializer.class,
                                 "value.deserializer",
                                 StringDeserializer.class))) {
-            // 이 검사에서 만든 두 토픽은 각 1개 파티션이다. 생성 직후 부분 메타데이터로 구독 토픽을 누락하지 않는다.
-            var partitions = topics.stream().map(topic -> new TopicPartition(topic, 0)).toList();
             consumer.assign(partitions);
+            assertThat(consumer.assignment()).containsExactlyInAnyOrderElementsOf(partitions);
             consumer.seekToEnd(partitions);
-            partitions.forEach(consumer::position);
+            // 모든 파티션의 시작 위치를 확정한 뒤 이번 UUID 키의 메시지를 발행한다.
+            for (var partition : partitions) {
+                assertThat(consumer.position(partition, Duration.ofSeconds(10)))
+                        .isGreaterThanOrEqualTo(0);
+            }
             Instant start = Instant.now().plusSeconds(3600), end = start.plusSeconds(3600);
             couponId =
                     creation.create(SELLER, "Kafka 쿠폰", 100, 1, start, end, end, List.of(product))

@@ -14,6 +14,11 @@ public interface OutboxMessageRepository extends JpaRepository<OutboxMessage, Lo
     /** 기록 순서(id)대로 읽어야 같은 key 의 이벤트 순서가 Kafka 에서도 유지된다. */
     List<OutboxMessage> findByPublishedAtIsNullOrderByIdAsc(Pageable pageable);
 
+    @Query(
+            "SELECT m FROM OutboxMessage m WHERE m.publishedAt IS NULL AND m.topic NOT IN :topics ORDER BY m.id")
+    List<OutboxMessage> findPendingExcluding(
+            @Param("topics") java.util.Collection<String> topics, Pageable pageable);
+
     @Transactional(
             propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @Modifying

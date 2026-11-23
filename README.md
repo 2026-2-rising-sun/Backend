@@ -77,7 +77,7 @@ Catalog는 상품·판매·쿠폰을 조회용 사본에 저장하며 더 큰 �
 
 ## API · 문서
 
-- [분리 서비스 로컬 실행](scripts/local/README.md): 전용 PostgreSQL·Kafka, 인증정보와 HTTP 실행 명령.
+- [서비스 로컬 실행](scripts/local/README.md): Infra 공통 미들웨어 연결, 인증정보와 HTTP 실행 명령.
 - [Backend 팀 하네스](docs/README.md): AI 작업 지침·모듈별 API/ERD/상태 문서·판단과 실행 기록.
 - [아키텍처](ARCHITECTURE.md) · [모듈 문서](docs/design-docs/README.md) · [문서 지도 HTML](docs/README.html).
 

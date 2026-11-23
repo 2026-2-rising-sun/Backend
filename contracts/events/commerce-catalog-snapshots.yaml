@@ -1,0 +1,374 @@
+asyncapi: 3.1.0
+info:
+  title: Commerce 상품·SKU·60초 재고 통합 스냅샷
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  events:
+    address: commerce.catalog.snapshots.v1
+    description: Kafka key와 aggregateId는 상품 product:{productId}, SKU/재고 sku:{skuId}. 공통 리스너에서 eventType/schemaVersion/source/키를
+      검증해 dispatch한다. metadataVersion과 inventoryVersion은 독립 단조 증가 비교값이며 occurredAt으로 정렬하지 않는다. SKU 메타데이터에 수량을, 재고에
+      가격을 포함하지 않는다. Product 삭제와 SKU 삭제 tombstone은 영속 보존하며 과거 데이터와 재고로 부활시키지 않는다. 재고는 기본 60초 주기 영속 dirty revision
+      배치로 생성하고 실제 주문 가능 여부는 Core에서 판단한다. Core event_outbox TEXT 봉투 전체 중 이 토픽만 CDC가 발행하며 relay 일반/claim 경로는 모두 제외한다.
+      구 상품·판매·쿠폰·주문·Live 알림 계약은 독립 유지한다.
+    messages:
+      ProductSnapshotChanged:
+        $ref: '#/components/messages/ProductSnapshotChanged'
+      SkuSnapshotChanged:
+        $ref: '#/components/messages/SkuSnapshotChanged'
+      InventorySnapshotChanged:
+        $ref: '#/components/messages/InventorySnapshotChanged'
+operations:
+  publishEvent:
+    action: send
+    channel:
+      $ref: '#/channels/events'
+    messages:
+    - $ref: '#/channels/events/messages/ProductSnapshotChanged'
+    - $ref: '#/channels/events/messages/SkuSnapshotChanged'
+    - $ref: '#/channels/events/messages/InventorySnapshotChanged'
+components:
+  messages:
+    ProductSnapshotChanged:
+      name: ProductSnapshotChanged
+      bindings:
+        kafka:
+          key: &id001
+            type: string
+            pattern: ^product:[1-9][0-9]*$
+          bindingVersion: 0.5.0
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: ProductSnapshotChanged
+          schemaVersion:
+            const: 1
+          source:
+            const: commercecore-service
+          aggregateId: *id001
+          occurredAt: &id003
+            type: string
+            format: date-time
+          payload:
+            $ref: '#/components/schemas/ProductSnapshot'
+      examples:
+      - name: 최신全量스냅샷
+        payload:
+          eventId: 11111111-1111-4111-8111-000000000010
+          eventType: ProductSnapshotChanged
+          schemaVersion: 1
+          source: commercecore-service
+          aggregateId: product:7
+          occurredAt: '2026-11-19T01:00:00Z'
+          payload:
+            productId: 7
+            metadataVersion: 0
+            name: 상품
+            description: 상품 설명
+            category: FASHION
+            mainImageId: 10
+            mainImageUrl: /api/commercecore/v1/product-images/10
+            sellerId: 00000000-0000-0000-0000-000000000003
+            createdAt: '2026-11-19T00:59:58Z'
+            updatedAt: '2026-11-19T00:59:58Z'
+            saleEnabled: false
+            deletedAt: null
+            initialSkuCount: 2
+      - name: 삭제tombstone
+        payload:
+          eventId: 11111111-1111-4111-8111-000000000013
+          eventType: ProductSnapshotChanged
+          schemaVersion: 1
+          source: commercecore-service
+          aggregateId: product:7
+          occurredAt: '2026-11-19T01:00:00Z'
+          payload:
+            productId: 7
+            metadataVersion: 2
+            name: 상품
+            description: 상품 설명
+            category: FASHION
+            mainImageId: 10
+            mainImageUrl: /api/commercecore/v1/product-images/10
+            sellerId: 00000000-0000-0000-0000-000000000003
+            createdAt: '2026-11-19T00:59:58Z'
+            updatedAt: '2026-11-19T00:59:58Z'
+            saleEnabled: false
+            deletedAt: '2026-11-19T01:00:00Z'
+            initialSkuCount: 2
+    SkuSnapshotChanged:
+      name: SkuSnapshotChanged
+      bindings:
+        kafka:
+          key: &id002
+            type: string
+            pattern: ^sku:[1-9][0-9]*$
+          bindingVersion: 0.5.0
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: SkuSnapshotChanged
+          schemaVersion:
+            const: 1
+          source:
+            const: commercecore-service
+          aggregateId: *id002
+          occurredAt: *id003
+          payload:
+            $ref: '#/components/schemas/SkuSnapshot'
+      examples:
+      - name: 최신全量스냅샷
+        payload:
+          eventId: 11111111-1111-4111-8111-000000000011
+          eventType: SkuSnapshotChanged
+          schemaVersion: 1
+          source: commercecore-service
+          aggregateId: sku:71
+          occurredAt: '2026-11-19T01:00:00Z'
+          payload:
+            skuId: 71
+            productId: 7
+            metadataVersion: 0
+            productMetadataVersion: 0
+            price: 4000
+            currency: KRW
+            optionLabel: 검정 / M
+            productNameSnapshot: 상품
+            saleStatus: ON_SALE
+            createdAt: '2026-11-19T00:59:58Z'
+            updatedAt: '2026-11-19T00:59:58Z'
+            deletedAt: null
+    InventorySnapshotChanged:
+      name: InventorySnapshotChanged
+      bindings:
+        kafka:
+          key: &id004
+            type: string
+            pattern: ^sku:[1-9][0-9]*$
+          bindingVersion: 0.5.0
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+        - eventId
+        - eventType
+        - schemaVersion
+        - source
+        - aggregateId
+        - occurredAt
+        - payload
+        properties:
+          eventId:
+            type: string
+            format: uuid
+          eventType:
+            const: InventorySnapshotChanged
+          schemaVersion:
+            const: 1
+          source:
+            const: commercecore-service
+          aggregateId: *id004
+          occurredAt: *id003
+          payload:
+            $ref: '#/components/schemas/InventorySnapshot'
+      examples:
+      - name: 최신全量스냅샷
+        payload:
+          eventId: 11111111-1111-4111-8111-000000000012
+          eventType: InventorySnapshotChanged
+          schemaVersion: 1
+          source: commercecore-service
+          aggregateId: sku:71
+          occurredAt: '2026-11-19T01:00:00Z'
+          payload:
+            skuId: 71
+            productId: 7
+            inventoryVersion: 12
+            available: 8
+            reserved: 2
+            capturedAt: '2026-11-19T01:00:00Z'
+  schemas:
+    PositiveId: &id005
+      type: integer
+      format: int64
+      minimum: 1
+    Timestamp: *id003
+    Version: &id006
+      type: integer
+      format: int64
+      minimum: 0
+    ProductSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - productId
+      - metadataVersion
+      - name
+      - description
+      - category
+      - mainImageId
+      - mainImageUrl
+      - sellerId
+      - createdAt
+      - updatedAt
+      - saleEnabled
+      - deletedAt
+      - initialSkuCount
+      properties:
+        productId: *id005
+        metadataVersion: *id006
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        category:
+          type:
+          - string
+          - 'null'
+          enum:
+          - FASHION
+          - BEAUTY
+          - FOOD
+          - LIVING
+          - DIGITAL
+          - KIDS
+          - ETC
+          - null
+        mainImageId: *id005
+        mainImageUrl:
+          type: string
+          format: uri-reference
+          minLength: 1
+          maxLength: 2048
+        sellerId:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 36
+        createdAt: *id003
+        updatedAt: *id003
+        saleEnabled:
+          type: boolean
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        initialSkuCount:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 100
+      allOf:
+      - if:
+          properties:
+            deletedAt:
+              type: string
+          required:
+          - deletedAt
+        then:
+          properties:
+            saleEnabled:
+              const: false
+    SkuSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - skuId
+      - productId
+      - metadataVersion
+      - productMetadataVersion
+      - price
+      - currency
+      - optionLabel
+      - productNameSnapshot
+      - saleStatus
+      - createdAt
+      - updatedAt
+      - deletedAt
+      properties:
+        skuId: *id005
+        productId: *id005
+        metadataVersion: *id006
+        productMetadataVersion: *id006
+        price:
+          type: integer
+          format: int64
+          minimum: 1
+        currency:
+          const: KRW
+        optionLabel:
+          type:
+          - string
+          - 'null'
+          maxLength: 255
+        productNameSnapshot:
+          type: string
+          maxLength: 255
+        saleStatus:
+          enum:
+          - READY
+          - ON_SALE
+          - PRIVATE
+        createdAt: *id003
+        updatedAt: *id003
+        deletedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    InventorySnapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - skuId
+      - productId
+      - inventoryVersion
+      - available
+      - reserved
+      - capturedAt
+      properties:
+        skuId: *id005
+        productId: *id005
+        inventoryVersion: *id006
+        available:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        reserved:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        capturedAt: *id003

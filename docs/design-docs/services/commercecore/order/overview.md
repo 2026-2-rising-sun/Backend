@@ -2,6 +2,12 @@
 
 [API](api.md) · [ERD](erd.md) · [확정 상태표·최신 검증](../../../../worklog/2026-11-20-core-compensation-state.md) · [이전 실행 기록](../../../../worklog/2026-11-19-core-refunds.md)
 
+## 기존 주문과 환불 경로
+
+2026-11-20 기준 Core는 새 주문서의 결제 준비·승인을 HTTP로 중계했다. 사용자 환불은 기존 주문에서만 접수했고, 새 주문서가 닫힌 뒤 승인이 도착하면 `payment_relay_refund`에 요청을 저장하고 하이픈 토픽으로 발행했다. 당시 주문·결제 상태표와 PR343의 검증 범위는 [변경 전 주문 문서](https://github.com/2026-2-rising-sun/Backend/blob/9b807f91e02483c6ecf9b089ea42fa1f85b5f099/docs/design-docs/services/commercecore/order/overview.md)와 [11월 20일 검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)에 있다.
+
+[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 신규 주문서의 사용자 환불과 시스템 보상 요청을 각각 저장하고 공통 Kafka 토픽으로 발행하는 Core 경로를 추가한다. 기존 주문과 이미 저장한 하이픈 토픽 요청의 결과는 기존 경로에서 처리한다.
+
 ## 주문과 승인
 
 논리 주문은 `payment_group`, 구매 항목은 `orders`, 판매자별 금액 스냅샷은 `seller_order`다. 신규 주문서는 policyVersion=1이며 기존 policyVersion=0의 공개 주문·결제·환불 실행과 분리한다. SKU·상품명·판매자·단가·할인·수량·Cart ID/version은 생성 시 보존한다. 옵션은 기존 공급 범위대로 처리하며 환불 시 현재 상품 가격을 재계산하지 않는다.
@@ -11,6 +17,10 @@
 준비 PENDING_PAYMENT는 생성부터600초, 승인 진입 PAYMENT_CONFIRMING은 최초 전환부터 별도600초다. PREPARE/APPROVAL 원문·고정 전달ID와 상태는 같은 Core TX에 저장하고 승인 HTTP는 커밋 뒤 수행한다. 정상202 PENDING은 처리 중 응답이며 보상 의도를 만들지 않는다. 단순 조회 실패도 보상 접수 근거가 아니다.
 
 확정 승인은 구매 guard와 그룹 잠금 아래 원결제ID·금액·승인시각을 검증한다. 유효 주문은 PAID와 판매 수량 소비·쿠폰 사용·본인 구매 SKU Cart 정리를 같은 TX에 반영한다. Cart 출처 ID/version은 삭제 뒤에도 보존한다. 실패·취소·만료·보상 대상 늦은 승인에서는 Cart를 정리하지 않는다.
+
+## #340 Cart 출처와 성공 정리
+
+Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환불 계약의 식별 자료로 보존한다. 성공 삭제에는 회원 ID + 해당 주문항목의 SKU만 사용하므로 결제 중 수량 변경·삭제 후 재추가도 정리한다. 같은 상품의 다른 SKU·다른 회원·직접 구매의 Cart는 보존한다. 기존 terminal 결과/승인 사실 및 상태 전이로 최초 성공만 반영하며 중복 성공 이후 재담기는 보존한다. 실패·취소·만료·늦은 승인에서는 Cart를 정리하지 않는다. Cart→SKU 잠금 순서와 상태·재고·쿠폰·알림의 원자성은 유지한다. [Cart 결정](../cart/overview.md#2026-11-18-340-성공-정리-결정).
 
 ## 시스템 응답 유실과 보상 fence
 
@@ -76,4 +86,6 @@ V115는 신규 intent/결과event 원장·이전 항목 상태·CANCEL_PENDING C
 
 V116은 기적용 V115를 변경하지 않고 상태 CHECK와 활성 회원 인덱스를 확장한다. 기존 미완료 시스템 보상과 진행 주문만 새 대기 상태로 이행하고 원문·요청ID·예약과 이미 종료한 주문은 보존한다.
 
-현재 저장소의 Payment 생산 계약은 구 `payment.refund-results.v1/RefundExecutionResolved`이며 신규 dot 토픽 `payment.refund.results.v1/RefundResultRecorded`와 불일치한다. 새 결과 모양은 Core 테스트 fixture이고 상대 producer 확정·연동 완료를 뜻하지 않는다. 이 계약 게이트가 해소되기 전 실제 환불 연동 완료로 배포하지 않는다.
+Core 선병합 기준(`dev` `1dbedd4a`)에서 Payment 생산 계약은 구 `payment.refund-results.v1/RefundExecutionResolved`이며 신규 dot 토픽 `payment.refund.results.v1/RefundResultRecorded`와 불일치한다. 새 결과 모양은 Core 테스트 fixture이고 상대 producer 확정·연동 완료를 뜻하지 않는다. 이 계약 게이트가 해소되기 전 실제 환불 연동 완료로 배포하지 않는다.
+
+Payment의 [결과 계약 #393](https://github.com/2026-2-rising-sun/Backend/pull/393), [요청 소비·결과 발행 #394](https://github.com/2026-2-rising-sun/Backend/pull/394), [사용자 환불 #395](https://github.com/2026-2-rising-sun/Backend/pull/395), [시스템 보상 #396](https://github.com/2026-2-rising-sun/Backend/pull/396)이 후속 변경이다. Core가 먼저 구·신 승인 토픽을 모두 구독하면 Payment가 승인 발행 토픽을 전환할 수 있다.

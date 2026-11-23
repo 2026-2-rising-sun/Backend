@@ -172,6 +172,6 @@ class SkuSalesPostgresTest extends SkuSalesIntegrationTest {
                                 com.shoppinglive.commercecore.sales.event.SalesInfoEventContract
                                         .TOPIC_NAME,
                                 sku.skuId().toString()))
-                .isEqualTo(4);
+                .isEqualTo(3);
     }
 }

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -59,6 +60,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
     @Test
     void apiChangesPublishContractJsonAndStableKeyToRealKafka() throws Exception {
         String broker = System.getenv("COMMERCECORE_TEST_KAFKA_SERVERS");
+        List<TopicPartition> partitions;
         try (AdminClient admin = AdminClient.create(Map.of("bootstrap.servers", broker))) {
             try {
                 admin.createTopics(
@@ -70,6 +72,25 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
             } catch (ExecutionException exists) {
                 if (!(exists.getCause() instanceof TopicExistsException)) throw exists;
             }
+            // 이미 존재하는 토픽의 실제 전체 파티션을 확인한다.
+            var descriptions =
+                    admin.describeTopics(List.of(SalesInfoEventContract.TOPIC_NAME))
+                            .allTopicNames()
+                            .get(10, TimeUnit.SECONDS);
+            assertThat(descriptions.keySet()).containsExactly(SalesInfoEventContract.TOPIC_NAME);
+            var actualPartitions = descriptions.get(SalesInfoEventContract.TOPIC_NAME).partitions();
+            assertThat(actualPartitions).isNotEmpty();
+            assertThat(actualPartitions.stream().map(partition -> partition.partition()).toList())
+                    .containsExactlyInAnyOrderElementsOf(
+                            IntStream.range(0, actualPartitions.size()).boxed().toList());
+            partitions =
+                    actualPartitions.stream()
+                            .map(
+                                    partition ->
+                                            new TopicPartition(
+                                                    SalesInfoEventContract.TOPIC_NAME,
+                                                    partition.partition()))
+                            .toList();
         }
         new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(
                         new org.springframework.core.io.ClassPathResource("cart/sku-fixture.sql"))
@@ -94,10 +115,14 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
                                 StringDeserializer.class,
                                 "value.deserializer",
                                 StringDeserializer.class))) {
-            var partitions = List.of(new TopicPartition(SalesInfoEventContract.TOPIC_NAME, 0));
             consumer.assign(partitions);
+            assertThat(consumer.assignment()).containsExactlyInAnyOrderElementsOf(partitions);
             consumer.seekToEnd(partitions);
-            partitions.forEach(consumer::position);
+            // HTTP 등록과 후속 변경 전에 모든 파티션의 소비 위치를 확정한다.
+            for (var partition : partitions) {
+                assertThat(consumer.position(partition, Duration.ofSeconds(10)))
+                        .isGreaterThanOrEqualTo(0);
+            }
 
             String response =
                     mvc.perform(
@@ -127,7 +152,7 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
 
             List<EventEnvelope<SalesInfoSnapshot>> events = new ArrayList<>();
             Instant deadline = Instant.now().plusSeconds(20);
-            while (events.size() < 7 && Instant.now().isBefore(deadline)) {
+            while (events.size() < 5 && Instant.now().isBefore(deadline)) {
                 for (ConsumerRecord<String, String> record :
                         consumer.poll(Duration.ofMillis(250))) {
                     EventEnvelope<SalesInfoSnapshot> event =
@@ -143,20 +168,18 @@ class SalesInfoEventKafkaTest extends CommerceCoreSecurityTestSupport {
                     events.add(event);
                 }
             }
-            assertThat(events).hasSize(7);
+            assertThat(events).hasSize(5);
             assertThat(events)
                     .extracting(EventEnvelope::eventType)
                     .containsExactly(
                             "SalesRegistered",
                             "PriceChanged",
                             "SalesStatusChanged",
-                            "InventoryChanged",
                             "SalesStatusChanged",
-                            "InventoryChanged",
                             "SalesStatusChanged");
             assertThat(events)
                     .extracting(e -> e.payload().snapshotVersion())
-                    .containsExactly(1L, 2L, 3L, 4L, 4L, 5L, 5L);
+                    .containsExactly(1L, 2L, 3L, 4L, 5L);
             assertThat(events.getLast().payload().available()).isEqualTo(1);
             assertThat(events.getLast().payload().status()).isEqualTo(SalesInfoStatus.ON_SALE);
             assertThat(events).extracting(EventEnvelope::eventId).doesNotHaveDuplicates();

@@ -127,7 +127,9 @@ public class OutboxConfiguration {
                     java.time.Duration retry,
             @org.springframework.beans.factory.annotation.Value(
                             "${shoppinglive.outbox.relay.claim.max-retry:1m}")
-                    java.time.Duration maxRetry) {
-        return new OutboxLeaseStore(jdbc, transactions, lease, retry, maxRetry);
+                    java.time.Duration maxRetry,
+            OutboxProperties properties) {
+        return new OutboxLeaseStore(
+                jdbc, transactions, lease, retry, maxRetry, properties.excludedTopics());
     }
 }

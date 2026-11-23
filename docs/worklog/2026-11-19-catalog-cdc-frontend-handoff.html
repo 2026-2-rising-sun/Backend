@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Catalog 지연 재고의 Frontend 인계</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="2026-11-19-catalog-cdc-frontend-handoff.md">MD 원본</a><a href="../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#범위와-확인-기준">범위와 확인 기준</a></li>
+<li><a href="#현재-화면이-먼저-거절하는-지점">현재 화면이 먼저 거절하는 지점</a></li>
+<li><a href="#새-catalog-응답-계약">새 Catalog 응답 계약</a></li>
+<li><a href="#필요한-후속-frontend-변경">필요한 후속 Frontend 변경</a></li>
+<li><a href="#후속-수용-시나리오">후속 수용 시나리오</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>Catalog 지연 재고의 Frontend 인계</h1><h2 id="범위와-확인-기준">범위와 확인 기준</h2>
+<p>Backend B는 Frontend를 읽기만 했다. Frontend 파일 변경·이슈 생성·브라우저/E2E 실행은 하지 않았다. 이 문서는 후속 Frontend 구현자가 새 Catalog 응답 의미를 적용할 때 필요한 인계이며, 백엔드만으로 현재 화면의 false rejection이 해결됐다는 보고가 아니다.</p>
+<p>확인한 체크아웃은 <code>/Users/junje/Projects/shoppinglive/Frontend</code>, 브랜치 <code>dev</code>, HEAD <code>890b475db6cf38da53b13bc7dac0953413d97f16</code>이며 확인 당시 미커밋 변경이 없었다. 아래 링크는 해당 SHA에 고정한다. Backend 기준은 <code>3537340c4686fec3b962da8ed02d368829d639af</code> 위의 B 미커밋 구현, 원본 API는 <a href="../../contracts/api/catalog-service.yaml">Catalog YAML</a> 2.1.0이다.</p>
+<h2 id="현재-화면이-먼저-거절하는-지점">현재 화면이 먼저 거절하는 지점</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>근거</th>
+<th>현재 조건</th>
+<th>지연 사본에서 생기는 결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/shopping/ProductDetailPage.tsx#L41">ProductDetailPage:41</a></td>
+<td>buyable = status==='SELLING' &amp;&amp; stock!==null &amp;&amp; stock&gt;0</td>
+<td>사본0/Core양수이거나 사본의 SOLD_OUT이 늦으면 Core에 묻기 전 진입을 막음</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/shopping/ProductDetailPage.tsx#L54">ProductDetailPage:54</a></td>
+<td>addCart가 !buyable이면 반환</td>
+<td>같은 사본 조건으로 장바구니 진입도 막음</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/shopping/ProductDetailPage.tsx#L75">ProductDetailPage:75</a></td>
+<td>QuantityStepper max=product.stock??1, disabled=!buyable</td>
+<td>사본2/Core20에서5개를 선택하지 못함</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/shopping/ProductDetailPage.tsx#L81">ProductDetailPage:81</a></td>
+<td>buyable이 아니면 비활성 버튼과 품절 표시</td>
+<td>서버의 purchasable=true를 받아도 stock/status 조건 때문에 구매 링크를 만들지 않음</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/components/ui/QuantityStepper.tsx#L17">QuantityStepper:17/37</a></td>
+<td>value&gt;=max이면 증가 버튼 비활성</td>
+<td>사본 재고를 max로 전달하는 호출자가 false rejection의 원인</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/api/http/mappers.ts#L4">mappers:4/10</a></td>
+<td>SOLD_OUT은 SOLD_OUT, available은 stock, purchasable은 전달. maxQuantity는 ProductDto/매핑에 없음</td>
+<td>새로운 진입 가능 표시와 입력 상한을 화면이 분리해 사용하지 못함</td>
+</tr>
+<tr>
+<td><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/live/components/LiveProductItem.tsx#L12">LiveProductItem:12</a></td>
+<td>status!=='SELLING'이면 soldOut</td>
+<td>같은 상품 상세 진입의 사본 상태 차단을 후속 점검해야 함. Live의 별도 원본·판매 정책을 이번 B가 바꾸지는 않음</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/api/http/index.ts#L50">api/http/index.ts:50/51</a>는 Catalog 상세와 purchase-check 어댑터를 제공한다. <code>rg 'products\.check\(' src</code>로 확인한 현재 src에는 purchase-check 호출자가 없었다. 따라서 purchase-check 서버 변경만으로 현재 상세 화면을 고칠 수 없다.</p>
+<h2 id="새-catalog-응답-계약">새 Catalog 응답 계약</h2>
+<p>새 필드를 추가하지 않고 기존 필드의 의미를 명시적으로 변경했다. 목록·상세의 available/salesStatus와 Core의 주문 승인 사이 경계를 유지한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>새 의미</th>
+<th>금지할 사용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>available</td>
+<td>기본60초 배치 이후 전파되는 표시 재고 사본</td>
+<td>입력 수량 상한·예약·구매 확정의 근거</td>
+</tr>
+<tr>
+<td>salesStatus</td>
+<td>표시 상태. SKU 판매의도 ON_SALE+사본available0이면 SOLD_OUT으로 표시</td>
+<td>SOLD_OUT 사본만으로 최신 Core 재고 확인 진입을 영구 차단</td>
+</tr>
+<tr>
+<td>purchasable</td>
+<td>공개 판매 상품이며 상품 전체 판매가 허용됐을 때 Core 확인 화면 진입 가능. SOLD_OUT/available0 사본이어도 true일 수 있음</td>
+<td>재고 예약 또는 구매 승인 완료로 해석</td>
+</tr>
+<tr>
+<td>상세 maxQuantity</td>
+<td>입력 형식 상한999999999. 상품 전체 중지이면0</td>
+<td>실제 남은 재고·판매량으로 표시</td>
+</tr>
+<tr>
+<td>purchase-check orderable</td>
+<td>공개 상품의 전체 판매 허용에 따른 Core 확인 진입 가능. 사본 수량 부족만으로 false가 되지 않음</td>
+<td>결제·주문 생성 성공 보장</td>
+</tr>
+<tr>
+<td>purchase-check reason</td>
+<td>전체 중지는 SALE_SUSPENDED, 허용이면null. SOLD_OUT/EXCEEDS_STOCK enum은 구 응답 호환용으로 남지만 새 사본 검사는 반환하지 않음</td>
+<td>구 enum이 존재한다는 이유로 사본 재고 거절을 다시 구현</td>
+</tr>
+<tr>
+<td>purchase-check maxQuantity</td>
+<td>허용 시999999999, 전체 중지 시0</td>
+<td>요청 수량을 available로 잘라 전송</td>
+</tr>
+</tbody>
+</table></div>
+<p>삭제/비공개는 기존404, 사본 미완성·기존 단일값 API로 읽을 수 없는 다중 SKU는503 경계를 유지한다. 품절 표시와 진입 허용은 다를 수 있다. 실제 가격·판매 가능량·경쟁 예약은 Core의 checkout과 최종 주문 생성에서 검증한다.</p>
+<h2 id="필요한-후속-frontend-변경">필요한 후속 Frontend 변경</h2>
+<ol>
+<li>Product DTO/도메인/매핑에서 상세 maxQuantity를 입력 형식 상한으로 전달하고 stock의 설명을 지연 사본으로 고친다. <code>purchasable</code>이 없거나 응답이 불완전하면 임의 true로 간주하지 말고 계약 오류/재조회로 처리한다.</li>
+<li>ProductDetail의 buyable·장바구니·바로 구매 조건은 서버의 진입 가능 표시와 응답 완전성을 사용한다. 공개 SOLD_OUT/available0 사본만으로 Core 확인을 막지 않는다. 판매 중지/삭제/비공개는 계속 막는다.</li>
+<li>QuantityStepper의 max는 사본 stock 대신 입력 형식 상한을 사용한다. 선택한 수량을 available로 축소하지 않고 Core checkout에 전달한다.</li>
+<li><a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/commerce/CheckoutPage.tsx#L29">CheckoutPage:29</a>의 Core checkout과 <a href="https://github.com/2026-2-rising-sun/Frontend/blob/890b475db6cf38da53b13bc7dac0953413d97f16/src/features/commerce/CheckoutPage.tsx#L53">같은 파일:53</a>의 최신 quote/orderable 검사, orderSheets.create의 최종 서버 검증을 유지한다. 이미 Core가 반환한 재고·오류를 Catalog 사본으로 덮어쓰지 않는다.</li>
+<li>LiveProductItem 등 다른 진입점은 자기 서버 응답의 의미를 대조한 뒤 같은 차단이 있는지 점검한다. Catalog 변경을 Live 업무 정책 변경 허가로 확대하지 않는다.</li>
+</ol>
+<h2 id="후속-수용-시나리오">후속 수용 시나리오</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>상황</th>
+<th>Frontend 기대 동작</th>
+<th>서버 최종 결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Catalog 사본0/SOLD_OUT, Core available20, 전체 판매 허용</td>
+<td>상세에서 Core 확인으로 진입하고5개 선택을 허용</td>
+<td>Core checkout·주문 생성이 최신20 기준으로5개 검증/예약</td>
+</tr>
+<tr>
+<td>Catalog 사본2, Core available20,5개 구매</td>
+<td>Stepper가2에서 막거나5를2로 줄이지 않고5개를 전송</td>
+<td>Core가5개를 검증/예약</td>
+</tr>
+<tr>
+<td>Catalog 사본20, Core available2,5개 구매</td>
+<td>진입 허용이 구매 성공을 보장하지 않음을 처리</td>
+<td>Core checkout 또는 최종 생성이 수량 부족을 거절. UI는 성공/결제 화면으로 진행하지 않음</td>
+</tr>
+<tr>
+<td>Catalog 사본20, Core available0 또는 동시 예약으로 소진</td>
+<td>Core 거절/충돌을 표시하고 최신 데이터를 다시 확인</td>
+<td>음수 재고·중복 예약 없이 거절</td>
+</tr>
+<tr>
+<td>상품 전체 판매 중지</td>
+<td>purchasable=false/orderable=false/SALE_SUSPENDED 또는0상한을 유지</td>
+<td>Core도 신규 주문 거절</td>
+</tr>
+<tr>
+<td>삭제/비공개/미완성 다중 SKU</td>
+<td>404/503을 성공이나 재고0으로 바꾸지 않음</td>
+<td>기존 노출·단일값 계약 경계 유지</td>
+</tr>
+</tbody>
+</table></div>
+<p>위 시나리오는 Frontend 후속 수용 기준이며 이 작업에서 실행한 브라우저/E2E 결과가 아니다. Backend에서는 사본0과 수량 초과에 대한 Catalog HTTP 회귀를 실행했다. 코드·DB·Kafka 검증 결과는 <a href="2026-11-19-catalog-cdc-sync.html">B 실행 기록</a>을 따른다.</p><p class="muted fingerprint">MD SHA-256: <code>1fe422d89218d5aac00a1620061313b6586c5656c704d293bcfe6c1cda91c51d</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>

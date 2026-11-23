@@ -16,9 +16,11 @@
 <li><a href="#적용-순서">적용 순서</a></li>
 </ul>
 </li>
+<li><a href="#catalog-cdc-상품-스냅샷">Catalog CDC 상품 스냅샷</a></li>
+<li><a href="#통합-등록-직후의-cdc알림-분포">통합 등록 직후의 CDC·알림 분포</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>Product 모듈</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 390" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="미생성·기존 JSON 등록" data-target="판매 준비·전체 false"><title>미생성·기존 JSON 등록 → 판매 준비·전체 false: 상품 기본정보 저장. SKU는 별도 생성이며 SKU 초기 READY. Product 등록과 Outbox version 0 저장.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="미생성·통합 등록" data-target="전체 true"><title>미생성·통합 등록 → 전체 true: 이미지·상품·모든 SKU를 한 번에 저장. SKU 최초 ON_SALE·예약 재고 0.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="판매 준비·전체 false" data-target="전체 true"><title>판매 준비·전체 false → 전체 true: 판매자가 판매 시작, 본인·미삭제·version 확인. Product만 변경하고 Outbox 기록.</title><path class="connector" d="M565,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="157.5">3</text></g><g class="edge-row" data-source="전체 true" data-target="전체 false"><title>전체 true → 전체 false: 판매자 전체 중지. Product만 변경하고 SKU 상태·수량은 보존.</title><path class="connector" d="M350,247 L405,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">4</text></g><g class="edge-row" data-source="전체 false" data-target="전체 true"><title>전체 false → 전체 true: 판매자 재개. 기존 개별 SKU 중지/품절 조건을 그대로 유지.</title><path class="connector" d="M405,247 L350,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">5</text></g><g class="edge-row" data-source="전체 true" data-target="삭제·전체 false"><title>전체 true → 삭제·전체 false: 본인·version 확인 후 deleted_at 저장. 원본·이미지·SKU·기존 주문 보존.</title><path class="connector" d="M350,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="242.0">6</text></g><g class="edge-row" data-source="전체 false" data-target="삭제·전체 false"><title>전체 false → 삭제·전체 false: 판매 준비 또는 중지 중에도 소프트 삭제 가능.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">7</text></g><g class="edge-row" data-source="삭제·전체 false" data-target="삭제·전체 false"><title>삭제·전체 false → 삭제·전체 false: 같은 판매자의 완료된 삭제 재요청은 추가 이벤트 없이 204. 복구 기능은 추가하지 않음.</title><path class="connector" d="M940,205 C880,167 1040,167 990,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="960" y="180">8</text></g><g><title>미생성·기존 JSON 등록</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">미생성·기존 JSON 등록</tspan></text></g><g><title>판매 준비·전체 false</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">판매 준비·전체 false</tspan></text></g><g><title>미생성·통합 등록</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">미생성·통합 등록</tspan></text></g><g><title>전체 true</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">전체 true</tspan></text></g><g><title>전체 false</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">전체 false</tspan></text></g><g><title>삭제·전체 false</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">삭제·전체 false</tspan></text></g></svg></div></section><p>Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 기준은 <code>cc91c09b</code> 위의 이 워크트리 구현이며 배포/운영 DB 적용 결과는 아니다. SKU #334의 가격·재고·개별 상태 구현과 후속 Order 연결은 별도로 통합한다.</p>
+</div></aside><main id="content"><h1>Product 모듈</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 390" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="미생성·기존 JSON 등록" data-target="판매 준비·전체 false"><title>미생성·기존 JSON 등록 → 판매 준비·전체 false: 상품 기본정보 저장. SKU는 별도 생성이며 SKU 초기 READY. Product 등록과 Outbox version 0 저장.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="미생성·통합 등록" data-target="전체 true"><title>미생성·통합 등록 → 전체 true: 이미지·상품·모든 SKU를 한 번에 저장. SKU 최초 ON_SALE·예약 재고 0.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="판매 준비·전체 false" data-target="전체 true"><title>판매 준비·전체 false → 전체 true: 판매자가 판매 시작, 본인·미삭제·version 확인. Product만 변경하고 Outbox 기록.</title><path class="connector" d="M565,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="157.5">3</text></g><g class="edge-row" data-source="전체 true" data-target="전체 false"><title>전체 true → 전체 false: 판매자 전체 중지. Product만 변경하고 SKU 상태·수량은 보존.</title><path class="connector" d="M350,247 L405,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">4</text></g><g class="edge-row" data-source="전체 false" data-target="전체 true"><title>전체 false → 전체 true: 판매자 재개. 기존 개별 SKU 중지/품절 조건을 그대로 유지.</title><path class="connector" d="M405,247 L350,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">5</text></g><g class="edge-row" data-source="전체 true" data-target="삭제·전체 false"><title>전체 true → 삭제·전체 false: 본인·version 확인 후 deleted_at 저장. 원본·이미지·SKU·기존 주문 보존.</title><path class="connector" d="M350,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="242.0">6</text></g><g class="edge-row" data-source="전체 false" data-target="삭제·전체 false"><title>전체 false → 삭제·전체 false: 판매 준비 또는 중지 중에도 소프트 삭제 가능.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">7</text></g><g class="edge-row" data-source="삭제·전체 false" data-target="삭제·전체 false"><title>삭제·전체 false → 삭제·전체 false: 같은 판매자의 완료된 삭제 재요청은 추가 이벤트 없이 204. 복구 기능은 추가하지 않음.</title><path class="connector" d="M940,205 C880,167 1040,167 990,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="960" y="180">8</text></g><g><title>미생성·기존 JSON 등록</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">미생성·기존 JSON 등록</tspan></text></g><g><title>판매 준비·전체 false</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">판매 준비·전체 false</tspan></text></g><g><title>미생성·통합 등록</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">미생성·통합 등록</tspan></text></g><g><title>전체 true</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">전체 true</tspan></text></g><g><title>전체 false</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">전체 false</tspan></text></g><g><title>삭제·전체 false</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">삭제·전체 false</tspan></text></g></svg></div></section><p>Product #333의 상품 표현 정보·전체 판매 제어·소프트 삭제와 거래 검증 경계를 설명한다. 현재 기준은 dev <code>d42c3b787f12b716789d35c8df37dd63a2b42ddc</code>다. #372 통합 상품/SKU 등록과 #379 CDC 경로가 병합됐으며 <a href="../../../flows/catalog-sync.html">상위 동기화 흐름</a>을 따른다. 아래 #333 당시 설명은 초기 설계 배경이고 운영 DB 적용 결과가 아니다.</p>
 <ul>
 <li><a href="erd.html">ERD 원본</a> · <a href="erd.html">ERD HTML</a></li>
 <li><a href="overview.html">상태 원본</a> · <a href="overview.html">상태 HTML</a></li>
@@ -27,7 +29,7 @@
 </ul>
 <p>MD가 원본이고 HTML은 저장소 렌더러로 생성한다. 실제 테스트 결과와 환경·미실행 범위는 <a href="../../../../worklog/2026-11-13.html">작업 기록</a>을 따른다.</p>
 <h2 id="product-상태--전체-제어와-sku-개별-조건">Product 상태 — 전체 제어와 SKU 개별 조건</h2>
-<p>기준: <code>cc91c09b</code> 위 Product #333 구현. ProductLifecycleService와 ProductTradingService, Catalog의 최소 제어 반영을 설명한다. SKU/Order의 후속 연결은 통합 대상이며 운영 배포 완료를 뜻하지 않는다.</p>
+<p>ProductLifecycleService와 ProductTradingService의 상태 경계를 설명한다. 현재 Catalog에는 최소 제어뿐 아니라 상품·SKU 전체 스냅샷과 독립 재고 버전을 전달한다. 운영 배포 완료를 뜻하지 않는다.</p>
 <p><a href="overview.html">시각 자료</a></p>
 <p>전체 스위치는 매장의 상품 전체에 붙은 판매 허용 조건이다. 각 SKU의 개별 중지나 재고 부족과 독립적이다. 전체 스위치를 다시 켜도 개별 중지된 옵션을 재개하거나 재고를 늘리지 않는다.</p>
 <h3 id="전이">전이</h3>
@@ -159,6 +161,48 @@
 <p>파일은 DB와 원자적으로 커밋되지 않는다. 롤백 확인 뒤 전용 파일을 즉시 지우며, 커밋 결과가 불명확하면 완료 기록 재조회 전에는 지우지 않는다. DB 접속·파일 삭제 실패는 복구 기록을 보존한다. 스케줄러는 1시간 이상 된 미완료 요청 최대 50개를 1분마다 FOR UPDATE SKIP LOCKED로 확인하고, product_image 메타데이터가 없는 키만 삭제한다. 연결·공유 이미지와 완료 요청은 보존한다. 로컬 저장소는 그 키로 추적되는 중단 임시 파일도 회수한다. 같은 미완료 요청을 재시도하면 남은 파일을 재사용하거나 같은 키로 다시 저장한다.</p>
 <p>initialSkuCount는 통합 등록의 불변 초기 SKU 수다. 이후 Product snapshot에도 유지한다. Catalog가 상품 이벤트와 첫 SKU만 수신한 순간에도 다중 SKU를 단일 상품으로 오인하지 않게 한다. 기존 Catalog 단일 판매 계약은 다중 SKU를 503으로 거절한다. 다중 SKU 고객 선택·대표 가격·합산 재고는 제공하지 않으며, Core 주문의 최종 검증은 유지한다.</p>
 <h3 id="적용-순서">적용 순서</h3>
-<p>Catalog V4와 소비자·조회 보호를 먼저 모든 인스턴스에 적용한다. 이어 Core V108과 새 생산자를 모든 인스턴스에 적용한 뒤 통합 등록 API 트래픽을 연다. initialSkuCount를 모르는 구형 Catalog가 실행 중인 채로 통합 등록을 열면 부분 수신 보호가 보장되지 않는다. 실제 배포는 이번 로컬 구현 검증에 포함하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>3a5c1f77b46ae1645986002df14cd192ef5d5bce402554829a23af30a7de1ca9</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>Catalog V4와 소비자·조회 보호를 먼저 모든 인스턴스에 적용한다. 이어 Core V108과 새 생산자를 모든 인스턴스에 적용한 뒤 통합 등록 API 트래픽을 연다. initialSkuCount를 모르는 구형 Catalog가 실행 중인 채로 통합 등록을 열면 부분 수신 보호가 보장되지 않는다. 실제 배포는 이번 로컬 구현 검증에 포함하지 않는다.</p>
+<h2 id="catalog-cdc-상품-스냅샷">Catalog CDC 상품 스냅샷</h2>
+<p><code>ProductInfoEventPublisher</code>는 상품 저장과 같은 TX에서 <code>commerce.catalog.snapshots.v1</code>의 ProductSnapshotChanged를 저장한다. key/aggregateId는 product:{id}, metadataVersion은 Product의 JPA version(최초0)이다. 이미지 ID/URL·설명·카테고리·판매자·판매 제어·삭제 이력·initialSkuCount를 모두 담는다. timestamp는 flush 후 DB 저장 정밀도로 읽어 재적재 같은 버전과 원문을 일치시킨다. 구 commerce.product-info.v1에 이중 발행하지 않는다. 삭제 Product는 재적재에서도 남고 복원 기능을 추가하지 않는다.</p>
+<h2 id="통합-등록-직후의-cdc알림-분포">통합 등록 직후의 CDC·알림 분포</h2>
+<p>상품1개와 SKU N개를 등록하면 같은 업무 TX의 Outbox는 상품 CDC1건·SKU 메타데이터 CDC N건·기존 SalesRegistered N건이다. SKU2개이면 총5건이며 타입·토픽·키가 서로 달라 중복 메타데이터 발행이 아니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>타입</th>
+<th>토픽</th>
+<th>키</th>
+<th>등록 직후 건수</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ProductSnapshotChanged</td>
+<td>commerce.catalog.snapshots.v1</td>
+<td>product:{productId}</td>
+<td>1</td>
+</tr>
+<tr>
+<td>SkuSnapshotChanged</td>
+<td>commerce.catalog.snapshots.v1</td>
+<td>sku:{skuId}</td>
+<td>SKU별1</td>
+</tr>
+<tr>
+<td>SalesRegistered</td>
+<td>commerce.sales-info.v1</td>
+<td>SKU ID 숫자 문자열</td>
+<td>SKU별1</td>
+</tr>
+<tr>
+<td>InventorySnapshotChanged</td>
+<td>commerce.catalog.snapshots.v1</td>
+<td>sku:{skuId}</td>
+<td>0. 영속 dirty revision을 기본60초 배치가 합쳐 발행</td>
+</tr>
+</tbody>
+</table></div>
+<p>일반/claim relay는 Catalog CDC 행을 배제하고 기존 판매 알림만 전송한다. Product/SKU CDC 또는 기존 판매 알림 Outbox 저장이 실패하면 이미지 메타데이터·상품·모든 SKU·완료 멱등 응답·Outbox는 함께 롤백한다. 별도 TX의 미완료 파일 복구 위치는 보존하고 참조 없는 파일을 정리하며 같은 요청으로 재시도할 수 있다.</p>
+<p>실제 PostgreSQL CHECK 장애 주입과 일반/claim relay의 EmbeddedKafka 판매 알림 수신 범위는 <a href="../../../../worklog/2026-11-20-product-bundle-cdc-regressions.html">상품 등록 회귀 후속 기록</a>을 따른다. 이 relay 검사는 CDC 메시지 수동 재발행이나 실제 앱→CDC→Catalog 종단 증거가 아니다.</p><p class="muted fingerprint">MD SHA-256: <code>82eb7210dd3f90994ff3fe359a503e063a836627c7990ae03ccd7e0db690eff2</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

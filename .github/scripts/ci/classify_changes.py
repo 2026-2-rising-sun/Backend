@@ -213,9 +213,9 @@ def classify(changes, full_reason=None):
         elif path.startswith("harness/") or (path.startswith("scripts/") and "/" not in path.removeprefix("scripts/")):
             tools["harness"] = tools["classifier"] = True
             action = "harness-tool"
-        elif path.startswith("scripts/local/auth-env."):
+        elif path.startswith("scripts/local/"):
             tools["local_auth"] = True
-            action = "local-auth-tool"
+            action = "local-tool"
         elif path.startswith("contracts/api/"):
             api = True
             action = "api-spec"

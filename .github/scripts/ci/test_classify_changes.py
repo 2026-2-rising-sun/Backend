@@ -151,6 +151,14 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(event_plan(Path("."), "workflow_dispatch", {})["gradle_tasks"], ["build"])
         self.assertTrue(event_plan(Path("."), "unknown", {})["run_tests"])
 
+    def test_removed_local_middleware_runs_tools_without_full_service_build(self):
+        """Infra로 옮긴 로컬 도구 삭제는 전체 서비스 빌드로 확대하지 않는다."""
+        plan = classify([Change("scripts/local/msa-compose.yml", b"services: {}", None),
+                         Change("scripts/local/msa-init/01-databases.sql", b"CREATE DATABASE commercecore;", None)])
+        self.assertTrue(plan["local_auth"])
+        self.assertEqual(plan["gradle_tasks"], [])
+        self.assertFalse(plan["api"])
+
     def test_migration_add_modify_delete_only_selects_changed_service(self):
         path = "services/commercecore-service/src/main/resources/db/migration/V99__example.sql"
         for before, after in ((None, b"CREATE TABLE example(id bigint)"),

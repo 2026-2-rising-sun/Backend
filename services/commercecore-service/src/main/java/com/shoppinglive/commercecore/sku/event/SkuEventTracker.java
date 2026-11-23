@@ -21,8 +21,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SkuEventTracker {
     private final JdbcTemplate jdbc;
     private final EventOutbox outbox;
+    private final CatalogSnapshotPublisher catalog;
 
-    public SkuEventTracker(JdbcTemplate jdbc, EventOutbox outbox) {
+    public SkuEventTracker(
+            JdbcTemplate jdbc, EventOutbox outbox, CatalogSnapshotPublisher catalog) {
+        this.catalog = catalog;
         this.jdbc = jdbc;
         this.outbox = outbox;
     }
@@ -35,10 +38,15 @@ public class SkuEventTracker {
             throw new SalesNotFoundException("SKU를 찾을 수 없습니다: skuId=" + skuId);
         }
         pending.before.put(skuId, snapshot(skuId));
+        pending.metadataBefore.put(skuId, metadataVersion(skuId));
     }
 
     public void registered(long skuId) {
         pending().before.put(skuId, null);
+    }
+
+    private long metadataVersion(long id) {
+        return jdbc.queryForObject("SELECT metadata_version FROM sku WHERE id=?", Long.class, id);
     }
 
     private Pending pending() {
@@ -80,6 +88,7 @@ public class SkuEventTracker {
 
     private final class Pending implements TransactionSynchronization {
         private final Map<Long, SalesInfoSnapshot> before = new LinkedHashMap<>();
+        private final Map<Long, Long> metadataBefore = new LinkedHashMap<>();
 
         private SkuEventTracker owner() {
             return SkuEventTracker.this;
@@ -90,17 +99,18 @@ public class SkuEventTracker {
             for (Map.Entry<Long, SalesInfoSnapshot> entry : before.entrySet()) {
                 SalesInfoSnapshot initial = entry.getValue();
                 SalesInfoSnapshot current = snapshot(entry.getKey());
+                if (initial == null
+                        || metadataBefore.get(entry.getKey()) != metadataVersion(entry.getKey()))
+                    catalog.metadataChanged(entry.getKey());
                 List<SalesInfoEventType> types = new ArrayList<>();
                 if (initial == null) types.add(SalesInfoEventType.SalesRegistered);
                 else {
                     if (initial.price() != current.price())
                         types.add(SalesInfoEventType.PriceChanged);
-                    if (initial.available() != current.available())
-                        types.add(SalesInfoEventType.InventoryChanged);
                     if (initial.status() != current.status())
                         types.add(SalesInfoEventType.SalesStatusChanged);
                 }
-                if (types.isEmpty()) continue;
+                if (types.isEmpty() && initial.available() == current.available()) continue;
                 if (initial != null) {
                     if (jdbc.update(
                                     "UPDATE sku SET snapshot_version=snapshot_version+1 WHERE id=?",

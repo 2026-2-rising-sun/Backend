@@ -2,7 +2,7 @@
 
 <!-- generated: OpenAPI -->
 
-[계약 YAML](../../../../contracts/api/catalog-service.yaml) · OpenAPI 3.1.0 · 계약 2.0.0
+[계약 YAML](../../../../contracts/api/catalog-service.yaml) · OpenAPI 3.1.0 · 계약 2.1.0
 
 계약에 선언된 API입니다. 실제 응답·인증·외부 서비스 실행 결과는 워크로그에서 확인합니다.
 
@@ -25,7 +25,7 @@ servers:
 
 공개 상품 목록
 
-모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도 200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 shopping.sales.backfill.enabled=true로 적재해야 한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
+모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도 200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 Core commercecore.catalog.backfill.enabled=true 기동으로 같은 버전의 상품·SKU·재고 Outbox를 적재한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
 q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
 q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다. 상품당 단일 SKU의 기존 공개 응답을 유지한다. 복수 SKU 사본의 저장은 지원하지만 대표가·가격 정렬·공개 옵션 선택은 미확정이며, 단일 판매 응답으로 축약할 수 없는 복수 SKU는 503 판매정보 조회 불가로 구분한다. 목록은 검색·카테고리·공개 상태에 해당하는 상품의 전체 SKU 수를 커서·페이지 적용 전에 검사하며 비공개 SKU도 수에 포함한다.
@@ -49,7 +49,7 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | 상태 코드 | 설명 |
 |---|---|
 | 401 | 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401. |
-| 200 | ON_SALE 또는 SOLD_OUT 상품에 검색·상태·카테고리·정렬 조건을 적용한다. 기본은 최신 등록순이다. |
+| 200 | 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다. 실제 가격·판매 가능량은 Core 주문 생성에서 검증한다. |
 | 400 | 요청 형식 또는 값이 올바르지 않음 |
 
 #### 401 · application/json
@@ -76,7 +76,7 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | data.items&#91;&#93;.price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data.items&#91;&#93;.available | integer | 필수 | 결제 대기 예약분을 제외한 주문 가능 재고. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다. | {&quot;minimum&quot;: 0} |
 | data.items&#91;&#93;.salesStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;&#93;} |
-| data.items&#91;&#93;.purchasable | boolean | 필수 | ON_SALE이고 available이 0보다 클 때만 true. | — |
+| data.items&#91;&#93;.purchasable | boolean | 필수 | 공개 판매 상태와 상품 전체 판매 허용에 따른 Core 확인 진입 가능 표시. 재고 사본을 사용한 구매 확정이 아니다. | — |
 | data.items&#91;&#93;.category | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST. | {&quot;enum&quot;: &#91;&quot;FASHION&quot;, &quot;BEAUTY&quot;, &quot;FOOD&quot;, &quot;LIVING&quot;, &quot;DIGITAL&quot;, &quot;KIDS&quot;, &quot;ETC&quot;, null&#93;} |
 | data.nextCursor | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 | data.hasNext | boolean | 필수 |  | — |
@@ -102,8 +102,8 @@ tags:
 summary: 공개 상품 목록
 operationId: listPublicProducts
 description: '모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도
-  200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 shopping.sales.backfill.enabled=true로 적재해야 한다.
-  상세·주문 가격 확정은 기존 경로를 유지한다.
+  200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 Core commercecore.catalog.backfill.enabled=true
+  기동으로 같은 버전의 상품·SKU·재고 Outbox를 적재한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
 
   q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort
   조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
@@ -165,7 +165,8 @@ responses:
   '401':
     $ref: '#/components/responses/Unauthorized'
   '200':
-    description: ON_SALE 또는 SOLD_OUT 상품에 검색·상태·카테고리·정렬 조건을 적용한다. 기본은 최신 등록순이다.
+    description: 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다.
+      실제 가격·판매 가능량은 Core 주문 생성에서 검증한다.
     content:
       application/json:
         schema:
@@ -198,7 +199,7 @@ responses:
                   price: 39000
                   available: 0
                   salesStatus: ON_SALE
-                  purchasable: false
+                  purchasable: true
                   category: null
                 nextCursor: null
                 hasNext: false
@@ -241,7 +242,7 @@ responses:
 | 상태 코드 | 설명 |
 |---|---|
 | 401 | 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401. |
-| 200 | 상품과 판매정보를 결합한 조회 결과다. 최종 가격·재고는 주문 생성 시 확인한다. |
+| 200 | 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다. 실제 가격·판매 가능량은 Core 주문 생성에서 검증한다. |
 | 400 | 요청 형식 또는 값이 올바르지 않음 |
 | 404 | 대상이 없거나 공개 대상이 아님 |
 | 503 | 판매정보를 조회할 수 없음 |
@@ -270,8 +271,8 @@ responses:
 | data.price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | data.salesStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;&#93;} |
 | data.available | integer | 필수 |  | {&quot;minimum&quot;: 0} |
-| data.purchasable | boolean | 필수 |  | — |
-| data.maxQuantity | integer | 필수 |  | {&quot;minimum&quot;: 0} |
+| data.purchasable | boolean | 필수 | 공개 판매 상태와 상품 전체 판매 허용에 따른 Core 확인 진입 가능 표시. 재고 사본을 사용한 구매 확정이 아니다. | — |
+| data.maxQuantity | integer | 필수 | 수량 입력 형식 상한 999999999. 상품 전체 판매 중지이면 0이며 실제 구매 가능량은 Core에서 검증한다. | {&quot;minimum&quot;: 0} |
 | data.category | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST. | {&quot;enum&quot;: &#91;&quot;FASHION&quot;, &quot;BEAUTY&quot;, &quot;FOOD&quot;, &quot;LIVING&quot;, &quot;DIGITAL&quot;, &quot;KIDS&quot;, &quot;ETC&quot;, null&#93;} |
 | error | null | 필수 |  | — |
 
@@ -320,7 +321,8 @@ responses:
   '401':
     $ref: '#/components/responses/Unauthorized'
   '200':
-    description: 상품과 판매정보를 결합한 조회 결과다. 최종 가격·재고는 주문 생성 시 확인한다.
+    description: 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다.
+      실제 가격·판매 가능량은 Core 주문 생성에서 검증한다.
     content:
       application/json:
         schema:
@@ -338,7 +340,7 @@ responses:
                 salesStatus: ON_SALE
                 available: 5
                 purchasable: true
-                maxQuantity: 5
+                maxQuantity: 999999999
                 category: FASHION
               error: null
           soldOut:
@@ -352,8 +354,8 @@ responses:
                 price: 39000
                 salesStatus: SOLD_OUT
                 available: 0
-                purchasable: false
-                maxQuantity: 0
+                purchasable: true
+                maxQuantity: 999999999
                 category: null
               error: null
   '400':
@@ -393,7 +395,7 @@ responses:
 | 상태 코드 | 설명 |
 |---|---|
 | 401 | 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401. |
-| 200 | 재고를 예약하거나 차감하지 않는다. 최종 가격과 재고 확인은 Commerce 주문 생성 시 수행한다. |
+| 200 | 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다. 실제 가격·판매 가능량은 Core 주문 생성에서 검증한다. |
 | 400 | 요청 형식 또는 값이 올바르지 않음 |
 | 404 | 대상이 없거나 공개 대상이 아님 |
 | 503 | 판매정보를 조회할 수 없음 |
@@ -417,9 +419,9 @@ responses:
 | data | object | 필수 |  | — |
 | data.productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
 | data.quantity | integer | 필수 |  | — |
-| data.orderable | boolean | 필수 |  | — |
-| data.reason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 상품 전체 중지는 SALE_SUSPENDED, SKU 품절은 SOLD_OUT, 수량 초과는 EXCEEDS_STOCK이며 주문 가능하면 null이다. | {&quot;enum&quot;: &#91;&quot;SALE_SUSPENDED&quot;, &quot;SOLD_OUT&quot;, &quot;EXCEEDS_STOCK&quot;, null&#93;} |
-| data.maxQuantity | integer | 필수 |  | — |
+| data.orderable | boolean | 필수 | 상품 전체 판매가 허용된 공개 상품이면 true. 사본 수량과 품절만으로 거절하지 않으며 실제 주문 승인은 Core가 판단한다. | — |
+| data.reason | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 상품 전체 중지는 SALE_SUSPENDED. SOLD_OUT/EXCEEDS_STOCK은 구 응답 호환 enum이며 새 사전 확인에서는 사본 재고를 이유로 반환하지 않는다. | {&quot;enum&quot;: &#91;&quot;SALE_SUSPENDED&quot;, &quot;SOLD_OUT&quot;, &quot;EXCEEDS_STOCK&quot;, null&#93;} |
+| data.maxQuantity | integer | 필수 | 수량 입력 형식 상한 999999999. 상품 전체 판매 중지이면 0이며 실제 구매 가능량은 Core에서 검증한다. | — |
 | data.unitPrice | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
 | error | null | 필수 |  | — |
 
@@ -477,7 +479,8 @@ responses:
   '401':
     $ref: '#/components/responses/Unauthorized'
   '200':
-    description: 재고를 예약하거나 차감하지 않는다. 최종 가격과 재고 확인은 Commerce 주문 생성 시 수행한다.
+    description: 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다.
+      실제 가격·판매 가능량은 Core 주문 생성에서 검증한다.
     content:
       application/json:
         schema:
@@ -491,7 +494,7 @@ responses:
                 quantity: 1
                 orderable: true
                 reason: null
-                maxQuantity: 5
+                maxQuantity: 999999999
                 unitPrice: 39000
               error: null
           soldOut:
@@ -500,9 +503,9 @@ responses:
               data:
                 productId: 1
                 quantity: 1
-                orderable: false
-                reason: SOLD_OUT
-                maxQuantity: 0
+                orderable: true
+                reason: null
+                maxQuantity: 999999999
                 unitPrice: 39000
               error: null
           exceedsStock:
@@ -511,9 +514,9 @@ responses:
               data:
                 productId: 1
                 quantity: 6
-                orderable: false
-                reason: EXCEEDS_STOCK
-                maxQuantity: 5
+                orderable: true
+                reason: null
+                maxQuantity: 999999999
                 unitPrice: 39000
               error: null
   '400':
@@ -853,7 +856,8 @@ components:
           - SOLD_OUT
         purchasable:
           type: boolean
-          description: ON_SALE이고 available이 0보다 클 때만 true.
+          description: 공개 판매 상태와 상품 전체 판매 허용에 따른 Core 확인 진입 가능 표시. 재고 사본을 사용한 구매 확정이
+            아니다.
         category:
           $ref: '#/components/schemas/ProductCategory'
     ProductCategory:
@@ -922,9 +926,13 @@ components:
           minimum: 0
         purchasable:
           type: boolean
+          description: 공개 판매 상태와 상품 전체 판매 허용에 따른 Core 확인 진입 가능 표시. 재고 사본을 사용한 구매 확정이
+            아니다.
         maxQuantity:
           type: integer
           minimum: 0
+          description: 수량 입력 형식 상한 999999999. 상품 전체 판매 중지이면 0이며 실제 구매 가능량은 Core에서
+            검증한다.
         category:
           $ref: '#/components/schemas/ProductCategory'
     PurchaseCheckEnvelope:
@@ -958,6 +966,8 @@ components:
           type: integer
         orderable:
           type: boolean
+          description: 상품 전체 판매가 허용된 공개 상품이면 true. 사본 수량과 품절만으로 거절하지 않으며 실제 주문 승인은
+            Core가 판단한다.
         reason:
           type:
           - string
@@ -967,10 +977,12 @@ components:
           - SOLD_OUT
           - EXCEEDS_STOCK
           - null
-          description: 상품 전체 중지는 SALE_SUSPENDED, SKU 품절은 SOLD_OUT, 수량 초과는 EXCEEDS_STOCK이며
-            주문 가능하면 null이다.
+          description: 상품 전체 중지는 SALE_SUSPENDED. SOLD_OUT/EXCEEDS_STOCK은 구 응답 호환 enum이며
+            새 사전 확인에서는 사본 재고를 이유로 반환하지 않는다.
         maxQuantity:
           type: integer
+          description: 수량 입력 형식 상한 999999999. 상품 전체 판매 중지이면 0이며 실제 구매 가능량은 Core에서
+            검증한다.
         unitPrice:
           type: integer
           format: int64
@@ -1063,4 +1075,4 @@ components:
           - 'null'
 ```
 
-입력 SHA-256: `6be25b626c44e63600ea725860d07b9bf554bd1160d5e65f81f38d9fe7afdf9e`
+입력 SHA-256: `90ce16e49d7c511fc7f0aa4047b1739a0e0016ee96bd386ed6daafb63277c047`

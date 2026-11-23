@@ -5,17 +5,15 @@
 *{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
 </style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="refund.md">MD 원본</a><a href="../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
 <ul>
-<li><a href="#책임과-경계">책임과 경계</a></li>
-<li><a href="#전이">전이</a></li>
-<li><a href="#상세와-근거">상세와 근거</a></li>
+<li><a href="#현재-dev-기존-사용자-환불">현재 dev: 기존 사용자 환불</a></li>
+<li><a href="#현재-dev-종료-주문의-늦은-승인">현재 dev: 종료 주문의 늦은 승인</a></li>
+<li><a href="#미병합-378-사용자-환불과-시스템-보상의-분리">미병합 #378: 사용자 환불과 시스템 보상의 분리</a></li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>환불 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 730" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="사용자" data-target="Core 접수"><title>사용자 → Core 접수: 소유권·기간·대상·누적 금액·멱등 키를 확인한다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="Core 요청" data-target="Payment 실행"><title>Core 요청 → Payment 실행: 환불 전달 토글이 활성일 때 영속 원문을 전달한다. Payment 실행 토글은 별도로 적용한다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="Payment 확정" data-target="Core 결과 반영"><title>Payment 확정 → Core 결과 반영: 원결제·금액·대상과 결과 일치 확인 후 성공 대상 주문만 REFUNDED 및 재고 복원</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="부분 환불" data-target="묶음 PAID 유지"><title>부분 환불 → 묶음 PAID 유지: 남은 자식 주문이 있으면 묶음 전체를 REFUNDED로 변경하지 않는다.</title><path class="connector" d="M350,417 L405,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="412.0">4</text></g><g class="edge-row" data-source="모든 대상 완료" data-target="묶음 REFUNDED"><title>모든 대상 완료 → 묶음 REFUNDED: 모든 자식 주문의 상태가 REFUNDED인 경우.</title><path class="connector" d="M940,460 L190,545" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="497.5">5</text></g><g class="edge-row" data-source="UNKNOWN" data-target="결과 조회 유지"><title>UNKNOWN → 결과 조회 유지: 예산 소진·시간 초과만으로 확정 실패하지 않는다.</title><path class="connector" d="M725,587 L780,587" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="582.0">6</text></g><g><title>사용자</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">사용자</tspan></text></g><g><title>Core 접수</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">Core 접수</tspan></text></g><g><title>Core 요청</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">Core 요청</tspan></text></g><g><title>Payment 실행</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">Payment 실행</tspan></text></g><g><title>Payment 확정</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">Payment 확정</tspan></text></g><g><title>Core 결과 반영</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Core 결과 반영</tspan></text></g><g><title>부분 환불</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">부분 환불</tspan></text></g><g><title>묶음 PAID 유지</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">묶음 PAID 유지</tspan></text></g><g><title>모든 대상 완료</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">모든 대상 완료</tspan></text></g><g><title>묶음 REFUNDED</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">묶음 REFUNDED</tspan></text></g><g><title>UNKNOWN</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">UNKNOWN</tspan></text></g><g><title>결과 조회 유지</title><rect x="780" y="545" width="320" height="85" rx="5"/><text x="940" y="573" text-anchor="middle"><tspan x="940" dy="0">결과 조회 유지</tspan></text></g></svg></div></section><p><strong>교체 예정:</strong> 현재 Mock 구현 설명이다. 결제 재설계(#337)에서 교체하며, 새 설계는 <a href="../services/payment/overview.html">Payment 도메인 홈</a>에 있다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). Core의 기존 환불 호출(<code>HttpPaymentClient</code>)은 403을 받는다. 결제는 새 주문서 결제 중계(<a href="order-payment.html">주문·결제</a>)를 쓴다.</p>
-<p>기준: <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사. #330의 미커밋 문서 변경을 포함하며 업무 코드 변경은 없다. 실제 DB·HTTP·Kafka·PG 실행 검증은 별도다.</p>
-<p><a href="refund.html">시각 자료</a></p>
-<h2 id="책임과-경계">책임과 경계</h2>
-<p>Core 접수·전달과 Payment 실행의 토글을 구분한다. 실행 중/미확정/성공 환불을 누적 금액에 포함하고 중복 결과로 재고를 다시 복원하지 않는다.</p>
-<h2 id="전이">전이</h2>
+</div></aside><main id="content"><h1>환불 서비스 간 흐름</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 730" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="legacy PAID" data-target="refund_request PROCESSING"><title>legacy PAID → refund_request PROCESSING: 원결제 HTTP 조회는 Core TX 밖에서 하고 잠금 아래 연결을 재검증한다. 대상·금액·전달 원문을 저장한다.</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="영속 REFUND 전달" data-target="기존 Payment HTTP"><title>영속 REFUND 전달 → 기존 Payment HTTP: execution-enabled일 때 커밋 후 고정 requestId/원문을 /v1/internal/refunds로 전달한다.</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="PROCESSING" data-target="UNKNOWN"><title>PROCESSING → UNKNOWN: 유효한 미확정 결과를 보존하고 재전달·조회한다. 시간 경과만으로 실패로 확정하지 않는다.</title><path class="connector" d="M725,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="752.5" y="242.0">3</text></g><g class="edge-row" data-source="PROCESSING/UNKNOWN" data-target="SUCCESS"><title>PROCESSING/UNKNOWN → SUCCESS: 검증된 성공 대상만 REFUNDED로 바꾸고 SKU 재고를 복구한다. 중복 결과는 다시 복구하지 않는다.</title><path class="connector" d="M350,417 L405,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="412.0">4</text></g><g class="edge-row" data-source="PROCESSING/UNKNOWN" data-target="FAILED"><title>PROCESSING/UNKNOWN → FAILED: 확정 실패만 반영하며 성공 재고 복원을 하지 않는다.</title><path class="connector" d="M350,417 L780,417" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="412.0">5</text></g><g class="edge-row" data-source="일부 항목 환불" data-target="묶음 PAID 유지"><title>일부 항목 환불 → 묶음 PAID 유지: 모든 자식 주문이 REFUNDED일 때만 묶음도 REFUNDED가 된다.</title><path class="connector" d="M350,587 L405,587" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="582.0">6</text></g><g><title>legacy PAID</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">legacy PAID</tspan></text></g><g><title>refund_request PROCESSING</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">refund_request PROCESSING</tspan></text></g><g><title>영속 REFUND 전달</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">영속 REFUND 전달</tspan></text></g><g><title>기존 Payment HTTP</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">기존 Payment HTTP</tspan></text></g><g><title>PROCESSING</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">PROCESSING</tspan></text></g><g><title>UNKNOWN</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">UNKNOWN</tspan></text></g><g><title>PROCESSING/UNKNOWN</title><rect x="30" y="375" width="320" height="85" rx="5"/><text x="190" y="403" text-anchor="middle"><tspan x="190" dy="0">PROCESSING/UNKNOWN</tspan></text></g><g><title>SUCCESS</title><rect x="405" y="375" width="320" height="85" rx="5"/><text x="565" y="403" text-anchor="middle"><tspan x="565" dy="0">SUCCESS</tspan></text></g><g><title>FAILED</title><rect x="780" y="375" width="320" height="85" rx="5"/><text x="940" y="403" text-anchor="middle"><tspan x="940" dy="0">FAILED</tspan></text></g><g><title>일부 항목 환불</title><rect x="30" y="545" width="320" height="85" rx="5"/><text x="190" y="573" text-anchor="middle"><tspan x="190" dy="0">일부 항목 환불</tspan></text></g><g><title>묶음 PAID 유지</title><rect x="405" y="545" width="320" height="85" rx="5"/><text x="565" y="573" text-anchor="middle"><tspan x="565" dy="0">묶음 PAID 유지</tspan></text></g></svg></div></section><p>기준: 2026-11-20 dev <code>d42c3b787f12b716789d35c8df37dd63a2b42ddc</code>의 Core 코드. <a href="https://github.com/2026-2-rising-sun/Backend/pull/378">#378</a>(head <code>228f33faaa5e9519ffd74ec12b2878825fa85dde</code>)은 미병합 Draft이며 아래 목표 흐름은 dev 동작이 아니다. Payment 환불 연동 완료나 실제 금전 환불을 확인한 문서가 아니다.</p>
+<p><a href="refund.html">시각 자료</a> · <a href="order-payment.html">주문·결제</a> · <a href="../../worklog/2026-11-20-cdc-refund-status.html">확인 근거와 잔여 과제</a></p>
+<h2 id="현재-dev-기존-사용자-환불">현재 dev: 기존 사용자 환불</h2>
+<p><a href="../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/RefundIntakeService.java">RefundIntakeService</a>는 legacy 실행 주문만 접수한다. 새 주문서의 사용자 환불을 이 입구가 제공한다고 해석하지 않는다. 소유권·원결제 성공·확정 시각부터 168시간 미만·대상·누적 금액·멱등 원문을 확인한다. 항목 전체 환불 계약이며 신규 수량 환불 완료를 뜻하지 않는다.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -26,42 +24,75 @@
 </thead>
 <tbody>
 <tr>
-<td>사용자</td>
-<td>Core 접수</td>
-<td>소유권·기간·대상·누적 금액·멱등 키를 확인한다.</td>
+<td>legacy PAID</td>
+<td>refund_request PROCESSING</td>
+<td>원결제 HTTP 조회는 Core TX 밖에서 하고 잠금 아래 연결을 재검증한다. 대상·금액·전달 원문을 저장한다.</td>
 </tr>
 <tr>
-<td>Core 요청</td>
-<td>Payment 실행</td>
-<td>환불 전달 토글이 활성일 때 영속 원문을 전달한다. Payment 실행 토글은 별도로 적용한다.</td>
+<td>영속 REFUND 전달</td>
+<td>기존 Payment HTTP</td>
+<td>execution-enabled일 때 커밋 후 고정 requestId/원문을 /v1/internal/refunds로 전달한다.</td>
 </tr>
 <tr>
-<td>Payment 확정</td>
-<td>Core 결과 반영</td>
-<td>원결제·금액·대상과 결과 일치 확인 후 성공 대상 주문만 REFUNDED 및 재고 복원</td>
-</tr>
-<tr>
-<td>부분 환불</td>
-<td>묶음 PAID 유지</td>
-<td>남은 자식 주문이 있으면 묶음 전체를 REFUNDED로 변경하지 않는다.</td>
-</tr>
-<tr>
-<td>모든 대상 완료</td>
-<td>묶음 REFUNDED</td>
-<td>모든 자식 주문의 상태가 REFUNDED인 경우.</td>
-</tr>
-<tr>
+<td>PROCESSING</td>
 <td>UNKNOWN</td>
-<td>결과 조회 유지</td>
-<td>예산 소진·시간 초과만으로 확정 실패하지 않는다.</td>
+<td>유효한 미확정 결과를 보존하고 재전달·조회한다. 시간 경과만으로 실패로 확정하지 않는다.</td>
+</tr>
+<tr>
+<td>PROCESSING/UNKNOWN</td>
+<td>SUCCESS</td>
+<td>검증된 성공 대상만 REFUNDED로 바꾸고 SKU 재고를 복구한다. 중복 결과는 다시 복구하지 않는다.</td>
+</tr>
+<tr>
+<td>PROCESSING/UNKNOWN</td>
+<td>FAILED</td>
+<td>확정 실패만 반영하며 성공 재고 복원을 하지 않는다.</td>
+</tr>
+<tr>
+<td>일부 항목 환불</td>
+<td>묶음 PAID 유지</td>
+<td>모든 자식 주문이 REFUNDED일 때만 묶음도 REFUNDED가 된다.</td>
 </tr>
 </tbody>
 </table></div>
-<h2 id="상세와-근거">상세와 근거</h2>
-<ul>
-<li><a href="../services/commercecore/order/overview.html">CommerceCore 환불 접수·결과 반영</a></li>
-<li><a href="../services/payment/overview.html">Payment 환불 실행</a></li>
-</ul>
-<p><a href="../services/common-module/outbox.html">공통 Outbox</a> · <a href="../../../contracts/events">이벤트 계약</a></p><p class="muted fingerprint">MD SHA-256: <code>effb0cc47801960929bccdf98ce4891ae0df658f838b8e1e9e317b831247199c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>현재 서비스 application.yml의 <code>commercecore.refunds.api-enabled</code>와 <code>execution-enabled</code>는 true다. 코드 생성자의 기본 false와 구분한다. 다만 dev Payment에서 기존 내부 환불 실행 API는 삭제됐고 이를 대체할 환불 provider가 없다. 따라서 토글이 켜졌거나 Core에 접수/결과 코드가 있다는 사실로 실제 환불 가능을 주장하지 않는다. 구 Mock 시나리오·과거 테스트 성공도 현재 Payment 실행 증거가 아니다.</p>
+<h2 id="현재-dev-종료-주문의-늦은-승인">현재 dev: 종료 주문의 늦은 승인</h2>
+<p>새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. <a href="../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java">PaymentRelayService</a>는 <code>payment_relay_refund(REQUESTED)</code>와 <code>late-{paymentId}</code> 요청을 같은 TX에 저장한다. 토픽은 구 하이픈 이름 <code>commerce.refund-requests.v1</code>, payload는 refundRequestId/paymentId/orderRef/reason 네 필드다. Core는 <code>payment.refund-results.v1</code>의 RefundSucceeded/RefundFailed를 검증해 SUCCEEDED/FAILED를 기록하며 주문·재고의 종료 상태를 유지한다. legacy의 <code>late_approval_refund(REQUIRED)</code>는 별도 기록이다.</p>
+<p>현재 dev Payment에는 이 요청의 실행 consumer와 해당 환불 결과 producer가 없다. Kafka 발행·Core 결과 대역 검사는 Payment 접수나 금전 환불 완료가 아니다.</p>
+<h2 id="미병합-378-사용자-환불과-시스템-보상의-분리">미병합 #378: 사용자 환불과 시스템 보상의 분리</h2>
+<p>아래는 #378의 Core 구현·목표이며 현재 dev에 적용되지 않았다. 사용자 요청과 시스템의 결제 미확정을 같은 취소 상태로 취급하지 않는다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>#378 목표·구현</th>
+<th>완료 전제</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>사용자 환불</td>
+<td>사용자 요청은 CANCEL_PENDING, 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED</td>
+<td>원요청·금액·대상과 맞는 결과만 반영</td>
+</tr>
+<tr>
+<td>시스템 보상</td>
+<td>명시적 Payment UNKNOWN 또는 최초 PROCESSING부터 600초 경과는 COMPENSATION_PENDING</td>
+<td>시작 때 재고·쿠폰을 해제하지 않고 성공 결과 뒤 한 번 해제·CANCELLED</td>
+</tr>
+<tr>
+<td>공통 요청/결과</td>
+<td>commerce.refund.requests.v1 → payment.refund.results.v1</td>
+<td>dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현</td>
+</tr>
+<tr>
+<td>종료 뒤 승인</td>
+<td>주문 부활 없이 고정된 요청 ID로 보상 재요청·대조</td>
+<td>원결제 ID 연결과 결과 원문 검증 유지</td>
+</tr>
+</tbody>
+</table></div>
+<p>Payment provider가 새 요청 consumer/결과 producer를 제공하지 않으며, 별도 provider 쪽 구 <code>payment.refund-results.v1/RefundExecutionResolved</code> 계약도 새 dot 결과와 일치하지 않는다. 이 상태로는 CANCEL_PENDING/COMPENSATION_PENDING이 끝나지 않고 시스템 보상은 재고·쿠폰·활성 구매 자리를 계속 점유한다. 원요청에 paymentId가 없고 결과에만 새 ID가 있는 경우 현재 조회 계약으로 안전한 연결 복구도 보장할 수 없다. 두 문제는 실제 병합 차단 사유이며 Draft 표시·단위 테스트로 해소되지 않는다.</p>
+<p><a href="../services/commercecore/order/overview.html">현재 Core 모듈</a> · <a href="../services/payment/overview.html">Payment 소유 설계</a> · <a href="../../../contracts/events">계약 원본</a>. Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>1983bb472fd156b0e19f566f90cda9b53a07db69e448125e76f32fc3d2adb8a6</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

@@ -152,7 +152,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("검색·상태·정렬 목록은 재고 0과 판매 상태를 보존하고 구매 불가로 응답한다")
+    @DisplayName("검색·상태·정렬 목록은 재고 0과 판매 상태를 보존하고 Core 확인 진입을 허용한다")
     void filteredZeroStockPreservesStatusAndPreventsPurchase() throws Exception {
         for (SalesStatus state : List.of(SalesStatus.ON_SALE, SalesStatus.SOLD_OUT)) {
             long id = product("재고 확인 " + state, 100, state, JwtTestTokens.SELLER);
@@ -165,7 +165,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                 assertThat(item.path("available").isIntegralNumber()).isTrue();
                 assertThat(item.path("available").intValue()).isZero();
                 assertThat(item.path("salesStatus").asText()).isEqualTo(state.name());
-                assertThat(item.path("purchasable").asBoolean()).isFalse();
+                assertThat(item.path("purchasable").asBoolean()).isTrue();
             }
         }
     }
