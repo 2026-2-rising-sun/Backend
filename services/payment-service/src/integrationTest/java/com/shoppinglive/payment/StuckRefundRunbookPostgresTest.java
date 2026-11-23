@@ -219,11 +219,15 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
                         false,
                         "server.port",
                         0);
+        // 기본 속성(properties)은 application.yml보다 낮아 명령행 인자로 넘긴다
+        String[] args =
+                props.entrySet().stream()
+                        .map(e -> "--" + e.getKey() + "=" + e.getValue())
+                        .toArray(String[]::new);
         return new SpringApplicationBuilder(
                         PaymentServiceApplication.class, RestartTossConfig.class)
-                .properties(props)
                 .profiles("test")
-                .run();
+                .run(args);
     }
 
     @TestConfiguration
