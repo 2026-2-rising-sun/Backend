@@ -65,7 +65,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         var state = relay.state(MEMBER_A, number);
         relay.prepared(
                 deliveries.relay(id(number), "PREPARE"),
-                new Created(paymentId, "CREATED", number + "-1", state.amount(), state.expiresAt()));
+                new Created(
+                        paymentId, "CREATED", number + "-1", state.amount(), state.expiresAt()));
         return number;
     }
 

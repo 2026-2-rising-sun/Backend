@@ -111,10 +111,13 @@ class CompensationStateMigrationPostgresTest {
                                     "SELECT checksum FROM flyway_schema_history WHERE version='115'",
                                     Integer.class))
                     .isEqualTo(checksum);
+            // V117: 보상 대기 주문은 회원의 새 주문을 막지 않고, 결제 확인 중 주문은 여전히 1건으로 막는다.
+            jdbc.update(
+                    "INSERT INTO payment_group(id,group_number,member_id,request_key,fingerprint,total_amount,discount_amount,payable_amount,status,expires_at,version,created_at,updated_at) VALUES(4,'other','member-1','other','hash',12000,0,12000,'PENDING_PAYMENT',now(),0,now(),now())");
             assertThatThrownBy(
                             () ->
                                     jdbc.update(
-                                            "INSERT INTO payment_group(id,group_number,member_id,request_key,fingerprint,total_amount,discount_amount,payable_amount,status,expires_at,version,created_at,updated_at) VALUES(4,'other','member-1','other','hash',12000,0,12000,'PENDING_PAYMENT',now(),0,now(),now())"))
+                                            "INSERT INTO payment_group(id,group_number,member_id,request_key,fingerprint,total_amount,discount_amount,payable_amount,status,expires_at,version,created_at,updated_at) VALUES(5,'other-2','member-3','other-2','hash',12000,0,12000,'PENDING_PAYMENT',now(),0,now(),now())"))
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class)
                     .hasMessageContaining("uk_payment_group_active_member");
             for (String table : java.util.List.of("orders", "payment_group"))
