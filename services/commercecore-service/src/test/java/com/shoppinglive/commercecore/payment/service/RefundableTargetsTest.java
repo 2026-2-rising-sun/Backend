@@ -62,6 +62,7 @@ class RefundableTargetsTest {
         when(order.getProductNameSnapshot()).thenReturn("할인 상품");
         when(order.getQuantity()).thenReturn(2);
         when(order.getPayableAmount()).thenReturn(900L);
+        when(order.getUnitPrice()).thenReturn(500L);
         return order;
     }
 
@@ -75,6 +76,8 @@ class RefundableTargetsTest {
         assertThat(targets.getFirst().refundable()).isTrue();
         assertThat(targets.getFirst().refundAmount()).isEqualTo(900L);
         assertThat(targets.getFirst().quantity()).isEqualTo(2);
+        assertThat(targets.getFirst().unitPrice()).isEqualTo(500);
+        assertThat(targets.getFirst().refundableQuantity()).isEqualTo(2);
         assertThat(targets.get(1).unavailableReason()).isEqualTo("CART_ITEM_UNAVAILABLE");
     }
 
@@ -88,6 +91,8 @@ class RefundableTargetsTest {
                 .thenReturn(List.of(1L));
         var targets = service.refundableTargets("buyer", "PG");
         assertThat(targets.getFirst().unavailableReason()).isEqualTo("ALREADY_REQUESTED");
+        assertThat(targets.getFirst().heldQuantity()).isEqualTo(2);
+        assertThat(targets.getFirst().remainingRefundableAmount()).isZero();
         assertThat(targets.get(1).refundable()).isTrue();
     }
 

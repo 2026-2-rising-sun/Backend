@@ -14,6 +14,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 신규 정책은 기존 활성 구매의 상태/기한 처리와 분리한다. */
 @Service
 public class OrderSheetLifecycleService {
+    @org.springframework.beans.factory.annotation.Autowired private RefundIntentStore refundIntents;
+    private final KafkaRefundService kafkaRefunds;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final PurchaseGuard guard;
@@ -34,7 +36,9 @@ public class OrderSheetLifecycleService {
             OrderTimeSource time,
             com.shoppinglive.commercecore.coupon.service.CouponReservationService
                     couponReservations,
-            com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher events) {
+            com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher events,
+            RefundIntentStore refundIntents,
+            KafkaRefundService kafkaRefunds) {
         this.groups = groups;
         this.orders = orders;
         this.guard = guard;
@@ -43,6 +47,8 @@ public class OrderSheetLifecycleService {
         this.time = time;
         this.couponReservations = couponReservations;
         this.events = events;
+        this.refundIntents = refundIntents;
+        this.kafkaRefunds = kafkaRefunds;
     }
 
     public boolean expire(long id) {
@@ -56,9 +62,13 @@ public class OrderSheetLifecycleService {
                         t -> {
                             guard.lock(found.getMemberId());
                             PaymentGroup group = locked(id);
-                            if (!awaitingPayment(group)
+                            if (refundIntents.fenced(group.getId())
+                                    || !awaitingPayment(group)
                                     || !group.paymentDeadlineReached(time.now())) return false;
-                            expireLocked(group);
+                            if (group.isOrderSheet()
+                                    && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
+                                kafkaRefunds.compensateLocked(group, "APPROVAL_UNKNOWN");
+                            else expireLocked(group);
                             return true;
                         }));
     }
@@ -72,7 +82,8 @@ public class OrderSheetLifecycleService {
                     PaymentGroup group = locked(found.getId());
                     if (group.getStatus() == OrderStatus.CANCELLED) return;
                     // 결제 결과 대기 중 즉시 취소 제한은 사용자 확정 정책이다.
-                    if (group.getStatus() != OrderStatus.PENDING_PAYMENT)
+                    if (refundIntents.fenced(group.getId())
+                            || group.getStatus() != OrderStatus.PENDING_PAYMENT)
                         throw conflict("결제 요청 전 주문만 즉시 취소할 수 있습니다.");
                     if (!group.getExpiresAt().isAfter(time.now())) {
                         expireLocked(group);

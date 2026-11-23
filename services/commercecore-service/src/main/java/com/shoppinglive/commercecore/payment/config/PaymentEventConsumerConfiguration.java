@@ -38,6 +38,35 @@ public class PaymentEventConsumerConfiguration {
     }
 
     @Bean
+    CommonRefundResultConsumer commonRefundResultConsumer(
+            com.shoppinglive.commercecore.payment.service.KafkaRefundService service,
+            ObjectMapper mapper) {
+        return new CommonRefundResultConsumer(service, mapper);
+    }
+
+    public static class CommonRefundResultConsumer {
+        private final com.shoppinglive.commercecore.payment.service.KafkaRefundService service;
+        private final ObjectMapper mapper;
+
+        CommonRefundResultConsumer(
+                com.shoppinglive.commercecore.payment.service.KafkaRefundService service,
+                ObjectMapper mapper) {
+            this.service = service;
+            this.mapper = mapper;
+        }
+
+        @KafkaListener(
+                topics = "payment.refund.results.v1",
+                groupId = "commercecore-common-refund-results-v1",
+                containerFactory = "paymentResultListenerContainerFactory",
+                autoStartup = "${commercecore.payment.results-enabled:true}")
+        public void refund(org.apache.kafka.clients.consumer.ConsumerRecord<String, String> record)
+                throws Exception {
+            service.result(record.key(), mapper.readTree(record.value()));
+        }
+    }
+
+    @Bean
     PaymentResultConsumer paymentResultConsumer(
             ObjectMapper mapper,
             PaymentResultHandler handler,
@@ -60,7 +89,7 @@ public class PaymentEventConsumerConfiguration {
         }
 
         @KafkaListener(
-                topics = "payment.execution-results.v1",
+                topics = {"payment.execution.results.v1", "payment.execution-results.v1"},
                 groupId = "commercecore-payment-results-v1",
                 containerFactory = "paymentResultListenerContainerFactory",
                 autoStartup = "${commercecore.payment.results-enabled:true}")
