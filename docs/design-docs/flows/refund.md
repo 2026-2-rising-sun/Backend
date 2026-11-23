@@ -2,9 +2,7 @@
 
 <!-- visual: relations -->
 
-> 주의: #378은 dev에 병합됐다. 이 문서의 "미병합" 설명은 과거 기준이며 #384에서 현재 구현으로 고친다. 그 전까지 동작 규칙은 [환불 요구사항](../services/payment/requirements/refund.md)과 이슈 본문을 따른다.
-
-기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 Core 코드. [#378](https://github.com/2026-2-rising-sun/Backend/pull/378)(head `228f33faaa5e9519ffd74ec12b2878825fa85dde`)은 미병합 Draft이며 아래 목표 흐름은 dev 동작이 아니다. Payment 환불 연동 완료나 실제 금전 환불을 확인한 문서가 아니다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 Core 코드와 그 뒤 #378(사용자 환불·시스템 보상 분리), #384(환불 결과 계약) 변경. Payment 환불 연동 완료나 실제 금전 환불을 확인한 문서가 아니다.
 
 [시각 자료](refund.html) · [주문·결제](order-payment.md) · [확인 근거와 잔여 과제](../../worklog/2026-11-20-cdc-refund-status.md)
 
@@ -27,13 +25,13 @@
 
 새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `payment_relay_refund(REQUESTED)`와 `late-{paymentId}` 요청을 같은 TX에 저장한다. 토픽은 구 하이픈 이름 `commerce.refund-requests.v1`, payload는 refundRequestId/paymentId/orderRef/reason 네 필드다. Core는 `payment.refund-results.v1`의 RefundSucceeded/RefundFailed를 검증해 SUCCEEDED/FAILED를 기록하며 주문·재고의 종료 상태를 유지한다. legacy의 `late_approval_refund(REQUIRED)`는 별도 기록이다.
 
-현재 dev Payment에는 이 요청의 실행 consumer와 해당 환불 결과 producer가 없다. Kafka 발행·Core 결과 대역 검사는 Payment 접수나 금전 환불 완료가 아니다.
+Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka 발행·계약 검사는 Payment 접수나 금전 환불 완료가 아니다.
 
-## 미병합 #378: 사용자 환불과 시스템 보상의 분리
+## 사용자 환불과 시스템 보상의 분리
 
-아래는 #378의 Core 구현·목표이며 현재 dev에 적용되지 않았다. 사용자 요청과 시스템의 결제 미확정을 같은 취소 상태로 취급하지 않는다.
+사용자 요청과 시스템의 결제 미확정을 같은 취소 상태로 취급하지 않는다.
 
-| 구분 | #378 목표·구현 | 완료 전제 |
+| 구분 | 현재 구현 | 완료 전제 |
 |---|---|---|
 | 사용자 환불 | 사용자 요청은 CANCEL_PENDING, 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED | 원요청·금액·대상과 맞는 결과만 반영 |
 | 시스템 보상 | 명시적 Payment UNKNOWN 또는 최초 PROCESSING부터 600초 경과는 COMPENSATION_PENDING | 시작 때 재고·쿠폰을 해제하지 않고 성공 결과 뒤 한 번 해제·CANCELLED |
@@ -42,18 +40,20 @@
 
 ## 결과 계약 (#384)
 
-Payment 결과 계약은 [payment-refund-results.yaml](../../../contracts/events/payment-refund-results.yaml)에 #378 Core 결과 소비자가 검증하는 모양으로 맞췄다. 구 `payment.refund-results.v1`·`RefundExecutionResolved` 계약은 이 계약으로 바뀌었다.
+Payment 결과 계약은 [payment-refund-results.yaml](../../../contracts/events/payment-refund-results.yaml)이다. 구 `payment.refund-results.v1`·`RefundExecutionResolved` 계약은 이 계약으로 바뀌었다.
 
 | 출발 | 도착 | 조건·처리 |
 |---|---|---|
 | Core `RefundRequested` | Payment 환불 PROCESSING | `commerce.refund.requests.v1`, 키 orderRef. 고객 환불(USER_REFUND)과 시스템 보상(SYSTEM_COMPENSATION)이 같은 토픽이다. `refundRequestId`로 한 번만 접수하고 원문을 저장한다. |
 | Payment 환불 | `RefundResultRecorded` | `payment.refund.results.v1`, 키 orderRef. payload는 요청 원문 그대로에 `executionId`(UUID, 요청당 고정)·`resultVersion`(1부터)·`status`·`refundedAmount`·`resolvedAt`·`nextActionAt`(null)·`failureCode`를 더한다. |
-| 결제 없음·paymentId 없음·불일치 | FAILED 결과 | 돈을 움직이지 않는다. `failureCode` `PAYMENT_NOT_FOUND`·`PAYMENT_ID_REQUIRED`·`PAYMENT_MISMATCH`. |
+| 요청 필드 | 계약 | `paymentId`는 USER_REFUND·SYSTEM_COMPENSATION 모두 필수다. 사유는 USER_REFUND의 `CUSTOMER_REQUEST`, SYSTEM_COMPENSATION의 `APPROVAL_UNKNOWN`·`LATE_APPROVAL`만 쓴다. |
+| 결제 없음·불일치 | FAILED 결과 | 돈을 움직이지 않는다. `failureCode` `PAYMENT_NOT_FOUND`·`PAYMENT_MISMATCH`. |
 | 같은 ID·같은 본문 | 저장 결과 재발행 | 같은 `resultVersion`·같은 payload, 새 eventId. 결과가 아직 없으면 보내지 않는다. |
 | 같은 ID·다른 본문 | 결과 없음 | Payment가 REQUEST_CONFLICT 수신으로 기록하고 ERROR 로그. Core가 원문과 다른 결과를 거부해 파티션이 막히는 것을 피한다(#389). |
 | 시스템 보상 FAILED | 더 높은 버전 SUCCEEDED·NO_CHARGE | 시스템 보상만 허용한다. NO_CHARGE는 `failureCode: NO_CHARGE`, 환불 금액 0. |
-| 결과 불명 | 결과 없음 | Payment는 UNKNOWN을 보내지 않는다. 확정될 때 보낸다. |
+| 결과 불명 | 결과 없음 | Payment는 UNKNOWN을 보내지 않는다(`status`는 SUCCEEDED·FAILED·NO_CHARGE). 확정될 때 보낸다. `nextActionAt`은 항상 null이다. |
+| 미승인 종료 | NO_CHARGE | 시스템 보상만 쓴다. `failureCode: NO_CHARGE`, 환불 금액 0. |
 
-Payment의 요청 consumer와 결과 producer는 #385가 만든다. 그 전까지는 CANCEL_PENDING/COMPENSATION_PENDING이 끝나지 않고 시스템 보상은 재고·쿠폰·활성 구매 자리를 계속 점유한다. 원요청에 paymentId가 없으면 Payment는 결과에 paymentId를 채우지 않고 FAILED(`PAYMENT_ID_REQUIRED`)로 답한다. Payment consumer가 없는 것은 실제 병합 차단 사유이며 Draft 표시·단위 테스트로 해소되지 않는다.
+Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 계약보다 넓게 받으며(#402에서 좁힌다), 계약 밖 요청은 FAILED(`PAYMENT_ID_REQUIRED`)로 답할 수 있다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.
 
 [현재 Core 모듈](../services/commercecore/order/overview.md) · [Payment 소유 설계](../services/payment/overview.md) · [계약 원본](../../../contracts/events). Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.
