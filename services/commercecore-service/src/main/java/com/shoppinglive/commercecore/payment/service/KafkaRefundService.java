@@ -521,10 +521,7 @@ public class KafkaRefundService {
     private void applyUser(PaymentGroup group, long id, String status, JsonNode result) {
         // CANCEL_PENDING은 이전 정책의 미완료 데이터에만 남는다. 새 환불은 주문 상태를 바꾸지 않는다.
         require(
-                Set.of(
-                                OrderStatus.PAID,
-                                OrderStatus.PARTIALLY_REFUNDED,
-                                OrderStatus.CANCEL_PENDING)
+                Set.of(OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED, OrderStatus.CANCEL_PENDING)
                         .contains(group.getStatus()),
                 "환불 가능한 주문 상태가 아닙니다.");
         if (!status.equals("UNKNOWN")) {

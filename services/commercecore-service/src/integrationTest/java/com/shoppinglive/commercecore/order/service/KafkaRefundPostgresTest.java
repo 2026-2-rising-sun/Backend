@@ -211,8 +211,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(r.created()).isTrue();
         assertThat(r.refund().targets().getFirst().quantity()).isEqualTo(2);
         assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().heldQuantity()).isEqualTo(3);
-        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity())
-                .isZero();
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
         apply(result(requestIdByKey("remaining"), "SUCCEEDED", 1, UUID.randomUUID().toString()));
         apply(result(requestIdByKey("first"), "SUCCEEDED", 1, UUID.randomUUID().toString()));
         assertThat(state(n)).isEqualTo("REFUNDED");
@@ -673,12 +672,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                 new RefundSelection(
                         "ITEMS", List.of(new RefundSelection.Item(b, 1)), List.of(), 3000L);
         refunds.request(MEMBER_A, n, "other-unknown", other);
-        apply(
-                result(
-                        requestIdByKey("other-unknown"),
-                        "UNKNOWN",
-                        1,
-                        UUID.randomUUID().toString()));
+        apply(result(requestIdByKey("other-unknown"), "UNKNOWN", 1, UUID.randomUUID().toString()));
         var one =
                 new RefundSelection(
                         "ITEMS", List.of(new RefundSelection.Item(a, 1)), List.of(), 4000L);
@@ -906,14 +900,30 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         String n = twoItems();
         var one =
                 new RefundSelection(
-                        "ITEMS", List.of(new RefundSelection.Item(orderOf(n, 501L), 2)), List.of(), null);
+                        "ITEMS",
+                        List.of(new RefundSelection.Item(orderOf(n, 501L), 2)),
+                        List.of(),
+                        null);
         var two =
                 new RefundSelection(
-                        "ITEMS", List.of(new RefundSelection.Item(orderOf(n, 502L), 1)), List.of(), null);
+                        "ITEMS",
+                        List.of(new RefundSelection.Item(orderOf(n, 502L), 1)),
+                        List.of(),
+                        null);
         var gate = new CyclicBarrier(2);
         try (var pool = Executors.newFixedThreadPool(2)) {
-            var a = pool.submit(() -> { gate.await(); return refunds.request(MEMBER_A, n, "item-a", one).created(); });
-            var b = pool.submit(() -> { gate.await(); return refunds.request(MEMBER_A, n, "item-b", two).created(); });
+            var a =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return refunds.request(MEMBER_A, n, "item-a", one).created();
+                            });
+            var b =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return refunds.request(MEMBER_A, n, "item-b", two).created();
+                            });
             assertThat(a.get(20, TimeUnit.SECONDS)).isTrue();
             assertThat(b.get(20, TimeUnit.SECONDS)).isTrue();
         }
@@ -962,8 +972,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                                 Long.class,
                                 id(n)))
                 .isEqualTo(10000L);
-        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity())
-                .isZero();
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
     }
 
     @Test
@@ -989,8 +998,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         apply(result(requestIdByKey("unknown-one"), "UNKNOWN", 1, execution));
         var rest = refunds.request(MEMBER_A, n, "rest", all());
         assertThat(rest.refund().refundAmount()).isEqualTo(6000L);
-        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity())
-                .isZero();
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
         assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "over", quantity(n, 1)))
                 .isInstanceOf(BusinessException.class);
         apply(result(requestIdByKey("unknown-one"), "FAILED", 2, execution));
