@@ -17,7 +17,7 @@ spring:
   task:
     scheduling:
       pool:
-        # @Scheduled 작업(outbox 릴레이·스위퍼·조회기·만료·환불 재처리)마다 스레드가 있어야 토스를 기다리는 작업이 나머지를 굶기지 않는다.
+        # @Scheduled 작업 6개(outbox 릴레이·스위퍼·조회기·만료·고객 환불 재처리·시스템 보상 재처리)마다 스레드가 있어야 토스를 기다리는 작업이 나머지를 굶기지 않는다.
         size: 6
 server:
   port: 8086

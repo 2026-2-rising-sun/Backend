@@ -127,6 +127,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             nativeQuery = true)
     int markCanceled(@Param("id") long id);
 
+    /** 시스템 보상: CREATED일 때만 막는다. 승인이 그 사이 시작됐으면 0행이라 조회 없는 NO_CHARGE로 가지 않는다. */
+    @Modifying(clearAutomatically = true)
+    @Query(
+            value =
+                    """
+                    UPDATE payment SET status = 'CANCELED', updated_at = now()
+                     WHERE id = :id AND status = 'CREATED'
+                    """,
+            nativeQuery = true)
+    int cancelCreated(@Param("id") long id);
+
     /** 환불 한도 검사와 예약을 결제별로 한 줄로 세운다. 토스 호출 전에 커밋해 잠금을 푼다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Payment p WHERE p.id = :id")

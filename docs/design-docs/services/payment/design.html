@@ -186,7 +186,7 @@ svg .amt { font-size: 15px; font-weight: 700; fill: currentColor; font-variant-n
   .flow-card { padding: 4px 14px 14px; }
 }
 </style>
-<!-- md-sha256: 2e30e709247cd0ad26f1958a71d5d914120576bb407cf928aa263b4a044987ef -->
+<!-- md-sha256: b843874669346d0b3f54d632586151963a9f20886b83bbdc494152bf6e5f5c7c -->
 </head>
 <body>
 <a href="design.md">MD 원본</a>
@@ -1336,7 +1336,7 @@ UPDATE orders SET status = 'CANCELLED'
 <dl class="qa">
   <dt>상황</dt><dd>구매자가 상품 일부나 전체의 환불을 요청합니다. 고객은 카드를 다시 긁지 않습니다. <strong>서버가 토스 취소 API를 호출합니다.</strong></dd>
   <dt>누가 정하나</dt><dd>환불해도 되는지는 <strong>Commerce가 정합니다.</strong> 배송 단계와 판매자 승인을 아는 곳이 Commerce이기 때문입니다. Payment는 승인된 환불을 <strong>실행만</strong> 합니다.</dd>
-  <dt>환불 실행을 부르는 곳</dt><dd><strong>실행은 하나, 시작점은 둘입니다.</strong> 둘 다 Commerce가 정합니다. 두 시작점 모두 Kafka <code>commerce.refund.requests.v1</code>의 "환불 요청됨" 하나로 오고 <code>purpose</code>로 구분합니다. ① 고객 환불(<code>USER_REFUND</code>, 금액·판매자 주문 지정). ② 시스템 보상(<code>SYSTEM_COMPENSATION</code>, 늦은 승인·승인 결과 불명, 흐름 6, 전액). 결과는 <code>payment.refund.results.v1</code>의 "환불 결과 기록됨" 하나입니다. 환불 요청 ID로 한 번만 접수하므로 이벤트가 두 번 와도 환불은 한 번입니다. 늦은 승인의 요청 ID는 <code>late-{결제 ID}</code>입니다.</dd>
+  <dt>환불 실행을 부르는 곳</dt><dd><strong>실행은 하나, 시작점은 둘입니다.</strong> 둘 다 Commerce가 정합니다. 두 시작점 모두 Kafka <code>commerce.refund.requests.v1</code>의 "환불 요청됨" 하나로 오고 <code>purpose</code>로 구분합니다. ① 고객 환불(<code>USER_REFUND</code>, 금액·판매자 주문 지정). ② 시스템 보상(<code>SYSTEM_COMPENSATION</code>, 늦은 승인·승인 결과 불명, 흐름 6, 전액). 표 밖 경우: 금액이 다르면 <code>PAYMENT_MISMATCH</code>, 이미 환불된 결제면 <code>NOT_REFUNDABLE</code>로 토스 호출 없이 FAILED입니다. 토스 장애로는 FAILED를 보내지 않고 UNKNOWN으로 조회·같은 키 재요청을 하며 24시간 뒤 멈춥니다. 결과는 <code>payment.refund.results.v1</code>의 "환불 결과 기록됨" 하나입니다. 환불 요청 ID로 한 번만 접수하므로 이벤트가 두 번 와도 환불은 한 번입니다. 늦은 승인의 요청 ID는 <code>late-{결제 ID}</code>입니다.</dd>
   <dt>대사와 다른 점</dt><dd>늦은 승인은 승인 이벤트를 받은 Commerce가 <strong>그 자리에서</strong> 판단합니다. 거래 대사는 Payment가 아예 모르는 승인(확인 포기 등)을 <strong>다음 날 찾아 APPROVED로 맞추는</strong> 안전망입니다. 맞추면 "결제 승인됨"이 나가고, 같은 판단을 탑니다.</dd>
   <dt>사고 1: 과다 환불</dt><dd>부분 환불 요청 두 개가 동시에 들어옵니다. 각각 "합계가 결제 금액 이하"인지 확인하고 둘 다 통과합니다. 결제 금액보다 많이 환불됩니다. 막는 방법: 결제 행의 환불 누적액을 조건부 UPDATE로 늘립니다.</dd>
   <dt>사고 2: 이중 환불</dt><dd>타임아웃 후 재시도하면 같은 환불이 두 번 실행됩니다. 막는 방법: 토스 취소 요청에 멱등키 헤더를 붙입니다. 같은 키로 다시 보내면 토스가 중복 취소하지 않습니다. 토스 문서 기준으로 멱등키는 <strong>처음 요청한 날부터 15일</strong> 유효하고 최대 300자입니다. 멱등키·API 키·주소·메서드가 같은 요청이 다시 오면 처리하지 않고 첫 응답을 그대로 돌려줍니다. 15일이 지난 재시도는 새 요청이 되므로, 오래된 환불은 다시 보내기 전에 조회부터 합니다.</dd>

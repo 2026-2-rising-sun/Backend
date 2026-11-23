@@ -2,12 +2,46 @@ package com.shoppinglive.payment.payment.repository;
 
 import com.shoppinglive.payment.payment.entity.PgCall;
 import com.shoppinglive.payment.payment.entity.PgCallKind;
+import java.time.Instant;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface PgCallRepository extends JpaRepository<PgCall, Long> {
+    /** 결제의 마지막 승인 시도. 재호출도 같은 pg_order_id이므로 그중 가장 이른 시각이 첫 CONFIRM이다. */
+    interface ConfirmAttempt {
+        String getPgOrderId();
+
+        Instant getFirstRequestedAt();
+    }
+
+    /** 이 키의 취소가 토스에 닿았을 수 있다. 응답을 받은 NotSent(429·401 등)도 처리되지 않았다는 보장이 없어 포함한다. */
+    @Query(
+            """
+            SELECT COUNT(c) > 0 FROM PgCall c
+             WHERE c.paymentId = :paymentId AND c.idempotencyKey = :idempotencyKey
+               AND (c.outcome IN (com.shoppinglive.payment.payment.entity.PgCallOutcome.SUCCESS,
+                                  com.shoppinglive.payment.payment.entity.PgCallOutcome.UNKNOWN)
+                    OR (c.outcome = com.shoppinglive.payment.payment.entity.PgCallOutcome.NOT_SENT
+                        AND c.httpStatus IS NOT NULL))
+            """)
+    boolean cancelMayHaveLanded(
+            @Param("paymentId") long paymentId, @Param("idempotencyKey") String idempotencyKey);
+
+    @Query(
+            """
+            SELECT c.pgOrderId AS pgOrderId, MIN(c.requestedAt) AS firstRequestedAt
+              FROM PgCall c
+             WHERE c.paymentId = :paymentId AND c.kind = com.shoppinglive.payment.payment.entity.PgCallKind.CONFIRM
+               AND c.pgOrderId = (SELECT l.pgOrderId FROM PgCall l WHERE l.id =
+                   (SELECT MAX(m.id) FROM PgCall m WHERE m.paymentId = :paymentId
+                       AND m.kind = com.shoppinglive.payment.payment.entity.PgCallKind.CONFIRM))
+             GROUP BY c.pgOrderId
+            """)
+    Optional<ConfirmAttempt> findLatestConfirmAttempt(@Param("paymentId") long paymentId);
+
     long countByPaymentIdAndKindAndIdempotencyKey(
             Long paymentId, PgCallKind kind, String idempotencyKey);
 
