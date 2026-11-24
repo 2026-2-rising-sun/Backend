@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>멈춘 고객 환불 수동 처리</title><style>
+:root{color-scheme:light dark;--bg:#f7f9fc;--paper:#fff;--ink:#17283d;--muted:#53647a;--line:#cdd7e2;--accent:#245da8;--soft:#eaf1fa}
+@media(prefers-color-scheme:dark){:root{--bg:#111a25;--paper:#182536;--ink:#e8eff8;--muted:#afc0d3;--line:#3e5065;--accent:#94bfff;--soft:#22374f}}
+*{box-sizing:border-box}html{scroll-padding-top:24px}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 'Apple SD Gothic Neo','Malgun Gothic',sans-serif}a{color:var(--accent);overflow-wrap:anywhere}a:hover{text-decoration-thickness:2px}:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.skip{position:absolute;top:-100px;left:12px;background:var(--paper);padding:10px;z-index:4}.skip:focus{top:10px}.shell{max-width:1600px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:36px;padding:32px}.sidebar{position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto;align-self:start;font-size:14px;border-right:1px solid var(--line);padding-right:18px}.sidebar ul{list-style:none;padding-left:14px}.sidebar>div>ul{padding-left:0}.sidebar a{display:block;padding:4px 0}.sidebar strong{font-size:16px}main{min-width:0;background:var(--paper);padding:28px 36px;border:1px solid var(--line)}h1{font-size:30px;line-height:1.35;margin:12px 0 28px}h2{font-size:23px;margin:40px 0 16px;border-bottom:1px solid var(--line);padding-bottom:8px}h3{font-size:19px;margin-top:28px}p,li{max-width:80ch}p{margin:14px 0}nav,.controls{display:flex;gap:14px;flex-wrap:wrap;align-items:center}nav{font-size:14px;margin-bottom:24px}code,pre{font:13px/1.65 ui-monospace,Menlo,monospace}code{overflow-wrap:anywhere}pre{padding:16px;background:var(--soft);white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);padding:8px 12px;border-radius:5px}button,summary{cursor:pointer}button:hover{border-color:var(--accent);background:var(--soft)}input{width:min(100%,550px);min-width:0}select{max-width:100%}.muted,footer,.fingerprint{color:var(--muted);font-size:13px}footer{margin-top:36px;border-top:1px solid var(--line);padding-top:16px}.table-wrap{overflow:auto;max-width:100%;margin:18px 0}table{width:100%;border-collapse:collapse;min-width:500px}th,td{padding:12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}th{background:var(--soft)}details{margin:14px 0;border-bottom:1px solid var(--line);padding:10px 0}summary{padding:8px;overflow-wrap:anywhere}summary:hover{background:var(--soft)}dl{margin:12px;border-left:2px solid var(--line);padding-left:16px}dt{font-weight:700}dd{margin:4px 0 14px 12px;overflow-wrap:anywhere}.badge{display:inline-block;background:var(--soft);padding:2px 8px;border-radius:4px;font:12px ui-monospace,monospace;margin-right:6px}.method-get{color:#247447}.method-post{color:#245da8}.method-delete{color:#b13d46}.method-patch,.method-put{color:#93600e}.operation[hidden]{display:none}.diagram{overflow:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);background:var(--bg);overscroll-behavior-x:contain}.diagram svg{display:block;width:100%;min-width:740px;height:auto}.diagram rect{fill:var(--paper);stroke:var(--accent);stroke-width:1.5}.diagram text{fill:var(--ink);font:13px ui-monospace,monospace}.diagram .connector{fill:none;stroke:var(--muted);stroke-width:1.5}.diagram marker path{fill:var(--muted)}.diagram .edge-number{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round;fill:var(--accent);font-weight:700}.endpoint{scroll-margin-top:24px}.endpoint h2{font-size:19px}.api-json{max-height:420px;overflow:auto}.api-section{margin:20px 0}.fingerprint{overflow-wrap:anywhere}@media(max-width:900px){.shell{grid-template-columns:1fr;padding:14px;gap:16px}.sidebar{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:12px}.sidebar .toc{max-height:200px;overflow:auto}main{padding:20px}.sidebar strong{display:block}h1{font-size:25px}}@media(prefers-color-scheme:dark){.method-get{color:#86dba6}.method-post{color:#94bfff}.method-delete{color:#ff9ba6}.method-patch,.method-put{color:#f4cf85}}
+</style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="stuck-refund.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
+<ul>
+<li><a href="#대상과-범위">대상과 범위</a></li>
+<li><a href="#1-멈춘-건-찾기">1. 멈춘 건 찾기</a></li>
+<li><a href="#2-판단">2. 판단</a></li>
+<li><a href="#3-재개">3. 재개</a></li>
+<li><a href="#4-처리-후-확인">4. 처리 후 확인</a></li>
+</ul>
+</div>
+</div></aside><main id="content"><h1>멈춘 고객 환불 수동 처리</h1><p>상태: 진행 중
+검증: <a href="../requirements/refund.html">환불 수용 기준</a> <code>REF-EXEC-04</code>·<code>REF-EXEC-06</code>, <a href="../design.md">결제 설계</a>, <a href="https://github.com/2026-2-rising-sun/Backend/issues/369">#369</a></p>
+<p>자동 복구는 고객 환불을 첫 시도부터 24시간까지 다시 시도한다. 그 뒤에도 결과를 확정하지 못한 환불은 UNKNOWN에 <code>next_attempt_at</code> NULL로 멈추고 ERROR 로그 <code>[사람 확인 필요]</code>를 한 번 남긴다. 이 문서는 멈춘 건을 찾고, 판단하고, 다시 잇고, 확인하는 절차다. 관리자 API와 화면은 없다. 지표 <code>shoppinglive.payment.unresolved.count{kind=refund_unknown}</code>가 0보다 크면 이 절차를 쓴다.</p>
+<h2 id="대상과-범위">대상과 범위</h2>
+<ul>
+<li><strong>이 절차의 대상:</strong> <code>refund</code>의 <code>status = 'UNKNOWN'</code>이고 <code>next_attempt_at IS NULL</code>인 행. 고객 환불(<code>USER_REFUND</code>)과 시스템 보상(<code>SYSTEM_COMPENSATION</code>)이 모두 여기에 든다.</li>
+<li><strong>이 절차의 대상이 아닌 것:</strong> 결제 자체가 조회 마감을 넘긴 UNKNOWN 결제(<code>kind=payment_unknown</code>). 거래 대사가 맡는다. 재개 SQL은 <code>payment</code>를 건드리지 않는다.</li>
+<li><strong>금액과 상태를 바꾸지 않는다.</strong> 재개 SQL은 재시도 시각과 조회 마감만 바꾼다. 환불 결과는 실행기가 토스 응답으로만 정한다.</li>
+</ul>
+<h2 id="1-멈춘-건-찾기">1. 멈춘 건 찾기</h2>
+<pre><code class="language-sql">SELECT refund_request_id, payment_id, purpose, status, amount, attempt_count, created_at, check_deadline_at
+  FROM refund
+ WHERE status = 'UNKNOWN' AND next_attempt_at IS NULL
+ ORDER BY created_at;
+</code></pre>
+<p>조회에는 결제키·고객 정보가 나오지 않는다. 필요하면 <code>payment_id</code>로 결제를 따로 본다.</p>
+<h2 id="2-판단">2. 판단</h2>
+<p>각 행을 아래 순서로 본다. 하나라도 걸리면 재개하지 말고 보고한다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>확인</th>
+<th>재개해도 되는 경우</th>
+<th>멈추고 보고하는 경우</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>created_at</code></td>
+<td>14일 이내. 토스 멱등 키 유효기간(15일) 안이다</td>
+<td>14일을 넘김. 같은 키로 다시 보낼 수 없다. 제품 결정이 필요하다</td>
+</tr>
+<tr>
+<td>결제 상태(<code>payment.status</code>)</td>
+<td>고객 환불은 <code>APPROVED</code>·<code>PARTIALLY_REFUNDED</code>, 시스템 보상은 <code>APPROVED</code>. 보상은 환불액이 0이 아니면 재개해도 <code>NOT_REFUNDABLE</code> 또는 보류로 끝난다</td>
+<td><code>CANCELED</code>·<code>REFUNDED</code> 등. 돈이 이미 돌아갔을 수 있다</td>
+</tr>
+<tr>
+<td>토스 결제 상세의 취소 내역</td>
+<td>이 건의 취소가 있거나 없음. 고객 환불은 사유 <code>고객 환불 {refund_request_id}</code>, 금액은 환불 금액이다. 시스템 보상은 사유 <code>승인 응답 불일치</code>, 금액은 결제 전액이다</td>
+<td>같은 금액이지만 다른 사유의 취소만 있음. 누가 취소했는지 먼저 확인한다</td>
+</tr>
+</tbody>
+</table></div>
+<p>재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키로 다시 취소를 보낸다. 키는 고객 환불이 <code>refund_request_id</code>, 시스템 보상이 <code>cancel-{pg_order_id}</code>다. 그래서 재개는 중복 환불을 만들지 않는다.</p>
+<h2 id="3-재개">3. 재개</h2>
+<p>2번 판단을 통과한 건만 재개한다. <code>:ids</code> 자리에 그 건의 <code>refund_request_id</code>를 <code>'id1', 'id2'</code>처럼 넣는다. ID 조건은 빼지 않는다. 빼면 "멈추고 보고"할 건까지 재개된다. <code>BEGIN</code> 뒤에 실행하고, 영향 행 수가 넣은 ID 수와 같을 때만 <code>COMMIT</code>한다. 다르면 <code>ROLLBACK</code>한다.</p>
+<pre><code class="language-sql">UPDATE refund
+   SET next_attempt_at = now(),
+       check_deadline_at = now() + INTERVAL '24 hours',
+       updated_at = now()
+ WHERE status = 'UNKNOWN'
+   AND next_attempt_at IS NULL
+   AND created_at &gt; now() - INTERVAL '14 days'
+   AND refund_request_id IN (:ids);
+</code></pre>
+<ul>
+<li>조회 마감을 24시간 뒤로 잡는 이유: 실행기는 마감이 이미 지났으면 조회만 하고 멈춘다. 마감을 되돌리기만 하면 재개 즉시 다시 멈춘다. 마감을 <code>payment.recovery.refund-give-up-after</code>(기본 24시간) 뒤로 다시 잡으면 실행기의 첫 시도 시각이 재개 시각이 되어, 조회 간격과 상한이 처음 규칙을 따른다.</li>
+<li><code>next_attempt_at = now()</code>는 다음 실행이 바로 집게 한다. 집은 뒤 실행기가 선점 시각을 3분 뒤로 미룬다.</li>
+<li>상태와 금액은 바뀌지 않는다. 바뀌는 것은 시각 두 개뿐이다.</li>
+</ul>
+<h2 id="4-처리-후-확인">4. 처리 후 확인</h2>
+<p>재개한 뒤 최대 몇 분 기다린다(선점 3분, 이후 재시도 간격). 그 뒤 다음을 확인한다.</p>
+<ol>
+<li>1번 조회를 다시 실행해 재개한 건이 목록에서 빠졌는지 본다. 빠진 것은 <code>SUCCEEDED</code>나 <code>FAILED</code>로 확정됐다는 뜻이다.</li>
+<li>같은 건이 다시 <code>next_attempt_at IS NULL</code>로 멈췄다면 <code>[사람 확인 필요]</code> ERROR가 다시 남는다. 이때는 토스의 취소 내역과 결제 상태를 직접 확인하고 보고한다.</li>
+<li>지표 <code>shoppinglive.payment.unresolved.count{kind=refund_unknown}</code>가 내려갔는지 본다.</li>
+<li>확정된 건은 <code>payment.refund.results.v1</code>에 결과가 나갔는지 본다(orderRef 키).</li>
+</ol>
+<p>재개를 되돌리는 SQL은 없다. 실행기가 같은 멱등 키로 다시 보낸 취소만 토스에 남는다. 취소가 잘못됐다면 토스에서 직접 되돌리고 원장 정정을 요청한다.</p><p class="muted fingerprint">MD SHA-256: <code>997745ffca08ccaebe2354736ff2e8a9c9d59308ec14e9dc6138fafe8a03a2b5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
+</script></body></html>
