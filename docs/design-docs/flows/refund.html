@@ -151,7 +151,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 계약보다 넓게 받으며(#402에서 좁힌다), 계약 밖 요청은 FAILED(<code>PAYMENT_ID_REQUIRED</code>)로 답할 수 있다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.</p>
-<p><a href="../services/commercecore/order/overview.html">현재 Core 모듈</a> · <a href="../services/payment/overview.html">Payment 소유 설계</a> · <a href="../../../contracts/events">계약 원본</a>. Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>54fe88ec0e72f8528ccaf1a244884f281a7ad65dba03f9c3015d3017a76988be</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 #402에서 계약만 받는다(paymentId 필수, 사유 3개). 계약 밖 요청은 결과를 만들지 않고 DLT로 보낸다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.</p>
+<p><a href="../services/commercecore/order/overview.html">현재 Core 모듈</a> · <a href="../services/payment/overview.html">Payment 소유 설계</a> · <a href="../../../contracts/events">계약 원본</a>. Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>ff299f6841384352cbf62faf2b3af98ac6286100ae5902a988944d4104b122d9</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

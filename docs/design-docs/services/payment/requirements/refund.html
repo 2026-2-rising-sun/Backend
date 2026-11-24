@@ -24,7 +24,6 @@
 <li>[x] <strong>REF-ACCEPT-04</strong> 실행 전에 결제와 요청을 맞춰 보고, 맞지 않으면 돈을 움직이지 않고 FAILED다. 부분 취소가 안 되는 결제의 부분 환불은 <code>PARTIAL_NOT_ALLOWED</code>, 이 결제에 없는 판매자 주문은 <code>UNKNOWN_SELLER_ORDER</code>, 환불할 수 없는 결제 상태는 <code>NOT_REFUNDABLE</code>이다. (EC 43)</li>
 <li>[x] <strong>REF-ACCEPT-05</strong> 다음 경우는 돈을 움직이지 않고 FAILED로 저장해 보내고, ERROR 로그를 남긴다.</li>
 <li><code>orderRef</code>로 결제를 찾지 못함: <code>PAYMENT_NOT_FOUND</code></li>
-<li>요청에 <code>paymentId</code>가 없음: <code>PAYMENT_ID_REQUIRED</code></li>
 <li><code>paymentId</code>가 그 결제와 다름: <code>PAYMENT_MISMATCH</code></li>
 </ul>
 <p><code>items</code>가 없는 요청처럼 계약을 어긴 메시지는 REF-ACCEPT-07을 따른다.
@@ -74,6 +73,6 @@
 <li><code>nextActionAt</code>: null</li>
 <li><code>failureCode</code></li>
 </ul>
-<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>af06ddd215dc99c41c62e2d3e670645d92b801ce5e3b15438e94d795a7ba7ba8</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>다시 보낼 때 payload는 처음과 같아야 하므로, 처음 만든 결과 문자열(<code>resolvedAt</code> 포함)을 저장해 두고 그대로 보낸다. 계약 YAML에 예시와 발행 표본이 있다.</p><p class="muted fingerprint">MD SHA-256: <code>3e7a35cd053b3567e873d33fe3631356328af2e627d01feade39b189ef4fb36e</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
