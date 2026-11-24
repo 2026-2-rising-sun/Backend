@@ -23,7 +23,7 @@
 
 ## 현재 dev: 종료 주문의 늦은 승인
 
-새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `payment_relay_refund(REQUESTED)`와 `late-{paymentId}` 요청을 같은 TX에 저장한다. 토픽은 구 하이픈 이름 `commerce.refund-requests.v1`, payload는 refundRequestId/paymentId/orderRef/reason 네 필드다. Core는 구 `payment.refund-results.v1`을 구독하지 않는다. 환불 결과는 `payment.refund.results.v1`의 RefundResultRecorded를 [KafkaRefundService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/KafkaRefundService.java)가 `core_refund_intent` 원요청과 대조해 반영한다. legacy의 `late_approval_refund(REQUIRED)`는 별도 기록이다.
+새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `KafkaRefundService.compensateLocked`로 `core_refund_intent`(purpose SYSTEM_COMPENSATION, reason LATE_APPROVAL)와 `commerce.refund.requests.v1`의 RefundRequested Outbox를 같은 TX에 저장한다. Payment가 이 요청을 실행하고 `payment.refund.results.v1`의 RefundResultRecorded로 결과를 보낸다. Core는 구 `payment.refund-results.v1`을 구독하지 않는다(#390). 환불 결과는 `CommonRefundResultConsumer`가 받아 [KafkaRefundService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/KafkaRefundService.java)가 `core_refund_intent` 원요청과 대조해 반영한다. 옛 `late_approval_refund`·`payment_relay_refund` 행은 지우지 않은 과거 기록이고 새 늦은 승인은 쓰지 않는다.
 
 Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka 발행·계약 검사는 Payment 접수나 금전 환불 완료가 아니다.
 

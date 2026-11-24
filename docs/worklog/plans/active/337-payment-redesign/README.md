@@ -1,6 +1,6 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — Phase 1 완료. Phase 2·3의 남은 일을 서비스별 이슈로 마무리하는 중이다.
+상태: 진행 중 — Backend 코드 작업(Phase 1~3)은 dev에 머지됐다. 남은 일은 Frontend #89, Infra #64 알림의 실제 확인, Backend #401·#387·#367의 완료 조건 확인이다.
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 남은 이슈는 [서비스별 표](#phase-23의-남은-일)에 있다.
 관련 요구사항: [결제](../../../../design-docs/services/payment/requirements/payment.md) · [원장](../../../../design-docs/services/payment/requirements/ledger.md) · [환불](../../../../design-docs/services/payment/requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../../adr/0337-5-pg-timeout-and-unknown.md)
@@ -9,7 +9,7 @@ Phase 1 구현 기록: [결제 1차](phase1-payment.md)
 
 ## 처음 읽는 사람을 위한 요약
 
-Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(CommerceCore)와 연결하는 작업이다. **결제와 환불의 정상 흐름은 이미 dev에서 동작한다.** 남은 일은 장애가 났을 때 고객 돈과 주문이 어긋나지 않게 막고, 옛 코드를 지우고, 화면을 연결하는 것이다.
+Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(CommerceCore)와 연결하는 작업이다. **결제와 환불의 정상 흐름, 장애 때 돈과 주문이 어긋나지 않게 막는 처리, 옛 코드 삭제는 dev에 머지됐다.** 남은 일은 화면 연결과 알림·완료 조건의 실제 확인이다.
 
 ```text
 결제: 구매자 → Frontend → CommerceCore → (HTTP) → Payment → 토스
@@ -21,13 +21,19 @@ Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(Com
 
 | 지금 남은 문제 | 고객이나 운영에 생기는 일 | 이슈 |
 |---|---|---|
-| 토스 승인 요청이 429를 받으면 미처리로 간주한다 | 실제로 승인됐다면 이중 청구되거나 환불이 누락될 수 있다 | #398 |
-| 환불 하나가 미확정이면 같은 결제의 다른 상품을 환불할 수 없다 | 토스 장애가 길면 환불 기간을 놓칠 수 있다 | #399, #401 |
-| Core가 처리 못 하는 메시지를 끝없이 재시도한다 | 뒤의 결제 결과가 모두 멈춘다 | #389, Infra #64 |
-| 보상 대기 주문이 있으면 새 구매가 막힌다 | 이전 결제 문제 때문에 고객이 구매하지 못한다 | #377 |
-| 오래 미확정인 건을 사람이 알 수 없다 | 고객 돈이 묶인 채 방치될 수 있다 | #387, #369 |
-| 옛 결제 경로와 계약이 남아 있다 | 호출하면 실패하고 새 경로와 헷갈린다 | #384, #390, #402 |
 | 화면이 새 상태를 모른다 | 처리 중인 주문이 오류처럼 보일 수 있다 | Frontend #89 |
+| DLT 유입·장기 미확정 알림을 실제로 받아 보지 않았다 | 처리 못 한 메시지나 묶인 고객 돈을 사람이 늦게 알 수 있다 | Infra #64, #387(지표는 PR #413로 머지) |
+| 토스의 환불 진행 중 응답(`ALREADY_REFUNDING_PAYMENT`)을 실제로 재현하지 못했다 | 코드는 PR #406로 머지됐고 테스트로만 확인했다 | #401 |
+| 구매자 일반 환불의 Core 완료 조건을 확인하지 않았다 | 토스 테스트 환경 E2E 근거는 이슈 댓글에 있다. 조건별 확인과 닫기만 남았다 | #367 |
+
+해결됨: 승인 429의 이중 청구 위험(#398), Core 결제 결과 소비자의 무한 재시도(#389), 보상 대기 중 새 구매 차단(#377), 미확정 환불 중 다른 상품 환불(#399), 멈춘 환불의 수동 처리 절차(#369), 옛 결제 경로와 계약(#384·#390·#402), 일부 수량 환불(#345).
+
+다음 Phase 후보:
+
+- #416 CommerceCore: 결제 결과 불명 주문을 처리 기한까지 유지한다(목표 설계와 구현 차이).
+- #417 CommerceCore: 결제 미확정으로 끝낸 주문의 재고·쿠폰 예약을 즉시 해제한다(목표 설계와 구현 차이).
+- #418 CommerceCore: 승인 거절 뒤 만료 전까지 같은 주문으로 재결제한다(목표 설계와 구현 차이).
+- #400 Payment: 서킷 브레이커와 Mock 2차 PG 라우팅.
 
 ### 용어
 
@@ -40,14 +46,12 @@ Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(Com
 
 | 팀 | 먼저 읽을 것 | 바로 시작할 수 있는 이슈 |
 |---|---|---|
-| Payment | [환불 요구사항](../../../../design-docs/services/payment/requirements/refund.md), [결제 요구사항](../../../../design-docs/services/payment/requirements/payment.md) | #398, #401, #387, #369 |
-| CommerceCore | 각 이슈 본문, [이벤트 계약](../../../../../contracts/events/commerce-refund-requests.yaml) | #377, #367 |
-| Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·보관·유입 알림 |
-| Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | Backend·Infra 완료 후 |
+| Payment | [환불 요구사항](../../../../design-docs/services/payment/requirements/refund.md), [결제 요구사항](../../../../design-docs/services/payment/requirements/payment.md) | #401·#387 완료 조건 확인, 다음 후보 #400 |
+| CommerceCore | 각 이슈 본문, [이벤트 계약](../../../../../contracts/events/commerce-refund-requests.yaml) | #367 완료 조건 확인, 다음 후보 #416·#417·#418 |
+| Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·보관·유입 알림과 미확정 알림의 실제 확인 |
+| Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | Backend 코드는 머지됨. 바로 시작 |
 
 로컬 실행은 [로컬 환경](../../../../design-docs/flows/local-environment.md)을 따른다.
-
-> 주의: [주문·결제 흐름](../../../../design-docs/flows/order-payment.md)과 [환불 흐름](../../../../design-docs/flows/refund.md)에는 과거 기준 설명이 남아 있다. 각각 #377, #384에서 고친다. 그 전까지 동작 규칙은 요구사항과 이슈 본문을 따른다.
 
 ### 이번 범위에서 정한 것
 
@@ -90,31 +94,31 @@ Mock 중심의 Payment를 토스 기준으로 교체한다. **최소 기능부�
 | | 결제 생성·결제창·조회 API | #348 | PAY-DATA·CREATE·CHECKOUT·QUERY·AUTH | 완료 (PR #354·#355) |
 | | 토스 승인과 원장 분개 | #338 | PAY-CONFIRM·PG·EVENT, LED-01–05·APPROVE-01 | 완료 (PR #353·#356–#358, 토스 샌드박스 확인 #366) |
 | | 결과 불명 복구와 만료 | #349 | PAY-RECOVER·EXPIRE | 완료 (PR #359) |
-| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | 완료 #343·#365·#383, 남음 #377·#389·#390 | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 진행 중 |
-| **3 환불** | Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다 | 완료 #385·#370·#386, 남음은 아래 표 | REF-*, LED-REFUND-01 | 진행 중 |
+| **2 주문 연동** | Commerce가 새 결제 API·이벤트를 쓴다 | 완료 #343·#365·#383·#377·#389·#390·#399·#345, 확인 남음 #367 | CommerceCore 문서([주문·결제 흐름](../../../../design-docs/flows/order-payment.md)) | 코드 머지 완료, #367 확인 남음 |
+| **3 환불** | Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다 | 완료 #385·#370·#386·#384·#398·#402·#369, 확인 남음 #401·#387 | REF-*, LED-REFUND-01 | 코드 머지 완료, #401·#387 확인 남음 |
 | 다음 범위 | 토스 장애 때 새 결제를 Mock 2차 PG로 보낸다 | #400 | 착수 때 요구사항 갱신 | 대기 |
 | 후순위 | 대사 → 정산 → 지급 → 선택(웹훅) | 착수 때 | 착수 때 `requirements/reconciliation.md` 등 | 대기 |
 
 ### Phase 2·3의 남은 일
 
-| 소유 | 이슈 | 끝나면 달라지는 것 | 선행 |
-|---|---|---|---|
-| 공유 계약 | #384 | 환불 요청·결과 계약과 ADR이 현재 구현과 맞는다 | #377 |
-| Payment | #398 | 승인 429 뒤 이중 청구와 미환불이 생기지 않는다 | 없음 |
-| Payment | #401 | 토스의 환불 진행 중 응답이 실패로 끝나지 않는다 | 없음 |
-| Payment | #402 | 환불 소비자가 확정 계약과 공통 오류 처리기를 쓴다 | #384, #389 |
-| Payment | #387 | 오래 미확정인 결제·환불 건수를 지표로 낸다 | 없음 |
-| Payment | #369 | 24시간 상한에 걸린 환불을 사람이 재개할 수 있다 | 없음 |
-| CommerceCore | #377 | 보상 대기 주문이 있어도 새 구매를 할 수 있다 | 없음 |
-| CommerceCore | #389 | 처리 못 할 메시지가 DLT로 가고 뒤 메시지가 막히지 않는다 | #390 |
-| CommerceCore | #390 | 옛 Payment 호출과 하이픈 토픽 구독이 사라진다 | #377 |
-| CommerceCore | #399 | 앞선 환불이 미확정이어도 남은 상품을 환불할 수 있다 | #377, #390, #401 |
-| CommerceCore | #367 | 구매자 일반 환불의 Core 완료 조건을 확인한다 | 없음 |
-| CommerceCore | #345 | 일부 수량 환불의 남은 조건을 확인한다 | #399 |
-| Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·30일 보관·Slack 알림이 동작한다 | 미확정 알림만 #387 |
-| Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | 구매자가 결제·환불 상태를 구분하고 남은 상품을 환불한다 | Backend·Infra 완료 |
+| 소유 | 이슈 | 끝나면 달라지는 것 | 선행 | 상태 |
+|---|---|---|---|---|
+| 공유 계약 | #384 | 환불 요청·결과 계약과 ADR이 현재 구현과 맞는다 | #377 | 닫힘(PR #393·#408) |
+| Payment | #398 | 승인 429 뒤 이중 청구와 미환불이 생기지 않는다 | 없음 | 닫힘(PR #405) |
+| Payment | #401 | 토스의 환불 진행 중 응답이 실패로 끝나지 않는다 | 없음 | 열림. PR #406 머지, 토스 실제 응답 미재현 |
+| Payment | #402 | 환불 소비자가 확정 계약과 공통 오류 처리기를 쓴다 | #384, #389 | 닫힘(PR #411) |
+| Payment | #387 | 오래 미확정인 결제·환불 건수를 지표로 낸다 | 없음 | 열림. PR #413 머지, Infra #64 알림 확인 남음 |
+| Payment | #369 | 24시간 상한에 걸린 환불을 사람이 재개할 수 있다 | 없음 | 닫힘(PR #414) |
+| CommerceCore | #377 | 보상 대기 주문이 있어도 새 구매를 할 수 있다 | 없음 | 닫힘(PR #378·#407) |
+| CommerceCore | #389 | 처리 못 할 메시지가 DLT로 가고 뒤 메시지가 막히지 않는다 | #390 | 닫힘(PR #410) |
+| CommerceCore | #390 | 옛 Payment 호출과 하이픈 토픽 구독이 사라진다 | #377 | 닫힘(PR #409) |
+| CommerceCore | #399 | 앞선 환불이 미확정이어도 남은 상품을 환불할 수 있다 | #377, #390, #401 | 닫힘(PR #412) |
+| CommerceCore | #367 | 구매자 일반 환불의 Core 완료 조건을 확인한다 | 없음 | 열림. 완료 조건 확인 남음 |
+| CommerceCore | #345 | 일부 수량 환불의 남은 조건을 확인한다 | #399 | 닫힘(PR #412) |
+| Infra | [Infra #64](https://github.com/2026-2-rising-sun/Infra/issues/64) | DLT 토픽·30일 보관·Slack 알림이 동작한다 | 미확정 알림만 #387 | 열림 |
+| Frontend | [Frontend #89](https://github.com/2026-2-rising-sun/Frontend/issues/89) | 구매자가 결제·환불 상태를 구분하고 남은 상품을 환불한다 | Backend·Infra 완료 | 열림 |
 
-작업 순서:
+작업 순서(1–5는 dev 머지 완료):
 
 1. 선행이 없는 Payment, CommerceCore, Infra DLT 작업을 서비스별로 병렬 진행한다.
 2. CommerceCore는 #377 → #390 → #389 순서로 진행한다. 같은 결제 코드와 소비자 설정을 고쳐 병렬로 하면 충돌한다.
@@ -194,13 +198,13 @@ gh pr edit <내-PR> --base dev && gh pr ready <내-PR>
 | 필요한 것 | 소유 | 상태 |
 |---|---|---|
 | 새 생성·승인 API 호출, `PaymentApproved` 소비 | CommerceCore | dev 병합 |
-| `commerce.refund.requests.v1` 발행, `payment.refund.results.v1` 소비 | CommerceCore | dev 병합. 계약 확정은 #384 |
+| `commerce.refund.requests.v1` 발행, `payment.refund.results.v1` 소비 | CommerceCore | dev 병합. 계약 확정 #384 완료 |
 | `PurchaseConfirmed` 발행 | CommerceCore | 정산 착수 때 |
 
 Payment 쪽 검증은 Commerce 없이 끝나게 만든다.
 
 ## 인계
 
-- 완료: 목표 설계, 요구사항, ADR, Phase 1 구현과 토스 샌드박스 확인, Core 결제 중계, Payment 환불 실행(#385·#370·#386).
-- 남은 일: 위 [Phase 2·3의 남은 일](#phase-23의-남은-일).
+- 완료: 목표 설계, 요구사항, ADR, Phase 1 구현과 토스 샌드박스 확인, Core 결제 중계, Payment 환불 실행(#385·#370·#386), Phase 2·3의 Backend 코드 작업(위 표의 닫힌 이슈).
+- 남은 일: 위 [Phase 2·3의 남은 일](#phase-23의-남은-일)의 열린 이슈와 [다음 Phase 후보](#처음-읽는-사람을-위한-요약).
 - 결제 재설계가 끝나면 `design-docs/services/payment/design.html` 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.
