@@ -76,10 +76,6 @@ public class CommerceCoreSecurityConfiguration {
                 environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
                         && environment.getProperty(
                                 "commercecore.dev-api.enabled", Boolean.class, false);
-        boolean devScenarios =
-                environment.acceptsProfiles(Profiles.of("(local | test) & !dev & !prod"))
-                        && environment.getProperty(
-                                "commercecore.dev.payment-scenario.enabled", Boolean.class, false);
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -135,10 +131,6 @@ public class CommerceCoreSecurityConfiguration {
                                     .hasRole("SELLER");
                             if (devImages) {
                                 auth.requestMatchers("/v1/dev/product-images").hasRole("SELLER");
-                            }
-                            if (devScenarios) {
-                                auth.requestMatchers("/v1/dev/payment-scenarios/**")
-                                        .hasRole("SELLER");
                             }
                             auth.anyRequest().denyAll();
                         })
