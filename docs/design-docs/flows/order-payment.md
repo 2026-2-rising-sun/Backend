@@ -18,7 +18,7 @@
 | Core 기한 경계 | EXPIRED | 재고/쿠폰 선점 한 번 해제. 이후 새 승인 POST 없이 조회 유지 |
 | 종료 주문의 늦은 승인 | 환불 필요+Outbox | 주문 부활 없이 late-{paymentId}와 구 commerce.refund-requests.v1의 RefundRequested(LATE_APPROVAL) 같은 TX |
 | Core 환불 요청 발행 | Payment 환불 소비 | 현재 dev Payment에는 해당 환불 consumer가 없음. 발행 성공은 환불 접수/완료가 아님 |
-| Payment 환불 결과 | Core 환불 상태 | 구 payment.refund-results.v1의 RefundSucceeded/RefundFailed를 검증해 SUCCEEDED/FAILED, 주문은 종료 상태 유지. 실제 provider 연동은 미완 |
+| Payment 환불 결과 | Core 환불 상태 | payment.refund.results.v1의 RefundResultRecorded를 core_refund_intent 원요청과 대조해 반영. 구 payment.refund-results.v1 구독은 없음. 실제 provider 연동은 미완 |
 
 과거 실행 기록에서는 팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.
 
