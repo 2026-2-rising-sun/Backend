@@ -1,0 +1,16 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "productId": { "type": "long" },
+      "name": { "type": "text" },
+      "description": { "type": "text" },
+      "category": { "type": "keyword" },
+      "sellerId": { "type": "keyword" },
+      "price": { "type": "long" },
+      "soldOut": { "type": "boolean" },
+      "status": { "type": "keyword" },
+      "createdAt": { "type": "date" }
+    }
+  }
+}

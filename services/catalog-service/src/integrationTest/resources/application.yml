@@ -33,6 +33,9 @@ catalog:
     base-url: http://127.0.0.1:1
 
 management:
+  health:
+    elasticsearch:
+      enabled: false
   endpoints:
     web:
       exposure:
