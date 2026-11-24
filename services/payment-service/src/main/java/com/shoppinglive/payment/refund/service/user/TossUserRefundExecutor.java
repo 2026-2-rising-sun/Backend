@@ -148,7 +148,7 @@ class TossUserRefundExecutor implements UserRefundExecutor {
             case TossResult.Success success -> confirm(refund, success.payment());
             case TossResult.Declined declined -> declined(refund, declined);
             case TossResult.NotSent notSent -> {
-                // 응답을 받았으면 토스에 닿았다(429·401 등). 처리되지 않았다는 보장이 없어 예약을 풀지 않는다
+                // 응답을 받았으면 토스에 닿았다(401 등). 처리되지 않았다는 보장이 없어 예약을 풀지 않는다
                 if (notSent.httpStatus() == null) {
                     refunds.releaseUnknown(refund.getId(), refund.getAttemptCount());
                 }

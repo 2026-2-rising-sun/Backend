@@ -3,6 +3,7 @@ package com.shoppinglive.payment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
@@ -97,6 +98,37 @@ class CompensationPostgresTest extends RecoveryPostgresTestSupport {
 
         assertResolved(c, refund, "NO_CHARGE", 0);
         verify(toss, never()).getPayment(anyString());
+    }
+
+    @Test
+    @DisplayName(
+            "[PAY-CONFIRM-10][REF-LATE-01] 승인 429 두 번으로 UNKNOWN이 된 결제(pg_order_id 유지)에 시스템 보상이 오면 조회 없이 NO_CHARGE가 아니라 토스를 조회해 확정한다")
+    void http429UnknownIsQueriedNotNoCharge() throws Exception {
+        ApproveCommand c = newPayment();
+        when(toss.confirm(anyString(), anyString(), anyLong(), anyString()))
+                .thenReturn(new TossResult.Unknown("HTTP 429", 429));
+        assertThat(approvalService.approve(c))
+                .isEqualTo(new ApprovalResult.Pending(paymentId(c.orderRef())));
+        assertThat(status(c.orderRef())).isEqualTo("UNKNOWN");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT pg_order_id FROM payment WHERE order_ref = ?",
+                                String.class,
+                                c.orderRef()))
+                .isEqualTo(c.pgOrderId());
+        // 같은 결제의 새 승인 시도는 토스를 부르지 않고 불명 대기로 답한다(새 주문번호·새 키를 쓰지 않는다)
+        assertThat(approvalService.approve(c))
+                .isEqualTo(new ApprovalResult.Pending(paymentId(c.orderRef())));
+        verify(toss, times(2))
+                .confirm(c.paymentKey(), c.pgOrderId(), c.amount(), "confirm-" + c.pgOrderId());
+        tossQuery(c, new TossResult.Success(withStatus(c, "CANCELED")));
+
+        Refund refund = receive(c);
+        intake.execute(refund);
+
+        assertResolved(c, refund, "SUCCEEDED", AMOUNT);
+        verify(toss).getPayment(c.paymentKey());
+        verify(toss, never()).cancel(anyString(), anyString(), anyString());
     }
 
     @Test

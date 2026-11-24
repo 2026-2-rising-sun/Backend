@@ -233,14 +233,22 @@ class TossPaymentsClientTest {
         assertThat(confirm()).isInstanceOf(TossResult.NotSent.class);
     }
 
-    @ParameterizedTest(name = "{0}")
-    @CsvSource({"401", "429"})
-    @DisplayName("PAY-PG-01 401·429는 본문 code를 읽지 못해도 NotSent")
-    void unauthorizedOrTooManyRequestsWithoutCodeIsNotSent(int status) {
+    @Test
+    @DisplayName("PAY-PG-01 401은 본문 code를 읽지 못해도 NotSent")
+    void unauthorizedWithoutCodeIsNotSent() {
         server.expect(requestTo(BASE + "/v1/payments/confirm"))
-                .andRespond(withStatus(HttpStatus.valueOf(status)));
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
         assertThat(confirm()).isInstanceOf(TossResult.NotSent.class);
+    }
+
+    @Test
+    @DisplayName("PAY-PG-01 429는 토스가 처리했는지 모르므로 본문과 무관하게 Unknown(#398)")
+    void tooManyRequestsIsUnknown() {
+        server.expect(requestTo(BASE + "/v1/payments/confirm"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThat(confirm()).isInstanceOf(TossResult.Unknown.class);
     }
 
     @ParameterizedTest(name = "{0} {1}")
