@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** 실제 ES 에서 확인한다. {@code CATALOG_TEST_ES_URL} 이 가리키는 ES 의 products 인덱스를 지우고 쓴다. */
+/** Nori 플러그인이 있는 실제 ES 에서 확인한다. {@code CATALOG_TEST_ES_URL} 이 가리키는 ES 의 products 인덱스를 지우고 쓴다. */
 @Tag("elasticsearch")
 class ElasticsearchProductIndexTest {
     private RestClient rest;
@@ -78,13 +78,13 @@ class ElasticsearchProductIndexTest {
     }
 
     @Test
-    @DisplayName("alias가 없으면 매핑과 alias를 만들고 상품명 단어로 찾는다")
-    void createsAliasAndSearchesByWord() throws IOException {
+    @DisplayName("alias가 없으면 매핑과 alias를 만들고 조사가 붙은 검색어로도 상품명을 찾는다")
+    void createsAliasAndSearchesKorean() throws IOException {
         Set<Long> failed = index.write(List.of(document(1, "남성 러닝 운동화", false)), List.of());
 
         assertThat(failed).isEmpty();
         assertThat(client.indices().existsAlias(a -> a.name("products")).value()).isTrue();
-        assertThat(search("운동화")).containsExactly(1L);
+        assertThat(search("운동화를")).containsExactly(1L);
     }
 
     @Test

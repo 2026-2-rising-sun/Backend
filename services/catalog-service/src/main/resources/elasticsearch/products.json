@@ -3,8 +3,8 @@
     "dynamic": "strict",
     "properties": {
       "productId": { "type": "long" },
-      "name": { "type": "text" },
-      "description": { "type": "text" },
+      "name": { "type": "text", "analyzer": "nori" },
+      "description": { "type": "text", "analyzer": "nori" },
       "category": { "type": "keyword" },
       "sellerId": { "type": "keyword" },
       "price": { "type": "long" },

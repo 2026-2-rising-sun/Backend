@@ -129,7 +129,7 @@ subprojects {
             registerExternalTest("postgresTest", "postgres & !migration", postgresEnabled)
         }
         if (prefix == "CATALOG") {
-            // 실제 ES. 지정한 ES 의 products 인덱스를 지우고 쓴다
+            // Nori 플러그인이 있는 실제 ES. 지정한 ES 의 products 인덱스를 지우고 쓴다
             registerExternalTest("elasticsearchTest", "elasticsearch") {
                 System.getenv("CATALOG_TEST_ES_URL")?.startsWith("http") == true
             }
