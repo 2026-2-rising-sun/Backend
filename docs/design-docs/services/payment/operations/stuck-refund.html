@@ -22,7 +22,7 @@
 <li><strong>금액과 상태를 바꾸지 않는다.</strong> 재개 SQL은 재시도 시각과 조회 마감만 바꾼다. 환불 결과는 실행기가 토스 응답으로만 정한다.</li>
 </ul>
 <h2 id="1-멈춘-건-찾기">1. 멈춘 건 찾기</h2>
-<pre><code class="language-sql">SELECT refund_request_id, purpose, status, amount, attempt_count, created_at, check_deadline_at
+<pre><code class="language-sql">SELECT refund_request_id, payment_id, purpose, status, amount, attempt_count, created_at, check_deadline_at
   FROM refund
  WHERE status = 'UNKNOWN' AND next_attempt_at IS NULL
  ORDER BY created_at;
@@ -58,14 +58,15 @@
 </table></div>
 <p>재개 뒤 실행기는 토스 조회부터 한다. 취소 내역이 있으면 재요청 없이 결과를 반영한다. 없으면 같은 멱등 키로 다시 취소를 보낸다. 키는 고객 환불이 <code>refund_request_id</code>, 시스템 보상이 <code>cancel-{pg_order_id}</code>다. 그래서 재개는 중복 환불을 만들지 않는다.</p>
 <h2 id="3-재개">3. 재개</h2>
-<p>재개할 행이 1번 조회의 결과에 있는 것만 실행한다. 목록 전체를 재개하려면 아래 SQL을 그대로 쓴다. 특정 건만 재개하려면 <code>WHERE</code> 끝에 <code>AND refund_request_id IN ('...')</code>를 더한다. 실행 전에 영향 행 수가 1번 조회의 건수와 같은지 본다.</p>
+<p>2번 판단을 통과한 건만 재개한다. <code>:ids</code> 자리에 그 건의 <code>refund_request_id</code>를 <code>'id1', 'id2'</code>처럼 넣는다. ID 조건은 빼지 않는다. 빼면 "멈추고 보고"할 건까지 재개된다. <code>BEGIN</code> 뒤에 실행하고, 영향 행 수가 넣은 ID 수와 같을 때만 <code>COMMIT</code>한다. 다르면 <code>ROLLBACK</code>한다.</p>
 <pre><code class="language-sql">UPDATE refund
    SET next_attempt_at = now(),
        check_deadline_at = now() + INTERVAL '24 hours',
        updated_at = now()
  WHERE status = 'UNKNOWN'
    AND next_attempt_at IS NULL
-   AND created_at &gt; now() - INTERVAL '14 days';
+   AND created_at &gt; now() - INTERVAL '14 days'
+   AND refund_request_id IN (:ids);
 </code></pre>
 <ul>
 <li>조회 마감을 24시간 뒤로 잡는 이유: 실행기는 마감이 이미 지났으면 조회만 하고 멈춘다. 마감을 되돌리기만 하면 재개 즉시 다시 멈춘다. 마감을 <code>payment.recovery.refund-give-up-after</code>(기본 24시간) 뒤로 다시 잡으면 실행기의 첫 시도 시각이 재개 시각이 되어, 조회 간격과 상한이 처음 규칙을 따른다.</li>
@@ -80,6 +81,6 @@
 <li>지표 <code>shoppinglive.payment.unresolved.count{kind=refund_unknown}</code>가 내려갔는지 본다.</li>
 <li>확정된 건은 <code>payment.refund.results.v1</code>에 결과가 나갔는지 본다(orderRef 키).</li>
 </ol>
-<p>재개를 되돌리는 SQL은 없다. 실행기가 같은 멱등 키로 다시 보낸 취소만 토스에 남는다. 취소가 잘못됐다면 토스에서 직접 되돌리고 원장 정정을 요청한다.</p><p class="muted fingerprint">MD SHA-256: <code>80d810bcc684011123a9fc6562185f0ce8d71c90cae7d21f692e120139912cfa</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>재개를 되돌리는 SQL은 없다. 실행기가 같은 멱등 키로 다시 보낸 취소만 토스에 남는다. 취소가 잘못됐다면 토스에서 직접 되돌리고 원장 정정을 요청한다.</p><p class="muted fingerprint">MD SHA-256: <code>997745ffca08ccaebe2354736ff2e8a9c9d59308ec14e9dc6138fafe8a03a2b5</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
