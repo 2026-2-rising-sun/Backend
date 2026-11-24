@@ -3,6 +3,7 @@ package com.shoppinglive.commercecore.payment.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.common.events.EventEnvelope;
+import com.shoppinglive.common.kafka.ConsumerErrorHandlers;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -12,14 +13,15 @@ import org.springframework.kafka.annotation.*;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.*;
-import org.springframework.util.backoff.FixedBackOff;
 
 @Configuration(proxyBeanMethods = false)
 @EnableKafka
 public class PaymentEventConsumerConfiguration {
     @Bean
     ConcurrentKafkaListenerContainerFactory<String, String> paymentResultListenerContainerFactory(
-            KafkaProperties properties) {
+            KafkaProperties properties,
+            @org.springframework.beans.factory.annotation.Qualifier("outboxKafkaTemplate")
+                    org.springframework.kafka.core.KafkaTemplate<String, String> kafka) {
         Map<String, Object> config =
                 new java.util.HashMap<>(properties.buildConsumerProperties(null));
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -29,9 +31,10 @@ public class PaymentEventConsumerConfiguration {
         var factory = new ConcurrentKafkaListenerContainerFactory<String, String>();
         factory.setConsumerFactory(new DefaultKafkaConsumerFactory<>(config));
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
-        // Core 로컬 반영 실패를 성공으로 ack하지 않고 같은 결과를 재전달한다.
+        // DB 장애는 복구될 때까지 재시도하고, 처리할 수 없는 메시지는 DLT로 보내 뒤의 메시지를 막지 않는다.
         factory.setCommonErrorHandler(
-                new DefaultErrorHandler(new FixedBackOff(1000, FixedBackOff.UNLIMITED_ATTEMPTS)));
+                ConsumerErrorHandlers.deadLettering(
+                        kafka, ".commercecore.dlt", java.time.Duration.ofSeconds(1)));
         return factory;
     }
 
@@ -97,11 +100,13 @@ public class PaymentEventConsumerConfiguration {
                         event = mapper.readValue(json, new TypeReference<>() {});
                 validate(event, "PaymentApproved", event.payload().orderRef());
                 if (!event.aggregateId().equals(record.key()))
-                    throw new IllegalArgumentException("승인 이벤트 키가 주문 참조와 다릅니다.");
+                    throw new com.shoppinglive.common.kafka.ContractViolationException(
+                            "승인 이벤트 키가 주문 참조와 다릅니다.");
                 relay.approved(event.payload());
                 return;
             }
-            throw new IllegalArgumentException("지원하지 않는 결제 결과 이벤트입니다.");
+            throw new com.shoppinglive.common.kafka.ContractViolationException(
+                    "지원하지 않는 결제 결과 이벤트입니다.");
         }
 
         private void validate(EventEnvelope<?> e, String type, String requestId) {
@@ -109,7 +114,8 @@ public class PaymentEventConsumerConfiguration {
                     || e.schemaVersion() != 1
                     || !"payment-service".equals(e.source())
                     || !e.aggregateId().equals(requestId))
-                throw new IllegalArgumentException("Payment 결과 이벤트 봉투가 올바르지 않습니다.");
+                throw new com.shoppinglive.common.kafka.ContractViolationException(
+                        "Payment 결과 이벤트 봉투가 올바르지 않습니다.");
         }
     }
 }

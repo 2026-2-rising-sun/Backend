@@ -270,7 +270,11 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         refunds.request(MEMBER_A, n, "mismatch", all());
         var event = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         ((ObjectNode) event.path("payload")).put(field, "wrong");
-        assertThatThrownBy(() -> apply(event)).isInstanceOf(BusinessException.class);
+        Class<? extends Exception> expected =
+                field.equals("orderRef")
+                        ? com.shoppinglive.common.kafka.ContractViolationException.class
+                        : BusinessException.class;
+        assertThatThrownBy(() -> apply(event)).isInstanceOf(expected);
         assertThat(state(n)).isEqualTo("CANCEL_PENDING");
         assertThat(available(501)).isEqualTo(17);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_result_event", Long.class))
@@ -815,7 +819,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         ((ObjectNode) done.path("payload")).set("refundRequestId", mapper.readTree(idJson));
         assertThatThrownBy(() -> apply(done))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(com.shoppinglive.common.kafka.ContractViolationException.class)
                 .hasMessageContaining("환불 요청 ID");
         assertThat(state(n)).isEqualTo("CANCEL_PENDING");
         assertThat(available(501)).isEqualTo(17);
