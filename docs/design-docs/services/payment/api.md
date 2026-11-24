@@ -533,7 +533,7 @@ responses:
 | 404 | PAYMENT_NOT_FOUND |
 | 409 | STALE_CHECKOUT(예전 결제창. 결제창을 다시 연다), PAYMENT_CLOSED(만료·닫힘, 또는 토스 승인 응답이 맞지 않아 전액 취소함) |
 | 422 | DECLINED. 토스가 거절했다. 결제는 CREATED로 돌아가고 결제창이 비워진다. 결제창 API로 새 결제창을 열어 다시 승인한다. data.code·message는 토스 오류 코드·메시지다. |
-| 503 | PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제, 호출 제한). 결제는 CREATED로 돌아가고 결제창이 비워진다. |
+| 503 | PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제). 결제는 CREATED로 돌아가고 결제창이 비워진다. 토스의 429(호출 제한)·408은 처리 여부를 알 수 없어 503이 아니라 202 처리 중(UNKNOWN)이다. |
 
 #### 200 · application/json
 
@@ -795,8 +795,8 @@ responses:
             message: 카드사에서 결제를 거절했습니다.
             requestId: 7f1c2b3a-0000-4000-8000-000000000001
   '503':
-    description: PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제, 호출 제한). 결제는 CREATED로
-      돌아가고 결제창이 비워진다.
+    description: PG_UNAVAILABLE. 요청이 토스에 가지 않았다(연결 실패, 우리 키·설정 문제). 결제는 CREATED로 돌아가고
+      결제창이 비워진다. 토스의 429(호출 제한)·408은 처리 여부를 알 수 없어 503이 아니라 202 처리 중(UNKNOWN)이다.
     content:
       application/json:
         schema:
@@ -1140,4 +1140,4 @@ components:
         허용 목록 밖의 /v1/internal 경로는 토큰이 맞아도 403이다.
 ```
 
-입력 SHA-256: `15d4bd4c6fd53f06e0af8af9403efa0f705fdf751c0c33dc587559f1cf61148e`
+입력 SHA-256: `13c120275bf7cdb6038b8262577328ec9471192cb9786acaec9827c91d782d93`

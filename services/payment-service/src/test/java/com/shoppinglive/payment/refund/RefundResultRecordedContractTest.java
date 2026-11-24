@@ -34,7 +34,7 @@ class RefundResultRecordedContractTest {
                 MAPPER.readTree(
                         """
                         {"refundRequestId":"b1111111-1111-4111-8111-111111111111",
-                         "orderRef":"PG-22222222-2222-4222-8222-222222222222",
+                         "orderRef":"PG-22222222-2222-4222-8222-222222222222","paymentId":7001,
                          "purpose":"SYSTEM_COMPENSATION","reason":"APPROVAL_UNKNOWN","currency":"KRW",
                          "amount":4000,"items":[{"sellerOrderNumber":"ORDER-301","amount":4000,
                          "orderItems":[{"orderItemId":301,"quantity":1,"amount":4000}]}],
@@ -44,7 +44,7 @@ class RefundResultRecordedContractTest {
                 RefundResultRecorded.failed(
                         request,
                         UUID.fromString("d1111111-1111-4111-8111-000000000001"),
-                        "PAYMENT_ID_REQUIRED",
+                        "PAYMENT_NOT_FOUND",
                         Instant.parse("2026-11-21T01:00:01.123456Z"));
         EventEnvelope<JsonNode> event =
                 RefundResultRecorded.envelope(result, Instant.parse("2026-11-21T01:00:01Z"));
@@ -71,11 +71,9 @@ class RefundResultRecordedContractTest {
     /** 파서가 받아들인 요청으로 접수가 만드는 실패 결과를 표본으로 남긴다. check_events --samples가 실제 생산 결과를 결과 계약으로 검사한다. */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        "user-no-payment-id,USER_REFUND,CUSTOMER_REQUEST,,PAYMENT_ID_REQUIRED",
         "user-not-found,USER_REFUND,CUSTOMER_REQUEST,7001,PAYMENT_NOT_FOUND",
         "user-mismatch,USER_REFUND,CUSTOMER_REQUEST,7002,PAYMENT_MISMATCH",
-        "system-in-progress,SYSTEM_COMPENSATION,LATE_APPROVAL,7001,COMPENSATION_IN_PROGRESS",
-        "system-no-payment-id,SYSTEM_COMPENSATION,APPROVAL_UNKNOWN,,PAYMENT_ID_REQUIRED"
+        "system-in-progress,SYSTEM_COMPENSATION,LATE_APPROVAL,7001,COMPENSATION_IN_PROGRESS"
     })
     @DisplayName("[REF-EVENT-01][REF-ACCEPT-05][REF-ACCEPT-06] 파서가 받은 요청의 실패 결과는 결과 계약을 지킨다")
     void writesFailedResultSamplesFromParsedRequests(

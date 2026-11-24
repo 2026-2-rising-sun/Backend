@@ -236,6 +236,8 @@ public class KafkaRefundService {
                                 OrderStatus.CANCEL_PENDING,
                                 OrderStatus.REFUNDED)
                         .contains(group.getStatus())) return;
+        var binding = relay.binding(group.getId());
+        require(binding != null && binding.paymentId() != null, "결제 ID가 없는 보상 요청은 만들 수 없습니다.");
         // 결제 대기 주문은 승인 응답 유실로 보상할 수 없다. 상태를 바꾸지 않고 원문만 남지 않게 막는다.
         require(group.getStatus() != OrderStatus.PENDING_PAYMENT, "결제 대기 주문은 보상할 수 없습니다.");
         require(
@@ -261,7 +263,6 @@ public class KafkaRefundService {
                 orders.findByPaymentGroupIdOrderByIdAsc(group.getId()).stream()
                         .map(o -> new Target(o, o.getQuantity(), o.getPayableAmount()))
                         .toList();
-        var binding = relay.binding(group.getId());
         save(
                 group,
                 null,
@@ -285,7 +286,7 @@ public class KafkaRefundService {
             Instant now) {
         ObjectNode payload = mapper.createObjectNode();
         payload.put("refundRequestId", id).put("orderRef", group.getGroupNumber());
-        if (paymentId != null) payload.put("paymentId", paymentId);
+        payload.put("paymentId", paymentId);
         payload.put("purpose", purpose)
                 .put("reason", reason)
                 .put("currency", "KRW")

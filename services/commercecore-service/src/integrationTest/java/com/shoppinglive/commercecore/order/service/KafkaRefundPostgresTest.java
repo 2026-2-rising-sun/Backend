@@ -1052,8 +1052,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("원결제ID 없는 요청에 결과만 새ID를 추가하면 연결검증을 완화하지 않고 재시도 가능하게 거절한다")
-    void unknownPaymentBindingRemainsSafelyUnapplied() throws Exception {
+    @DisplayName("원결제ID가 없으면 paymentId 필수 계약에 맞지 않아 보상 요청을 만들지 않고 상태를 바꾸지 않는다")
+    void compensationWithoutPaymentIdIsRefused() throws Exception {
         String n = prepare(false);
         jdbc.update(
                 "UPDATE order_payment_relay SET remote_payment_id=NULL WHERE payment_group_id=?",
@@ -1063,21 +1063,19 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                 id(n));
         jdbc.update(
                 "UPDATE orders SET status='PAYMENT_CONFIRMING' WHERE payment_group_id=?", id(n));
-        tx.executeWithoutResult(
-                t -> {
-                    guard.lock(MEMBER_A);
-                    refunds.compensateLocked(
-                            groups.lockById(id(n)).orElseThrow(), "APPROVAL_UNKNOWN");
-                });
-        var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
-        ((ObjectNode) done.path("payload")).put("paymentId", PAYMENT);
-        for (int i = 0; i < 2; i++)
-            assertThatThrownBy(() -> apply(done)).isInstanceOf(BusinessException.class);
-        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThatThrownBy(
+                        () ->
+                                tx.executeWithoutResult(
+                                        t -> {
+                                            guard.lock(MEMBER_A);
+                                            refunds.compensateLocked(
+                                                    groups.lockById(id(n)).orElseThrow(),
+                                                    "APPROVAL_UNKNOWN");
+                                        }))
+                .isInstanceOf(BusinessException.class);
+        assertThat(state(n)).isEqualTo("PAYMENT_CONFIRMING");
         assertThat(reserved(501)).isEqualTo(3);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_result_event", Long.class))
-                .isZero();
-        assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
+        assertThat(compensationRequests(n)).isZero();
         verifyNoInteractions(remote);
     }
 
