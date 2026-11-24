@@ -38,6 +38,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -82,11 +83,12 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
-    @DisplayName("[REF-EXEC-06] 재개 SQL은 재시도 시각과 조회 마감만 바꾸고 금액·상태는 그대로 둔다")
+    @DisplayName("[REF-EXEC-06] 재개 SQL은 넣은 ID만 재시도 시각과 조회 마감을 바꾸고 금액·상태는 그대로 둔다")
     void resumeSqlChangesOnlyScheduleAndDeadline() throws Exception {
         Refund refund = stuckUserRefund("RB-KEEP");
+        Refund other = stuckUserRefund("RB-OTHER");
 
-        jdbc.update(sql("resume-stuck-refund"));
+        resume(refund);
 
         Map<String, Object> row = refund(refund.getRefundRequestId());
         assertThat(row)
@@ -103,13 +105,15 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
                                 Timestamp.from(Instant.now()),
                                 refund.getId()))
                 .isTrue();
+        // ID 목록에 없는 멈춘 건은 재개되지 않는다
+        assertThat(refund(other.getRefundRequestId()).get("next_attempt_at")).isNull();
     }
 
     @Test
     @DisplayName("[REF-EXEC-04] 재개하면 실행기가 토스 조회부터 다시 하고 같은 멱등 키로만 취소를 보낸다")
     void resumedRefundQueriesFirstThenResendsSameKey() throws Exception {
         Refund refund = stuckUserRefund("RB-RESUME");
-        jdbc.update(sql("resume-stuck-refund"));
+        resume(refund);
 
         // 재개 직후 첫 실행: 조회가 실패하면 멈추지 않고 다음 실행을 예약한다
         when(toss.getPayment(pk("RB-RESUME"))).thenReturn(new TossResult.Unknown("시간 초과"));
@@ -141,7 +145,7 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
     @DisplayName("[REF-EXEC-04] 서버를 다시 띄운 뒤에도 재개된 고객 환불이 이어서 처리된다")
     void resumedRefundContinuesAfterRestart() throws Exception {
         Refund refund = stuckUserRefund("RB-RESTART");
-        jdbc.update(sql("resume-stuck-refund"));
+        resume(refund);
         // 이전 프로세스가 토스 호출 중에 죽었다고 보고 선점(next_attempt_at)만 지난 것으로 둔다
         jdbc.update(
                 "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
@@ -169,7 +173,7 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
         String orderRef = "RB-COMP-" + UUID.randomUUID().toString().substring(0, 8);
         Refund refund = stuckCompensation(orderRef);
         String key = "cancel-PO-" + orderRef;
-        jdbc.update(sql("resume-stuck-refund"));
+        resume(refund);
 
         Map<String, Object> row = refund(refund.getRefundRequestId());
         assertThat(row)
@@ -207,7 +211,7 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
     void resumedCompensationSettlesWithoutResendWhenCancelExists() throws Exception {
         String orderRef = "RB-COMPOK-" + UUID.randomUUID().toString().substring(0, 8);
         Refund refund = stuckCompensation(orderRef);
-        jdbc.update(sql("resume-stuck-refund"));
+        resume(refund);
 
         when(toss.getPayment(pk(orderRef)))
                 .thenReturn(new TossResult.Success(compensationCanceledPayment(orderRef)));
@@ -262,6 +266,14 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");
         verify(toss, times(1)).cancel(any(), any(), any());
         return refund;
+    }
+
+    /** 운영 문서의 재개 SQL을 이 건의 ID만 넣어 실행한다. */
+    private void resume(Refund refund) throws IOException {
+        new NamedParameterJdbcTemplate(jdbc)
+                .update(
+                        sql("resume-stuck-refund"),
+                        Map.of("ids", List.of(refund.getRefundRequestId())));
     }
 
     private void makeDue(Refund refund) {

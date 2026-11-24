@@ -15,7 +15,7 @@
 
 <!-- sql: find-stuck-refund -->
 ```sql
-SELECT refund_request_id, purpose, status, amount, attempt_count, created_at, check_deadline_at
+SELECT refund_request_id, payment_id, purpose, status, amount, attempt_count, created_at, check_deadline_at
   FROM refund
  WHERE status = 'UNKNOWN' AND next_attempt_at IS NULL
  ORDER BY created_at;
@@ -37,7 +37,7 @@ SELECT refund_request_id, purpose, status, amount, attempt_count, created_at, ch
 
 ## 3. 재개
 
-재개할 행이 1번 조회의 결과에 있는 것만 실행한다. 목록 전체를 재개하려면 아래 SQL을 그대로 쓴다. 특정 건만 재개하려면 `WHERE` 끝에 `AND refund_request_id IN ('...')`를 더한다. 실행 전에 영향 행 수가 1번 조회의 건수와 같은지 본다.
+2번 판단을 통과한 건만 재개한다. `:ids` 자리에 그 건의 `refund_request_id`를 `'id1', 'id2'`처럼 넣는다. ID 조건은 빼지 않는다. 빼면 "멈추고 보고"할 건까지 재개된다. `BEGIN` 뒤에 실행하고, 영향 행 수가 넣은 ID 수와 같을 때만 `COMMIT`한다. 다르면 `ROLLBACK`한다.
 
 <!-- sql: resume-stuck-refund -->
 ```sql
@@ -47,7 +47,8 @@ UPDATE refund
        updated_at = now()
  WHERE status = 'UNKNOWN'
    AND next_attempt_at IS NULL
-   AND created_at > now() - INTERVAL '14 days';
+   AND created_at > now() - INTERVAL '14 days'
+   AND refund_request_id IN (:ids);
 ```
 
 - 조회 마감을 24시간 뒤로 잡는 이유: 실행기는 마감이 이미 지났으면 조회만 하고 멈춘다. 마감을 되돌리기만 하면 재개 즉시 다시 멈춘다. 마감을 `payment.recovery.refund-give-up-after`(기본 24시간) 뒤로 다시 잡으면 실행기의 첫 시도 시각이 재개 시각이 되어, 조회 간격과 상한이 처음 규칙을 따른다.
