@@ -18,7 +18,8 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
      * 없을 때만 환불을 넣는다. 0이면 같은 refund_request_id가 이미 있거나, 같은 결제에 진행 중인 시스템 보상이 있다(부분 UNIQUE). null일 수
      * 있는 값은 CAST로 타입을 정한다(타입 없는 null 바인딩을 PostgreSQL이 bytea로 본다). 충돌 대상을 적지 않아 두 UNIQUE를 모두 받는다.
      * UNIQUE 예외를 잡지 않는 이유: PostgreSQL은 위반 시 트랜잭션 전체가 중단된다. PROCESSING은 바로 재처리 대상(next_attempt_at =
-     * now())으로 넣어, 커밋 뒤 실행 전에 죽어도 재처리가 집는다.
+     * 호출자의 JVM 시각 {@code now})으로 넣어, 커밋 뒤 실행 전에 죽어도 재처리가 집는다. 재처리 조회·선점이 JVM 시각과 비교하므로 DB 시계를 쓰지
+     * 않는다.
      */
     @Modifying
     @Query(
@@ -32,7 +33,7 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
                             :amount, :requestPayload, :status, CAST(:failureCode AS VARCHAR(100)),
                             :resultVersion, CAST(:resultPayload AS TEXT), 0,
                             CAST(:resolvedAt AS TIMESTAMP WITH TIME ZONE), 0,
-                            CASE WHEN :status = 'PROCESSING' THEN now() END, now(), now())
+                            CASE WHEN :status = 'PROCESSING' THEN CAST(:now AS TIMESTAMP WITH TIME ZONE) END, now(), now())
                     ON CONFLICT DO NOTHING
                     """,
             nativeQuery = true)
@@ -47,7 +48,8 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
             @Param("failureCode") String failureCode,
             @Param("resultVersion") int resultVersion,
             @Param("resultPayload") String resultPayload,
-            @Param("resolvedAt") Instant resolvedAt);
+            @Param("resolvedAt") Instant resolvedAt,
+            @Param("now") Instant now);
 
     /** 재처리 대상: 이 목적의 PROCESSING·UNKNOWN 중 다음 처리 시각이 지난 것. 실행 PR의 스케줄러가 자기 목적만 집는다(REF-EXEC-01). */
     @Query(

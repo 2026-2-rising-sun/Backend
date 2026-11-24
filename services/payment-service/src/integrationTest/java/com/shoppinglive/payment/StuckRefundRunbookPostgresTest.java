@@ -20,6 +20,8 @@ import com.shoppinglive.payment.refund.service.user.UserRefundExecutor;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,8 +100,9 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
         assertThat(row.get("check_deadline_at")).isNotNull();
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT check_deadline_at > now() FROM refund WHERE id = ?",
+                                "SELECT check_deadline_at > ? FROM refund WHERE id = ?",
                                 Boolean.class,
+                                Timestamp.from(Instant.now()),
                                 refund.getId()))
                 .isTrue();
         // ID 목록에 없는 멈춘 건은 재개되지 않는다
@@ -122,7 +125,8 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
 
         // 다음 실행: 조회에 취소가 없으니 같은 멱등 키와 같은 본문으로 다시 보낸다
         jdbc.update(
-                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
         when(toss.getPayment(pk("RB-RESUME")))
                 .thenReturn(new TossResult.Success(tossPayment("RB-RESUME", false)));
@@ -144,7 +148,8 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
         resume(refund);
         // 이전 프로세스가 토스 호출 중에 죽었다고 보고 선점(next_attempt_at)만 지난 것으로 둔다
         jdbc.update(
-                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
 
         try (ConfigurableApplicationContext restarted = restart()) {
@@ -231,9 +236,10 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
                 paymentId);
         jdbc.update(
                 "INSERT INTO pg_call (payment_id, kind, pg_order_id, outcome, requested_at, responded_at)"
-                        + " VALUES (?, 'CONFIRM', ?, 'SUCCESS', now(), now())",
+                        + " VALUES (?, 'CONFIRM', ?, 'SUCCESS', ?, now())",
                 paymentId,
-                "PO-" + orderRef);
+                "PO-" + orderRef,
+                Timestamp.from(Instant.now()));
         ObjectNode request = request(orderRef, paymentId, "SYSTEM_COMPENSATION");
         request.put("amount", AMOUNT);
         ObjectNode item = (ObjectNode) request.get("items").get(0);
@@ -251,7 +257,8 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
 
         // 조회 마감이 지난 뒤 재처리: 취소가 없으니 재요청 없이 멈춘다
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
         makeDue(refund);
         retryJob.run();
@@ -271,7 +278,8 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
 
     private void makeDue(Refund refund) {
         jdbc.update(
-                "UPDATE refund SET next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
     }
 
@@ -331,8 +339,9 @@ class StuckRefundRunbookPostgresTest extends RefundPostgresTestSupport {
                 .thenReturn(new TossResult.Success(tossPayment(orderRef, false)));
         executor.execute(refund);
         jdbc.update(
-                "UPDATE refund SET check_deadline_at = now() - INTERVAL '1' SECOND,"
-                        + " next_attempt_at = now() - INTERVAL '1' SECOND WHERE id = ?",
+                "UPDATE refund SET check_deadline_at = ?, next_attempt_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)),
+                Timestamp.from(Instant.now().minusSeconds(1)),
                 refund.getId());
         executor.retryDue();
         assertThat(refund(refund.getRefundRequestId())).containsEntry("status", "UNKNOWN");

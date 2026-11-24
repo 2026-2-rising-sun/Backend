@@ -147,7 +147,8 @@ public class RefundIntakeService {
                 failure,
                 result == null ? 0 : 1,
                 result,
-                resolvedAt);
+                resolvedAt,
+                Instant.now());
     }
 
     /** 저장한 결과 문자열을 그대로 싣는다. 같은 resultVersion은 같은 payload여야 Core가 중복으로 받는다. */
