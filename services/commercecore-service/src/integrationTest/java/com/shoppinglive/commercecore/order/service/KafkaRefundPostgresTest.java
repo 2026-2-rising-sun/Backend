@@ -42,6 +42,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @MockitoBean PaymentRelayClient remote;
     @MockitoSpyBean EventOutbox outbox;
     @MockitoSpyBean OrderTimeSource time;
+    @MockitoSpyBean com.shoppinglive.commercecore.coupon.service.CouponReservationService coupons;
     static final long PAYMENT = 7001L;
 
     String prepare(boolean coupon) {
@@ -188,7 +189,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
             amounts.add(r.refund().refundAmount());
             requestSample(n, "UserRefundRequested");
             assertThat(r.refund().targets().getFirst().quantity()).isEqualTo(1);
-            assertThat(state(n)).isEqualTo("CANCEL_PENDING");
+            assertThat(state(n)).isEqualTo(i == 0 ? "PAID" : "PARTIALLY_REFUNDED");
             assertThat(available(501)).isEqualTo(17 + i);
             success(n);
             assertThat(state(n)).isEqualTo(i == 2 ? "REFUNDED" : "PARTIALLY_REFUNDED");
@@ -202,18 +203,26 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("전체 잔여 환불은 이미 성공한 수량을 제외하고 새 키의 미완료 접수를 직렬화한다")
-    void fullRemainingAndSerialization() throws Exception {
+    @DisplayName("전체 잔여 환불은 성공과 미완료 수량을 뺀 나머지를 앞선 결과를 기다리지 않고 접수한다")
+    void fullRemainingWithoutWaitingForPendingResult() throws Exception {
         String n = paid(false);
         refunds.request(MEMBER_A, n, "first", quantity(n, 1));
-        assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "second", all()))
-                .isInstanceOf(BusinessException.class);
-        success(n);
         var r = refunds.request(MEMBER_A, n, "remaining", all());
+        assertThat(r.created()).isTrue();
         assertThat(r.refund().targets().getFirst().quantity()).isEqualTo(2);
-        success(n);
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().heldQuantity()).isEqualTo(3);
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
+        apply(result(requestIdByKey("remaining"), "SUCCEEDED", 1, UUID.randomUUID().toString()));
+        apply(result(requestIdByKey("first"), "SUCCEEDED", 1, UUID.randomUUID().toString()));
         assertThat(state(n)).isEqualTo("REFUNDED");
         assertThat(available(501)).isEqualTo(20);
+    }
+
+    String requestIdByKey(String key) {
+        return jdbc.queryForObject(
+                "SELECT i.refund_request_id FROM core_refund_intent i JOIN refund_request r ON r.id=i.user_request_id WHERE r.idempotency_key=?",
+                String.class,
+                key);
     }
 
     @Test
@@ -242,7 +251,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         String execution = UUID.randomUUID().toString();
         var unknown = result(requestId(n), "UNKNOWN", 1, execution);
         apply(unknown);
-        assertThat(state(n)).isEqualTo("CANCEL_PENDING");
+        assertThat(state(n)).isEqualTo("PAID");
         assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().heldQuantity()).isEqualTo(1);
         var success = result(requestId(n), "SUCCEEDED", 2, execution);
         assertThat(apply(success)).isTrue();
@@ -275,7 +284,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                         ? com.shoppinglive.common.kafka.ContractViolationException.class
                         : BusinessException.class;
         assertThatThrownBy(() -> apply(event)).isInstanceOf(expected);
-        assertThat(state(n)).isEqualTo("CANCEL_PENDING");
+        assertThat(state(n)).isEqualTo("PAID");
         assertThat(available(501)).isEqualTo(17);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_result_event", Long.class))
                 .isZero();
@@ -612,7 +621,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         } finally {
             reset(outbox);
         }
-        assertThat(state(n)).isEqualTo("CANCEL_PENDING");
+        assertThat(state(n)).isEqualTo("PAID");
         assertThat(available(501)).isEqualTo(17);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_result_event", Long.class))
                 .isZero();
@@ -622,10 +631,103 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("서로 다른 키의 동시 부분환불은 한 건만 접수하고 나머지는 충돌한다")
-    void concurrentDifferentKeysSerialize() throws Exception {
+    @DisplayName("처리 중·미확정 환불 금액은 표시 환불 가능 금액과 수량에서 빠지고 FAILED 뒤 다시 풀린다")
+    void displayedAmountsExcludeHeldAndReleaseOnFailure() throws Exception {
         String n = paid(false);
-        var selection = quantity(n, 1);
+        String execution = UUID.randomUUID().toString();
+        refunds.request(MEMBER_A, n, "display-unknown", quantity(n, 1));
+        apply(result(requestIdByKey("display-unknown"), "UNKNOWN", 1, execution));
+        var held = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(held.refundable()).isTrue();
+        assertThat(held.heldQuantity()).isEqualTo(1);
+        assertThat(held.refundableQuantity()).isEqualTo(2);
+        assertThat(held.refundAmount()).isEqualTo(8000L);
+        assertThat(held.remainingRefundableAmount()).isEqualTo(8000L);
+        apply(result(requestIdByKey("display-unknown"), "FAILED", 2, execution));
+        var released = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(released.heldQuantity()).isZero();
+        assertThat(released.refundableQuantity()).isEqualTo(3);
+        assertThat(released.refundAmount()).isEqualTo(12000L);
+        assertThat(released.remainingRefundableAmount()).isEqualTo(12000L);
+    }
+
+    @Test
+    @DisplayName("쿠폰 주문에서 표시 환불 가능 금액은 전체 환불이 접수하는 금액과 같다")
+    void displayedAmountMatchesAcceptedAmountWithCoupon() throws Exception {
+        String n = paid(true);
+        refunds.request(MEMBER_A, n, "coupon-one", quantity(n, 1));
+        var shown = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(shown.refundAmount()).isEqualTo(6000L);
+        assertThat(shown.remainingRefundableAmount()).isEqualTo(6000L);
+        assertThat(refunds.request(MEMBER_A, n, "coupon-rest", all()).refund().refundAmount())
+                .isEqualTo(shown.refundAmount());
+    }
+
+    String twoItems() {
+        String n =
+                relay.create(
+                                MEMBER_A,
+                                UUID.randomUUID().toString(),
+                                new RelayOrderRequest(
+                                        List.of(
+                                                new CreateOrderSheetRequest.Item(501L, 2),
+                                                new CreateOrderSheetRequest.Item(502L, 1)),
+                                        null,
+                                        "구매자",
+                                        "01012345678",
+                                        11000L,
+                                        null,
+                                        null))
+                        .number();
+        var st = relay.state(MEMBER_A, n);
+        relay.prepared(
+                deliveries.relay(id(n), "PREPARE"),
+                new Created(PAYMENT, "CREATED", n + "-1", 11000, st.expiresAt()));
+        accept(n);
+        relay.approved(new Approved(PAYMENT, n, 11000, Instant.now()));
+        return n;
+    }
+
+    long orderOf(String n, long sku) {
+        return jdbc.queryForObject(
+                "SELECT id FROM orders WHERE payment_group_id=? AND sku_id=?",
+                Long.class,
+                id(n),
+                sku);
+    }
+
+    @Test
+    @DisplayName("다른 항목의 미확정 환불이 있어도 같은 항목의 남은 수량을 앞선 결과 없이 접수하고 수량 한도를 지킨다")
+    void otherItemAndSameItemRemainingAreNotBlocked() throws Exception {
+        String n = twoItems();
+        long a = orderOf(n, 501L), b = orderOf(n, 502L);
+        var other =
+                new RefundSelection(
+                        "ITEMS", List.of(new RefundSelection.Item(b, 1)), List.of(), 3000L);
+        refunds.request(MEMBER_A, n, "other-unknown", other);
+        apply(result(requestIdByKey("other-unknown"), "UNKNOWN", 1, UUID.randomUUID().toString()));
+        var one =
+                new RefundSelection(
+                        "ITEMS", List.of(new RefundSelection.Item(a, 1)), List.of(), 4000L);
+        assertThat(refunds.request(MEMBER_A, n, "same-one", one).created()).isTrue();
+        assertThat(refunds.request(MEMBER_A, n, "same-rest", one).created()).isTrue();
+        assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "same-over", one))
+                .isInstanceOf(BusinessException.class);
+        assertThat(state(n)).isEqualTo("PAID");
+        var sku501 =
+                queries.refundableTargets(MEMBER_A, n).stream()
+                        .filter(t -> t.orderId() == a)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(sku501.heldQuantity()).isEqualTo(2);
+        assertThat(sku501.refundableQuantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("서로 다른 키의 동시 부분환불은 수량 한도를 넘지 않고 나머지는 거절한다")
+    void concurrentDifferentKeysRespectQuantityLimit() throws Exception {
+        String n = paid(false);
+        var selection = quantity(n, 2);
         var gate = new CyclicBarrier(2);
         try (var pool = Executors.newFixedThreadPool(2)) {
             List<Future<Boolean>> calls = new ArrayList<>();
@@ -821,8 +923,183 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThatThrownBy(() -> apply(done))
                 .isInstanceOf(com.shoppinglive.common.kafka.ContractViolationException.class)
                 .hasMessageContaining("환불 요청 ID");
-        assertThat(state(n)).isEqualTo("CANCEL_PENDING");
+        assertThat(state(n)).isEqualTo("PAID");
         assertThat(available(501)).isEqualTo(17);
+    }
+
+    @Test
+    @DisplayName("다른 항목의 동시 환불은 서로 막지 않고 두 항목의 금액 합계는 실결제액과 같다")
+    void concurrentDifferentItemsBothAccepted() throws Exception {
+        String n = twoItems();
+        var one =
+                new RefundSelection(
+                        "ITEMS",
+                        List.of(new RefundSelection.Item(orderOf(n, 501L), 2)),
+                        List.of(),
+                        null);
+        var two =
+                new RefundSelection(
+                        "ITEMS",
+                        List.of(new RefundSelection.Item(orderOf(n, 502L), 1)),
+                        List.of(),
+                        null);
+        var gate = new CyclicBarrier(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var a =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return refunds.request(MEMBER_A, n, "item-a", one).created();
+                            });
+            var b =
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                return refunds.request(MEMBER_A, n, "item-b", two).created();
+                            });
+            assertThat(a.get(20, TimeUnit.SECONDS)).isTrue();
+            assertThat(b.get(20, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=?",
+                                Long.class,
+                                id(n)))
+                .isEqualTo(11000L);
+    }
+
+    @Test
+    @DisplayName("동시 부분환불과 전체 잔여 환불의 금액 합계는 실결제액을 넘지 않는다")
+    void concurrentAmountNeverExceedsPaid() throws Exception {
+        String n = paid(true);
+        var gate = new CyclicBarrier(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            List<Future<Boolean>> calls = new ArrayList<>();
+            calls.add(
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                try {
+                                    refunds.request(MEMBER_A, n, "amount-a", quantity(n, 1));
+                                    return true;
+                                } catch (BusinessException conflict) {
+                                    return false;
+                                }
+                            }));
+            calls.add(
+                    pool.submit(
+                            () -> {
+                                gate.await();
+                                try {
+                                    refunds.request(MEMBER_A, n, "amount-b", all());
+                                    return true;
+                                } catch (BusinessException conflict) {
+                                    return false;
+                                }
+                            }));
+            for (var call : calls) call.get(20, TimeUnit.SECONDS);
+        }
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=?",
+                                Long.class,
+                                id(n)))
+                .isEqualTo(10000L);
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("같은 키 재전송은 같은 환불을 돌려주고 내용이 다르면 거절한다")
+    void sameKeyReplaysOrRejectsDifferentContent() {
+        String n = paid(false);
+        var first = refunds.request(MEMBER_A, n, "same-key", quantity(n, 1));
+        var replay = refunds.request(MEMBER_A, n, "same-key", quantity(n, 1));
+        assertThat(replay.created()).isFalse();
+        assertThat(replay.refund().id()).isEqualTo(first.refund().id());
+        assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "same-key", quantity(n, 2)))
+                .isInstanceOf(BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM refund_request", Long.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("미확정 금액은 확정 전까지 한도를 점유하고 확정 실패 뒤 같은 수량을 다시 환불할 수 있다")
+    void unknownHoldsAmountUntilFailed() throws Exception {
+        String n = paid(true);
+        String execution = UUID.randomUUID().toString();
+        refunds.request(MEMBER_A, n, "unknown-one", quantity(n, 1));
+        apply(result(requestIdByKey("unknown-one"), "UNKNOWN", 1, execution));
+        var rest = refunds.request(MEMBER_A, n, "rest", all());
+        assertThat(rest.refund().refundAmount()).isEqualTo(6000L);
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().refundableQuantity()).isZero();
+        assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "over", quantity(n, 1)))
+                .isInstanceOf(BusinessException.class);
+        apply(result(requestIdByKey("unknown-one"), "FAILED", 2, execution));
+        assertThat(state(n)).isEqualTo("PAID");
+        var target = queries.refundableTargets(MEMBER_A, n).getFirst();
+        assertThat(target.refundableQuantity()).isEqualTo(1);
+        assertThat(target.remainingRefundableAmount()).isEqualTo(4000L);
+        assertThat(available(501)).isEqualTo(17);
+    }
+
+    @Test
+    @DisplayName("역순·중복 성공 결과도 재고는 수량당 한 번, 쿠폰은 누적 전량 때 한 번만 복원하고 금액 합계는 실결제액과 같다")
+    void reverseAndDuplicateSuccessRestoreOnce() throws Exception {
+        String n = paid(true);
+        refunds.request(MEMBER_A, n, "one", quantity(n, 1));
+        refunds.request(MEMBER_A, n, "two", quantity(n, 2));
+        var one = result(requestIdByKey("one"), "SUCCEEDED", 1, UUID.randomUUID().toString());
+        var two = result(requestIdByKey("two"), "SUCCEEDED", 1, UUID.randomUUID().toString());
+        clearInvocations(coupons);
+        apply(two);
+        apply(two);
+        apply(one);
+        apply(one);
+        assertThat(state(n)).isEqualTo("REFUNDED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        verify(coupons, times(1)).restoreForOrder(MEMBER_A, COUPON, id(n));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COALESCE(SUM(refund_amount),0) FROM refund_request WHERE payment_group_id=? AND status='SUCCESS'",
+                                Long.class,
+                                id(n)))
+                .isEqualTo(10000L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SUCCEEDED", "FAILED"})
+    @DisplayName("이미 CANCEL_PENDING인 기존 데이터는 마이그레이션 없이 결과 반영이 끝나고 새 접수는 그동안 거절한다")
+    void legacyCancelPendingSettlesWithoutMigration(String status) throws Exception {
+        String n = paid(false);
+        refunds.request(MEMBER_A, n, "legacy", quantity(n, 1));
+        jdbc.update("UPDATE orders SET status='CANCEL_PENDING' WHERE id=?", item(n));
+        jdbc.update("UPDATE payment_group SET status='CANCEL_PENDING' WHERE id=?", id(n));
+        assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "blocked", quantity(n, 1)))
+                .isInstanceOf(BusinessException.class);
+        apply(result(requestIdByKey("legacy"), status, 1, UUID.randomUUID().toString()));
+        String expected = status.equals("SUCCEEDED") ? "PARTIALLY_REFUNDED" : "PAID";
+        assertThat(state(n)).isEqualTo(expected);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM orders WHERE id=?", String.class, item(n)))
+                .isEqualTo(expected);
+        assertThat(available(501)).isEqualTo(status.equals("SUCCEEDED") ? 18 : 17);
+    }
+
+    @Test
+    @DisplayName("고객 환불 처리 중 시스템 보상 요청은 결제 완료 주문에서 무시되고 보상 의도를 만들지 않는다")
+    void customerRefundInFlightIsNotCompensated() throws Exception {
+        String n = paid(false);
+        refunds.request(MEMBER_A, n, "customer", quantity(n, 1));
+        tx.executeWithoutResult(
+                t ->
+                        refunds.compensateLocked(
+                                groups.findById(id(n)).orElseThrow(), "APPROVAL_UNKNOWN"));
+        assertThat(intents.fenced(id(n))).isFalse();
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(state(n)).isEqualTo("PAID");
+        assertThat(queries.refundableTargets(MEMBER_A, n).getFirst().heldQuantity()).isEqualTo(1);
     }
 
     long compensationRequests(String n) {

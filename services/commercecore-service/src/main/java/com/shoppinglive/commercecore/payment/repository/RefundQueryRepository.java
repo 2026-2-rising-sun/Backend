@@ -67,7 +67,7 @@ public class RefundQueryRepository {
                             (Long) r.getObject("source_cart_item_id"),
                             r.getString("product_name_snapshot"),
                             quantity,
-                            remaining,
+                            remaining - r.getLong("held_amount"),
                             reason == null,
                             reason,
                             r.getLong("unit_price"),

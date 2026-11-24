@@ -8,8 +8,8 @@
 
 | 출발 | 도착 | 조건·참조 |
 |---|---|---|
-| 논리 Order | payment_group | 기존 PK·번호·정책·생성기한 유지. PAYMENT_CONFIRMING 기한 별도. 사용자 환불에만 CANCEL_PENDING |
-| payment_group | orders | 불변 SKU/상품/판매자/수량/가격/할인/Cart출처. 항목별 PAID·CANCEL_PENDING·PARTIALLY_REFUNDED·REFUNDED |
+| 논리 Order | payment_group | 기존 PK·번호·정책·생성기한 유지. PAYMENT_CONFIRMING 기한 별도. 사용자 환불 진행은 refund_request가 가진다 |
+| payment_group | orders | 불변 SKU/상품/판매자/수량/가격/할인/Cart출처. 항목별 PAID·PARTIALLY_REFUNDED·REFUNDED (이전 정책 행만 CANCEL_PENDING 가능) |
 | payment_group | seller_order | 판매자별 생성 당시 실결제액·수수료율·외부 판매자주문번호 |
 | payment_group | order_payment_relay | 원결제ID·결제창·별도 승인 사실·approval_send_started_at. 송신 시작/보상을 같은 그룹 잠금으로 정렬하며 HTTP 동안 잠금 유지 없음. 주문 종료 뒤에도 승인 사실 보존 |
 | payment_group | payment_delivery_request | 기존 PREPARE/APPROVAL HTTP 원문. 신규 환불 HTTP 전달은 만들지 않음 |
