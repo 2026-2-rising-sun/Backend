@@ -18,6 +18,8 @@
 | catalog_snapshot_receipt | PK event_id; 원문 봉투 TEXT. 조회 모델과 동일 TX | [V5](../../../../services/catalog-service/src/main/resources/db/migration/V5__catalog_snapshot_state.sql) |
 | coupon_display | PK coupon_id; fixed_discount; sold_out; version; 유효 기간 | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display_product | PK (coupon_id,product_id) | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
+| index_task | PK id(증가); product_id 비유일; requested_at. 사본과 같은 TX로 기록 | [V6](../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql) |
+| shedlock | PK name; lock_until; locked_at; locked_by. 검색 색인 잠금 | [V6](../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql) |
 
 ## 관계
 
@@ -62,3 +64,10 @@ Catalog V5의 상태 테이블은 상품/SKU별 row lock 단위다. payload는 �
 `catalog_snapshot_state`는 조회 사본에 적용한 독립 revision·payload·삭제 fence를, `catalog_snapshot_receipt`는 eventId별 수신 봉투 원문을 보관한다. 두 테이블은 사본 반영과 재처리를 위한 Catalog 내부 상태이며 Core 상품 원본의 변경 권한이나 상품 등록 멱등키를 소유하지 않는다. 이미지도 Core의 ID/URL 참조만 보관하며 이미지 파일·파일 저장 메타데이터 테이블을 만들지 않는다.
 
 `CatalogSchemaPostgresTest`는 위 두 테이블을 포함한 업무 테이블6개와 Flyway 이력 테이블1개의 **정확한 목록**을 검사한다. `product.idempotency_key` 부재, Core에서 받은 상품 ID 사용, 최초 버전0 허용·음수 거절 검사도 유지한다. V5 추가 테이블을 누락한 기대 목록을 고쳤으며, 조건을 부분 포함 검사로 완화하지 않는다. 실제 실패와 수정 후 검증은 [Catalog migration 후속 기록](../../../worklog/2026-11-20-catalog-migration-expectations.md)을 따른다.
+
+## 검색 색인 작업 (#419)
+
+스냅샷 반영 TX가 검색 문서 값이 바뀐 상품을 `index_task`에 한 줄씩 추가한다. 상품 스냅샷, SKU의 가격·판매 상태 변경, 삭제, 품절↔재입고가 대상이며 재고 수량만 바뀐 경우와 무시한 옛·중복 이벤트는 기록하지 않는다. 같은 상품의 동시 기록이 키 충돌로 사본 반영을 실패시키지 않도록 product_id를 PK로 두지 않는다.
+
+부분 색인(`catalog.search.enabled=true`일 때만)은 상품별로 모아 Catalog DB에서 문서를 다시 만들고 ES alias `products`에 bulk로 반영한다. 삭제·공개 SKU 없음은 문서 삭제다. 대표 가격은 판매 중 SKU 최저가, 모두 품절이면 품절 SKU 최저가다. 재고 수량과 쿠폰은 문서에 넣지 않는다. 처리 후 읽은 시점의 마지막 task id까지만 지워, 색인 중 새로 쌓인 작업과 ES가 실패한 상품은 다음 주기에 다시 처리한다. `shedlock`의 `catalog-search-index` 잠금을 DB 시각으로 잡아 Pod가 여러 개여도 한 번만 돈다. 전체 색인(#420)도 같은 잠금 이름을 쓴다.
+
