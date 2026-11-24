@@ -706,6 +706,7 @@ Commerce에 알리나이벤트로는 알리지 않습니다. Commerce는 중계�
 | 429 (호출 제한), 408 | 갔을 수 있음. 토스가 처리하지 않았다고 보장하지 않음 | 5xx와 같다. ① 같은 멱등키로 다시 보냄 → ② 그래도 모르면 **UNKNOWN**(`pg_order_id` 유지) → 조회. CREATED로 되돌리면 뒤의 시스템 보상이 토스 조회 없이 NO_CHARGE로 끝난다(#398) |
 | 401, 400 `INVALID_API_KEY`, 설정 403 | 처리하지 않았다고 본다. 우리 인증·설정 문제로 거부된 응답 | "보내지 않음". 결제는 CREATED로 돌아가고 `pg_order_id`를 지운다 |
 | 400 ALREADY\_PROCESSED\_PAYMENT · ALREADY\_PROCESSING\_REQUEST | 갔음, 결과는 응답에 없음 | **UNKNOWN** → 조회 (흐름 3\) |
+| 400 ALREADY\_REFUNDING\_PAYMENT (취소 호출) | 앞선 취소가 진행 중. 이번 취소는 거절이 아님 | **UNKNOWN** → 같은 멱등키로 재확인 (#401) |
 
 
 * **읽기 타임아웃은 60초**로 둡니다. 토스가 결제 API에 권장하는 값입니다. 짧게 잡으면 토스가 정상 처리 중인데도 UNKNOWN이 늘어납니다.

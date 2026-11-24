@@ -31,7 +31,11 @@ public class TossPaymentsClient {
     private static final Set<String> OUR_CONFIGURATION_FORBIDDEN_CODES =
             Set.of("INCORRECT_BASIC_AUTH_FORMAT", "API_KEY_ACCESS_DENIED");
     private static final Set<String> POSSIBLY_IN_FLIGHT_BAD_REQUEST_CODES =
-            Set.of("ALREADY_PROCESSED_PAYMENT", "ALREADY_PROCESSING_REQUEST");
+            Set.of(
+                    "ALREADY_PROCESSED_PAYMENT",
+                    "ALREADY_PROCESSING_REQUEST",
+                    // 앞선 취소가 진행 중이다. 이번 환불이 거절된 것이 아니다(#401)
+                    "ALREADY_REFUNDING_PAYMENT");
     private static final String CONSECUTIVE_REQUEST_FORBIDDEN_CODE =
             "FORBIDDEN_CONSECUTIVE_REQUEST";
     private static final String IDEMPOTENT_REQUEST_PROCESSING_CODE =

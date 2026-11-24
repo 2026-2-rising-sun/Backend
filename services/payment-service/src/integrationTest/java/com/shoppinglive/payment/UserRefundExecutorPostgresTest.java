@@ -218,6 +218,34 @@ class UserRefundExecutorPostgresTest extends RefundPostgresTestSupport {
     }
 
     @Test
+    @DisplayName(
+            "[REF-EXEC-04][REF-ACCEPT-03] 앞선 환불이 UNKNOWN이어도 뒤 환불의 토스 취소는 나가고, 미확정 금액을 포함한 합계가 결제 금액을 넘으면 FAILED(OVER_REFUND)다")
+    void refundAfterUnknownSendsCancelAndCountsUnknownAmount() throws Exception {
+        String orderRef = newOrderRef();
+        long paymentId = approved(orderRef, true);
+        Refund first = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        Refund second = receive(orderRef, paymentId, orderRef + "-S1", 4000);
+        Refund third = receive(orderRef, paymentId, orderRef + "-S1", AMOUNT - 8000 + 1);
+        when(toss.cancel(any(), any(), eq(first.getRefundRequestId()), any()))
+                .thenReturn(new TossResult.Unknown("HTTP 400 ALREADY_REFUNDING_PAYMENT", 400));
+        when(toss.cancel(any(), any(), eq(second.getRefundRequestId()), any()))
+                .thenReturn(canceled(second));
+
+        executor.execute(first);
+        assertThat(refund(first.getRefundRequestId())).containsEntry("status", "UNKNOWN");
+
+        executor.execute(second);
+
+        verify(toss).cancel(key(orderRef), reason(second), second.getRefundRequestId(), 4000L);
+        assertThat(refund(second.getRefundRequestId())).containsEntry("status", "SUCCEEDED");
+
+        executor.execute(third);
+
+        assertFailed(third, "OVER_REFUND");
+        verify(toss, never()).cancel(any(), any(), eq(third.getRefundRequestId()), any());
+    }
+
+    @Test
     @DisplayName("[REF-ACCEPT-03] 합이 결제 금액을 넘는 동시 요청은 한 건만 토스로 간다")
     void concurrentOverRefund() throws Exception {
         String orderRef = newOrderRef();
