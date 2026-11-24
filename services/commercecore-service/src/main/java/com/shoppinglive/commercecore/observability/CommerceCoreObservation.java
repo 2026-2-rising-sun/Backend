@@ -2,7 +2,7 @@ package com.shoppinglive.commercecore.observability;
 
 import com.shoppinglive.commercecore.order.dto.OrderCreationResult;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService;
-import com.shoppinglive.commercecore.payment.service.RefundIntakeService;
+import com.shoppinglive.commercecore.payment.service.KafkaRefundService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.observability.BusinessTelemetry;
 import io.micrometer.core.instrument.Tags;
@@ -69,9 +69,9 @@ public class CommerceCoreObservation {
     }
 
     @Around(
-            "execution(* com.shoppinglive.commercecore.payment.service.RefundIntakeService.request(..))")
+            "execution(* com.shoppinglive.commercecore.payment.service.KafkaRefundService.request(..))")
     public Object refundRequested(ProceedingJoinPoint call) throws Throwable {
-        var result = (RefundIntakeService.RequestResult) call.proceed();
+        var result = (KafkaRefundService.RequestResult) call.proceed();
         telemetry.count(
                 "shoppinglive.payment.operations",
                 Tags.of(

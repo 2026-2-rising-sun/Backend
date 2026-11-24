@@ -2,8 +2,6 @@ package com.shoppinglive.commercecore.payment.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.commercecore.payment.dto.*;
-import com.shoppinglive.commercecore.payment.service.PaymentResultHandler;
 import com.shoppinglive.common.events.EventEnvelope;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -69,27 +67,23 @@ public class PaymentEventConsumerConfiguration {
     @Bean
     PaymentResultConsumer paymentResultConsumer(
             ObjectMapper mapper,
-            PaymentResultHandler handler,
             com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
-        return new PaymentResultConsumer(mapper, handler, relay);
+        return new PaymentResultConsumer(mapper, relay);
     }
 
     public static class PaymentResultConsumer {
         private final ObjectMapper mapper;
-        private final PaymentResultHandler handler;
         private final com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay;
 
         PaymentResultConsumer(
                 ObjectMapper mapper,
-                PaymentResultHandler handler,
                 com.shoppinglive.commercecore.payment.relay.PaymentRelayService relay) {
             this.mapper = mapper;
-            this.handler = handler;
             this.relay = relay;
         }
 
         @KafkaListener(
-                topics = {"payment.execution.results.v1", "payment.execution-results.v1"},
+                topics = "payment.execution.results.v1",
                 groupId = "commercecore-payment-results-v1",
                 containerFactory = "paymentResultListenerContainerFactory",
                 autoStartup = "${commercecore.payment.results-enabled:true}")
@@ -107,48 +101,7 @@ public class PaymentEventConsumerConfiguration {
                 relay.approved(event.payload());
                 return;
             }
-            EventEnvelope<PaymentExecution> event =
-                    mapper.readValue(json, new TypeReference<>() {});
-            validate(event, "PaymentExecutionResolved", event.payload().requestId());
-            if (!event.payload().status().isConfirmedOutcome())
-                throw new IllegalArgumentException("확정된 결제 결과 이벤트가 필요합니다.");
-            handler.payment(event.payload());
-        }
-
-        @KafkaListener(
-                topics = "payment.refund-results.v1",
-                groupId = "commercecore-refund-results-v1",
-                containerFactory = "paymentResultListenerContainerFactory",
-                autoStartup = "${commercecore.payment.results-enabled:true}")
-        public void refund(org.apache.kafka.clients.consumer.ConsumerRecord<String, String> record)
-                throws Exception {
-            String json = record.value();
-            String type = mapper.readTree(json).path("eventType").asText();
-            if ("RefundSucceeded".equals(type)) {
-                EventEnvelope<
-                                com.shoppinglive.commercecore.payment.relay.PaymentRelayContract
-                                        .RefundSucceeded>
-                        event = mapper.readValue(json, new TypeReference<>() {});
-                validate(event, type, record.key());
-                relay.refundSucceeded(event.aggregateId(), event.payload());
-                return;
-            }
-            if ("RefundFailed".equals(type)) {
-                EventEnvelope<
-                                com.shoppinglive.commercecore.payment.relay.PaymentRelayContract
-                                        .RefundFailed>
-                        event = mapper.readValue(json, new TypeReference<>() {});
-                validate(event, type, record.key());
-                relay.refundFailed(event.aggregateId(), event.payload());
-                return;
-            }
-            EventEnvelope<RefundExecution> event = mapper.readValue(json, new TypeReference<>() {});
-            validate(event, "RefundExecutionResolved", event.payload().requestId());
-            var status = event.payload().status();
-            if (status != com.shoppinglive.commercecore.payment.entity.RefundStatus.SUCCESS
-                    && status != com.shoppinglive.commercecore.payment.entity.RefundStatus.FAILED)
-                throw new IllegalArgumentException("확정된 환불 결과 이벤트가 필요합니다.");
-            handler.refund(event.payload());
+            throw new IllegalArgumentException("지원하지 않는 결제 결과 이벤트입니다.");
         }
 
         private void validate(EventEnvelope<?> e, String type, String requestId) {

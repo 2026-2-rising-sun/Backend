@@ -11,7 +11,6 @@ import com.shoppinglive.commercecore.order.entity.*;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
 import com.shoppinglive.commercecore.order.service.PaymentGroupService.Selection;
-import com.shoppinglive.commercecore.payment.service.PaymentService;
 import com.shoppinglive.commercecore.product.dto.ProductSnapshot;
 import com.shoppinglive.commercecore.product.service.InMemoryProductLookupStub;
 import com.shoppinglive.commercecore.sales.entity.Sales;
@@ -52,7 +51,6 @@ class PaymentGroupIntegrationTest
     @Autowired CartItemRepository items;
     @Autowired OrderCreationService singleCreation;
     @Autowired OrderService singleOrders;
-    @Autowired PaymentService singlePayments;
     @Autowired OrderJpaRepository orders;
     @Autowired SalesJpaRepository sales;
     @Autowired SalesStockJpaRepository stocks;
@@ -383,19 +381,16 @@ class PaymentGroupIntegrationTest
         assertThat(couponStatus()).isEqualTo("RESERVED");
     }
 
-    @DisplayName("단건 주문의 결제 결과가 미확정이면 쿠폰 예약을 유지한다")
+    @DisplayName("옛 단건 주문은 결제할 수 없고 만료 전까지 쿠폰 예약을 유지한다")
     @Test
-    void singleOrderCouponRemainsReservedWhilePaymentOutcomeIsUnresolved() {
+    void singleOrderCouponRemainsReservedUntilExpiryWithoutPaymentPath() {
         issueCoupon();
         var created = singleCouponOrder("single-coupon-pending").order();
 
-        // Payment에 닿지 않아 결과가 없으므로 미확정 상태가 유지된다.
-        var attempt = singlePayments.startPayment(created.getOrderNumber(), MEMBER_A);
-
-        assertThat(attempt.getStatus().name()).isEqualTo("PROCESSING");
         assertThat(couponStatus()).isEqualTo("RESERVED");
         assertThat(service.get(MEMBER_A, created.getPaymentGroup().getGroupNumber()).status())
-                .isEqualTo(OrderStatus.PAYMENT_CONFIRMING);
+                .isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(service.expire(created.getPaymentGroup().getId())).isFalse();
     }
 
     private com.shoppinglive.commercecore.order.dto.OrderCreationResult singleCouponOrder(
@@ -466,7 +461,7 @@ class PaymentGroupIntegrationTest
         stock(salesB, 9, 1);
     }
 
-    @DisplayName("활성 단건 주문은 새 묶음을 막고 기존 하위 주문 경로로 묶음을 일부 결제·취소할 수 없다")
+    @DisplayName("활성 단건 주문은 새 묶음을 막고 묶음 하위 주문은 단건 경로로 취소할 수 없다")
     @Test
     void activeSingleOrderBlocksGroupAndLegacyChildActionsCannotPartiallyPayOrCancelGroup() {
         var single =
@@ -477,8 +472,6 @@ class PaymentGroupIntegrationTest
         singleOrders.cancelBeforePayment(single.order().getOrderNumber(), MEMBER_A);
         var group = create("group").group();
         String child = group.orders().getFirst().orderNumber();
-        assertThatThrownBy(() -> singlePayments.startPayment(child, MEMBER_A))
-                .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> singleOrders.cancelBeforePayment(child, MEMBER_A))
                 .isInstanceOf(BusinessException.class);
         assertThat(service.get(MEMBER_A, group.groupNumber()).status())
@@ -573,7 +566,7 @@ class PaymentGroupIntegrationTest
         stock(salesB, 10, 0);
     }
 
-    @DisplayName("만료는 예약 재고를 한 번만 복구하고 결제 확인 중인 묶음은 만료시키지 않는다")
+    @DisplayName("만료는 예약 재고를 한 번만 복구한다")
     @Test
     void expiryRestoresAllReservedStockOnceAndDoesNotExpireConfirmingGroups() {
         var group = create("expiry").group();
@@ -592,15 +585,6 @@ class PaymentGroupIntegrationTest
                 .isEqualTo(OrderStatus.EXPIRED);
         stock(salesA, 10, 0);
         stock(salesB, 10, 0);
-        var confirming = create("confirming").group();
-        var attempt = service.start(MEMBER_A, confirming.groupNumber(), "pay");
-        jdbc.update(
-                "UPDATE payment_group SET expires_at=? WHERE id=?",
-                Timestamp.from(Instant.now().minusSeconds(60)),
-                attempt.getPaymentGroupId());
-        assertThat(service.expire(attempt.getPaymentGroupId())).isFalse();
-        stock(salesA, 8, 2);
-        stock(salesB, 9, 1);
     }
 
     @DisplayName("같은 키로 동시에 요청해도 결제 묶음과 재고 예약은 한 번만 생성한다")

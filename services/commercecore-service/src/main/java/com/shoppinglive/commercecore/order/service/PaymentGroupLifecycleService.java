@@ -7,9 +7,6 @@ import com.shoppinglive.commercecore.order.entity.PaymentGroup;
 import com.shoppinglive.commercecore.order.event.PaymentGroupEventPublisher;
 import com.shoppinglive.commercecore.order.repository.OrderJpaRepository;
 import com.shoppinglive.commercecore.order.repository.PaymentGroupRepository;
-import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
-import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
-import com.shoppinglive.commercecore.payment.service.PaymentDispatcher;
 import com.shoppinglive.commercecore.sku.service.SkuService;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
@@ -18,21 +15,17 @@ import jakarta.persistence.PersistenceContext;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 class PaymentGroupLifecycleService {
-    private final OrderTimeSource time;
     private final OrderSheetLifecycleService localOrders;
     private final PaymentGroupRepository groups;
     private final OrderJpaRepository orders;
     private final SkuService skus;
-    private final PaymentDeliveryStore payments;
     private final PurchaseGuard guard;
-    private final PaymentDispatcher dispatcher;
     private final TransactionTemplate tx;
     private final JdbcTemplate jdbc;
     private final CouponReservationService couponReservations;
@@ -41,84 +34,23 @@ class PaymentGroupLifecycleService {
 
     PaymentGroupLifecycleService(
             PaymentGroupRepository groups,
-            OrderTimeSource time,
             OrderSheetLifecycleService localOrders,
             OrderJpaRepository orders,
             SkuService skus,
-            PaymentDeliveryStore payments,
             PurchaseGuard guard,
-            PaymentDispatcher dispatcher,
             TransactionTemplate tx,
             JdbcTemplate jdbc,
             CouponReservationService couponReservations,
             PaymentGroupEventPublisher notificationEvents) {
         this.groups = groups;
-        this.time = time;
         this.localOrders = localOrders;
         this.orders = orders;
         this.skus = skus;
-        this.payments = payments;
         this.guard = guard;
-        this.dispatcher = dispatcher;
         this.tx = tx;
         this.jdbc = jdbc;
         this.couponReservations = couponReservations;
         this.notificationEvents = notificationEvents;
-    }
-
-    PaymentExecution start(String member, String number, String key) {
-        PaymentGroup found = owned(member, number);
-        guard.ensure(member);
-        PaymentExecution accepted =
-                tx.execute(
-                        t -> {
-                            guard.lock(member);
-                            PaymentGroup g = lockedGroup(found.getId());
-                            if (g.getPaymentId() != null) {
-                                if (Objects.equals(payments.key(g.getPaymentId()), key))
-                                    return payments.payment(g.getPaymentId());
-                                throw conflict("이미 결제를 시작했습니다. 기존 결과를 확인해 주세요.");
-                            }
-                            if (g.getStatus() != OrderStatus.PENDING_PAYMENT
-                                    || !g.getExpiresAt().isAfter(time.now()))
-                                throw conflict("결제를 시작할 수 없는 주문입니다.");
-                            List<Order> children =
-                                    orders.findByPaymentGroupIdOrderByIdAsc(g.getId());
-                            PaymentExecution request =
-                                    payments.payment(
-                                            children.getFirst().getId(),
-                                            g.getId(),
-                                            number,
-                                            g.getPayableAmount(),
-                                            key,
-                                            null);
-                            var processingStartedAt = time.now();
-                            if (!g.getExpiresAt().isAfter(processingStartedAt))
-                                throw conflict("결제를 시작할 수 없는 주문입니다.");
-                            g.beginProcessing(processingStartedAt);
-                            g.setPaymentId(request.paymentId());
-                            groups.saveAndFlush(g);
-                            for (Order child : children) {
-                                if (orders.transitionStatus(
-                                                child.getId(),
-                                                "PENDING_PAYMENT",
-                                                "PAYMENT_CONFIRMING")
-                                        != 1)
-                                    throw new IllegalStateException("결제 묶음 주문의 상태 변경에 실패했습니다.");
-                            }
-                            return request;
-                        });
-        if (accepted == null) throw conflict("주문의 10분 기한이 지났습니다.");
-        // 전달 요청과 주문 상태를 커밋한 뒤 HTTP를 호출한다. 0원도 Payment 원본을 저장한다.
-        return dispatcher.paymentAfterCommit(accepted.paymentId());
-    }
-
-    PaymentExecution payment(String member, String number, Long id) {
-        PaymentGroup g = owned(member, number);
-        PaymentExecution p = payments.payment(id);
-        if (!Objects.equals(p.paymentGroupId(), g.getId()))
-            throw error(ErrorCode.NOT_FOUND, "결제를 찾을 수 없습니다.");
-        return dispatcher.payment(id);
     }
 
     void cancel(String member, String number) {

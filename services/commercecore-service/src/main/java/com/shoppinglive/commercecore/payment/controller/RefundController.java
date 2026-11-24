@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.shoppinglive.commercecore.payment.dto.RefundView;
 import com.shoppinglive.commercecore.payment.dto.RefundableTarget;
 import com.shoppinglive.commercecore.payment.dto.SellerRefundView;
-import com.shoppinglive.commercecore.payment.service.RefundIntakeService;
 import com.shoppinglive.commercecore.payment.service.RefundQueryService;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.core.BusinessException;
@@ -29,14 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(prefix = "commercecore.refunds", name = "api-enabled", havingValue = "true")
 public class RefundController {
     private final com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds;
-    private final RefundIntakeService refunds;
     private final RefundQueryService queries;
 
     public RefundController(
-            RefundIntakeService refunds,
             RefundQueryService queries,
             com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds) {
-        this.refunds = refunds;
         this.queries = queries;
         this.kafkaRefunds = kafkaRefunds;
     }
@@ -48,15 +44,9 @@ public class RefundController {
             @RequestHeader("Idempotency-Key") String key,
             @RequestBody(required = false) JsonNode body) {
         var selection = com.shoppinglive.commercecore.payment.dto.RefundSelection.parse(body);
-        RefundIntakeService.RequestResult result;
-        if (kafkaRefunds.supports(member.memberId(), number))
-            result = kafkaRefunds.request(member.memberId(), number, key, selection);
-        else {
-            if (selection.mode().equals("ITEMS") || selection.expectedAmount() != null)
-                throw new BusinessException(
-                        ErrorCode.CONFLICT, "이전 정책 주문은 기존 전체·장바구니 환불 경로를 사용합니다.");
-            result = refunds.request(member.memberId(), number, key, selection.cartItemIds());
-        }
+        if (!kafkaRefunds.supports(member.memberId(), number))
+            throw new BusinessException(ErrorCode.CONFLICT, "이전 정책 주문은 환불을 요청할 수 없습니다.");
+        var result = kafkaRefunds.request(member.memberId(), number, key, selection);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(ApiResponse.ok(result.refund()));
     }

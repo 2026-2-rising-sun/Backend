@@ -56,7 +56,6 @@ public abstract class RefundTestSupport extends CommerceCoreSecurityTestSupport 
     @Autowired protected InMemoryProductLookupStub productLookup;
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected PaymentDeliveryStore deliveries;
-    @Autowired protected PaymentDispatcher dispatcher;
     protected CartItem a;
     protected CartItem b;
 

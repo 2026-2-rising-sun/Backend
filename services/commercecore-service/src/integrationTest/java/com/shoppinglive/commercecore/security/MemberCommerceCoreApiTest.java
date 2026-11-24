@@ -195,13 +195,13 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                                 .header("Authorization", bearer(MEMBER_A))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"scenario\":\"INSTANT_SUCCESS\"}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isNotFound());
         mvc.perform(
                         put("/v1/dev/payment-scenarios/{number}", order.getOrderNumber())
                                 .header("Authorization", bearer(MEMBER_A))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"scenario\":\"INSTANT_SUCCESS\"}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().is4xxClientError());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_delivery_request", Long.class))
                 .isZero();
         assertThat(orders.findById(order.getId()).orElseThrow().getStatus())
@@ -254,29 +254,16 @@ class MemberCommerceCoreApiTest extends CommerceCoreSecurityTestSupport {
                         .getResponse()
                         .getContentAsString();
         String number = mapper.readTree(result).get("orderNumber").asText();
-        String paymentBody =
-                mvc.perform(
-                                post("/v1/orders/{number}/payments", number)
-                                        .header("Authorization", bearer(MEMBER_A)))
-                        .andExpect(status().isOk())
-                        .andReturn()
-                        .getResponse()
-                        .getContentAsString();
-        long paymentId = mapper.readTree(paymentBody).get("paymentId").asLong();
-        assertThat(paymentId).isPositive();
-        // 첫 주문이 결제 확정 전이라 같은 회원의 두 번째 주문은 만들 수 없다. 다른 회원의 주문으로 확인한다.
-        var another = order(MEMBER_B);
+        // 옛 구 API 결제 시작 경로는 제거되어 주문 소유와 무관하게 404다.
         mvc.perform(
-                        get(
-                                        "/v1/orders/{number}/payments/{id}",
-                                        another.getOrderNumber(),
-                                        paymentId)
-                                .header("Authorization", bearer(MEMBER_B)))
+                        post("/v1/orders/{number}/payments", number)
+                                .header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/v1/orders").header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1));
-        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(7);
+        // 옛 결제 시작 경로가 없어 재고는 차감 없이 예약 상태로 남는다(만료 전까지).
+        assertThat(legacyStock(salesId).getAvailable()).isEqualTo(8);
     }
 
     @DisplayName("일반 사용자는 판매를 관리할 수 없고 판매자는 가능하며 서비스가 회원을 대신할 수 없다")

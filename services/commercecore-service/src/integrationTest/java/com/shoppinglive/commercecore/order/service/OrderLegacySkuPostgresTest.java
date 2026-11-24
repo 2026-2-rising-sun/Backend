@@ -24,7 +24,6 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
     @Autowired OrderCreationService legacyCreation;
     @Autowired OrderCheckoutService quote;
     @Autowired InMemoryProductLookupStub lookup;
-    @Autowired com.shoppinglive.commercecore.payment.service.RefundIntakeService legacyRefunds;
 
     @BeforeEach
     void seedPreservedDefaultIdentity() {
@@ -149,5 +148,54 @@ class OrderLegacySkuPostgresTest extends OrderSheetPostgresSupport {
         assertThat(order.items().getFirst().skuId()).isEqualTo(503);
         assertThat(available(503)).isEqualTo(19);
         assertThat(available(501)).isEqualTo(20);
+    }
+
+    @Autowired org.springframework.test.web.servlet.MockMvc mvc;
+
+    @Test
+    @DisplayName("옛 구 API 주문은 결제할 수 없고 환불은 409이며 만료 뒤에는 새 구매를 막지 않는다")
+    void legacyOrderCannotBePaidRefundedOrBlockNewPurchase() throws Exception {
+        var order = legacy("legacy-closed");
+        String number = order.getPaymentGroup().getGroupNumber();
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                        "/v1/payment-groups/" + number + "/payments")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header("X-Idempotency-Key", "pay-legacy"))
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isNotFound());
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                                        "/v1/payment-groups/" + number + "/refunds")
+                                .header("Authorization", bearer(MEMBER_A))
+                                .header("Idempotency-Key", "refund-legacy"))
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isConflict());
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                                        "/v1/payment-groups/" + number + "/refundable-targets")
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isOk())
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                                        "$.data[0].unavailableReason")
+                                .value("LEGACY_REFUND_UNAVAILABLE"));
+        mvc.perform(
+                        org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                                        "/v1/payment-groups/" + number)
+                                .header("Authorization", bearer(MEMBER_A)))
+                .andExpect(
+                        org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                                .isOk());
+        jdbc.update(
+                "UPDATE payment_group SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE id=?",
+                order.getPaymentGroup().getId());
+        assertThat(legacyGroups.expire(order.getPaymentGroup().getId())).isTrue();
+        assertThat(legacyGroups.active(MEMBER_A)).isEmpty();
+        assertThat(legacy("after-expiry").getPaymentGroup()).isNotNull();
     }
 }

@@ -46,9 +46,6 @@ public final class PaymentRelayContract {
 
     public record Approved(long paymentId, String orderRef, long amount, Instant approvedAt) {}
 
-    public record RefundRequested(
-            String refundRequestId, long paymentId, String orderRef, String reason) {}
-
     public record RefundItem(String sellerOrderNumber, long amount) {}
 
     public record RefundSucceeded(

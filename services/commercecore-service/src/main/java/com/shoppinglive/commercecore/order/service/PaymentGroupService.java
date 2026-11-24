@@ -5,7 +5,6 @@ import com.shoppinglive.commercecore.order.dto.OrderResponse;
 import com.shoppinglive.commercecore.order.entity.Order;
 import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.entity.PaymentGroup;
-import com.shoppinglive.commercecore.payment.dto.PaymentExecution;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.time.Instant;
@@ -112,15 +111,6 @@ public class PaymentGroupService {
 
     public Optional<GroupResponse> active(String member) {
         return checkout.active(member);
-    }
-
-    public PaymentExecution start(String member, String number, String key) {
-        validateKey(key);
-        return lifecycle.start(member, number, key);
-    }
-
-    public PaymentExecution payment(String member, String number, Long id) {
-        return lifecycle.payment(member, number, id);
     }
 
     public void cancel(String member, String number) {

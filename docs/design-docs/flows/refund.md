@@ -8,12 +8,12 @@
 
 ## 현재 dev: 기존 사용자 환불
 
-[RefundIntakeService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/RefundIntakeService.java)는 legacy 실행 주문만 접수한다. 새 주문서의 사용자 환불을 이 입구가 제공한다고 해석하지 않는다. 소유권·원결제 성공·확정 시각부터 168시간 미만·대상·누적 금액·멱등 원문을 확인한다. 항목 전체 환불 계약이며 신규 수량 환불 완료를 뜻하지 않는다.
+정책0 실행 주문은 #390에서 삭제된 옛 `RefundIntakeService`가 접수했고 지금은 409로 거절한다. 새 주문서의 사용자 환불을 이 입구가 제공한다고 해석하지 않는다. 소유권·원결제 성공·확정 시각부터 168시간 미만·대상·누적 금액·멱등 원문을 확인한다. 항목 전체 환불 계약이며 신규 수량 환불 완료를 뜻하지 않는다.
 
 | 출발 | 도착 | 조건·처리 |
 |---|---|---|
 | legacy PAID | refund_request PROCESSING | 원결제 HTTP 조회는 Core TX 밖에서 하고 잠금 아래 연결을 재검증한다. 대상·금액·전달 원문을 저장한다. |
-| 영속 REFUND 전달 | 기존 Payment HTTP | execution-enabled일 때 커밋 후 고정 requestId/원문을 /v1/internal/refunds로 전달한다. |
+| 영속 REFUND 전달 | 삭제됨(#390) | 정책0 주문의 환불 요청은 409이고 Payment를 호출하지 않는다. 정책0 환불 대상 조회는 `LEGACY_REFUND_UNAVAILABLE`을 돌려준다. 정책1 주문서 환불은 Kafka 요청·결과 경로를 쓴다.|
 | PROCESSING | UNKNOWN | 유효한 미확정 결과를 보존하고 재전달·조회한다. 시간 경과만으로 실패로 확정하지 않는다. |
 | PROCESSING/UNKNOWN | SUCCESS | 검증된 성공 대상만 REFUNDED로 바꾸고 SKU 재고를 복구한다. 중복 결과는 다시 복구하지 않는다. |
 | PROCESSING/UNKNOWN | FAILED | 확정 실패만 반영하며 성공 재고 복원을 하지 않는다. |
@@ -23,7 +23,7 @@
 
 ## 현재 dev: 종료 주문의 늦은 승인
 
-새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `payment_relay_refund(REQUESTED)`와 `late-{paymentId}` 요청을 같은 TX에 저장한다. 토픽은 구 하이픈 이름 `commerce.refund-requests.v1`, payload는 refundRequestId/paymentId/orderRef/reason 네 필드다. Core는 `payment.refund-results.v1`의 RefundSucceeded/RefundFailed를 검증해 SUCCEEDED/FAILED를 기록하며 주문·재고의 종료 상태를 유지한다. legacy의 `late_approval_refund(REQUIRED)`는 별도 기록이다.
+새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `payment_relay_refund(REQUESTED)`와 `late-{paymentId}` 요청을 같은 TX에 저장한다. 토픽은 구 하이픈 이름 `commerce.refund-requests.v1`, payload는 refundRequestId/paymentId/orderRef/reason 네 필드다. Core는 구 `payment.refund-results.v1`을 구독하지 않는다. 환불 결과는 `payment.refund.results.v1`의 RefundResultRecorded를 [KafkaRefundService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/KafkaRefundService.java)가 `core_refund_intent` 원요청과 대조해 반영한다. legacy의 `late_approval_refund(REQUIRED)`는 별도 기록이다.
 
 Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka 발행·계약 검사는 Payment 접수나 금전 환불 완료가 아니다.
 
