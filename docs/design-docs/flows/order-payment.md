@@ -32,7 +32,7 @@
 
 ## 기존 경로와 이행
 
-정책0(legacy) 주문의 PAYMENT/REFUND 전달과 Payment 호출 경로는 #390에서 삭제됐다. 옛 주문 생성 API는 Frontend #89 전환 전까지 남지만 그 주문은 결제되지 않고 만료된다. 정책0 주문의 환불 요청은 409이고 환불 가능 조회는 `LEGACY_REFUND_UNAVAILABLE`을 돌려준다. 옛 `late_approval_refund`·`payment_relay_refund` 테이블과 기존 행은 지우지 않았다. 새 늦은 승인은 이 테이블에 쓰지 않고 `core_refund_intent`로 보상을 요청한다. 같은 주문에 옛 `payment_relay_refund` 행이 있으면 새 보상 요청을 만들지 않고 별도 복구 대상으로 남긴다. 과거 번호/기한/금액/기존 null 처리기한을 임의 재작성하지 않는다. 토스 테스트 환경의 주문 → 승인 → 부분·전체 환불 확인은 #367에 기록했다. 운영 결제·배포와 과거 미확정 거래의 운영 대사는 후속이다.
+정책0(legacy) 주문의 PAYMENT/REFUND 전달과 Payment 호출 경로는 #390에서 삭제됐다. 옛 주문 생성 API는 Frontend #89 전환 전까지 남지만 그 주문은 결제되지 않고 만료된다. 정책0 주문의 환불 요청은 409이고 환불 가능 조회는 `LEGACY_REFUND_UNAVAILABLE`을 돌려준다. 옛 `late_approval_refund`·`payment_relay_refund` 테이블과 기존 행은 지우지 않았다. 새 늦은 승인은 이 테이블에 쓰지 않고 `core_refund_intent`로 보상을 요청한다. 같은 주문에 옛 `payment_relay_refund` 행이 있으면 보상 요청 생성이 예외로 막혀 승인 반영 TX 전체가 롤백되므로 별도 복구가 필요하다. 과거 번호/기한/금액/기존 null 처리기한을 임의 재작성하지 않는다. 토스 테스트 환경의 주문 → 승인 → 부분·전체 환불 확인은 #367에 기록했다. 운영 결제·배포와 과거 미확정 거래의 운영 대사는 후속이다.
 
 [Core 상세](../services/commercecore/order/overview.md) · [현재 원본·남은 기준](../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 기록](../../worklog/2026-11-16.md) · [팀원 설계](../services/payment/overview.md)
 
