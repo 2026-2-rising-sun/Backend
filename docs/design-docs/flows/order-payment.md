@@ -4,9 +4,7 @@
 
 새 주문서 경로는 결제창 준비와 실제 승인을 나눈다. 준비 동안 생성부터600초 PENDING을 유지하고 인증 후 승인 접수에서 PROCESSING 별도600초를 시작한다. 기존 공개 legacy 경로도 유지한다. Payment 실행·원장은 팀원 소유이며 Core는 주문·재고·쿠폰과 전달 기록을 소유한다.
 
-> 주의: #378은 dev에 병합됐다. 이 문서의 "미병합" 설명은 과거 기준이며 #377에서 현재 구현으로 고친다. 그 전까지 동작 규칙은 [환불 요구사항](../services/payment/requirements/refund.md)과 이슈 본문을 따른다.
-
-기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`. 새 주문서 결제 HTTP 중계와 legacy 공개 입구가 함께 남아 있다. 기존 Mock 내부 결제·환불 API는 Payment에서 삭제됐지만 새 생성·승인·조회 어댑터는 별개다. 구 호출의 실패를 새 결제 경로 전체의 403으로 일반화하지 않는다. 현재 환불과 미병합 #378은 [환불 흐름](refund.md)에서 구분한다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`. 새 주문서 결제 HTTP 중계와 legacy 공개 입구가 함께 남아 있다. 기존 Mock 내부 결제·환불 API는 Payment에서 삭제됐지만 새 생성·승인·조회 어댑터는 별개다. 구 호출의 실패를 새 결제 경로 전체의 403으로 일반화하지 않는다. 보상 대기와 환불 흐름은 [환불 흐름](refund.md)에서 설명한다.
 
 ## 새 계약 경로
 
@@ -24,9 +22,11 @@
 
 과거 실행 기록에서는 팀원 복구2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. PG는 HTTP 대역이며 실 PG와 실제 환불 실행은 미실행이다. 이전 Mock/legacy 검증을 새 설계 E2E로 세지 않는다.
 
-## 미병합 환불 변경과 재고 사본
+## 보상 대기와 재고 사본
 
-미병합 #378의 CANCEL_PENDING/COMPENSATION_PENDING과 공통 dot 환불 토픽은 현재 dev에 없다. 현행 처리기한 만료의 EXPIRED·즉시 선점 해제와 #378의 보상 결과 후 해제를 혼동하지 않는다. provider 부재·계약 불일치·paymentId 복구 차단이 남아 있다.
+승인 응답 유실·명시적 UNKNOWN 또는 종료 주문의 늦은 승인이면 주문을 COMPENSATION_PENDING(보상 대기)으로 바꾸고 `SYSTEM_COMPENSATION` 환불 요청을 보낸다. 보상 대기 동안 재고·쿠폰 예약은 보존하고, 검증된 완료 결과(SUCCEEDED 또는 NO_CHARGE)를 받아 CANCELLED로 확정할 때 한 번만 해제한다. 처리기한 만료의 EXPIRED 즉시 해제와 보상 완료 후 해제는 다른 경로다.
+
+회원의 진행 중 주문 제한은 결제 대기(PENDING_PAYMENT)와 결제 확인 중(PAYMENT_CONFIRMING) 주문에만 걸린다. 보상 대기 주문이 있어도 같은 회원은 새 주문을 만들고 결제할 수 있다. 두 주문의 재고·쿠폰 예약은 서로 섞이지 않는다. 이 제한은 `PurchaseGuard.requireNoActive`, 부분 unique 인덱스(V117), `PaymentRelayService.active`가 함께 지킨다. 보상 대기 주문은 활성 주문 조회에 나오지 않는다. provider 부재·계약 불일치·paymentId 복구 차단이 남아 있다.
 
 예약·소진·해제·환불 복원으로 바뀐 재고는 SKU dirty revision을 올리고 기본 60초 배치가 Catalog로 보낸다. Catalog 재고는 표시 정보이며 이 주문 처리의 원본 검증·잠금을 대신하지 않는다. [CDC 경로](catalog-sync.md)와 [최종 검증 범위](../../worklog/2026-11-20-cdc-refund-status.md)를 따른다.
 

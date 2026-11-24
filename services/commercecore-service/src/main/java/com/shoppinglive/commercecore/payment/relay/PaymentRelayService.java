@@ -453,8 +453,7 @@ public class PaymentRelayService {
                                     member,
                                     List.of(
                                             OrderStatus.PENDING_PAYMENT,
-                                            OrderStatus.PAYMENT_CONFIRMING,
-                                            OrderStatus.COMPENSATION_PENDING))) {
+                                            OrderStatus.PAYMENT_CONFIRMING))) {
                         if (found.usesLegacyExecution()) continue;
                         var group = locked(found.getId());
                         if (!group.isOrderSheet() || store.binding(group.getId()) == null)
@@ -462,8 +461,7 @@ public class PaymentRelayService {
                         lifecycle.expire(group.getId());
                         group = locked(group.getId());
                         if (group.getStatus() != OrderStatus.PENDING_PAYMENT
-                                && group.getStatus() != OrderStatus.PAYMENT_CONFIRMING
-                                && group.getStatus() != OrderStatus.COMPENSATION_PENDING) continue;
+                                && group.getStatus() != OrderStatus.PAYMENT_CONFIRMING) continue;
                         if (active != null) throw conflict("진행 중인 주문이 여러 건입니다. 기존 주문을 확인해 주세요.");
                         active = viewLocked(group);
                     }

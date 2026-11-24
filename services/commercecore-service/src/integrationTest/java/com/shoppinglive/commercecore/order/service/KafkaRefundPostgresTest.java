@@ -45,6 +45,10 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     static final long PAYMENT = 7001L;
 
     String prepare(boolean coupon) {
+        return prepare(coupon, PAYMENT);
+    }
+
+    String prepare(boolean coupon, long paymentId) {
         String number =
                 relay.create(
                                 MEMBER_A,
@@ -61,7 +65,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         var state = relay.state(MEMBER_A, number);
         relay.prepared(
                 deliveries.relay(id(number), "PREPARE"),
-                new Created(PAYMENT, "CREATED", number + "-1", state.amount(), state.expiresAt()));
+                new Created(
+                        paymentId, "CREATED", number + "-1", state.amount(), state.expiresAt()));
         return number;
     }
 
@@ -693,46 +698,6 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("원결제ID 없는 시스템 미승인 종료도 알림·가짜ID 없이 예약을 단일 해제한다")
-    void noChargeWithoutPaymentIdDoesNotInventNotification() throws Exception {
-        String n =
-                relay.create(
-                                MEMBER_A,
-                                "no-payment",
-                                new RelayOrderRequest(
-                                        List.of(new CreateOrderSheetRequest.Item(501L, 3)),
-                                        null,
-                                        "구매자",
-                                        "01012345678",
-                                        10000L,
-                                        COUPON,
-                                        501L))
-                        .number();
-        tx.executeWithoutResult(
-                t -> {
-                    guard.lock(MEMBER_A);
-                    var group = groups.lockById(id(n)).orElseThrow();
-                    refunds.compensateLocked(group, "APPROVAL_UNKNOWN");
-                });
-        String request = requestId(n);
-        var done = result(request, "NO_CHARGE", 1, UUID.randomUUID().toString());
-        assertThat(done.path("payload").has("paymentId")).isFalse();
-        apply(done);
-        apply(done);
-        assertThat(state(n)).isEqualTo("CANCELLED");
-        assertThat(available(501)).isEqualTo(20);
-        assertThat(reserved(501)).isZero();
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
-        assertThat(intents.compensation(id(n)).outcome()).isEqualTo("NO_CHARGE");
-        assertThat(relay.state(MEMBER_A, n).paymentId()).isNull();
-        assertThat(
-                        jdbc.queryForObject(
-                                "SELECT COUNT(*) FROM event_outbox WHERE event_type IN ('PaymentFailed','OrderFailed')",
-                                Long.class))
-                .isZero();
-    }
-
-    @Test
     @DisplayName("늦은 승인 뒤 시스템 환불 완료는 승인 사실을 보존하고 결제실패 알림을 발행하지 않는다")
     void systemCompletionDoesNotPublishRejectedPayment() throws Exception {
         String n = prepare(true);
@@ -906,7 +871,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(relay.view(MEMBER_A, n).order().status()).isEqualTo("COMPENSATION_PENDING");
         assertThat(relay.view(MEMBER_A, n).order().items())
                 .allSatisfy(item -> assertThat(item.status()).isEqualTo("COMPENSATION_PENDING"));
-        assertThat(relay.active(MEMBER_A)).isPresent();
+        assertThat(relay.active(MEMBER_A)).isEmpty();
     }
 
     @ParameterizedTest
@@ -1021,7 +986,6 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> relayDispatcher.checkout(MEMBER_A, n))
                 .isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> prepare(false)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> refunds.request(MEMBER_A, n, "no-user-refund", all()))
                 .isInstanceOf(BusinessException.class);
         assertThat(lifecycle.expire(id(n))).isFalse();
@@ -1031,6 +995,24 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(reserved(501)).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("보상 대기 주문이 있어도 같은 회원은 새 주문을 만들 수 있고 결제 대기 주문은 1건만 허용한다")
+    void compensationPendingAllowsNewPurchaseWithOneActive() throws Exception {
+        String old = prepare(true);
+        relay.approvalUnknown(accept(old), Map.of("code", "UNKNOWN"));
+        assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        String fresh = prepare(false, PAYMENT + 1);
+        assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(relay.active(MEMBER_A).orElseThrow().order().orderNumber()).isEqualTo(fresh);
+        assertThatThrownBy(() -> prepare(false)).isInstanceOf(BusinessException.class);
+        assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
     }
 
     @ParameterizedTest

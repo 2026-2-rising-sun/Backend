@@ -236,6 +236,8 @@ public class KafkaRefundService {
                                 OrderStatus.CANCEL_PENDING,
                                 OrderStatus.REFUNDED)
                         .contains(group.getStatus())) return;
+        // 결제 대기 주문은 승인 응답 유실로 보상할 수 없다. 상태를 바꾸지 않고 원문만 남지 않게 막는다.
+        require(group.getStatus() != OrderStatus.PENDING_PAYMENT, "결제 대기 주문은 보상할 수 없습니다.");
         require(
                 jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM payment_relay_refund WHERE payment_group_id=?",
@@ -243,8 +245,7 @@ public class KafkaRefundService {
                                 group.getId())
                         == 0,
                 "기존 보상 원문은 별도 복구가 필요합니다.");
-        if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING
-                || group.getStatus() == OrderStatus.PENDING_PAYMENT) {
+        if (group.getStatus() == OrderStatus.PAYMENT_CONFIRMING) {
             for (var item : orders.findByPaymentGroupIdOrderByIdAsc(group.getId()))
                 require(
                         orders.transitionStatus(
