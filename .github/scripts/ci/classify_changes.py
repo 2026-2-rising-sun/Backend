@@ -17,6 +17,8 @@ API = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(API)
 MIGRATION_SERVICES = SERVICES
 POSTGRES_SERVICES = {"catalog-service", "commercecore-service", "payment-service", "live-service"}
+# Nori 분석기가 있는 ES 로 검색 색인과 검색을 확인한다.
+ELASTICSEARCH_SERVICES = {"catalog-service"}
 LIVE_PREFIX = "services/live-service/"
 PUBSUB_CALLERS = {"ChatWriteService.java", "BroadcastEndNotifier.java", "BroadcastService.java"}
 
@@ -260,12 +262,14 @@ def classify(changes, full_reason=None):
         database_services.add("payment-service")
     postgres_tasks = [":services:" + service + ":postgresTest" for service in sorted(postgres)]
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
+    elasticsearch = ELASTICSEARCH_SERVICES if full else {m.removeprefix("services:") for m in builds} & ELASTICSEARCH_SERVICES
+    elasticsearch_tasks = [":services:" + service + ":elasticsearchTest" for service in sorted(elasticsearch)]
     event_samples = full or bool(builds & {"services:catalog-service", "services:commercecore-service", "services:payment-service", "services:live-service"})
     return {"gradle_tasks": tasks, "run_tests": full or bool(builds), "api": api,
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
             "migration_tasks": [":services:" + service + ":migrationTest" for service in sorted(migrations)],
-            "redis_tasks": redis_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres), "database_services": sorted(database_services),
+            "redis_tasks": redis_tasks, "elasticsearch_tasks": elasticsearch_tasks, "postgres_tasks": postgres_tasks, "postgres_services": sorted(postgres), "database_services": sorted(database_services),
             **tools, "reasons": reasons}
 
 

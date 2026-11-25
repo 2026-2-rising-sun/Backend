@@ -188,10 +188,42 @@ jobs:
           subprocess.run(['./gradlew', *json.loads(os.environ['REDIS_TASKS']),
                           '--no-daemon', '--max-workers=2'], check=True)
           PY
-      - name: Stop temporary external services
-        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]')
+      # 버전은 catalog-service 의 elasticsearch-java 클라이언트와 Infra local/elasticsearch/Dockerfile 에 맞춘다.
+      - name: Start Elasticsearch only for search checks
+        if: steps.changes.outputs.elasticsearch_tasks != '[]'
         run: |
-          for container in ci-migration-postgres ci-redis; do
+          printf 'FROM docker.elastic.co/elasticsearch/elasticsearch:8.18.8\nRUN bin/elasticsearch-plugin install --batch analysis-nori\n' \
+            | docker build --tag ci-elasticsearch-nori -
+          docker run --detach --name ci-elasticsearch \
+            --env discovery.type=single-node --env xpack.security.enabled=false \
+            --env cluster.routing.allocation.disk.threshold_enabled=false \
+            --env ES_JAVA_OPTS='-Xms512m -Xmx512m' \
+            --publish 127.0.0.1:59200:9200 ci-elasticsearch-nori
+          for attempt in {1..60}; do
+            if curl -fs 'http://127.0.0.1:59200/_cluster/health?wait_for_status=yellow&timeout=1s' >/dev/null; then break; fi
+            echo "Elasticsearch 준비 대기 중 ($attempt/60)"
+            sleep 2
+          done
+          curl -fsS 'http://127.0.0.1:59200/_cat/plugins?v' | grep analysis-nori
+      - name: Run Elasticsearch-tagged tests
+        if: steps.changes.outputs.elasticsearch_tasks != '[]'
+        env:
+          ELASTICSEARCH_TASKS: ${{ steps.changes.outputs.elasticsearch_tasks }}
+          CATALOG_TEST_ES_URL: http://127.0.0.1:59200
+          # Catalog 의 검색 업무 변경은 PostgreSQL 검사도 선택하므로 같은 DB 를 쓴다.
+          CATALOG_TEST_POSTGRES_URL: jdbc:postgresql://localhost:55432/catalog_test
+          CATALOG_TEST_POSTGRES_USER: postgres
+          CATALOG_TEST_POSTGRES_PASSWORD: test
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          subprocess.run(['./gradlew', *json.loads(os.environ['ELASTICSEARCH_TASKS']),
+                          '--no-daemon', '--max-workers=2'], check=True)
+          PY
+      - name: Stop temporary external services
+        if: always() && (steps.changes.outputs.migration_tasks != '[]' || steps.changes.outputs.postgres_tasks != '[]' || steps.changes.outputs.redis_tasks != '[]' || steps.changes.outputs.elasticsearch_tasks != '[]')
+        run: |
+          for container in ci-migration-postgres ci-redis ci-elasticsearch; do
             if docker container inspect "$container" >/dev/null 2>&1; then
               docker stop "$container"
               docker container rm "$container"

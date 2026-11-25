@@ -102,7 +102,8 @@ def commands_for(plan):
         add("gradle", ["./gradlew", *plan["gradle_tasks"], *options])
     if plan["event_samples"]:
         add("event-samples", [sys.executable, ".github/scripts/api/check_events.py", "--samples"])
-    for task in plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]:
+    for task in (plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]
+                 + plan["elasticsearch_tasks"]):
         add(task, ["./gradlew", task, *options], task)
     return checks
 
@@ -111,6 +112,8 @@ def external_ready(task, environment):
     prefix = task.split(":")[2].removesuffix("-service").upper()
     if task.endswith(":redisTest"):
         return environment.get(prefix + "_REDIS_TEST") == "1"
+    if task.endswith(":elasticsearchTest"):
+        return environment.get(prefix + "_TEST_ES_URL", "").startswith("http")
     if prefix == "LIVE":
         return environment.get("LIVE_PG_TEST") == "1"
     key = "MEMBER_TEST_DB_URL" if prefix == "MEMBER" else prefix + "_TEST_POSTGRES_URL"
