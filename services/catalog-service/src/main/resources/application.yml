@@ -47,6 +47,14 @@ catalog:
       interval: 5s
       batch-size: 500
       lock-at-most-for: 1m
+    # 전체 색인. check-interval 마다 할 일이 있는지 보고, alias 가 없거나 지금 인덱스를 만든 뒤 cron 시각이 지났으면 다시 만든다.
+    # lock-at-most-for 는 한 번 도는 시간보다 길어야 한다. 짧으면 도중에 잠금이 풀려 부분 색인이 옛 인덱스에 쓴다.
+    full:
+      cron: "0 0 4 * * *"
+      zone: Asia/Seoul
+      check-interval: 1m
+      batch-size: 500
+      lock-at-most-for: 30m
 
 shoppinglive:
   security:
