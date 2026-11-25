@@ -175,7 +175,8 @@ class SelectionTests(unittest.TestCase):
         names = {c["name"] for c in checks}
         self.assertTrue({"classifier", "api_tests", "harness", "workflow", "local-auth",
                          "api", "events", "gradle", "event-samples"} <= names)
-        self.assertTrue(set(plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]) <= names)
+        self.assertTrue(set(plan["migration_tasks"] + plan["postgres_tasks"] + plan["redis_tasks"]
+                            + plan["elasticsearch_tasks"]) <= names)
         self.assertLess([c["name"] for c in checks].index("gradle"),
                         [c["name"] for c in checks].index("event-samples"))
 
@@ -200,6 +201,9 @@ class SelectionTests(unittest.TestCase):
         self.assertFalse(verify.external_ready(":services:member-service:migrationTest", {}))
         self.assertTrue(verify.external_ready(":services:live-service:migrationTest", {"LIVE_PG_TEST": "1"}))
         self.assertTrue(verify.external_ready(":services:live-service:redisTest", {"LIVE_REDIS_TEST": "1"}))
+        task = ":services:catalog-service:elasticsearchTest"
+        self.assertTrue(verify.external_ready(task, {"CATALOG_TEST_ES_URL": "http://localhost:9200"}))
+        self.assertFalse(verify.external_ready(task, {}))
 
 
 class ExecutionTests(unittest.TestCase):

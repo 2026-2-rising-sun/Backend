@@ -382,10 +382,24 @@ class ServiceBoundaryTests(unittest.TestCase):
                 self.assertEqual(plan["migration_tasks"], [":services:payment-service:migrationTest"])
                 self.assertEqual(plan["postgres_tasks"], [":services:payment-service:postgresTest"])
 
+    def test_catalog_change_selects_elasticsearch_with_its_database(self):
+        """Catalog 업무 변경만 ES 검사를 고르고, 그때 같은 Catalog DB 도 준비한다."""
+        plan = classify([Change("services/catalog-service/src/main/java/Example.java", None, b"class Example {}")])
+        self.assertEqual(plan["elasticsearch_tasks"], [":services:catalog-service:elasticsearchTest"])
+        self.assertIn("catalog-service", plan["database_services"])
+        for service in ("member-service", "commercecore-service", "payment-service", "live-service"):
+            with self.subTest(service=service):
+                other = classify([Change(f"services/{service}/src/main/java/Example.java", None, b"class Example {}")])
+                self.assertEqual(other["elasticsearch_tasks"], [])
+        full = classify([], "비교 불가")
+        self.assertEqual(full["elasticsearch_tasks"], [":services:catalog-service:elasticsearchTest"])
+        self.assertIn("catalog-service", full["database_services"])
+
     def test_comment_only_change_does_not_select_postgres(self):
         """주석만 바뀌면 외부 DB를 시작하지 않는다."""
         plan = classify([Change(JAVA, b"class A {}", "// 설명\nclass A {}".encode())])
         self.assertEqual(plan["postgres_tasks"], [])
+        self.assertEqual(plan["elasticsearch_tasks"], [])
 
 
 class WorkflowTests(unittest.TestCase):
@@ -413,7 +427,8 @@ class WorkflowTests(unittest.TestCase):
         steps = ci["jobs"]["build"]["steps"]
         for step in steps:
             if "docker run" in step.get("run", ""):
-                self.assertTrue("migration_tasks != '[]'" in step["if"] or "postgres_tasks != '[]'" in step["if"] or "redis_tasks != '[]'" in step["if"])
+                self.assertTrue("migration_tasks != '[]'" in step["if"] or "postgres_tasks != '[]'" in step["if"]
+                                or "redis_tasks != '[]'" in step["if"] or "elasticsearch_tasks != '[]'" in step["if"])
         ordinary = next(i for i, s in enumerate(steps) if s.get("name") == "Run selected Gradle work")
         postgres = next(i for i, s in enumerate(steps) if s.get("name") == "Start PostgreSQL only for selected database checks")
         self.assertLess(ordinary, postgres)
