@@ -71,3 +71,33 @@ Catalog V5의 상태 테이블은 상품/SKU별 row lock 단위다. payload는 �
 
 부분 색인(`catalog.search.enabled=true`일 때만)은 상품별로 모아 Catalog DB에서 문서를 다시 만들고 ES alias `products`에 bulk로 반영한다. 삭제·공개 SKU 없음은 문서 삭제다. 대표 가격은 판매 중 SKU 최저가, 모두 품절이면 품절 SKU 최저가다. 재고 수량과 쿠폰은 문서에 넣지 않는다. 처리 후 읽은 시점의 마지막 task id까지만 지워, 색인 중 새로 쌓인 작업과 ES가 실패한 상품은 다음 주기에 다시 처리한다. `shedlock`의 `catalog-search-index` 잠금을 DB 시각으로 잡아 Pod가 여러 개여도 한 번만 돈다. 전체 색인(#420)도 같은 잠금 이름을 쓴다.
 
+alias가 없으면 부분 색인은 ES에 쓰지 않고 작업을 남긴다. alias 없이 쓰면 ES가 `products`라는 일반 인덱스를 자동으로 만들어 이후 alias 교체를 막기 때문이다. 첫 인덱스는 전체 색인이 만든다.
+
+## 전체 색인 (#420)
+
+전체 색인은 `catalog.search.full.check-interval`(기본 1분)마다 할 일이 있는지 본다. alias가 없거나(첫 배포), 지금 인덱스를 만든 뒤 `catalog.search.full.cron`(기본 매일 04:00, `Asia/Seoul`)이 지났으면 다시 만든다. 정해진 시각에 한 번만 실행하지 않는 이유는, 그 순간 부분 색인이 잠금을 쥐고 있어도 다음 확인 때 실행되게 하려는 것이다. 잠금을 잡은 뒤 한 번 더 확인하므로 Pod가 여러 개여도 한 번만 만든다.
+
+1. `products_<UTC 시각, 밀리초까지>` 이름의 빈 인덱스를 alias 없이 만든다. 매핑은 부분 색인과 같은 `elasticsearch/products.json`이다.
+2. 삭제되지 않은 상품을 id 순서로 `batch-size`(기본 500)개씩 읽어 부분 색인과 같은 기준으로 문서를 만들고 새 인덱스에 넣는다. 공개 SKU가 없는 상품은 넣지 않는다.
+3. 새 인덱스를 refresh하고 문서 수가 넣은 수와 같으면 alias `products`를 한 번의 요청으로 새 인덱스로 옮긴다.
+4. 직전 인덱스 하나는 되돌리기용으로 남기고 그보다 오래된 `products_*` 인덱스는 지운다.
+
+중간에 문서 반영이나 DB 조회가 실패하거나 문서 수가 다르면 새 인덱스를 지우고 alias는 옮기지 않는다. 검색은 기존 인덱스로 계속되고, 다음 확인 때 다시 시도한다. 전체 색인 중에는 같은 잠금 때문에 부분 색인이 돌지 않는다. 그 사이 바뀐 상품은 `index_task`에 남아 alias를 옮긴 뒤 새 인덱스에 반영된다. `lock-at-most-for`(기본 30분)는 전체 색인 한 번보다 길어야 한다. 짧으면 도중에 잠금이 풀려 부분 색인이 옛 인덱스에 쓰고, 그 변경이 새 인덱스에서 빠질 수 있다.
+
+### alias 되돌리기
+
+새 인덱스에 문제가 있으면 alias를 직전 인덱스로 옮긴다. 인덱스 이름은 먼저 조회한다.
+
+```bash
+curl -s "$ES/_cat/aliases/products?v"         # 지금 alias가 가리키는 인덱스
+curl -s "$ES/_cat/indices/products_*?v&s=index" # 남아 있는 인덱스. 시각이 이름에 있다
+curl -s -X POST "$ES/_aliases" -H 'Content-Type: application/json' -d '{
+  "actions": [
+    {"remove": {"index": "<지금 인덱스>", "alias": "products"}},
+    {"add":    {"index": "<직전 인덱스>", "alias": "products"}}
+  ]
+}'
+```
+
+되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 `CATALOG_SEARCH_ENABLED=false`로 색인을 끈다. 꺼도 `index_task`는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.
+
