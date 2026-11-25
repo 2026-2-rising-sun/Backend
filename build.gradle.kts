@@ -76,7 +76,7 @@ subprojects {
             group = "verification"
             testClassesDirs = integrationSources.output.classesDirs
             classpath = integrationSources.runtimeClasspath
-            useJUnitPlatform { excludeTags("postgres", "redis", "toss-sandbox") }
+            useJUnitPlatform { excludeTags("postgres", "redis", "toss-sandbox", "elasticsearch") }
             dependsOn(tasks.named("testClasses"))
             shouldRunAfter(tasks.named("test"))
             if (project.name in setOf("member-service", "notification-service")) {
@@ -127,6 +127,12 @@ subprojects {
         registerExternalTest("migrationTest", "postgres & migration", postgresEnabled)
         if (prefix in setOf("CATALOG", "COMMERCECORE", "PAYMENT", "LIVE")) {
             registerExternalTest("postgresTest", "postgres & !migration", postgresEnabled)
+        }
+        if (prefix == "CATALOG") {
+            // Nori 플러그인이 있는 실제 ES. 지정한 ES 의 products 인덱스를 지우고 쓴다
+            registerExternalTest("elasticsearchTest", "elasticsearch") {
+                System.getenv("CATALOG_TEST_ES_URL")?.startsWith("http") == true
+            }
         }
         if (prefix == "PAYMENT") {
             // 실제 토스 API를 부른다. CI에서 돌지 않게 integrationTest에서 뺀 태그다

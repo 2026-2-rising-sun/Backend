@@ -19,6 +19,11 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
+    // 상품 검색 색인. ES 클라이언트 버전은 BOM 이 관리하고, ShedLock 은 BOM 에 없어 직접 고정한다.
+    implementation("co.elastic.clients:elasticsearch-java")
+    implementation("net.javacrumbs.shedlock:shedlock-spring:6.10.0")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.10.0")
+
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")
     testRuntimeOnly("com.h2database:h2")

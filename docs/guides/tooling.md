@@ -71,10 +71,11 @@ git diff --check
 | 작업 | 대상 | 주의점 |
 |---|---|---|
 | `test` | `src/test` | 실제 실행·캐시 재사용 구분 |
-| `integrationTest` | `src/integrationTest` 중 `postgres`, `redis`, `toss-sandbox` 제외 | 조건부 테스트는 스킵될 수 있음 |
+| `integrationTest` | `src/integrationTest` 중 `postgres`, `redis`, `toss-sandbox`, `elasticsearch` 제외 | 조건부 테스트는 스킵될 수 있음 |
 | `postgresTest` | Catalog·CommerceCore·Payment·Live 통합 테스트 중 `postgres & !migration` | 서비스별 격리 PostgreSQL 필요 |
 | `migrationTest` | 통합 테스트 중 `postgres & migration` | 서비스 모듈만 등록, 환경 준비 필요 |
 | `redisTest` | 통합 테스트 중 `redis` | 서비스 모듈만 등록, 환경 준비 필요 |
+| `elasticsearchTest` | Catalog 통합 테스트 중 `elasticsearch` | Nori 플러그인이 있는 ES 필요, CI 미실행. `CATALOG_TEST_ES_URL`의 `products_*` 인덱스를 지우고 씀 |
 | `tossSandboxTest` | Payment 통합 테스트 중 `toss-sandbox` | 실제 토스 API 호출, CI 미실행. 실행법은 [Payment 로컬 검증](../../services/payment-service/local/README.md#실제-토스-분류-확인-테스트선택-실행) |
 
 Catalog·CommerceCore·Payment·Live의 `postgresTest`가 `postgres` 단독 업무 테스트를 실행한다. CI와 로컬 하네스는 해당 서비스의 업무 변경에 이 작업을 추가로 선택한다. `--tests` 필터는 위 태그 조건에 추가로 적용되므로 제외 조건을 우회하지 못한다. 외부 전용 작업은 환경 조건과 컴파일된 테스트 존재를 확인하며, 실행된 테스트가 0건이거나 스킵이 있으면 실패하도록 설정되어 있다. Gradle의 `NO-SOURCE` 등 작업 상태와 생성된 결과도 확인한다. 태그만으로 DB 연결이나 컨테이너가 준비되지 않는다.
@@ -99,6 +100,7 @@ Catalog·CommerceCore·Payment·Live의 `postgresTest`가 `postgres` 단독 업�
 ./gradlew :services:member-service:migrationTest
 LIVE_PG_TEST=1 ./gradlew :services:live-service:migrationTest
 LIVE_REDIS_TEST=1 ./gradlew :services:live-service:redisTest
+CATALOG_TEST_ES_URL=http://localhost:9200 ./gradlew :services:catalog-service:elasticsearchTest
 ```
 
 현재 Redis 태그 테스트는 Live에 있다. 실제 연결은 localhost와 `LIVE_REDIS_PORT`(기본 56379)를 사용한다. 다른 서비스에도 `redisTest` 작업은 등록되지만 대상 테스트가 있다는 뜻은 아니다.

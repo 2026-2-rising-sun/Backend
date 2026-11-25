@@ -143,6 +143,57 @@ class CatalogSnapshotStoreTest {
                 .isEqualTo("상품");
     }
 
+    private long indexTasks() {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM index_task WHERE product_id=7", Long.class);
+    }
+
+    @Test
+    @DisplayName("상품과 SKU 가격, 판매 상태가 바뀌면 같은 트랜잭션에서 색인 작업을 남긴다")
+    void recordsIndexTaskWhenSearchValuesChange() {
+        apply("ProductSnapshotChanged", product(0));
+        apply("SkuSnapshotChanged", sku(0));
+        apply("InventorySnapshotChanged", inventory(0, 8));
+        assertThat(indexTasks()).isEqualTo(3);
+
+        apply("SkuSnapshotChanged", sku(1));
+        assertThat(indexTasks()).as("가격이 바뀜").isEqualTo(4);
+
+        var sameValues = sku(2);
+        sameValues.put("price", 4001);
+        apply("SkuSnapshotChanged", sameValues);
+        assertThat(indexTasks()).as("가격, 판매 상태가 같음").isEqualTo(4);
+
+        var hidden = sku(3);
+        hidden.put("price", 4001);
+        hidden.put("saleStatus", "PRIVATE");
+        apply("SkuSnapshotChanged", hidden);
+        assertThat(indexTasks()).as("판매 상태가 바뀜").isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("재고 수량만 바뀌면 색인 작업을 남기지 않고 품절, 재입고일 때만 남긴다")
+    void recordsIndexTaskOnlyWhenSoldOutFlips() {
+        apply("InventorySnapshotChanged", inventory(0, 8));
+        apply("InventorySnapshotChanged", inventory(1, 3));
+        assertThat(indexTasks()).as("첫 재고만").isEqualTo(1);
+
+        apply("InventorySnapshotChanged", inventory(2, 0));
+        assertThat(indexTasks()).as("품절").isEqualTo(2);
+
+        apply("InventorySnapshotChanged", inventory(3, 5));
+        assertThat(indexTasks()).as("재입고").isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("무시한 옛 버전과 중복 이벤트는 색인 작업을 남기지 않는다")
+    void skipsIndexTaskForIgnoredEvents() {
+        apply("ProductSnapshotChanged", product(2));
+        apply("ProductSnapshotChanged", product(1));
+        apply("ProductSnapshotChanged", product(2));
+        assertThat(indexTasks()).isEqualTo(1);
+    }
+
     @Test
     @DisplayName("같은 revision과 원문은 재처리해도 무변경이고 다른 원문은 충돌로 거절한다")
     void validatesSameRevisionPayload() {

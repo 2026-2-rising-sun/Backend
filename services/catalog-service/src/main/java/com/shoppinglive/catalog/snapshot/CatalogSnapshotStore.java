@@ -105,6 +105,10 @@ public class CatalogSnapshotStore {
                 m.payload().toString(),
                 deleted,
                 m.aggregateId());
+        if (searchValueChanged(m, old, deleted))
+            jdbc.update(
+                    "INSERT INTO index_task(product_id) VALUES(?)",
+                    m.payload().get("productId").longValue());
         if (m.eventType().equals("ProductSnapshotChanged")) applyProduct(m);
         else {
             JsonNode metadata = inventory ? read(state.metadata()) : m.payload();
@@ -116,6 +120,17 @@ public class CatalogSnapshotStore {
             else if (metadata != null && quantities != null) materialize(metadata, quantities);
         }
         return true;
+    }
+
+    /** 재고 수량만 바뀌고 품절 여부가 같으면 검색 문서가 같으므로 색인하지 않는다. */
+    private boolean searchValueChanged(CatalogSnapshotMessage m, String old, boolean deleted) {
+        if (m.eventType().equals("ProductSnapshotChanged") || old == null || deleted) return true;
+        JsonNode before = read(old);
+        if (m.eventType().equals("InventorySnapshotChanged"))
+            return (before.get("available").intValue() == 0)
+                    != (m.payload().get("available").intValue() == 0);
+        return before.get("price").longValue() != m.payload().get("price").longValue()
+                || !before.get("saleStatus").equals(m.payload().get("saleStatus"));
     }
 
     private void applyProduct(CatalogSnapshotMessage m) {
