@@ -38,8 +38,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.scheduling.support.CronExpression;
 
 /**
- * H2 Catalog DB 와 Nori 가 있는 실제 ES 로 확인한다. {@code CATALOG_TEST_ES_URL} 이 가리키는 ES 의 products_* 인덱스를
- * 지우고 쓴다.
+ * Catalog DB 와 Nori 가 있는 실제 ES 로 확인한다. {@code CATALOG_TEST_ES_URL} 이 가리키는 ES 의 products_* 인덱스를 지우고
+ * 쓴다. DB 는 {@code CATALOG_TEST_POSTGRES_URL} 이 있으면 그 PostgreSQL 의 새 스키마, 없으면 H2 다. 잠금이 DB 시각을 읽는
+ * SQL 이 DB 마다 달라 운영과 같은 PostgreSQL 로도 확인한다.
  */
 @Tag("elasticsearch")
 class FullIndexerTest {
@@ -52,19 +53,13 @@ class FullIndexerTest {
     private LockingTaskExecutor locks;
     private MutableClock clock;
     private ElasticsearchProductIndex index;
+    private String schema;
 
     @BeforeEach
     void prepare() throws IOException {
         rest = RestClient.builder(HttpHost.create(System.getenv("CATALOG_TEST_ES_URL"))).build();
         client = new ElasticsearchClient(new RestClientTransport(rest, new JacksonJsonpMapper()));
-        var source =
-                new DriverManagerDataSource(
-                        "jdbc:h2:mem:full_"
-                                + UUID.randomUUID()
-                                + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
-                        "sa",
-                        "");
-        Flyway.configure().dataSource(source).load().migrate();
+        var source = catalogDatabase();
         jdbc = new JdbcTemplate(source);
         named = new NamedParameterJdbcTemplate(source);
         locks =
@@ -84,6 +79,40 @@ class FullIndexerTest {
     void close() throws IOException {
         deleteProductIndices();
         rest.close();
+        if (schema != null) jdbc.execute("DROP SCHEMA " + schema + " CASCADE");
+    }
+
+    private DriverManagerDataSource catalogDatabase() {
+        String url = System.getenv("CATALOG_TEST_POSTGRES_URL");
+        if (url == null || url.isBlank()) {
+            var h2 =
+                    new DriverManagerDataSource(
+                            "jdbc:h2:mem:full_"
+                                    + UUID.randomUUID()
+                                    + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE",
+                            "sa",
+                            "");
+            Flyway.configure().dataSource(h2).load().migrate();
+            return h2;
+        }
+        String user = System.getenv().getOrDefault("CATALOG_TEST_POSTGRES_USER", "postgres");
+        String password =
+                System.getenv().getOrDefault("CATALOG_TEST_POSTGRES_PASSWORD", "postgres");
+        schema = "catalog_full_" + UUID.randomUUID().toString().replace("-", "");
+        new JdbcTemplate(new DriverManagerDataSource(url, user, password))
+                .execute("CREATE SCHEMA " + schema);
+        var postgres =
+                new DriverManagerDataSource(
+                        url + (url.contains("?") ? "&" : "?") + "currentSchema=" + schema,
+                        user,
+                        password);
+        Flyway.configure()
+                .dataSource(postgres)
+                .schemas(schema)
+                .defaultSchema(schema)
+                .load()
+                .migrate();
+        return postgres;
     }
 
     private void deleteProductIndices() throws IOException {
