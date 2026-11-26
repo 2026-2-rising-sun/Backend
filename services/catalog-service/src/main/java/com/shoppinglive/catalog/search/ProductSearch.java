@@ -7,6 +7,7 @@ import co.elastic.clients.elasticsearch._types.SortOptions;
 import co.elastic.clients.elasticsearch._types.SortOrder;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
@@ -26,10 +27,10 @@ import org.springframework.stereotype.Component;
 /**
  * 공개 목록 조건에 맞는 상품 id 를 ES 에서 정렬된 순서로 찾는다. 가격, 재고, 판매 상태는 응답 때 Catalog DB 에서 붙인다.
  *
- * <p>상품명은 Nori 로 나눈 단어 중 하나라도 들어간 상품을 찾는다. 기본 Nori 분석기는 같은 단어도 조사에 따라 다르게 나눠서("운동화" 는 운동, "운동화를" 은
- * 운동과 화) 모든 단어를 요구하면 조사가 붙은 검색어로 찾지 못한다. 분석기를 조정할 때 함께 다시 정한다. 정렬의 마지막 기준은 항상 productId 라서 같은 가격이나
- * 같은 시각이어도 순서가 정해지고, 다음 페이지는 직전 페이지 마지막 상품의 정렬 값 뒤부터 이어진다(search_after). ES 가 응답하지 않거나 alias 가 아직
- * 없으면 503 이다.
+ * <p>상품명은 검색어를 Nori 로 나눈 단어가 모두 들어간 상품을 찾는다. 색인과 검색어 모두 합성어를 부분으로 나누고 잘못 나뉘는 쇼핑 단어는 사용자 사전으로
+ * 고정해서(products.json), "무선이어폰" 과 "무선 이어폰" 이 서로 찾히고 "운동화" 로 운동복은 찾히지 않는다. 정렬의 마지막 기준은 항상 productId
+ * 라서 같은 가격이나 같은 시각이어도 순서가 정해지고, 다음 페이지는 직전 페이지 마지막 상품의 정렬 값 뒤부터 이어진다(search_after). ES 가 응답하지 않거나
+ * alias 가 아직 없으면 503 이다.
  */
 @Component
 public class ProductSearch {
@@ -90,7 +91,9 @@ public class ProductSearch {
         if (category != null)
             bool.filter(TermQuery.of(t -> t.field("category").value(category.name()))._toQuery());
         if (!keyword.isEmpty())
-            bool.must(MatchQuery.of(m -> m.field("name").query(keyword))._toQuery());
+            bool.must(
+                    MatchQuery.of(m -> m.field("name").query(keyword).operator(Operator.And))
+                            ._toQuery());
         return bool.build()._toQuery();
     }
 

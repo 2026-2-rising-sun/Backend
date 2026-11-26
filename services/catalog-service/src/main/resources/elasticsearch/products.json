@@ -1,10 +1,57 @@
 {
+  "settings": {
+    "analysis": {
+      "tokenizer": {
+        "product_name_tokenizer": {
+          "type": "nori_tokenizer",
+          "decompound_mode": "discard",
+          "user_dictionary_rules": [
+            "운동화 운동 화",
+            "러닝화 러닝 화",
+            "세럼",
+            "앰플",
+            "쿠션팩트 쿠션 팩트",
+            "마스크팩 마스크 팩",
+            "그래놀라",
+            "후드티 후드 티",
+            "반팔티 반팔 티",
+            "크롭티 크롭 티",
+            "롱패딩 롱 패딩",
+            "백팩",
+            "에코백 에코 백",
+            "크로스백 크로스 백",
+            "토트백 토트 백",
+            "립밤 립 밤",
+            "클렌징폼 클렌징 폼",
+            "무선이어폰 무선 이어폰",
+            "블루투스이어폰 블루투스 이어폰",
+            "보조배터리 보조 배터리",
+            "스마트워치 스마트 워치",
+            "공기청정기 공기 청정기",
+            "에어프라이어 에어 프라이어",
+            "밀키트",
+            "닭가슴살 닭 가슴살",
+            "머그컵 머그 컵",
+            "에어맥스 에어 맥스"
+          ]
+        }
+      },
+      "analyzer": {
+        "product_name": {
+          "type": "custom",
+          "tokenizer": "product_name_tokenizer",
+          "filter": ["nori_part_of_speech", "nori_readingform", "lowercase"]
+        }
+      }
+    }
+  },
   "mappings": {
+    "_meta": { "version": 2 },
     "dynamic": "strict",
     "properties": {
       "productId": { "type": "long" },
-      "name": { "type": "text", "analyzer": "nori" },
-      "description": { "type": "text", "analyzer": "nori" },
+      "name": { "type": "text", "analyzer": "product_name" },
+      "description": { "type": "text", "analyzer": "product_name" },
       "category": { "type": "keyword" },
       "sellerId": { "type": "keyword" },
       "price": { "type": "long" },
