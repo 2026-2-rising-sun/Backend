@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.catalog.client.commercecore.HttpSalesInfoClient;
@@ -15,25 +16,39 @@ import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
+import com.shoppinglive.catalog.search.FullIndexer;
 import com.shoppinglive.catalog.security.CatalogSecuritySupport;
 import com.shoppinglive.common.security.test.JwtTestTokens;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+/**
+ * 공개 목록 API 를 Nori 가 있는 실제 ES 로 확인한다. {@code CATALOG_TEST_ES_URL} 이 가리키는 ES 의 products_* 인덱스를 지우고
+ * 쓴다. 색인 주기를 기다리지 않도록 데이터를 넣은 뒤 {@link #indexed()} 로 전체 색인을 돌리고 조회한다.
+ */
+@Tag("elasticsearch")
 @SpringBootTest(
-        properties =
-                "spring.datasource.url=jdbc:h2:mem:catalog_query;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE")
+        properties = {
+            "spring.datasource.url=jdbc:h2:mem:catalog_query;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
+            "catalog.search.enabled=true",
+            "catalog.search.partial.initial-delay=1h",
+            "catalog.search.full.initial-delay=1h"
+        })
 @AutoConfigureMockMvc
 class CatalogQueryHttpTest extends CatalogSecuritySupport {
     @Autowired MockMvc mvc;
@@ -41,19 +56,44 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     @Autowired ProductRepository products;
     @Autowired ProductSalesRepository sales;
     @Autowired JdbcTemplate jdbc;
+    @Autowired FullIndexer fullIndexer;
+    @Autowired ElasticsearchClient client;
     @MockitoBean HttpSalesInfoClient commerce;
     private long imageId;
 
+    @DynamicPropertySource
+    static void elasticsearch(DynamicPropertyRegistry registry) {
+        registry.add("spring.elasticsearch.uris", () -> System.getenv("CATALOG_TEST_ES_URL"));
+    }
+
     @BeforeEach
-    void prepare() {
+    void prepare() throws IOException {
         imageId = 100L;
+        deleteProductIndices();
     }
 
     @AfterEach
-    void clean() {
+    void clean() throws IOException {
         verifyNoInteractions(commerce);
         jdbc.update("DELETE FROM product_sales");
         products.deleteAll();
+        deleteProductIndices();
+    }
+
+    /** ES 8 은 와일드카드 삭제를 막으므로 이름을 조회해 지운다. */
+    private void deleteProductIndices() throws IOException {
+        var names =
+                List.copyOf(
+                        client.indices()
+                                .get(g -> g.index("products_*").allowNoIndices(true))
+                                .result()
+                                .keySet());
+        if (!names.isEmpty()) client.indices().delete(d -> d.index(names));
+    }
+
+    /** 지금 Catalog DB 로 검색 인덱스를 다시 만든다. */
+    private void indexed() {
+        fullIndexer.rebuild();
     }
 
     @Test
@@ -66,6 +106,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
         product("검색 비공개", 0, SalesStatus.PRIVATE, JwtTestTokens.SELLER);
         product("검색 품절", 0, SalesStatus.SOLD_OUT, JwtTestTokens.SELLER);
         product("다른 상품", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
         for (String sort : List.of("PRICE_ASC", "PRICE_DESC", "LATEST")) {
             List<Long> actual = new ArrayList<>();
             String cursor = "";
@@ -92,19 +133,34 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("검색 특수문자는 와일드카드가 아니며 대소문자를 무시한다")
-    void wildcardCharactersAreLiteral() throws Exception {
-        long match = product("SALE 100%_!", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
-        product("SALE 100xxx", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
-        JsonNode data = listing(" sale 100%_! ", "ON_SALE", "LATEST", "");
-        assertThat(data.path("items").size()).isEqualTo(1);
-        assertThat(data.path("items").get(0).path("productId").asLong()).isEqualTo(match);
+    @DisplayName("상품명은 형태소로 찾아 조사가 붙은 검색어로도 찾고 검색어 단어가 없는 상품은 뺀다")
+    void searchesProductNamesByMorphemes() throws Exception {
+        long shoes = product("남성 러닝 운동화", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("겨울 코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
+
+        assertThat(ids(listing("운동화를", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(shoes);
+        assertThat(ids(listing("러닝화 남성", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(shoes);
+    }
+
+    @Test
+    @DisplayName("검색어의 특수문자는 오류 없이 무시하고 대소문자를 구분하지 않는다")
+    void ignoresSymbolsAndCase() throws Exception {
+        long match = product("SALE 니트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
+
+        assertThat(ids(listing(" sale %_! ", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(match);
     }
 
     @Test
     @DisplayName("다른 검색·상태·정렬에 커서를 재사용하거나 잘못된 조건을 보내면 입력 오류다")
     void rejectsChangedOrMalformedConditions() throws Exception {
         for (int i = 0; i < 4; i++) product("니트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
         String cursor = listing("니트", "ON_SALE", "PRICE_ASC", "").path("nextCursor").asText();
         for (String q : List.of("다른 검색", "x".repeat(101)))
             mvc.perform(
@@ -157,6 +213,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
         for (SalesStatus state : List.of(SalesStatus.ON_SALE, SalesStatus.SOLD_OUT)) {
             long id = product("재고 확인 " + state, 100, state, JwtTestTokens.SELLER);
             sales.apply(new SalesInfo(id, id * 10, 100, state, 0), 2);
+            indexed();
             for (String sort : List.of("LATEST", "PRICE_ASC", "PRICE_DESC")) {
                 JsonNode items = listing("재고 확인", state.name(), sort, "").path("items");
                 assertThat(items.size()).isEqualTo(1);
@@ -175,6 +232,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     void omittedConditionsMatchLatestAndRejectLegacyCursor() throws Exception {
         for (int i = 0; i < 3; i++)
             product("상품 " + i, 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
         String bare = page(get("/v1/products").param("size", "2"));
         assertThat(bare)
                 .isEqualTo(page(get("/v1/products").param("sort", "LATEST").param("size", "2")));
@@ -211,6 +269,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
         product("니트 뷰티", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.BEAUTY);
         product("코트", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER, ProductCategory.FASHION);
         long unclassified = product("니트 미분류", 0, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
         List<Long> actual = new ArrayList<>();
         String cursor = "";
         String firstCursor = null;
@@ -240,62 +299,61 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("복수 SKU는 공개·비공개 조합과 정렬·커서에 관계없이 대표값 대신 503을 반환한다")
-    void rejectsMultipleSkusBeforeFilteringAndPaging() throws Exception {
-        long ambiguous =
-                product(
-                        "니트 중복",
-                        100,
-                        SalesStatus.ON_SALE,
-                        JwtTestTokens.SELLER,
-                        ProductCategory.FASHION);
-        for (int i = 0; i < 3; i++)
-            product(
-                    "니트 단일 " + i,
-                    200,
-                    SalesStatus.ON_SALE,
-                    JwtTestTokens.SELLER,
-                    ProductCategory.FASHION);
-        String cursor = listing("니트", "ON_SALE", "LATEST", "").path("nextCursor").asText();
-        long version = 10;
-        for (SalesStatus second :
-                List.of(SalesStatus.PRIVATE, SalesStatus.ON_SALE, SalesStatus.SOLD_OUT)) {
-            sales.apply(new SalesInfo(ambiguous, ambiguous * 10 + 1, 300, second, 1), version++);
-            mvc.perform(get("/v1/products")).andExpect(status().isServiceUnavailable());
-            if (second == SalesStatus.SOLD_OUT) {
-                mvc.perform(get("/v1/products").param("status", "SOLD_OUT"))
-                        .andExpect(status().isServiceUnavailable());
-            }
-            for (String sort : List.of("LATEST", "PRICE_ASC", "PRICE_DESC")) {
-                mvc.perform(
-                                get("/v1/products")
-                                        .param("q", "니트")
-                                        .param("status", "ON_SALE")
-                                        .param("category", "FASHION")
-                                        .param("sort", sort)
-                                        .param("size", "1"))
-                        .andExpect(status().isServiceUnavailable());
-            }
-            mvc.perform(
-                            get("/v1/products")
-                                    .param("q", "니트")
-                                    .param("status", "ON_SALE")
-                                    .param("sort", "LATEST")
-                                    .param("cursor", cursor)
-                                    .param("size", "2"))
-                    .andExpect(status().isServiceUnavailable());
-            mvc.perform(get("/v1/products/" + ambiguous))
-                    .andExpect(status().isServiceUnavailable());
-        }
-        // 요청 검색·카테고리 밖의 다중 SKU가 무관한 목록까지 막지 않는다.
-        mvc.perform(get("/v1/products").param("q", "니트 단일")).andExpect(status().isOk());
-        mvc.perform(get("/v1/products").param("category", "BEAUTY"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items").isEmpty());
-        jdbc.update(
-                "UPDATE product SET deleted_at=CURRENT_TIMESTAMP,sale_enabled=FALSE WHERE id=?",
-                ambiguous);
-        mvc.perform(get("/v1/products")).andExpect(status().isOk());
+    @DisplayName("복수 SKU 상품은 판매 중 SKU 최저가와 재고 합으로 한 줄이 되고, 모두 품절이면 품절 SKU 기준이다")
+    void multipleSkusAreShownByRepresentativeValues() throws Exception {
+        long bundle = product("니트 묶음", 300, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        sales.apply(new SalesInfo(bundle, bundle * 10 + 1, 100, SalesStatus.ON_SALE, 2), 1);
+        sales.apply(new SalesInfo(bundle, bundle * 10 + 2, 50, SalesStatus.SOLD_OUT, 0), 1);
+        sales.apply(new SalesInfo(bundle, bundle * 10 + 3, 10, SalesStatus.PRIVATE, 9), 1);
+        List<Long> singles = new ArrayList<>();
+        for (int i = 0; i < 2; i++)
+            singles.add(product("니트 단일 " + i, 200, SalesStatus.ON_SALE, JwtTestTokens.SELLER));
+        indexed();
+
+        JsonNode items = listing("니트", "ON_SALE", "PRICE_ASC", "").path("items");
+        assertThat(ids(items)).containsExactly(bundle, singles.get(0));
+        assertThat(items.get(0).path("price").asLong()).isEqualTo(100);
+        assertThat(items.get(0).path("available").asInt()).isEqualTo(3);
+        assertThat(items.get(0).path("salesStatus").asText()).isEqualTo("ON_SALE");
+
+        sales.apply(new SalesInfo(bundle, bundle * 10, 300, SalesStatus.SOLD_OUT, 0), 2);
+        sales.apply(new SalesInfo(bundle, bundle * 10 + 1, 100, SalesStatus.SOLD_OUT, 1), 2);
+        indexed();
+
+        assertThat(ids(listing("니트", "ON_SALE", "PRICE_ASC", "").path("items")))
+                .containsExactlyElementsOf(singles);
+        JsonNode soldOut = listing("니트", "SOLD_OUT", "PRICE_ASC", "").path("items");
+        assertThat(ids(soldOut)).containsExactly(bundle);
+        assertThat(soldOut.get(0).path("price").asLong()).isEqualTo(50);
+        assertThat(soldOut.get(0).path("available").asInt()).isEqualTo(1);
+        // 상세는 여전히 단일 판매정보만 응답한다.
+        mvc.perform(get("/v1/products/" + bundle)).andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    @DisplayName("비공개, 미등록, 삭제 상품은 목록에서 빠지고 판매 중지 상품은 구매만 막는다")
+    void hiddenProductsAreExcludedAndPausedProductCannotBePurchased() throws Exception {
+        product("숨김 상품", 100, SalesStatus.PRIVATE, JwtTestTokens.SELLER);
+        product("미등록 상품", 100, null, JwtTestTokens.SELLER);
+        long paused = product("중지 상품", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        jdbc.update("UPDATE product SET sale_enabled=FALSE WHERE id=?", paused);
+        indexed();
+
+        JsonNode items = listing("상품", null, "LATEST", "").path("items");
+        assertThat(ids(items)).containsExactly(paused);
+        assertThat(items.get(0).path("salesStatus").asText()).isEqualTo("ON_SALE");
+        assertThat(items.get(0).path("purchasable").asBoolean()).isFalse();
+
+        // 색인이 반영되기 전에 삭제돼도 응답 때 DB 기준으로 뺀다.
+        jdbc.update("UPDATE product SET deleted_at=CURRENT_TIMESTAMP WHERE id=?", paused);
+        JsonNode stale = listing("상품", null, "LATEST", "");
+        assertThat(stale.path("items")).isEmpty();
+    }
+
+    private static List<Long> ids(JsonNode items) {
+        List<Long> ids = new ArrayList<>();
+        items.forEach(item -> ids.add(item.path("productId").asLong()));
+        return ids;
     }
 
     private MockHttpServletRequestBuilder categoryListing(String category, String cursor) {
@@ -322,7 +380,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                         mvc.perform(
                                         get("/v1/products")
                                                 .param("q", q)
-                                                .param("status", state)
+                                                .param("status", state == null ? "" : state)
                                                 .param("sort", sort)
                                                 .param("cursor", cursor)
                                                 .param("size", "2"))
@@ -334,7 +392,7 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("통합 다중 SKU는 첫 SKU만 도착해도 단일 상품으로 노출되지 않고 이벤트 역순에도 유지된다")
+    @DisplayName("통합 다중 SKU는 첫 SKU만 도착해도 상세에서 단일 상품으로 노출되지 않고 이벤트 역순에도 유지된다")
     void rejectsPartialBundleReplica() throws Exception {
         long id = product("통합 상품", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
         var snapshots =
@@ -358,8 +416,6 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                         null,
                         2));
         for (int stage = 0; stage < 2; stage++) {
-            mvc.perform(get("/v1/products").param("q", "통합 상품"))
-                    .andExpect(status().isServiceUnavailable());
             mvc.perform(get("/v1/products/" + id)).andExpect(status().isServiceUnavailable());
             sales.apply(new SalesInfo(id, id * 10 + 1, 200, SalesStatus.ON_SALE, 2), 1);
         }

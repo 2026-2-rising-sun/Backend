@@ -7,10 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.shoppinglive.catalog.client.commercecore.SalesInfo;
-import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
-import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
 import com.shoppinglive.catalog.security.CatalogSecuritySupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(
@@ -34,8 +30,6 @@ class ProductHttpContractTest extends CatalogSecuritySupport {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
     @Autowired ProductRepository products;
-    @Autowired ProductSalesRepository sales;
-    @Autowired JdbcTemplate jdbc;
 
     private long imageId;
 
@@ -58,22 +52,6 @@ class ProductHttpContractTest extends CatalogSecuritySupport {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("SALES_INFO_UNAVAILABLE"))
                 .andExpect(jsonPath("$.data", nullValue()));
-    }
-
-    @Test
-    @DisplayName("Commerce에 연결할 수 없어도 공개 목록은 판매정보 사본으로 200을 반환한다")
-    void publicListIsServedFromReplicaWhileCommerceIsUnreachable() throws Exception {
-        long id = register().path("productId").asLong();
-        sales.apply(new SalesInfo(id, id, 1_000L, SalesStatus.ON_SALE, 3), 1);
-        try {
-            mvc.perform(get("/v1/products"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.items[0].productId").value(id))
-                    .andExpect(jsonPath("$.data.items[0].price").value(1_000L))
-                    .andExpect(jsonPath("$.data.items[0].available").value(3));
-        } finally {
-            jdbc.update("DELETE FROM product_sales");
-        }
     }
 
     private JsonNode register() {

@@ -41,12 +41,11 @@ class PublicProductInputHttpTest extends CatalogSecuritySupport {
         }
     }
 
-    @DisplayName("상품 목록과 존재하지 않는 숫자 ID는 기존 공개 응답을 유지한다")
+    @DisplayName("상품 목록은 익명으로 들어가고 존재하지 않는 숫자 ID는 기존 공개 응답을 유지한다")
     @Test
     void listAndUnknownNumericIdKeepTheirPublicResponses() throws Exception {
-        HttpResponse<String> list = request("GET", "/v1/products", null);
-        assertThat(list.statusCode()).isEqualTo(200);
-        assertThat(mapper.readTree(list.body()).path("success").asBoolean()).isTrue();
+        // 목록 결과는 ES 가 있어야 해서 CatalogQueryHttpTest 에서 본다.
+        assertThat(request("GET", "/v1/products", null).statusCode()).isNotIn(401, 403);
         expect(request("GET", "/v1/products/9", null), 404, "NOT_FOUND");
     }
 
