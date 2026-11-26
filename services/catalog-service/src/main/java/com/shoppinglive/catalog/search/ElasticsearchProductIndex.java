@@ -4,6 +4,8 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch.core.BulkRequest;
 import co.elastic.clients.elasticsearch.core.bulk.BulkResponseItem;
 import co.elastic.clients.elasticsearch.indices.update_aliases.Action;
+import co.elastic.clients.json.JsonData;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -27,6 +29,7 @@ import java.util.Set;
 public class ElasticsearchProductIndex implements ProductSearchIndex {
     public static final String ALIAS = "products";
     private static final String PREFIX = ALIAS + "_";
+    private static final String MAPPING = "/elasticsearch/products.json";
     private static final DateTimeFormatter SUFFIX =
             DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS").withZone(ZoneOffset.UTC);
 
@@ -57,6 +60,32 @@ public class ElasticsearchProductIndex implements ProductSearchIndex {
         }
     }
 
+    /** 매핑 파일의 _meta.version. 분석기나 필드를 바꾸면 올려서 배포 직후 전체 색인을 다시 하게 한다. */
+    public int mappingVersion() {
+        try (InputStream mapping = mapping()) {
+            return new ObjectMapper().readTree(mapping).at("/mappings/_meta/version").asInt();
+        } catch (IOException failure) {
+            throw new UncheckedIOException("검색 인덱스 매핑 파일을 읽지 못했습니다.", failure);
+        }
+    }
+
+    /** 인덱스를 만들 때 쓴 매핑 버전. 버전을 넣기 전에 만든 인덱스는 0 이다. */
+    public int versionOf(String index) {
+        try {
+            JsonData version =
+                    client.indices()
+                            .getMapping(g -> g.index(index))
+                            .result()
+                            .get(index)
+                            .mappings()
+                            .meta()
+                            .get("version");
+            return version == null ? 0 : version.to(Integer.class);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("검색 인덱스 매핑을 확인하지 못했습니다.", failure);
+        }
+    }
+
     /** 인덱스 이름의 시각. 전체 색인이 그 인덱스를 만들기 시작한 시각이다. */
     public static Instant createdAt(String index) {
         return Instant.from(SUFFIX.parse(index.substring(PREFIX.length())));
@@ -65,8 +94,7 @@ public class ElasticsearchProductIndex implements ProductSearchIndex {
     /** alias 없이 빈 인덱스를 만든다. 전체 색인이 채운 뒤 {@link #publish} 로 공개한다. */
     public String createIndex() {
         String name = PREFIX + SUFFIX.format(clock.instant());
-        try (InputStream mapping = getClass().getResourceAsStream("/elasticsearch/products.json")) {
-            if (mapping == null) throw new IllegalStateException("검색 인덱스 매핑 파일이 없습니다.");
+        try (InputStream mapping = mapping()) {
             client.indices().create(c -> c.index(name).withJson(mapping));
             return name;
         } catch (IOException failure) {
@@ -118,6 +146,12 @@ public class ElasticsearchProductIndex implements ProductSearchIndex {
         } catch (IOException failure) {
             throw new UncheckedIOException("검색 인덱스를 지우지 못했습니다.", failure);
         }
+    }
+
+    private InputStream mapping() {
+        InputStream mapping = getClass().getResourceAsStream(MAPPING);
+        if (mapping == null) throw new IllegalStateException("검색 인덱스 매핑 파일이 없습니다.");
+        return mapping;
     }
 
     List<String> indexNames() throws IOException {
