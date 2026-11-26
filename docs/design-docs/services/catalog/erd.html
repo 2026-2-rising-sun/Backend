@@ -118,8 +118,10 @@
 <p>JPA 매핑: <a href="../../../../services/catalog-service/src/main/java/com/shoppinglive/catalog/product/entity/Product.java">Product.java</a>.</p>
 <p>JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본다. 상태·제약을 변경할 때 이 문서와 HTML을 재생성하고 실제 DB 검증 여부를 별도로 기록한다.</p>
 <h2 id="단일-sku-공개-호환">단일 SKU 공개 호환</h2>
-<p>단일 판매정보 API는 SKU를 대표가·합산 재고로 축약하지 않는다. 상세는 상품의 전체 SKU가 둘 이상이면 503이다. 목록은 검색·카테고리·공개 상태에 해당하는 상품 중 전체 SKU가 둘 이상인 상품이 있으면 커서·LIMIT 적용 전 503이다. 비공개 SKU도 전체 수에 포함하므로 상태 필터로 차단을 우회하지 않는다. 조건 밖/삭제 상품은 해당 목록을 막지 않는다. 두 목록 조회는 REPEATABLE_READ의 같은 스냅샷으로 검사·페이지를 계산한다. 이는 기존 단일값 계약의 기술 구현이며 공개 다중 SKU 정책을 새로 채택한 것이 아니다.</p>
-<p><a href="../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql">V3 이행</a> · <a href="../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryHttpTest.java">목록 HTTP 회귀</a> · <a href="../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryPostgresTest.java">PostgreSQL 동일 회귀</a>.</p>
+<p>상세와 구매 사전확인은 SKU를 대표가나 합산 재고로 축약하지 않는다. 상세는 상품의 전체 SKU가 둘 이상이면 503이다.</p>
+<p>공개 목록(#421)은 SKU가 여러 개인 상품을 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 가격은 판매 중 SKU 최저가, 재고는 판매 중 SKU 재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 비공개 SKU는 계산에서 뺀다. 가격 정렬과 가격 기준은 검색 문서의 같은 대표 가격이다. 통합 등록에서 SKU가 일부만 도착한 상품도 도착한 SKU로 계산한다.</p>
+<p>목록은 ES 검색 인덱스에서 조건에 맞는 상품 id를 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 응답 때 위 규칙으로 DB에서 다시 계산한다. 색인이 늦어 응답 시점에 삭제됐거나 공개 SKU가 없는 상품은 뺀다. ES에 연결할 수 없거나 alias가 아직 없으면 DB로 대신 검색하지 않고 503 SERVICE_UNAVAILABLE이다. 다음 페이지 커서는 ES 정렬 값(search_after)이며 이전 형식 커서는 400이다.</p>
+<p><a href="../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql">V3 이행</a> · <a href="../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryHttpTest.java">목록 HTTP 회귀(ES)</a> · <a href="../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryPostgresTest.java">PostgreSQL 동일 회귀(ES)</a>.</p>
 <h2 id="통합-등록-sku-수-372">통합 등록 SKU 수 (#372)</h2>
 <p>V4는 product.initial_sku_count nullable INTEGER(1~100)를 추가한다. Core가 발행한 통합 등록 초기 SKU 수이며 단일 SKU로 잘못 노출되는 것을 막는 정보다. 기존 상품과 구형 이벤트는 null이다. 최신 snapshot을 반영해도 이미 아는 초기 수를 null로 덮지 않는다.</p>
 <h2 id="독립-revision-저장">독립 revision 저장</h2>
@@ -151,6 +153,6 @@ curl -s -X POST &quot;$ES/_aliases&quot; -H 'Content-Type: application/json' -d 
   ]
 }'
 </code></pre>
-<p>되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 <code>CATALOG_SEARCH_ENABLED=false</code>로 색인을 끈다. 꺼도 <code>index_task</code>는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.</p><p class="muted fingerprint">MD SHA-256: <code>fdd1024f9a7af2ec3f2dddb77677f02cd903e83524ff45f13084934865532393</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 <code>CATALOG_SEARCH_ENABLED=false</code>로 색인을 끈다. 꺼도 <code>index_task</code>는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.</p><p class="muted fingerprint">MD SHA-256: <code>f019bb98230ea11c0e494ae112a20f2dd7b7097900cd1be3bbb5ef7063a1eaca</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

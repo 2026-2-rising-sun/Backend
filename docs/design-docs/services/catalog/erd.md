@@ -47,9 +47,13 @@ JPA로 매핑하지 않는 테이블은 JDBC 저장 코드와 DDL을 함께 본�
 
 ## 단일 SKU 공개 호환
 
-단일 판매정보 API는 SKU를 대표가·합산 재고로 축약하지 않는다. 상세는 상품의 전체 SKU가 둘 이상이면 503이다. 목록은 검색·카테고리·공개 상태에 해당하는 상품 중 전체 SKU가 둘 이상인 상품이 있으면 커서·LIMIT 적용 전 503이다. 비공개 SKU도 전체 수에 포함하므로 상태 필터로 차단을 우회하지 않는다. 조건 밖/삭제 상품은 해당 목록을 막지 않는다. 두 목록 조회는 REPEATABLE_READ의 같은 스냅샷으로 검사·페이지를 계산한다. 이는 기존 단일값 계약의 기술 구현이며 공개 다중 SKU 정책을 새로 채택한 것이 아니다.
+상세와 구매 사전확인은 SKU를 대표가나 합산 재고로 축약하지 않는다. 상세는 상품의 전체 SKU가 둘 이상이면 503이다.
 
-[V3 이행](../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql) · [목록 HTTP 회귀](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryHttpTest.java) · [PostgreSQL 동일 회귀](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryPostgresTest.java).
+공개 목록(#421)은 SKU가 여러 개인 상품을 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 가격은 판매 중 SKU 최저가, 재고는 판매 중 SKU 재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 비공개 SKU는 계산에서 뺀다. 가격 정렬과 가격 기준은 검색 문서의 같은 대표 가격이다. 통합 등록에서 SKU가 일부만 도착한 상품도 도착한 SKU로 계산한다.
+
+목록은 ES 검색 인덱스에서 조건에 맞는 상품 id를 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 응답 때 위 규칙으로 DB에서 다시 계산한다. 색인이 늦어 응답 시점에 삭제됐거나 공개 SKU가 없는 상품은 뺀다. ES에 연결할 수 없거나 alias가 아직 없으면 DB로 대신 검색하지 않고 503 SERVICE_UNAVAILABLE이다. 다음 페이지 커서는 ES 정렬 값(search_after)이며 이전 형식 커서는 400이다.
+
+[V3 이행](../../../../services/catalog-service/src/main/resources/db/migration/V3__sku_sales_replica.sql) · [목록 HTTP 회귀(ES)](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryHttpTest.java) · [PostgreSQL 동일 회귀(ES)](../../../../services/catalog-service/src/integrationTest/java/com/shoppinglive/catalog/product/controller/CatalogQueryPostgresTest.java).
 
 ## 통합 등록 SKU 수 (#372)
 

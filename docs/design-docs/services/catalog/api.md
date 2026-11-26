@@ -25,10 +25,10 @@ servers:
 
 공개 상품 목록
 
-모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도 200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 Core commercecore.catalog.backfill.enabled=true 기동으로 같은 버전의 상품·SKU·재고 Outbox를 적재한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
-q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
+검색 인덱스(Elasticsearch)에서 조건에 맞는 상품을 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 응답 때 product_sales 이벤트 사본에서 붙인다. Commerce가 응답하지 않아도 200을 반환한다. 검색 인덱스는 사본 변경 뒤 몇 초 늦게 반영되며, 그 사이 삭제되거나 공개 대상이 아니게 된 상품은 응답에서 뺀다. 상세·주문 가격 확정은 기존 경로를 유지한다.
+q는 상품명을 한국어 형태소 단위로 검색한다. 조사가 붙은 검색어도 찾으며 검색어의 단어 중 하나라도 들어간 상품을 반환한다. 대소문자를 구분하지 않고 특수문자는 무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
-q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다. 상품당 단일 SKU의 기존 공개 응답을 유지한다. 복수 SKU 사본의 저장은 지원하지만 대표가·가격 정렬·공개 옵션 선택은 미확정이며, 단일 판매 응답으로 축약할 수 없는 복수 SKU는 503 판매정보 조회 불가로 구분한다. 목록은 검색·카테고리·공개 상태에 해당하는 상품의 전체 SKU 수를 커서·페이지 적용 전에 검사하며 비공개 SKU도 수에 포함한다.
+q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다. SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은 판매 중 SKU 재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 가격 정렬과 가격 기준도 이 대표 가격이다. 비공개 SKU는 계산에서 뺀다. 검색 인덱스에 연결할 수 없으면 사본으로 대신 검색하지 않고 503 SERVICE_UNAVAILABLE이다.
 
 **인증:** `[]`
 **태그:** Public Product
@@ -51,6 +51,7 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | 401 | 인증 누락 또는 위조·만료 토큰. 공개 경로라도 잘못된 Bearer를 보내면 401. |
 | 200 | 지연된 재고 사본은 표시 정보다. 공개 판매 상품의 주문 화면 진입을 허용하며 재고를 예약하거나 구매를 승인하지 않는다. 실제 가격·판매 가능량은 Core 주문 생성에서 검증한다. |
 | 400 | 요청 형식 또는 값이 올바르지 않음 |
+| 503 | 상품 검색 인덱스에 연결할 수 없음 |
 
 #### 401 · application/json
 
@@ -73,8 +74,8 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | data.items&#91;&#93;.productId | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;} |
 | data.items&#91;&#93;.name | string | 필수 |  | — |
 | data.items&#91;&#93;.mainImageUrl | string | 필수 |  | {&quot;format&quot;: &quot;uri-reference&quot;} |
-| data.items&#91;&#93;.price | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
-| data.items&#91;&#93;.available | integer | 필수 | 결제 대기 예약분을 제외한 주문 가능 재고. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다. | {&quot;minimum&quot;: 0} |
+| data.items&#91;&#93;.price | integer | 필수 | 대표 가격. SKU가 여러 개면 판매 중 SKU 최저가, 모두 품절이면 품절 SKU 최저가다. | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
+| data.items&#91;&#93;.available | integer | 필수 | 결제 대기 예약분을 제외한 주문 가능 재고. SKU가 여러 개면 salesStatus와 같은 상태인 SKU 재고의 합이다. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다. | {&quot;minimum&quot;: 0} |
 | data.items&#91;&#93;.salesStatus | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;ON_SALE&quot;, &quot;SOLD_OUT&quot;&#93;} |
 | data.items&#91;&#93;.purchasable | boolean | 필수 | 공개 판매 상태와 상품 전체 판매 허용에 따른 Core 확인 진입 가능 표시. 재고 사본을 사용한 구매 확정이 아니다. | — |
 | data.items&#91;&#93;.category | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 1단계 상품 분류. null은 미분류(기존 상품 포함)다. 요청에서 목록에 없는 값은 400 INVALID_REQUEST. | {&quot;enum&quot;: &#91;&quot;FASHION&quot;, &quot;BEAUTY&quot;, &quot;FOOD&quot;, &quot;LIVING&quot;, &quot;DIGITAL&quot;, &quot;KIDS&quot;, &quot;ETC&quot;, null&#93;} |
@@ -93,6 +94,17 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | error.message | string | 필수 |  | — |
 | error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
 
+#### 503 · application/json
+
+| 필드 | 타입 | 필수 | 설명 | 제약 |
+|---|---|---|---|---|
+| success | boolean | 필수 |  | — |
+| data | null | 필수 |  | — |
+| error | object | 필수 |  | — |
+| error.code | string | 필수 |  | — |
+| error.message | string | 필수 |  | — |
+| error.requestId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | — |
+
 ### 계약 원문
 
 ```yaml
@@ -101,19 +113,20 @@ tags:
 - Public Product
 summary: 공개 상품 목록
 operationId: listPublicProducts
-description: '모든 요청을 product_sales 이벤트 사본과 결합해 전체 목록에 조건을 적용하므로 Commerce가 응답하지 않아도
-  200을 반환한다. 사본 지연이 있을 수 있으며 기존 데이터는 Core commercecore.catalog.backfill.enabled=true
-  기동으로 같은 버전의 상품·SKU·재고 Outbox를 적재한다. 상세·주문 가격 확정은 기존 경로를 유지한다.
+description: '검색 인덱스(Elasticsearch)에서 조건에 맞는 상품을 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 응답 때 product_sales
+  이벤트 사본에서 붙인다. Commerce가 응답하지 않아도 200을 반환한다. 검색 인덱스는 사본 변경 뒤 몇 초 늦게 반영되며, 그 사이 삭제되거나
+  공개 대상이 아니게 된 상품은 응답에서 뺀다. 상세·주문 가격 확정은 기존 경로를 유지한다.
 
-  q는 앞뒤 공백을 제거한 대소문자 무시 상품명 부분 검색이며 %, _, !도 일반 문자다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort
-  조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
+  q는 상품명을 한국어 형태소 단위로 검색한다. 조사가 붙은 검색어도 찾으며 검색어의 단어 중 하나라도 들어간 상품을 반환한다. 대소문자를 구분하지
+  않고 특수문자는 무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건
+  변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 
   category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
 
   q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
-  상품당 단일 SKU의 기존 공개 응답을 유지한다. 복수 SKU 사본의 저장은 지원하지만 대표가·가격 정렬·공개 옵션 선택은 미확정이며, 단일 판매
-  응답으로 축약할 수 없는 복수 SKU는 503 판매정보 조회 불가로 구분한다. 목록은 검색·카테고리·공개 상태에 해당하는 상품의 전체 SKU 수를
-  커서·페이지 적용 전에 검사하며 비공개 SKU도 수에 포함한다.'
+  SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은
+  판매 중 SKU 재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 가격 정렬과 가격 기준도 이 대표 가격이다.
+  비공개 SKU는 계산에서 뺀다. 검색 인덱스에 연결할 수 없으면 사본으로 대신 검색하지 않고 503 SERVICE_UNAVAILABLE이다.'
 parameters:
 - name: q
   in: query
@@ -214,6 +227,8 @@ responses:
               error: null
   '400':
     $ref: '#/components/responses/BadRequest'
+  '503':
+    $ref: '#/components/responses/SearchUnavailable'
 경로 공통 선언: {}
 적용 서버:
 - url: http://localhost:8082
@@ -741,6 +756,21 @@ components:
                   code: INVALID_REQUEST
                   message: 잘못된 요청입니다.
                   requestId: request-001
+    SearchUnavailable:
+      description: 상품 검색 인덱스에 연결할 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          examples:
+            searchUnavailable:
+              value:
+                success: false
+                data: null
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: 상품 검색을 잠시 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.
+                  requestId: request-001
     NotFound:
       description: 대상이 없거나 공개 대상이 아님
       content:
@@ -844,11 +874,12 @@ components:
           type: integer
           format: int64
           minimum: 0
+          description: 대표 가격. SKU가 여러 개면 판매 중 SKU 최저가, 모두 품절이면 품절 SKU 최저가다.
         available:
           type: integer
           minimum: 0
-          description: 결제 대기 예약분을 제외한 주문 가능 재고. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지
-            않는다.
+          description: 결제 대기 예약분을 제외한 주문 가능 재고. SKU가 여러 개면 salesStatus와 같은 상태인 SKU
+            재고의 합이다. 판매 상태와 별개이며 ON_SALE에서 0이어도 상태를 변경하지 않는다.
         salesStatus:
           type: string
           enum:
@@ -1075,4 +1106,4 @@ components:
           - 'null'
 ```
 
-입력 SHA-256: `90ce16e49d7c511fc7f0aa4047b1739a0e0016ee96bd386ed6daafb63277c047`
+입력 SHA-256: `f1cd9338b8090301d4187c73856173c2ac80304c59b1da5c900904391d39a1b3`
