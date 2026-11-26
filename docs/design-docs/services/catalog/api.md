@@ -26,8 +26,9 @@ servers:
 공개 상품 목록
 
 검색 인덱스(Elasticsearch)에서 조건에 맞는 상품을 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 응답 때 product_sales 이벤트 사본에서 붙인다. Commerce가 응답하지 않아도 200을 반환한다. 검색 인덱스는 사본 변경 뒤 몇 초 늦게 반영되며, 그 사이 삭제되거나 공개 대상이 아니게 된 상품은 응답에서 뺀다. 상세·주문 가격 확정은 기존 경로를 유지한다.
-q는 상품명을 한국어 형태소 단위로 검색한다. 조사나 띄어쓰기가 달라도 찾으며(무선이어폰, 무선 이어폰) 검색어의 단어가 모두 들어간 상품을 반환한다. 자주 쓰는 동의어와 영어 표기도 찾는다(셔츠, shirts). 대소문자를 구분하지 않고 특수문자는 무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
+q는 상품명을 한국어 형태소 단위로 검색한다. 조사나 띄어쓰기가 달라도 찾으며(무선이어폰, 무선 이어폰) 검색어의 단어가 모두 들어간 상품을 반환한다. 자주 쓰는 동의어와 영어 표기도 찾는다(셔츠, shirts). 대소문자를 구분하지 않고 특수문자는 무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/minPrice/maxPrice/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
+minPrice, maxPrice는 대표 가격이 양 끝 값을 포함해 범위 안인 상품만 반환한다. 하나만 보내면 그쪽 경계만 적용한다.
 q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다. SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은 판매 중 SKU 재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 가격 정렬과 가격 기준도 이 대표 가격이다. 비공개 SKU는 계산에서 뺀다. 검색 인덱스에 연결할 수 없으면 사본으로 대신 검색하지 않고 503 SERVICE_UNAVAILABLE이다.
 
 **인증:** `[]`
@@ -40,6 +41,8 @@ q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 �
 | q | query | 선택 | string |  |
 | status | query | 선택 | string |  |
 | category | query | 선택 | string | 목록에 없는 값은 400 INVALID_REQUEST. |
+| minPrice | query | 선택 | integer | 대표 가격 하한(포함). 음수이거나 maxPrice보다 크면 400 INVALID_REQUEST. |
+| maxPrice | query | 선택 | integer | 대표 가격 상한(포함). 음수이면 400 INVALID_REQUEST. |
 | sort | query | 선택 | string |  |
 | cursor | query | 선택 | string | 이전 응답의 nextCursor. 형식은 내부 구현이므로 변경 가능하다. |
 | size | query | 선택 | integer |  |
@@ -119,10 +122,12 @@ description: '검색 인덱스(Elasticsearch)에서 조건에 맞는 상품을 �
 
   q는 상품명을 한국어 형태소 단위로 검색한다. 조사나 띄어쓰기가 달라도 찾으며(무선이어폰, 무선 이어폰) 검색어의 단어가 모두 들어간 상품을 반환한다.
   자주 쓰는 동의어와 영어 표기도 찾는다(셔츠, shirts). 대소문자를 구분하지 않고 특수문자는 무시한다. 가격 동률은 ID로 정렬한다. cursor는
-  같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태 변경 시 실시간 목록 특성상
-  페이지 간 위치가 바뀔 수 있다.
+  같은 q/status/category/minPrice/maxPrice/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태
+  변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 
   category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
+
+  minPrice, maxPrice는 대표 가격이 양 끝 값을 포함해 범위 안인 상품만 반환한다. 하나만 보내면 그쪽 경계만 적용한다.
 
   q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
   SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은
@@ -154,6 +159,20 @@ parameters:
     - DIGITAL
     - KIDS
     - ETC
+- name: minPrice
+  in: query
+  description: 대표 가격 하한(포함). 음수이거나 maxPrice보다 크면 400 INVALID_REQUEST.
+  schema:
+    type: integer
+    format: int64
+    minimum: 0
+- name: maxPrice
+  in: query
+  description: 대표 가격 상한(포함). 음수이면 400 INVALID_REQUEST.
+  schema:
+    type: integer
+    format: int64
+    minimum: 0
 - name: sort
   in: query
   schema:
@@ -1107,4 +1126,4 @@ components:
           - 'null'
 ```
 
-입력 SHA-256: `5d51bd59d5cf3dc5117a3a20f468936dd27efbdafdf48e8b6df03a78e10065ff`
+입력 SHA-256: `105cd2209e492da67068c45f75b4f388c164e5d0e3d7811c25dda62da1acaab8`

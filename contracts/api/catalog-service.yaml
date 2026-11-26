@@ -36,10 +36,12 @@ paths:
         상품은 응답에서 뺀다. 상세·주문 가격 확정은 기존 경로를 유지한다.
 
         q는 상품명을 한국어 형태소 단위로 검색한다. 조사나 띄어쓰기가 달라도 찾으며(무선이어폰, 무선 이어폰) 검색어의 단어가 모두 들어간 상품을 반환한다. 자주 쓰는 동의어와 영어 표기도 찾는다(셔츠, shirts). 대소문자를 구분하지 않고 특수문자는
-        무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태
+        무시한다. 가격 동률은 ID로 정렬한다. cursor는 같은 q/status/category/minPrice/maxPrice/sort 조건에서만 재사용하며 조건 변경 시 생략한다. 조회 도중 가격·상태
         변경 시 실시간 목록 특성상 페이지 간 위치가 바뀔 수 있다.
 
         category는 해당 분류 상품만 반환하며 생략하면 미분류(null)를 포함한 전체다. 미분류만 고르는 값은 없다.
+
+        minPrice, maxPrice는 대표 가격이 양 끝 값을 포함해 범위 안인 상품만 반환한다. 하나만 보내면 그쪽 경계만 적용한다.
 
         q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
         SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은 판매 중 SKU
@@ -71,6 +73,20 @@ paths:
           - DIGITAL
           - KIDS
           - ETC
+      - name: minPrice
+        in: query
+        description: 대표 가격 하한(포함). 음수이거나 maxPrice보다 크면 400 INVALID_REQUEST.
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+      - name: maxPrice
+        in: query
+        description: 대표 가격 상한(포함). 음수이면 400 INVALID_REQUEST.
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
       - name: sort
         in: query
         schema:

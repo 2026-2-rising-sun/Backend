@@ -24,7 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 않는다.
  *
  * <p>SKU 가 여러 개인 상품은 한 줄로 보여 준다. 판매 중 SKU 가 하나라도 있으면 판매 중이고 가격은 판매 중 SKU 최저가, 재고는 판매 중 SKU 재고의 합이다.
- * 모두 품절이면 품절 SKU 의 최저가와 재고 합이다. ES 가 아직 반영하지 못해 지금은 공개 대상이 아닌 상품은 응답에서 뺀다.
+ * 모두 품절이면 품절 SKU 의 최저가와 재고 합이다. 가격 범위는 ES 에 색인한 같은 대표 가격으로 거른다. ES 가 아직 반영하지 못해 지금은 공개 대상이 아닌 상품은
+ * 응답에서 뺀다.
  */
 @Service
 public class CatalogQueryService {
@@ -44,6 +45,8 @@ public class CatalogQueryService {
             String query,
             SalesDisplayStatus status,
             ProductCategory category,
+            Long minPrice,
+            Long maxPrice,
             ProductSort sort,
             String cursor,
             int size) {
@@ -52,24 +55,33 @@ public class CatalogQueryService {
                 || (status != null && !status.isPubliclyVisible())) {
             throw invalid("검색어는 100자 이하이며 공개 상태는 ON_SALE 또는 SOLD_OUT 이어야 합니다.");
         }
+        if ((minPrice != null && minPrice < 0)
+                || (maxPrice != null && maxPrice < 0)
+                || (minPrice != null && maxPrice != null && minPrice > maxPrice)) {
+            throw invalid("minPrice, maxPrice 는 0 이상이며 minPrice 는 maxPrice 보다 클 수 없습니다.");
+        }
         ProductSort ordering = sort == null ? ProductSort.LATEST : sort;
-        // 카테고리가 없을 때는 카테고리 도입 전 커서와 같은 조건 문자열을 쓴다.
+        // 카테고리, 가격 범위가 없을 때는 그 조건 도입 전 커서와 같은 조건 문자열을 쓴다.
         String fingerprint =
                 keyword
                         + "\n"
                         + status
                         + "\n"
                         + ordering
-                        + (category == null ? "" : "\n" + category);
+                        + (category == null ? "" : "\n" + category)
+                        + (minPrice == null && maxPrice == null
+                                ? ""
+                                : "\nprice:" + minPrice + "~" + maxPrice);
         List<Long> after = null;
         if (cursor != null && !cursor.isBlank()) {
             Position position = decode(cursor);
             if (!fingerprint.equals(position.fingerprint())) {
-                throw invalid("cursor 는 같은 검색·상태·카테고리·정렬 조건에서만 사용할 수 있습니다.");
+                throw invalid("cursor 는 같은 검색·상태·카테고리·가격 범위·정렬 조건에서만 사용할 수 있습니다.");
             }
             after = position.after();
         }
-        ProductSearch.Page found = search.find(keyword, status, category, ordering, after, size);
+        ProductSearch.Page found =
+                search.find(keyword, status, category, minPrice, maxPrice, ordering, after, size);
         Map<Long, PublicProductItemResponse> rows = load(found.productIds());
         String next = found.hasNext() ? encode(new Position(fingerprint, found.lastSort())) : null;
         return new PublicProductListResponse(
