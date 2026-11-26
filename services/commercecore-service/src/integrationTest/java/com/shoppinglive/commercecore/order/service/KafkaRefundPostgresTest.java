@@ -417,6 +417,23 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         return deliveries.relayDue().stream().anyMatch(d -> d.id() == delivery.id());
     }
 
+    @Test
+    @DisplayName("복구 대상은 id가 아니라 다음 처리 시각 순으로 뽑아 매초 due인 UNKNOWN이 뒤 전달을 밀어내지 않는다")
+    void relayDueOrdersByNextActionAt() {
+        String n = prepare(false);
+        var approval = accept(n);
+        var prepare = deliveries.relay(id(n), "PREPARE");
+        assertThat(approval.id()).isGreaterThan(prepare.id());
+        jdbc.update(
+                "UPDATE payment_delivery_request SET status='PROCESSING',next_action_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                prepare.id());
+        jdbc.update(
+                "UPDATE payment_delivery_request SET next_action_at=CURRENT_TIMESTAMP-INTERVAL '10 seconds' WHERE id=?",
+                approval.id());
+        assertThat(deliveries.relayDue().stream().map(PaymentDeliveryStore.Delivery::id).toList())
+                .containsSubsequence(approval.id(), prepare.id());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"COMPENSATION_PENDING", "EXPIRED"})
     @DisplayName("보상됐거나 닫힌 주문의 승인 전달은 dispatch에서 종료돼 복구 대상에서 빠지고 늦은 승인은 보상으로 수렴한다")

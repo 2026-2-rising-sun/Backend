@@ -140,7 +140,7 @@ public class PaymentDeliveryStore {
 
     public java.util.List<Delivery> relayDue() {
         return jdbc.query(
-                "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE kind IN ('PREPARE','APPROVAL') AND status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP ORDER BY id LIMIT 100",
+                "SELECT id,request_id,kind,command,result,status FROM payment_delivery_request WHERE kind IN ('PREPARE','APPROVAL') AND status IN ('PROCESSING','UNKNOWN') AND next_action_at<=CURRENT_TIMESTAMP ORDER BY next_action_at,id LIMIT 100",
                 (r, n) ->
                         new Delivery(
                                 r.getLong(1),
