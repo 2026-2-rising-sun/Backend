@@ -28,7 +28,6 @@ public class PaymentRelayService {
     private final OrderTimeSource time;
 
     private final com.shoppinglive.commercecore.payment.service.KafkaRefundService kafkaRefunds;
-
     private final com.shoppinglive.commercecore.payment.service.RefundIntentStore refundIntents;
 
     private final PaymentRelayStore store;
@@ -271,17 +270,9 @@ public class PaymentRelayService {
                 });
     }
 
+    /** 결과 불명은 처리 기한까지 조회를 이어 간다. 기한 도달 시 보상은 lifecycle.expire가 주문당 한 번 만든다. */
     public void approvalUnknown(PaymentDeliveryStore.Delivery delivery, Object reply) {
-        var found = deliveryGroup(delivery);
-        guard.ensure(found.getMemberId());
-        tx.executeWithoutResult(
-                t -> {
-                    guard.lock(found.getMemberId());
-                    var group = locked(found.getId());
-                    if (store.binding(group.getId()).approvedAt() == null)
-                        kafkaRefunds.compensateLocked(group, "APPROVAL_UNKNOWN");
-                    deliveries.record(delivery, reply, "UNKNOWN");
-                });
+        pending(delivery, reply, "UNKNOWN");
     }
 
     public void stopPreparation(PaymentDeliveryStore.Delivery delivery, Object result) {
