@@ -39,6 +39,11 @@ class ProductListSearchUnavailableHttpTest extends CatalogSecuritySupport {
                 .andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("status", "PRIVATE"))
                 .andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/products").param("minPrice", "-1")).andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/products").param("maxPrice", "-1")).andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/products").param("minPrice", "3000").param("maxPrice", "2000"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/v1/products").param("minPrice", "만원")).andExpect(status().isBadRequest());
         mvc.perform(get("/v1/products").param("cursor", "broken"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));

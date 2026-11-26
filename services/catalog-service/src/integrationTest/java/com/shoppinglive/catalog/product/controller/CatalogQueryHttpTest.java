@@ -291,6 +291,47 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
+    @DisplayName("가격 범위는 대표 가격이 양 끝 값을 포함해 범위 안인 상품만 찾고 검색어, 정렬, 커서와 함께 쓴다")
+    void filtersByPriceRange() throws Exception {
+        long cheap = product("니트 A", 1000, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long low = product("니트 B", 2000, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long mid = product("니트 C", 2500, SalesStatus.SOLD_OUT, JwtTestTokens.SELLER);
+        long high = product("니트 D", 3000, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long expensive = product("니트 E", 4000, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("코트", 2500, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
+
+        JsonNode first = priced("니트", "2000", "3000", "PRICE_ASC", null);
+        assertThat(ids(first.path("items"))).containsExactly(low, mid);
+        JsonNode second =
+                priced("니트", "2000", "3000", "PRICE_ASC", first.path("nextCursor").asText());
+        assertThat(ids(second.path("items"))).containsExactly(high);
+        assertThat(second.path("hasNext").asBoolean()).isFalse();
+
+        assertThat(ids(priced("니트", "3000", null, "PRICE_ASC", null).path("items")))
+                .containsExactly(high, expensive);
+        assertThat(ids(priced("니트", null, "1000", "PRICE_ASC", null).path("items")))
+                .containsExactly(cheap);
+        assertThat(ids(priced("니트", "2500", "2500", "PRICE_ASC", null).path("items")))
+                .containsExactly(mid);
+
+        // 다른 가격 범위나 가격 범위가 없는 조건에 커서를 쓰면 입력 오류다.
+        String cursor = first.path("nextCursor").asText();
+        for (String[] range : new String[][] {{"2000", "4000"}, {null, null}}) {
+            var request =
+                    get("/v1/products")
+                            .param("q", "니트")
+                            .param("sort", "PRICE_ASC")
+                            .param("cursor", cursor)
+                            .param("size", "2");
+            if (range[0] != null) request.param("minPrice", range[0]).param("maxPrice", range[1]);
+            mvc.perform(request)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+        }
+    }
+
+    @Test
     @DisplayName("카테고리는 검색·상태·정렬과 함께 적용되고 미분류 상품은 카테고리 필터에서 빠진다")
     void categoryCombinesWithSearchSortAndCursor() throws Exception {
         List<Long> expected = new ArrayList<>();
@@ -409,6 +450,25 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+    }
+
+    private JsonNode priced(String q, String min, String max, String sort, String cursor)
+            throws Exception {
+        var request =
+                get("/v1/products")
+                        .param("q", q)
+                        .param("sort", sort)
+                        .param("cursor", cursor == null ? "" : cursor)
+                        .param("size", "2");
+        if (min != null) request.param("minPrice", min);
+        if (max != null) request.param("maxPrice", max);
+        return mapper.readTree(
+                        mvc.perform(request)
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString())
+                .path("data");
     }
 
     private JsonNode listing(String q, String state, String sort, String cursor) throws Exception {
