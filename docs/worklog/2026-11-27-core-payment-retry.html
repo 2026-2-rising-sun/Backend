@@ -79,15 +79,15 @@
 </tr>
 <tr>
 <td>로컬 E2E: Core·Payment jar + <code>lc-e2e-*</code> Postgres·Kafka·WireMock 가짜 토스, 시각은 DB 행 이동</td>
-<td>1차 77건(통과 71·부분 3·실패 1·미검증 2), 실패 1건(D-1)을 고친 뒤 재검증 18건 통과</td>
+<td>1차 77건(통과 71·부분 3·실패 1·미검증 2). 실패 1건(D-1)을 고친 뒤 재검증 18건, 최종 코드(<code>10effc30</code>) 회귀 20건 통과</td>
 </tr>
 </tbody>
 </table></div>
 <ul>
 <li>부분 통과: 보상 선점 뒤 늦은 DONE에서 같은 멱등 키 취소가 두 번 나간다(토스가 같은 요청으로 처리, 환불 1·분개 0). 보상 없는 EXPIRED 주문의 늦은 승인은 SQL로 상태를 만들어 확인했다. 고객 전액 환불의 PARTIAL_CANCELED는 REF-EXEC-04대로 24시간 상한까지 재시도한다.</li>
-<li>미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체). E2E 재검증은 <code>5ec69bc9</code> 기준이다. 그 뒤의 <code>pending</code> 가드·<code>relayDue</code> 정렬·409 문구는 테스트로만 확인했다.</li>
+<li>미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체).</li>
 </ul>
 <h2 id="리뷰">리뷰</h2>
-<p>Sonnet 독립 리뷰 6회. 1회차 9건(중요 2), 2회차 경미 3, 3회차 경미 1, 4회차 경미 1, 5회차 경미 2, 6회차 #418 No Findings. #416·#417은 5회차에 No Findings, 그 뒤 변경 없음. 지적은 모두 고치거나 PR 본문의 머지·배포·Frontend 협의 항목으로 남겼다.</p><p class="muted fingerprint">MD SHA-256: <code>a493a23434941f1e117c45f35c54c4d51269abf4aa9dce498407237265864233</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>Sonnet 독립 리뷰 6회. 1회차 9건(중요 2), 2회차 경미 3, 3회차 경미 1, 4회차 경미 1, 5회차 경미 2, 6회차 #418 No Findings. #416·#417은 5회차에 No Findings, 그 뒤 변경 없음. 지적은 모두 고치거나 PR 본문의 머지·배포·Frontend 협의 항목으로 남겼다.</p><p class="muted fingerprint">MD SHA-256: <code>c93aa21847dbd9942a8eff630acf8ff37eac7b90fc5f9fa9c24f99637c2e4cb6</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
