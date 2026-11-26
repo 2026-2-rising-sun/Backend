@@ -1,7 +1,6 @@
 package com.shoppinglive.catalog.product.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.empty;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -61,18 +60,11 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("판매 중 상품은 목록·상세·구매 사전확인 모두 사본의 가격과 재고로 응답한다")
+    @DisplayName("판매 중 상품은 상세와 구매 사전확인 모두 사본의 가격과 재고로 응답한다")
     void saleFromReplicaIsServedByAllFourReads() throws Exception {
         long id = product("on-sale");
         sales(id, SalesStatus.ON_SALE, 4);
 
-        mvc.perform(get("/v1/products"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[0].productId").value(id))
-                .andExpect(jsonPath("$.data.items[0].price").value(PRICE))
-                .andExpect(jsonPath("$.data.items[0].available").value(4))
-                .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
-                .andExpect(jsonPath("$.data.items[0].purchasable").value(true));
         mvc.perform(get("/v1/products/{id}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.price").value(PRICE))
@@ -91,31 +83,12 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
         long unregistered = product("unregistered");
         sales(hidden, SalesStatus.PRIVATE, 4);
 
-        mvc.perform(get("/v1/products"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items", empty()));
         for (long id : new long[] {hidden, unregistered}) {
             mvc.perform(get("/v1/products/{id}", id))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
             mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
                     .andExpect(status().isNotFound());
-        }
-    }
-
-    @Test
-    @DisplayName("기본 목록은 재고 0과 표시 상태를 보존하면서 Core 확인 진입을 허용한다")
-    void zeroStockPreservesSalesStatusAndPreventsPurchase() throws Exception {
-        for (SalesStatus salesStatus :
-                new SalesStatus[] {SalesStatus.ON_SALE, SalesStatus.SOLD_OUT}) {
-            long id = product(salesStatus.name());
-            sales(id, salesStatus, 0);
-            mvc.perform(get("/v1/products"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.items[0].productId").value(id))
-                    .andExpect(jsonPath("$.data.items[0].available").value(0))
-                    .andExpect(jsonPath("$.data.items[0].salesStatus").value(salesStatus.name()))
-                    .andExpect(jsonPath("$.data.items[0].purchasable").value(true));
         }
     }
 
@@ -144,25 +117,17 @@ class ProductReplicaSalesHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("상품 전체 중지는 공개 상태·재고를 보존하며 구매만 막고 삭제는 모든 공개 조회에서 제외한다")
+    @DisplayName("상품 전체 중지는 구매 사전확인만 막고 삭제는 상세와 구매 사전확인에서 제외한다")
     void wholeControlDoesNotPretendToBeStockoutAndDeletionStaysHidden() throws Exception {
         long id = product("paused");
         sales(id, SalesStatus.ON_SALE, 4);
         jdbc.update("UPDATE product SET sale_enabled=FALSE WHERE id=?", id);
-        mvc.perform(get("/v1/products"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items[0].salesStatus").value("ON_SALE"))
-                .andExpect(jsonPath("$.data.items[0].available").value(4))
-                .andExpect(jsonPath("$.data.items[0].purchasable").value(false));
         mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.orderable").value(false))
                 .andExpect(jsonPath("$.data.reason").value("SALE_SUSPENDED"))
                 .andExpect(jsonPath("$.data.maxQuantity").value(0));
         jdbc.update("UPDATE product SET deleted_at=CURRENT_TIMESTAMP WHERE id=?", id);
-        mvc.perform(get("/v1/products"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.items", empty()));
         mvc.perform(get("/v1/products/{id}", id)).andExpect(status().isNotFound());
         mvc.perform(get("/v1/products/{id}/purchase-check", id).param("quantity", "1"))
                 .andExpect(status().isNotFound());

@@ -40,9 +40,10 @@ catalog:
     sync:
       enabled: false
       interval: 10m
-  # 상품 검색 색인. ES 가 있는 환경에서만 켠다. 꺼져 있어도 index_task 는 쌓이고, 켜면 밀린 상품부터 반영한다.
+  # 상품 검색 색인. 공개 목록 API 가 ES 인덱스로 찾으므로 기본으로 켠다. 끄면 인덱스가 갱신되지 않고 목록은 마지막 색인 기준이다.
+  # 꺼져 있어도 index_task 는 쌓이고, 다시 켜면 밀린 상품부터 반영한다.
   search:
-    enabled: ${CATALOG_SEARCH_ENABLED:false}
+    enabled: ${CATALOG_SEARCH_ENABLED:true}
     partial:
       interval: 5s
       batch-size: 500

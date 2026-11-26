@@ -1,5 +1,6 @@
 package com.shoppinglive.catalog.security;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -56,9 +57,12 @@ class CatalogAuthorizationTest extends CatalogSecuritySupport {
     @DisplayName("공개 상품 조회와 최소 probe는 익명 접근을 허용한다")
     @Test
     void publicReadsAndMinimalProbesRemainAnonymous() throws Exception {
+        // 목록 결과는 ES 가 있어야 해서 CatalogQueryHttpTest 에서 본다. 여기서는 인증에서 막히지 않는지만 본다.
+        mvc.perform(get("/v1/products"))
+                .andExpect(
+                        result -> assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
         for (String path :
                 List.of(
-                        "/v1/products",
                         "/v1/products/" + productId,
                         "/v1/products/" + productId + "/purchase-check?quantity=1",
                         "/actuator/health/readiness",
