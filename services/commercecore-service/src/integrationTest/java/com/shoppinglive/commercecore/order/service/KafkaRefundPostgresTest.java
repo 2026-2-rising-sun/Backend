@@ -348,7 +348,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인 응답 유실은 별도 보상을 기록하고 늦은 승인·만료·재전달로 주문을 성공시키지 않는다")
+    @DisplayName("승인 처리 기한 도달은 별도 보상을 기록하고 늦은 승인·만료·재전달로 주문을 성공시키지 않는다")
     void lostApprovalFencesLateSuccessAndExpiry() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
@@ -413,7 +413,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @Test
     @DisplayName("승인과 보상 intent 경합은 같은 그룹 잠금으로 정상성공 또는 보상 중 하나에 수렴한다")
     void approvalCompensationRace() throws Exception {
-        String n = prepare(false);
+        String n = prepare(true);
         var delivery = accept(n);
         var gate = new CyclicBarrier(2);
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -421,7 +421,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                     pool.submit(
                             () -> {
                                 gate.await();
-                                relay.approved(new Approved(PAYMENT, n, 12000, Instant.now()));
+                                relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
                                 return true;
                             });
             var b =
@@ -434,12 +434,17 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
             a.get(20, TimeUnit.SECONDS);
             b.get(20, TimeUnit.SECONDS);
         }
+        // 보상이 먼저 이기는 순서의 결정적 검증은 lostApprovalFencesLateSuccessAndExpiry가 맡는다.
         if (intents.fenced(id(n))) {
             assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-            assertThat(reserved(501)).isEqualTo(3);
+            assertThat(reserved(501)).isZero();
+            assertThat(available(501)).isEqualTo(20);
+            assertThat(couponStatus()).isEqualTo("AVAILABLE");
         } else {
             assertThat(state(n)).isEqualTo("PAID");
             assertThat(reserved(501)).isZero();
+            assertThat(available(501)).isEqualTo(17);
+            assertThat(couponStatus()).isEqualTo("USED");
         }
     }
 
@@ -1253,8 +1258,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("동시 만료와UNKNOWN은 회원·그룹 잠금으로 요청1개와 예약 단일 해제에 수렴한다")
-    void concurrentDeadlineAndUnknownCreateOneIntent() throws Exception {
+    @DisplayName("UNKNOWN 기록 뒤 만료와 겹친 동시 처리기한 만료는 회원·그룹 잠금으로 요청1개와 예약 단일 해제에 수렴한다")
+    void concurrentDeadlineExpiriesCreateOneIntent() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
         doReturn(groups.findById(id(n)).orElseThrow().getProcessingExpiresAt()).when(time).now();
@@ -1388,14 +1393,15 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
 
     @ParameterizedTest
     @ValueSource(strings = {"SUCCEEDED", "NO_CHARGE"})
-    @DisplayName("보상 대기 전환 때 해제한 재고를 다른 주문이 사도 보상 결과가 여러 번 와 그 예약을 건드리지 않는다")
+    @DisplayName("보상 대기 전환 때 해제한 재고·쿠폰을 다른 주문이 잡아도 보상 결과가 여러 번 와 그 예약을 건드리지 않는다")
     void releasedStockStaysWithOtherOrder(String finalStatus) throws Exception {
         String n = prepare(true);
         compensate(accept(n));
         assertThat(reserved(501)).isZero();
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
-        String other = prepare(false, PAYMENT + 1);
+        String other = prepare(true, PAYMENT + 1);
         assertThat(reserved(501)).isEqualTo(3);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
         String request = requestId(n), execution = UUID.randomUUID().toString();
         apply(result(request, "UNKNOWN", 1, execution));
         var done = result(request, finalStatus, 2, execution);
@@ -1405,7 +1411,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(state(other)).isEqualTo("PENDING_PAYMENT");
         assertThat(reserved(501)).isEqualTo(3);
         assertThat(available(501)).isEqualTo(17);
-        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(couponStatus()).isEqualTo("RESERVED");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT compensation_released_at IS NOT NULL FROM payment_group WHERE id=?",
@@ -1426,6 +1432,47 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                 "UPDATE member_coupon SET status='RESERVED' WHERE member_id=? AND coupon_id=?",
                 MEMBER_A,
                 COUPON);
+        var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
+        apply(done);
+        apply(done);
+        assertThat(state(n)).isEqualTo("CANCELLED");
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sku", "coupon"})
+    @DisplayName("보상 대기 전환 때 예약 해제가 실패하면 savepoint만 롤백해 보상 요청은 커밋하고 보상 완료 때 다시 해제한다")
+    void releaseFailureKeepsCompensationRequest(String failing) throws Exception {
+        String n = prepare(true);
+        var delivery = accept(n);
+        // sku: 트랜잭션 참여 메서드의 실패, coupon: 재고 해제 뒤 실패라 savepoint가 앞선 재고 해제까지 되돌려야 한다.
+        String broken =
+                failing.equals("sku")
+                        ? "UPDATE sku SET reserved=0 WHERE id=501"
+                        : "UPDATE member_coupon SET status='USED' WHERE coupon_id='" + COUPON + "'";
+        String restored =
+                failing.equals("sku")
+                        ? "UPDATE sku SET reserved=3 WHERE id=501"
+                        : "UPDATE member_coupon SET status='RESERVED' WHERE coupon_id='"
+                                + COUPON
+                                + "'";
+        jdbc.update(broken);
+        compensate(delivery);
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(available(501)).isEqualTo(17);
+        assertThat(reserved(501)).isEqualTo(failing.equals("sku") ? 0 : 3);
+        assertThat(couponStatus()).isEqualTo(failing.equals("sku") ? "RESERVED" : "USED");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT compensation_released_at IS NULL FROM payment_group WHERE id=?",
+                                Boolean.class,
+                                id(n)))
+                .isTrue();
+        jdbc.update(restored);
         var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         apply(done);
         apply(done);
