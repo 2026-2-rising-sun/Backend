@@ -270,6 +270,25 @@ class FullIndexerTest {
     }
 
     @Test
+    @DisplayName("지금 인덱스의 매핑 버전이 낮으면 예정 시각 전이라도 새 매핑으로 다시 만든다")
+    void rebuildsWhenMappingVersionIsOlder() throws IOException {
+        product(1, "남성 러닝 운동화", 50000, "ON_SALE");
+        // 버전을 넣기 전 매핑으로 만든 인덱스. 한국 시간 오늘 05:00 에 만들어 예정 시각은 아직이다.
+        String old = "products_20261124200000000";
+        client.indices().create(c -> c.index(old));
+        index.publish(old, 0);
+        FullIndexer indexer = indexer();
+        assertThat(index.versionOf(old)).isZero();
+        assertThat(indexer.due()).isTrue();
+
+        indexer.run();
+        String current = index.currentIndex().orElseThrow();
+        assertThat(current).isNotEqualTo(old);
+        assertThat(index.versionOf(current)).isEqualTo(index.mappingVersion());
+        assertThat(indexer.due()).isFalse();
+    }
+
+    @Test
     @DisplayName("전체 색인 중에는 부분 색인이 돌지 않고, 그 사이 쌓인 작업은 alias를 옮긴 뒤 새 인덱스에 반영된다")
     void partialIndexingWaitsForFullIndexing() throws Exception {
         product(1, "기본 티셔츠", 10000, "ON_SALE");
