@@ -56,6 +56,8 @@ public class OrderPaymentResultApplier {
         if (group.getStatus() != OrderStatus.COMPENSATION_PENDING)
             throw new IllegalStateException("보상 대기 주문만 예약을 해제할 수 있습니다.");
         // HibernateJpaDialect는 PROPAGATION_NESTED savepoint를 지원하지 않아 트랜잭션 연결에 직접 savepoint를 건다.
+        // 한계: tryRelease false 같은 논리적 실패만 막는다. 트랜잭션 프록시를 지난 예외(락 타임아웃·SQL 오류 등)는 바깥을 rollback-only로
+        // 만들어 보상 요청도 롤백되고 다음 만료 판정에서 재시도된다.
         jdbc.execute(
                 (ConnectionCallback<Void>)
                         con -> {
