@@ -21,3 +21,19 @@
 - #416: `approvalUnknown`은 전달을 UNKNOWN으로 기록만 한다. 보상은 기한 판정(`OrderSheetLifecycleService.expire`)이 유일하게 만든다.
 - #417: `payment_group.compensation_released_at`(V118)으로 해제를 한 번만 한다. 값이 없는 배포 전 보상 대기 행은 보상 완료 때 한 번 해제한다.
 - #418: 재결제 기한은 원래 주문 만료 시각이다. 승인 전달은 시도마다 남긴다(V119: 진행·성공 시도는 주문당 하나, 같은 멱등 키는 같은 시도). 거절 때 Core 결제창(`pg_order_id`)과 송신 표시를 비운다. 거절 판정은 422 `DECLINED`와 "조회가 CREATED이고 결제창이 시도의 것과 다름" 두 가지다. 후자는 202 뒤 거절과 UNKNOWN 뒤 ABORTED·EXPIRED를 함께 덮는다.
+- 리뷰·E2E 뒤 추가: 닫힌 주문의 승인 전달은 dispatch 때 `TIMEOUT`(`ORDER_CLOSED`)으로 닫고, `relayDue`는 `next_action_at, id` 순으로 뽑는다(#416). 예약 해제는 JDBC savepoint로 감싸 논리적 실패가 보상 요청을 막지 않게 했다(#417). 끝난 시도의 늦은 거절·처리중 응답은 상태를 바꾸지 않는다(#418).
+
+## 검증
+
+| 명령·환경 | 결과 |
+|---|---|
+| `commercecore-service:postgresTest test migrationTest` (격리 Postgres 16, 스택 맨 위) | 235 / 185 / 30건, 실패·스킵 0 |
+| `scripts/check.sh --base origin/dev --external` | docs·api-docs·design-docs·events·migrationTest·postgresTest 통과. `build`의 integrationTest 288건 중 2건 스킵(이 스택과 무관한 Kafka 표본 테스트)으로 incomplete |
+| 로컬 E2E: Core·Payment jar + `lc-e2e-*` Postgres·Kafka·WireMock 가짜 토스, 시각은 DB 행 이동 | 1차 77건(통과 71·부분 3·실패 1·미검증 2), 실패 1건(D-1)을 고친 뒤 재검증 18건 통과 |
+
+- 부분 통과: 보상 선점 뒤 늦은 DONE에서 같은 멱등 키 취소가 두 번 나간다(토스가 같은 요청으로 처리, 환불 1·분개 0). 보상 없는 EXPIRED 주문의 늦은 승인은 SQL로 상태를 만들어 확인했다. 고객 전액 환불의 PARTIAL_CANCELED는 REF-EXEC-04대로 24시간 상한까지 재시도한다.
+- 미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체). E2E 재검증은 `5ec69bc9` 기준이다. 그 뒤의 `pending` 가드·`relayDue` 정렬·409 문구는 테스트로만 확인했다.
+
+## 리뷰
+
+Sonnet 독립 리뷰 6회. 1회차 9건(중요 2), 2회차 경미 3, 3회차 경미 1, 4회차 경미 1, 5회차 경미 2, 6회차 #418 No Findings. #416·#417은 5회차에 No Findings, 그 뒤 변경 없음. 지적은 모두 고치거나 PR 본문의 머지·배포·Frontend 협의 항목으로 남겼다.
