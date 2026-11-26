@@ -29,10 +29,10 @@
 |---|---|
 | `commercecore-service:postgresTest test migrationTest` (격리 Postgres 16, 스택 맨 위) | 235 / 185 / 30건, 실패·스킵 0 |
 | `scripts/check.sh --base origin/dev --external` | docs·api-docs·design-docs·events·migrationTest·postgresTest 통과. `build`의 integrationTest 288건 중 2건 스킵(이 스택과 무관한 Kafka 표본 테스트)으로 incomplete |
-| 로컬 E2E: Core·Payment jar + `lc-e2e-*` Postgres·Kafka·WireMock 가짜 토스, 시각은 DB 행 이동 | 1차 77건(통과 71·부분 3·실패 1·미검증 2), 실패 1건(D-1)을 고친 뒤 재검증 18건 통과 |
+| 로컬 E2E: Core·Payment jar + `lc-e2e-*` Postgres·Kafka·WireMock 가짜 토스, 시각은 DB 행 이동 | 1차 77건(통과 71·부분 3·실패 1·미검증 2). 실패 1건(D-1)을 고친 뒤 재검증 18건, 최종 코드(`10effc30`) 회귀 20건 통과 |
 
 - 부분 통과: 보상 선점 뒤 늦은 DONE에서 같은 멱등 키 취소가 두 번 나간다(토스가 같은 요청으로 처리, 환불 1·분개 0). 보상 없는 EXPIRED 주문의 늦은 승인은 SQL로 상태를 만들어 확인했다. 고객 전액 환불의 PARTIAL_CANCELED는 REF-EXEC-04대로 24시간 상한까지 재시도한다.
-- 미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체). E2E 재검증은 `5ec69bc9` 기준이다. 그 뒤의 `pending` 가드·`relayDue` 정렬·409 문구는 테스트로만 확인했다.
+- 미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체).
 
 ## 리뷰
 
