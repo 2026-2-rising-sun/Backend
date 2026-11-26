@@ -264,7 +264,8 @@ def classify(changes, full_reason=None):
     redis_tasks = [":services:" + service + ":redisTest" for service in sorted(redis)]
     elasticsearch = ELASTICSEARCH_SERVICES if full else {m.removeprefix("services:") for m in builds} & ELASTICSEARCH_SERVICES
     elasticsearch_tasks = [":services:" + service + ":elasticsearchTest" for service in sorted(elasticsearch)]
-    event_samples = full or bool(builds & {"services:catalog-service", "services:commercecore-service", "services:payment-service", "services:live-service"})
+    # 표본은 이벤트를 발행하는 서비스의 테스트만 만든다. Catalog 는 소비만 해서 표본이 없다.
+    event_samples = full or bool(builds & {"services:commercecore-service", "services:payment-service", "services:live-service"})
     return {"gradle_tasks": tasks, "run_tests": full or bool(builds), "api": api,
             "events": event_samples or tools["api_tests"], "event_samples": event_samples,
             "migration_services": sorted(migrations),
