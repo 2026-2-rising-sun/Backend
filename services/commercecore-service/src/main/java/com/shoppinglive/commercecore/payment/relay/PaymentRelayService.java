@@ -248,6 +248,8 @@ public class PaymentRelayService {
         long id = store.deliveryGroup(delivery.id());
         tx.executeWithoutResult(
                 t -> {
+                    // 이미 끝난 시도의 늦은 응답은 그 뒤 바뀐 결제 상태(취소·새 결제창)를 덮지 않는다.
+                    if (deliveries.get(delivery.requestId()).terminal()) return;
                     if (remoteStatus != null) store.status(id, remoteStatus);
                     deliveries.record(delivery, reply, "UNKNOWN");
                 });

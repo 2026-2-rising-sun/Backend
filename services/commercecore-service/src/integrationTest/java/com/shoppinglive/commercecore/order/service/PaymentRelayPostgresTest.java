@@ -869,6 +869,31 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
+    @DisplayName("전액 취소로 끝난 시도의 늦은 처리중 응답은 CANCELED 결제 상태를 APPROVING으로 덮지 않는다")
+    void latePendingAfterCanceledKeepsCanceled() {
+        String number = createRelay("late-pending-canceled", true).number();
+        prepare(number);
+        var delivery = accept(number);
+        relay.canceled(delivery, Map.of("status", "CANCELED"));
+        relay.pending(delivery, Map.of("status", "PENDING"), "APPROVING");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("FAILED");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("CANCELED");
+    }
+
+    @Test
+    @DisplayName("거절 뒤 새 결제창을 열면 앞 시도의 늦은 미확정 응답이 CREATED 결제 상태를 덮지 않는다")
+    void latePendingAfterNewCheckoutKeepsCreated() {
+        String number = createRelay("late-pending-checkout", true).number();
+        prepare(number);
+        var delivery = accept(number);
+        relay.declined(delivery, Map.of("status", "DECLINED"));
+        reopenCheckout(number, number + "-2");
+        relay.pending(delivery, Map.of("code", "UNKNOWN"), "UNKNOWN");
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("CREATED");
+    }
+
+    @Test
     @DisplayName("같은 시도의 늦은 거절 처리는 이미 끝난 시도면 그 뒤 연 새 결제창 상태를 DECLINED로 덮지 않는다")
     void lateDuplicateDeclineKeepsNewCheckout() {
         String number = createRelay("late-decline", true).number();
