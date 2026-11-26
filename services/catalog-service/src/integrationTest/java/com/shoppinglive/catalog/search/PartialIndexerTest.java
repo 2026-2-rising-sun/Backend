@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
@@ -28,14 +29,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
+/** H2 로 확인한다. 같은 테스트를 PostgreSQL 로도 돌리는 판은 {@link PartialIndexerPostgresTest} 다. */
 class PartialIndexerTest {
     private JdbcTemplate jdbc;
     private NamedParameterJdbcTemplate named;
     private FakeIndex index;
     private PartialIndexer indexer;
 
-    @BeforeEach
-    void prepare() {
+    /** Flyway 를 적용한 빈 Catalog DB. */
+    DataSource catalogDatabase() {
         var source =
                 new DriverManagerDataSource(
                         "jdbc:h2:mem:search_"
@@ -44,6 +46,12 @@ class PartialIndexerTest {
                         "sa",
                         "");
         Flyway.configure().dataSource(source).load().migrate();
+        return source;
+    }
+
+    @BeforeEach
+    void prepare() {
+        DataSource source = catalogDatabase();
         jdbc = new JdbcTemplate(source);
         named = new NamedParameterJdbcTemplate(source);
         index = new FakeIndex();
