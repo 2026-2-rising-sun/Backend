@@ -410,6 +410,36 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
+    boolean relayDue(PaymentDeliveryStore.Delivery delivery) {
+        jdbc.update(
+                "UPDATE payment_delivery_request SET next_action_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                delivery.id());
+        return deliveries.relayDue().stream().anyMatch(d -> d.id() == delivery.id());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COMPENSATION_PENDING", "EXPIRED"})
+    @DisplayName("보상됐거나 닫힌 주문의 승인 전달은 dispatch에서 종료돼 복구 대상에서 빠지고 늦은 승인은 보상으로 수렴한다")
+    void closedOrderApprovalDeliveryLeavesRelayDue(String closed) {
+        String n = prepare(true);
+        var delivery = accept(n);
+        if (closed.equals("EXPIRED")) {
+            relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+            jdbc.update("UPDATE payment_group SET status='EXPIRED' WHERE id=?", id(n));
+            jdbc.update("UPDATE orders SET status='EXPIRED' WHERE payment_group_id=?", id(n));
+        } else compensate(delivery);
+        assertThat(relayDue(delivery)).isTrue();
+        relayDispatcher.dispatch(delivery);
+        verifyNoInteractions(remote);
+        assertThat(deliveries.get(delivery.requestId()).status()).isEqualTo("TIMEOUT");
+        assertThat(deliveries.get(delivery.requestId()).result()).contains("ORDER_CLOSED");
+        assertThat(relayDue(delivery)).isFalse();
+        relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
+        assertThat(state(n)).isEqualTo(closed);
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(deliveries.get(delivery.requestId()).status()).isEqualTo("TIMEOUT");
+    }
+
     @Test
     @DisplayName("승인과 보상 intent 경합은 같은 그룹 잠금으로 정상성공 또는 보상 중 하나에 수렴한다")
     void approvalCompensationRace() throws Exception {
