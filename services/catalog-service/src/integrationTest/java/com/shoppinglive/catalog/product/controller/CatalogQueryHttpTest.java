@@ -157,6 +157,31 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
+    @DisplayName("동의어 사전의 한글, 영어, 다른 표기로 검색해도 같은 상품을 찾고, 사전 단어의 일부로는 찾지 않는다")
+    void searchesSynonyms() throws Exception {
+        long shirt = product("남성 옥스포드 셔츠", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long sneakers = product("캔버스 스니커즈", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long jeans = product("와이드 데님 팬츠", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long sunscreen = product("썬크림 SPF50", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long mug = product("흰색 머그컵", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("두루마리 화장지 30롤", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("겨울 코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
+
+        assertThat(ids(listing("shirts", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(shirt);
+        assertThat(ids(listing("운동화", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(sneakers);
+        assertThat(ids(listing("청바지", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(jeans);
+        assertThat(ids(listing("선크림", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(sunscreen);
+        assertThat(ids(listing("white 머그", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(mug);
+        assertThat(ids(listing("화장", "ON_SALE", "LATEST", "").path("items"))).isEmpty();
+    }
+
+    @Test
     @DisplayName("검색어의 특수문자는 오류 없이 무시하고 대소문자를 구분하지 않는다")
     void ignoresSymbolsAndCase() throws Exception {
         long match = product("SALE 니트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
