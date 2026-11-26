@@ -614,6 +614,32 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                 .approve(anyString(), any());
     }
 
+    void unknownNextApproval() {
+        doAnswer(
+                        i -> {
+                            remoteStatus = "UNKNOWN";
+                            return new Reply<>(
+                                    200,
+                                    true,
+                                    new ApprovalResult(paymentId, "UNKNOWN", null, null),
+                                    null,
+                                    null);
+                        })
+                .when(remote)
+                .approve(anyString(), any());
+    }
+
+    long approvalDeliveries(String number) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payment_delivery_request WHERE payment_group_id=? AND kind='APPROVAL'",
+                Long.class,
+                id(number));
+    }
+
+    String groupStatus(String number) {
+        return groups.findById(id(number)).orElseThrow().getStatus().name();
+    }
+
     void approveNext() {
         doAnswer(
                         i -> {
@@ -737,6 +763,18 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(outboxCount("PaymentFailed")).isZero();
         assertThatThrownBy(() -> relayDispatcher.checkout(MEMBER_A, number))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+        assertThatThrownBy(
+                        () ->
+                                relay.acceptApproval(
+                                        MEMBER_A,
+                                        number,
+                                        "after-expiry",
+                                        new Approval(
+                                                MEMBER_A,
+                                                "toss-key",
+                                                remoteCreate.orderRef() + "-1",
+                                                remoteCreate.amount())))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
     }
 
     @Test
@@ -789,6 +827,179 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(outboxCount("PaymentFailed")).isEqualTo(1);
         assertThatThrownBy(() -> relayDispatcher.checkout(MEMBER_A, number))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("앞 시도의 오래된 전달 객체로 다시 돌려도 진행 중인 다음 시도의 결제 상태를 거절로 덮지 않는다")
+    void staleDeclinedDeliveryKeepsNextAttempt() {
+        String number = createRelay("stale-attempt", true).number();
+        prepare(number);
+        declineNextApproval();
+        var first = accept(number);
+        relayDispatcher.dispatch(first);
+        reopenCheckout(number, number + "-2");
+        var second = relay.acceptApproval(MEMBER_A, number, "approval-2", request(number));
+        String paymentStatus = relay.state(MEMBER_A, number).paymentStatus();
+        String secondStatus = deliveries.get(second.requestId()).status();
+        // first는 거절 전 스냅샷이라 terminal()이 false다.
+        relayDispatcher.dispatch(first);
+        relay.declined(first, Map.of("status", "DECLINED"));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus())
+                .isEqualTo(paymentStatus)
+                .isNotEqualTo("DECLINED");
+        assertThat(deliveries.get(second.requestId()).status()).isEqualTo(secondStatus);
+        verify(remote, times(1)).approve(anyString(), any());
+        approveNext();
+        relayDispatcher.dispatch(second);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+        verify(remote, times(2)).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("승인 결과 UNKNOWN 뒤 처리 기한 전 PaymentApproved가 오면 보상 없이 PAID가 되고 쿠폰을 사용 처리한다")
+    void unknownThenApprovedEventBeforeDeadline() {
+        String number = createRelay("unknown-event", true).number();
+        prepare(number);
+        unknownNextApproval();
+        relayDispatcher.dispatch(accept(number));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(relay.approved(fact(number))).isTrue();
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
+                .isZero();
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(reserved(501)).isZero();
+        assertThat(reserved(502)).isZero();
+    }
+
+    @Test
+    @DisplayName("승인 결과 UNKNOWN 뒤 Payment가 결제를 CREATED로 되돌리고 결제창을 비우면 결제 대기로 되돌리고 예약을 유지한다")
+    void unknownThenRevertedToCreatedReopens() {
+        String number = createRelay("unknown-reverted", true).number();
+        prepare(number);
+        unknownNextApproval();
+        var delivery = accept(number);
+        relayDispatcher.dispatch(delivery);
+        // Payment가 결과 불명 시도를 ABORTED·EXPIRED로 종결하면 결제를 CREATED로 되돌린다.
+        remoteStatus = "CREATED";
+        remotePgOrderId = null;
+        relayDispatcher.dispatch(delivery);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(reserved(501)).isEqualTo(2);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(outboxCount("PaymentFailed")).isZero();
+        verify(remote, times(1)).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("승인 미전송 503 뒤 결제창이 비워진 CREATED가 조회되면 결제 대기로 되돌려 재결제할 수 있다")
+    void unsentApprovalReopensForRetry() {
+        String number = createRelay("unsent", true).number();
+        prepare(number);
+        doAnswer(
+                        i -> {
+                            // PG에 보내지 못한 시도도 Payment는 결제를 CREATED로 되돌리고 결제창을 비운다.
+                            remoteStatus = "CREATED";
+                            remotePgOrderId = null;
+                            return new Reply<>(503, false, null, "PG_UNAVAILABLE", null);
+                        })
+                .when(remote)
+                .approve(anyString(), any());
+        var delivery = accept(number);
+        relayDispatcher.dispatch(delivery);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        relayDispatcher.dispatch(delivery);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(reserved(501)).isEqualTo(2);
+        verify(remote, times(1)).approve(anyString(), any());
+        reopenCheckout(number, number + "-2");
+        approveNext();
+        relayDispatcher.dispatch(
+                relay.acceptApproval(MEMBER_A, number, "approval-2", request(number)));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+    }
+
+    @Test
+    @DisplayName("거절로 결제 대기가 된 주문을 구매자가 취소하면 CANCELLED가 되고 예약·쿠폰을 한 번 해제한다")
+    void declinedOrderCanBeCancelledByBuyer() {
+        String number = createRelay("decline-cancel", true).number();
+        prepare(number);
+        declineNextApproval();
+        relayDispatcher.dispatch(accept(number));
+        lifecycle.cancel(MEMBER_A, number);
+        assertThat(groupStatus(number)).isEqualTo("CANCELLED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(reserved(502)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(outboxCount("OrderCancelled")).isEqualTo(1);
+        assertThat(outboxCount("PaymentFailed")).isZero();
+    }
+
+    @Test
+    @DisplayName("거절 뒤 재결제가 다시 거절돼도 같은 주문으로 또 재결제해 PAID가 된다")
+    void repeatedDeclinesThenPaid() {
+        String number = createRelay("decline-twice", true).number();
+        prepare(number);
+        declineNextApproval();
+        relayDispatcher.dispatch(accept(number));
+        reopenCheckout(number, number + "-2");
+        relayDispatcher.dispatch(
+                relay.acceptApproval(MEMBER_A, number, "approval-2", request(number)));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(reserved(501)).isEqualTo(2);
+        reopenCheckout(number, number + "-3");
+        approveNext();
+        relayDispatcher.dispatch(
+                relay.acceptApproval(MEMBER_A, number, "approval-3", request(number)));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("USED");
+        assertThat(approvalDeliveries(number)).isEqualTo(3);
+        assertThat(outboxCount("PaymentFailed")).isZero();
+        verify(remote, times(3)).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("같은 승인 요청 키에 다른 본문을 보내면 CONFLICT로 거절하고 새 전달을 만들지 않는다")
+    void sameApprovalKeyWithDifferentBodyConflicts() {
+        String number = createRelay("same-key", true).number();
+        prepare(number);
+        accept(number);
+        assertThatThrownBy(
+                        () ->
+                                relay.acceptApproval(
+                                        MEMBER_A,
+                                        number,
+                                        "approval",
+                                        new Approval(
+                                                MEMBER_A,
+                                                "other-key",
+                                                remotePgOrderId,
+                                                remoteCreate.amount())))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class)
+                .extracting(e -> ((com.shoppinglive.common.core.BusinessException) e).errorCode())
+                .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+        assertThat(approvalDeliveries(number)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("거절로 결제 대기가 된 주문에 PaymentApproved가 오면 정상 흐름에선 도달할 수 없으므로 충돌 예외로 소비 재시도·DLT에 맡긴다")
+    void approvedFactOnReopenedOrderConflicts() {
+        String number = createRelay("reopened-approved", true).number();
+        prepare(number);
+        declineNextApproval();
+        relayDispatcher.dispatch(accept(number));
+        // Payment는 거절을 확정한 시도를 승인하지 않는다. 이 사실이 오면 계약 위반이라 조용히 반영하지 않는다.
+        assertThatThrownBy(() -> relay.approved(fact(number)))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class)
+                .extracting(e -> ((com.shoppinglive.common.core.BusinessException) e).errorCode())
+                .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(reserved(501)).isEqualTo(2);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(outboxCount("PaymentSucceeded")).isZero();
     }
 
     @Test

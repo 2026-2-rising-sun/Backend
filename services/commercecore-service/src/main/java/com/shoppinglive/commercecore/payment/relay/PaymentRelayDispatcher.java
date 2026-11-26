@@ -38,7 +38,10 @@ public class PaymentRelayDispatcher {
     }
 
     public void dispatch(PaymentDeliveryStore.Delivery delivery) {
-        if (delivery == null || delivery.terminal()) return;
+        if (delivery == null) return;
+        // 호출자가 든 스냅샷은 이미 끝난 시도일 수 있다. 저장된 현재 상태로 판정한다.
+        delivery = deliveries.get(delivery.requestId());
+        if (delivery.terminal()) return;
         try {
             if ("PREPARE".equals(delivery.kind())) prepare(delivery);
             else if ("APPROVAL".equals(delivery.kind())) approval(delivery);

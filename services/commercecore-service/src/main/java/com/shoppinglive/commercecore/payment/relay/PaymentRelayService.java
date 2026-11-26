@@ -363,7 +363,9 @@ public class PaymentRelayService {
                         lifecycle.expire(id);
                         return;
                     }
-                    store.status(id, "DECLINED");
+                    // 뒤 시도가 진행 중이면 앞 시도의 거절로 그 시도의 결제 상태를 덮지 않는다.
+                    if (current == null || current.id() == delivery.id())
+                        store.status(id, "DECLINED");
                     deliveries.record(delivery, result, "FAILED");
                 });
     }

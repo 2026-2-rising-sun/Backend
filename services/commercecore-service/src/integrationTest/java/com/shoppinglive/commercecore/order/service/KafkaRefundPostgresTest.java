@@ -1483,6 +1483,25 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
+    @DisplayName("보상 대기 중 승인 거절이 확정돼도 보상 대기를 유지하고 예약을 다시 잡거나 결제 실패 알림을 보내지 않는다")
+    void declineDuringCompensationKeepsCompensation() {
+        String n = prepare(true);
+        var delivery = accept(n);
+        compensate(delivery);
+        relay.declined(delivery, Map.of("status", "DECLINED"));
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentFailed'",
+                                Long.class))
+                .isZero();
+    }
+
+    @Test
     @DisplayName("동시에 같은 완료 결과를 받아도 취소·재고·쿠폰은 한 번만 확정한다")
     void concurrentCompensationCompletionReleasesOnce() throws Exception {
         String n = prepare(true);
