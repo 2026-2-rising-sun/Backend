@@ -193,6 +193,10 @@ class ClassificationTests(unittest.TestCase):
                                     b'class Example {}', b'class Example { int value; }')])
             self.assertTrue(plan["events"])
             self.assertTrue(plan["event_samples"])
+        # Catalog 는 이벤트를 소비만 해서 직렬화 표본을 만들지 않는다.
+        plan = classify([Change("services/catalog-service/src/main/java/Example.java",
+                                b'class Example {}', b'class Example { int value; }')])
+        self.assertFalse(plan["event_samples"])
         plan = classify([Change("services/member-service/src/main/java/Example.java",
                                 b'class Example {}', b'class Example { int value; }')])
         self.assertFalse(plan["event_samples"])
@@ -357,7 +361,7 @@ class ServiceBoundaryTests(unittest.TestCase):
                 plan = classify([Change(f"services/{service}/src/main/java/Example.java", None, b"class Example {}")])
                 self.assertEqual(plan["gradle_tasks"], [f":services:{service}:build"])
                 self.assertEqual(plan["postgres_tasks"], [f":services:{service}:postgresTest"])
-                self.assertTrue(plan["event_samples"])
+                self.assertEqual(plan["event_samples"], service != "catalog-service")
 
     def test_core_only_database_checks_provision_payment_fixture_database(self):
         """Core만 검사해도 독립 Payment fixture DB를 준비하고 Payment 업무 검사는 추가하지 않는다."""

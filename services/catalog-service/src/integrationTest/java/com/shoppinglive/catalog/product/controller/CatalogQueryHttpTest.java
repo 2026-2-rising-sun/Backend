@@ -133,16 +133,52 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     }
 
     @Test
-    @DisplayName("상품명은 형태소로 찾아 조사가 붙은 검색어로도 찾고 검색어 단어가 없는 상품은 뺀다")
+    @DisplayName("검색어 단어가 모두 들어간 상품만 찾고, 조사와 띄어쓰기가 달라도 찾으며 비슷한 다른 단어는 찾지 않는다")
     void searchesProductNamesByMorphemes() throws Exception {
         long shoes = product("남성 러닝 운동화", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long sportswear = product("남성 운동복 세트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long earphones = product("무선 이어폰 화이트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long serum = product("수분 세럼 50ml", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("럼 레이즌 초콜릿", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
         product("겨울 코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
         indexed();
 
         assertThat(ids(listing("운동화를", "ON_SALE", "LATEST", "").path("items")))
                 .containsExactly(shoes);
-        assertThat(ids(listing("러닝화 남성", "ON_SALE", "LATEST", "").path("items")))
+        assertThat(ids(listing("남성 운동화", "ON_SALE", "LATEST", "").path("items")))
                 .containsExactly(shoes);
+        assertThat(ids(listing("운동", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactlyInAnyOrder(shoes, sportswear);
+        assertThat(ids(listing("무선이어폰", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(earphones);
+        assertThat(ids(listing("세럼", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(serum);
+        assertThat(ids(listing("남성 코트", "ON_SALE", "LATEST", "").path("items"))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("동의어 사전의 한글, 영어, 다른 표기로 검색해도 같은 상품을 찾고, 사전 단어의 일부로는 찾지 않는다")
+    void searchesSynonyms() throws Exception {
+        long shirt = product("남성 옥스포드 셔츠", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long sneakers = product("캔버스 스니커즈", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long jeans = product("와이드 데님 팬츠", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long sunscreen = product("썬크림 SPF50", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long mug = product("흰색 머그컵", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("두루마리 화장지 30롤", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        product("겨울 코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        indexed();
+
+        assertThat(ids(listing("shirts", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(shirt);
+        assertThat(ids(listing("운동화", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(sneakers);
+        assertThat(ids(listing("청바지", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(jeans);
+        assertThat(ids(listing("선크림", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(sunscreen);
+        assertThat(ids(listing("white 머그", "ON_SALE", "LATEST", "").path("items")))
+                .containsExactly(mug);
+        assertThat(ids(listing("화장", "ON_SALE", "LATEST", "").path("items"))).isEmpty();
     }
 
     @Test

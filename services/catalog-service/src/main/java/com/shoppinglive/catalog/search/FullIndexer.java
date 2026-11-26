@@ -80,10 +80,14 @@ public class FullIndexer {
         }
     }
 
-    /** alias 가 없거나, 지금 인덱스를 만든 뒤 예정 시각이 지났으면 다시 만들 때다. */
+    /**
+     * alias 가 없거나, 지금 인덱스의 매핑 버전이 낮거나, 지금 인덱스를 만든 뒤 예정 시각이 지났으면 다시 만들 때다. 버전이 더 높은 인덱스는 그대로 둔다. 순차
+     * 배포 중 이전 버전 앱이 새 인덱스를 되돌리지 않게 하기 위해서다.
+     */
     boolean due() {
         Optional<String> current = index.currentIndex();
         if (current.isEmpty()) return true;
+        if (index.versionOf(current.get()) < index.mappingVersion()) return true;
         ZonedDateTime next =
                 schedule.next(ElasticsearchProductIndex.createdAt(current.get()).atZone(zone));
         return next != null && !next.toInstant().isAfter(clock.instant());
