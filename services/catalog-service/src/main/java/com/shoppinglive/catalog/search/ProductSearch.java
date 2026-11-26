@@ -9,6 +9,7 @@ import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MatchQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch._types.query_dsl.RangeQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermsQuery;
 import co.elastic.clients.elasticsearch.core.SearchRequest;
@@ -42,12 +43,16 @@ public class ProductSearch {
 
     /**
      * @param keyword 앞뒤 공백을 뺀 검색어. 비어 있으면 상품명 조건을 걸지 않는다
+     * @param minPrice 대표 가격 하한(포함). null 이면 하한 없음
+     * @param maxPrice 대표 가격 상한(포함). null 이면 상한 없음
      * @param after 직전 페이지 마지막 상품의 정렬 값. 첫 페이지면 null
      */
     public Page find(
             String keyword,
             SalesDisplayStatus status,
             ProductCategory category,
+            Long minPrice,
+            Long maxPrice,
             ProductSort sort,
             List<Long> after,
             int size) {
@@ -58,7 +63,7 @@ public class ProductSearch {
                         .size(size + 1)
                         .source(s -> s.fetch(false))
                         .trackTotalHits(t -> t.enabled(false))
-                        .query(query(keyword, status, category))
+                        .query(query(keyword, status, category, minPrice, maxPrice))
                         .sort(order(sort));
         if (after != null) request.searchAfter(after.stream().map(FieldValue::of).toList());
         try {
@@ -78,7 +83,11 @@ public class ProductSearch {
     }
 
     private static Query query(
-            String keyword, SalesDisplayStatus status, ProductCategory category) {
+            String keyword,
+            SalesDisplayStatus status,
+            ProductCategory category,
+            Long minPrice,
+            Long maxPrice) {
         List<FieldValue> statuses =
                 status == null
                         ? List.of(FieldValue.of("ON_SALE"), FieldValue.of("SOLD_OUT"))
@@ -90,6 +99,20 @@ public class ProductSearch {
                                         ._toQuery());
         if (category != null)
             bool.filter(TermQuery.of(t -> t.field("category").value(category.name()))._toQuery());
+        if (minPrice != null || maxPrice != null)
+            bool.filter(
+                    RangeQuery.of(
+                                    r ->
+                                            r.number(
+                                                    n -> {
+                                                        n.field("price");
+                                                        if (minPrice != null)
+                                                            n.gte(minPrice.doubleValue());
+                                                        if (maxPrice != null)
+                                                            n.lte(maxPrice.doubleValue());
+                                                        return n;
+                                                    }))
+                            ._toQuery());
         if (!keyword.isEmpty())
             bool.must(
                     MatchQuery.of(m -> m.field("name").query(keyword).operator(Operator.And))
