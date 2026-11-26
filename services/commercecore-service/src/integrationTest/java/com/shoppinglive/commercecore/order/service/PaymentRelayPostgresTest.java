@@ -837,6 +837,16 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         assertThat(outboxCount("PaymentFailed")).isEqualTo(1);
         assertThatThrownBy(() -> relayDispatcher.checkout(MEMBER_A, number))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class);
+        relay.approved(fact(number));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("FAILED");
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT status FROM core_refund_intent WHERE payment_group_id=? AND purpose='SYSTEM_COMPENSATION'",
+                                String.class,
+                                id(number)))
+                .containsExactly("REQUESTED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
     }
 
     @Test
@@ -1019,7 +1029,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     void sameApprovalKeyWithDifferentBodyConflicts() {
         String number = createRelay("same-key", true).number();
         prepare(number);
-        accept(number);
+        var first = accept(number);
         assertThatThrownBy(
                         () ->
                                 relay.acceptApproval(
@@ -1032,9 +1042,19 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                                                 remotePgOrderId,
                                                 remoteCreate.amount())))
                 .isInstanceOf(com.shoppinglive.common.core.BusinessException.class)
+                .hasMessage("기존 중계 요청과 입력이 다릅니다.")
                 .extracting(e -> ((com.shoppinglive.common.core.BusinessException) e).errorCode())
                 .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
         assertThat(approvalDeliveries(number)).isEqualTo(1);
+        // 거절된 시도의 키로 새 결제창 본문을 보내면 새 키가 필요하다고 구분해 알린다.
+        relay.declined(first, Map.of("status", "DECLINED"));
+        reopenCheckout(number, number + "-2");
+        assertThatThrownBy(
+                        () -> relay.acceptApproval(MEMBER_A, number, "approval", request(number)))
+                .isInstanceOf(com.shoppinglive.common.core.BusinessException.class)
+                .hasMessage("거절된 승인 시도의 키입니다. 재결제는 새 X-Idempotency-Key로 요청해 주세요.")
+                .extracting(e -> ((com.shoppinglive.common.core.BusinessException) e).errorCode())
+                .isEqualTo(com.shoppinglive.common.core.ErrorCode.CONFLICT);
     }
 
     @Test

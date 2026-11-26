@@ -98,7 +98,13 @@ public class PaymentDeliveryStore {
                             prior.id());
             if (!Objects.equals(key, priorKey)
                     || !Objects.equals(readTree(json(command)), readTree(prior.command())))
-                throw new BusinessException(ErrorCode.CONFLICT, "기존 중계 요청과 입력이 다릅니다.");
+                throw new BusinessException(
+                        ErrorCode.CONFLICT,
+                        "APPROVAL".equals(kind)
+                                        && Objects.equals(key, priorKey)
+                                        && "FAILED".equals(prior.status())
+                                ? "거절된 승인 시도의 키입니다. 재결제는 새 X-Idempotency-Key로 요청해 주세요."
+                                : "기존 중계 요청과 입력이 다릅니다.");
             return prior;
         }
         String requestId = UUID.randomUUID().toString();
