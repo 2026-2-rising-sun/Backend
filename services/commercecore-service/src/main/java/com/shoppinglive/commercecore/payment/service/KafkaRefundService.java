@@ -246,6 +246,7 @@ public class KafkaRefundService {
                         "보상 대기 항목 상태가 다릅니다.");
             group.transition(OrderStatus.COMPENSATION_PENDING);
             groups.saveAndFlush(group);
+            outcomes.releaseForCompensation(group);
         }
         var targets =
                 orders.findByPaymentGroupIdOrderByIdAsc(group.getId()).stream()
