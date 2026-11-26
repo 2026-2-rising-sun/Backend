@@ -126,12 +126,15 @@ subprojects {
             }
         registerExternalTest("migrationTest", "postgres & migration", postgresEnabled)
         if (prefix in setOf("CATALOG", "COMMERCECORE", "PAYMENT", "LIVE")) {
-            registerExternalTest("postgresTest", "postgres & !migration", postgresEnabled)
+            // ES 도 필요한 PostgreSQL 테스트는 elasticsearchTest 가 돌린다.
+            registerExternalTest(
+                "postgresTest", "postgres & !migration & !elasticsearch", postgresEnabled
+            )
         }
         if (prefix == "CATALOG") {
-            // Nori 플러그인이 있는 실제 ES. 지정한 ES 의 products 인덱스를 지우고 쓴다
+            // Nori 플러그인이 있는 실제 ES 와 Catalog PostgreSQL. 지정한 ES 의 products_* 인덱스를 지우고 쓴다
             registerExternalTest("elasticsearchTest", "elasticsearch") {
-                System.getenv("CATALOG_TEST_ES_URL")?.startsWith("http") == true
+                System.getenv("CATALOG_TEST_ES_URL")?.startsWith("http") == true && postgresEnabled()
             }
         }
         if (prefix == "PAYMENT") {

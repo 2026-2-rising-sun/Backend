@@ -202,7 +202,10 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(verify.external_ready(":services:live-service:migrationTest", {"LIVE_PG_TEST": "1"}))
         self.assertTrue(verify.external_ready(":services:live-service:redisTest", {"LIVE_REDIS_TEST": "1"}))
         task = ":services:catalog-service:elasticsearchTest"
-        self.assertTrue(verify.external_ready(task, {"CATALOG_TEST_ES_URL": "http://localhost:9200"}))
+        es = {"CATALOG_TEST_ES_URL": "http://localhost:9200"}
+        self.assertFalse(verify.external_ready(task, es))
+        self.assertTrue(verify.external_ready(
+            task, es | {"CATALOG_TEST_POSTGRES_URL": "jdbc:postgresql://localhost/catalog_test"}))
         self.assertFalse(verify.external_ready(task, {}))
 
 
