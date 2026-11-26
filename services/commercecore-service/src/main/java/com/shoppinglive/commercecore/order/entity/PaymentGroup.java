@@ -208,6 +208,14 @@ public class PaymentGroup extends BaseEntity {
         status = OrderStatus.PAYMENT_CONFIRMING;
     }
 
+    /** 승인 거절 뒤 같은 주문에서 다시 결제하도록 결제 대기로 되돌린다. 생성 기한은 바꾸지 않는다. */
+    public void reopenForPayment() {
+        if (status != OrderStatus.PAYMENT_CONFIRMING)
+            throw new IllegalStateException("결제 확인 중 주문만 다시 결제할 수 있습니다.");
+        status = OrderStatus.PENDING_PAYMENT;
+        processingExpiresAt = null;
+    }
+
     public Long getPaymentId() {
         return paymentId;
     }

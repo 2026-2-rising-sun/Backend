@@ -141,13 +141,26 @@ public class PaymentRelayService {
                     guard.lock(member);
                     var group = locked(found.getId());
                     var binding = store.binding(group.getId());
+                    require(!refundIntents.fenced(group.getId()), "시스템 보상으로 승인 재개가 차단되었습니다.");
+                    // 같은 키 재전송은 그 시도의 원문을 돌려준다. 거절로 결제창이 닫힌 뒤에도 새 승인이 되지 않는다.
+                    if (deliveries.approvalKeyUsed(group.getId(), key))
+                        return deliveries.relay(
+                                "APPROVAL",
+                                orders.findByPaymentGroupIdOrderByIdAsc(group.getId())
+                                        .getFirst()
+                                        .getId(),
+                                group.getId(),
+                                number,
+                                group.getPayableAmount(),
+                                key,
+                                binding.paymentId(),
+                                request);
                     if (binding.paymentId() == null
                             || !Objects.equals(request.pgOrderId(), binding.pgOrderId())
                             || request.amount() != group.getPayableAmount())
                         throw conflict("준비된 결제창 정보와 승인 요청이 다릅니다.");
-                    require(!refundIntents.fenced(group.getId()), "시스템 보상으로 승인 재개가 차단되었습니다.");
                     var existing = deliveries.relay(group.getId(), "APPROVAL");
-                    if (existing != null)
+                    if (existing != null && !"FAILED".equals(existing.status()))
                         return deliveries.relay(
                                 "APPROVAL",
                                 orders.findByPaymentGroupIdOrderByIdAsc(group.getId())
@@ -321,7 +334,42 @@ public class PaymentRelayService {
                 });
     }
 
+    /**
+     * 승인 거절이 확정된 시도를 닫는다. 주문은 결제 대기로 되돌리고 예약을 유지해 원래 만료 시각 전까지 새 결제창으로 다시 결제하게 한다. 거절마다 결제 실패 알림을
+     * 보내지 않는다. 만료 시각이 이미 지났으면 같은 트랜잭션에서 만료한다.
+     */
     public void declined(PaymentDeliveryStore.Delivery delivery, Object result) {
+        long id = store.deliveryGroup(delivery.id());
+        var found = groups.findById(id).orElseThrow();
+        guard.ensure(found.getMemberId());
+        tx.executeWithoutResult(
+                t -> {
+                    guard.lock(found.getMemberId());
+                    var group = locked(id);
+                    if (store.binding(id).approvedAt() != null) return;
+                    var current = deliveries.relay(id, "APPROVAL");
+                    if (!refundIntents.fenced(id)
+                            && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING
+                            && current != null
+                            && current.id() == delivery.id()) {
+                        for (var item : orders.findByPaymentGroupIdOrderByIdAsc(id))
+                            if (orders.transitionStatus(
+                                            item.getId(), "PAYMENT_CONFIRMING", "PENDING_PAYMENT")
+                                    != 1) throw new IllegalStateException("거절 반영 항목 상태가 다릅니다.");
+                        group.reopenForPayment();
+                        groups.saveAndFlush(group);
+                        store.declined(id);
+                        deliveries.record(delivery, result, "FAILED");
+                        lifecycle.expire(id);
+                        return;
+                    }
+                    store.status(id, "DECLINED");
+                    deliveries.record(delivery, result, "FAILED");
+                });
+    }
+
+    /** 응답 값 불일치 등으로 Payment가 결제를 전액 취소(CANCELED)한 경우다. 재결제 대상이 아니므로 주문을 실패로 끝낸다. */
+    public void canceled(PaymentDeliveryStore.Delivery delivery, Object result) {
         long id = store.deliveryGroup(delivery.id());
         var found = groups.findById(id).orElseThrow();
         guard.ensure(found.getMemberId());
@@ -338,7 +386,7 @@ public class PaymentRelayService {
                     if (!refundIntents.fenced(group.getId())
                             && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING)
                         orderOutcomes.finish(group, false);
-                    store.status(id, "DECLINED");
+                    store.status(id, "CANCELED");
                     deliveries.record(delivery, result, "FAILED");
                 });
     }

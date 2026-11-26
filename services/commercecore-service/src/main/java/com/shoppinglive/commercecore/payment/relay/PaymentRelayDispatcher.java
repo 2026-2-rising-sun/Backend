@@ -6,15 +6,15 @@ import com.shoppinglive.commercecore.order.entity.OrderStatus;
 import com.shoppinglive.commercecore.order.service.OrderSheetLifecycleService;
 import com.shoppinglive.commercecore.payment.service.PaymentDeliveryStore;
 import java.util.Map;
-import org.slf4j.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
+@Slf4j
 @Service
 public class PaymentRelayDispatcher {
-    private static final Logger log = LoggerFactory.getLogger(PaymentRelayDispatcher.class);
     private final PaymentRelayClient client;
     private final PaymentRelayService service;
     private final PaymentDeliveryStore deliveries;
@@ -94,6 +94,13 @@ public class PaymentRelayDispatcher {
             return;
         }
         if ("CANCELED".equals(lookup.status())) {
+            service.canceled(delivery, lookup);
+            return;
+        }
+        var request = deliveries.read(delivery.command(), Approval.class);
+        // Payment는 거절·미전송·미승인 종료 때 결제를 CREATED로 되돌리고 결제창을 비운다. 이 시도는 청구 없이 끝났다.
+        if ("CREATED".equals(lookup.status())
+                && !java.util.Objects.equals(lookup.pgOrderId(), request.pgOrderId())) {
             service.declined(delivery, lookup);
             return;
         }
@@ -106,7 +113,6 @@ public class PaymentRelayDispatcher {
             service.pending(delivery, lookup, lookup.status());
             return;
         }
-        var request = deliveries.read(delivery.command(), Approval.class);
         if (!service.claimApprovalSend(delivery)) return;
         Reply<ApprovalResult> result;
         try {
