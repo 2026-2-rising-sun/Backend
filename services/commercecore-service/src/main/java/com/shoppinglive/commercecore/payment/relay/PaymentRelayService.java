@@ -253,6 +253,10 @@ public class PaymentRelayService {
                 });
     }
 
+    /**
+     * 보상 펜스가 있거나 결제 확인 중이 아닌 주문의 시도는 다시 승인 대상이 되지 않으므로 같은 잠금 안에서 전달을 종료한다. 열린 채 두면 복구 루프가 매초 다시 집어
+     * 다른 주문의 전달을 밀어낸다. 늦은 승인은 PaymentApproved가 처리한다.
+     */
     public boolean approvalAllowed(PaymentDeliveryStore.Delivery delivery) {
         var found = deliveryGroup(delivery);
         guard.ensure(found.getMemberId());
@@ -260,8 +264,10 @@ public class PaymentRelayService {
                 t -> {
                     guard.lock(found.getMemberId());
                     var group = locked(found.getId());
-                    return !refundIntents.fenced(group.getId())
-                            && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING;
+                    if (!refundIntents.fenced(group.getId())
+                            && group.getStatus() == OrderStatus.PAYMENT_CONFIRMING) return true;
+                    deliveries.record(delivery, Map.of("code", "ORDER_CLOSED"), "TIMEOUT");
+                    return false;
                 });
     }
 
