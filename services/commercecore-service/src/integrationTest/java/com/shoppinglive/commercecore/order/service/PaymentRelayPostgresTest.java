@@ -636,6 +636,16 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                 id(number));
     }
 
+    int lookups(String number) {
+        return (int)
+                mockingDetails(remote).getInvocations().stream()
+                        .filter(
+                                i ->
+                                        i.getMethod().getName().equals("get")
+                                                && number.equals(i.getArgument(0)))
+                        .count();
+    }
+
     String groupStatus(String number) {
         return groups.findById(id(number)).orElseThrow().getStatus().name();
     }
@@ -841,8 +851,10 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         var second = relay.acceptApproval(MEMBER_A, number, "approval-2", request(number));
         String paymentStatus = relay.state(MEMBER_A, number).paymentStatus();
         String secondStatus = deliveries.get(second.requestId()).status();
-        // first는 거절 전 스냅샷이라 terminal()이 false다.
+        // first는 거절 전 스냅샷이라 terminal()이 false다. 재조회하면 Payment 조회 없이 멈춘다.
+        int lookups = lookups(number);
         relayDispatcher.dispatch(first);
+        verify(remote, times(lookups)).get(number);
         relay.declined(first, Map.of("status", "DECLINED"));
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
         assertThat(relay.state(MEMBER_A, number).paymentStatus())
@@ -854,6 +866,22 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         relayDispatcher.dispatch(second);
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
         verify(remote, times(2)).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("같은 시도의 늦은 거절 처리는 이미 끝난 시도면 그 뒤 연 새 결제창 상태를 DECLINED로 덮지 않는다")
+    void lateDuplicateDeclineKeepsNewCheckout() {
+        String number = createRelay("late-decline", true).number();
+        prepare(number);
+        var delivery = accept(number);
+        relay.declined(delivery, Map.of("status", "DECLINED"));
+        reopenCheckout(number, number + "-2");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("CREATED");
+        relay.declined(delivery, Map.of("status", "DECLINED"));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PENDING");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("CREATED");
+        assertThat(relay.state(MEMBER_A, number).pgOrderId()).isEqualTo(number + "-2");
+        assertThat(reserved(501)).isEqualTo(2);
     }
 
     @Test

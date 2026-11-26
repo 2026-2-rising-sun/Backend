@@ -363,6 +363,8 @@ public class PaymentRelayService {
                         lifecycle.expire(id);
                         return;
                     }
+                    // 다른 처리기가 이미 끝낸 시도면 그 뒤 연 결제창 상태를 덮지 않는다.
+                    if (deliveries.get(delivery.requestId()).terminal()) return;
                     // 뒤 시도가 진행 중이면 앞 시도의 거절로 그 시도의 결제 상태를 덮지 않는다.
                     if (current == null || current.id() == delivery.id())
                         store.status(id, "DECLINED");
