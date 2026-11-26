@@ -10,7 +10,11 @@
 <li><a href="#plan과-결정">Plan과 결정</a></li>
 <li><a href="#416-approvalunknown은-전달을-unknown으로-기록만-한다-보상은-기한-판정ordersheetlifecycleserviceexpire이-유일하게-만든다">416: approvalUnknown은 전달을 UNKNOWN으로 기록만 한다. 보상은 기한 판정(OrderSheetLifecycleService.expire)이 유일하게 만든다.</a></li>
 <li><a href="#417-payment_groupcompensation_released_atv118으로-해제를-한-번만-한다-값이-없는-배포-전-보상-대기-행은-보상-완료-때-한-번-해제한다">417: payment_group.compensation_released_at(V118)으로 해제를 한 번만 한다. 값이 없는 배포 전 보상 대기 행은 보상 완료 때 한 번 해제한다.</a></li>
-<li><a href="#418-재결제-기한은-원래-주문-만료-시각이다-승인-전달은-시도마다-남긴다v119-진행성공-시도는-주문당-하나-같은-멱등-키는-같은-시도-거절-때-core-결제창pg_order_id과-송신-표시를-비운다-거절-판정은-422-declined와-조회가-created이고-결제창이-시도의-것과-다름-두-가지다-후자는-202-뒤-거절과-unknown-뒤-abortedexpired를-함께-덮는다">418: 재결제 기한은 원래 주문 만료 시각이다. 승인 전달은 시도마다 남긴다(V119: 진행·성공 시도는 주문당 하나, 같은 멱등 키는 같은 시도). 거절 때 Core 결제창(pg_order_id)과 송신 표시를 비운다. 거절 판정은 422 DECLINED와 "조회가 CREATED이고 결제창이 시도의 것과 다름" 두 가지다. 후자는 202 뒤 거절과 UNKNOWN 뒤 ABORTED·EXPIRED를 함께 덮는다.</a></li>
+<li><a href="#418-재결제-기한은-원래-주문-만료-시각이다-승인-전달은-시도마다-남긴다v119-진행성공-시도는-주문당-하나-같은-멱등-키는-같은-시도-거절-때-core-결제창pg_order_id과-송신-표시를-비운다-거절-판정은-422-declined와-조회가-created이고-결제창이-시도의-것과-다름-두-가지다-후자는-202-뒤-거절과-unknown-뒤-abortedexpired를-함께-덮는다">418: 재결제 기한은 원래 주문 만료 시각이다. 승인 전달은 시도마다 남긴다(V119: 진행·성공 시도는 주문당 하나, 같은 멱등 키는 같은 시도). 거절 때 Core 결제창(pg_order_id)과 송신 표시를 비운다. 거절 판정은 422 DECLINED와 "조회가 CREATED이고 결제창이 시도의 것과 다름" 두 가지다. 후자는 202 뒤 거절과 UNKNOWN 뒤 ABORTED·EXPIRED를 함께 덮는다.</a><ul>
+<li><a href="#검증">검증</a></li>
+<li><a href="#리뷰">리뷰</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>결제 결과 불명·보상 대기·승인 거절의 주문 처리 (#416, #417, #418)</h1><p>결제 재설계(#337)의 마지막 CommerceCore 범위다. 원칙은 "만료나 처리 기한 전에는 주문을 끝내거나 예약을 풀지 않는다. 예외는 구매자의 명시적 취소뿐"이다.</p>
@@ -54,6 +58,36 @@
 <li>
 <h1 id="418-재결제-기한은-원래-주문-만료-시각이다-승인-전달은-시도마다-남긴다v119-진행성공-시도는-주문당-하나-같은-멱등-키는-같은-시도-거절-때-core-결제창pg_order_id과-송신-표시를-비운다-거절-판정은-422-declined와-조회가-created이고-결제창이-시도의-것과-다름-두-가지다-후자는-202-뒤-거절과-unknown-뒤-abortedexpired를-함께-덮는다">418: 재결제 기한은 원래 주문 만료 시각이다. 승인 전달은 시도마다 남긴다(V119: 진행·성공 시도는 주문당 하나, 같은 멱등 키는 같은 시도). 거절 때 Core 결제창(<code>pg_order_id</code>)과 송신 표시를 비운다. 거절 판정은 422 <code>DECLINED</code>와 "조회가 CREATED이고 결제창이 시도의 것과 다름" 두 가지다. 후자는 202 뒤 거절과 UNKNOWN 뒤 ABORTED·EXPIRED를 함께 덮는다.</h1>
 </li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>7c36338208caef7f6ee833a1dad4d34ddaae4b0301a7b89dca77eac86eaa890c</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<li>리뷰·E2E 뒤 추가: 닫힌 주문의 승인 전달은 dispatch 때 <code>TIMEOUT</code>(<code>ORDER_CLOSED</code>)으로 닫고, <code>relayDue</code>는 <code>next_action_at, id</code> 순으로 뽑는다(#416). 예약 해제는 JDBC savepoint로 감싸 논리적 실패가 보상 요청을 막지 않게 했다(#417). 끝난 시도의 늦은 거절·처리중 응답은 상태를 바꾸지 않는다(#418).</li>
+</ul>
+<h2 id="검증">검증</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>명령·환경</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>commercecore-service:postgresTest test migrationTest</code> (격리 Postgres 16, 스택 맨 위)</td>
+<td>235 / 185 / 30건, 실패·스킵 0</td>
+</tr>
+<tr>
+<td><code>scripts/check.sh --base origin/dev --external</code></td>
+<td>docs·api-docs·design-docs·events·migrationTest·postgresTest 통과. <code>build</code>의 integrationTest 288건 중 2건 스킵(이 스택과 무관한 Kafka 표본 테스트)으로 incomplete</td>
+</tr>
+<tr>
+<td>로컬 E2E: Core·Payment jar + <code>lc-e2e-*</code> Postgres·Kafka·WireMock 가짜 토스, 시각은 DB 행 이동</td>
+<td>1차 77건(통과 71·부분 3·실패 1·미검증 2), 실패 1건(D-1)을 고친 뒤 재검증 18건 통과</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>부분 통과: 보상 선점 뒤 늦은 DONE에서 같은 멱등 키 취소가 두 번 나간다(토스가 같은 요청으로 처리, 환불 1·분개 0). 보상 없는 EXPIRED 주문의 늦은 승인은 SQL로 상태를 만들어 확인했다. 고객 전액 환불의 PARTIAL_CANCELED는 REF-EXEC-04대로 24시간 상한까지 재시도한다.</li>
+<li>미검증: 24시간 재시도 상한 실경과, member-service 실제 세션(가짜 응답으로 대체). E2E 재검증은 <code>5ec69bc9</code> 기준이다. 그 뒤의 <code>pending</code> 가드·<code>relayDue</code> 정렬·409 문구는 테스트로만 확인했다.</li>
+</ul>
+<h2 id="리뷰">리뷰</h2>
+<p>Sonnet 독립 리뷰 6회. 1회차 9건(중요 2), 2회차 경미 3, 3회차 경미 1, 4회차 경미 1, 5회차 경미 2, 6회차 #418 No Findings. #416·#417은 5회차에 No Findings, 그 뒤 변경 없음. 지적은 모두 고치거나 PR 본문의 머지·배포·Frontend 협의 항목으로 남겼다.</p><p class="muted fingerprint">MD SHA-256: <code>a493a23434941f1e117c45f35c54c4d51269abf4aa9dce498407237265864233</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
