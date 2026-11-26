@@ -2,14 +2,13 @@ package com.shoppinglive.catalog.product.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.shoppinglive.catalog.client.commercecore.SalesDisplayStatus;
-import com.shoppinglive.catalog.client.commercecore.SalesInfoUnavailableException;
 import com.shoppinglive.catalog.product.dto.PublicProductItemResponse;
 import com.shoppinglive.catalog.product.dto.PublicProductListResponse;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
+import com.shoppinglive.catalog.search.ProductSearch;
 import com.shoppinglive.common.core.BusinessException;
 import com.shoppinglive.common.core.ErrorCode;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -18,21 +17,29 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 가격·상태의 전체 목록 조건은 기존 이벤트 읽기 모델에서 함께 적용한다. 상세·주문 확정 경로는 바꾸지 않는다. */
+/**
+ * 공개 목록. ES 가 조건에 맞는 상품 id 를 정렬된 순서로 찾고, 가격, 재고, 판매 상태는 Catalog DB 에서 지금 값을 붙인다. 상세, 주문 확정 경로는 바꾸지
+ * 않는다.
+ *
+ * <p>SKU 가 여러 개인 상품은 한 줄로 보여 준다. 판매 중 SKU 가 하나라도 있으면 판매 중이고 가격은 판매 중 SKU 최저가, 재고는 판매 중 SKU 재고의 합이다.
+ * 모두 품절이면 품절 SKU 의 최저가와 재고 합이다. ES 가 아직 반영하지 못해 지금은 공개 대상이 아닌 상품은 응답에서 뺀다.
+ */
 @Service
 public class CatalogQueryService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final ProductSearch search;
 
-    public CatalogQueryService(NamedParameterJdbcTemplate jdbc, ObjectMapper mapper) {
+    public CatalogQueryService(
+            NamedParameterJdbcTemplate jdbc, ObjectMapper mapper, ProductSearch search) {
         this.jdbc = jdbc;
         this.mapper = mapper;
+        this.search = search;
     }
 
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = true)
     public PublicProductListResponse list(
             String query,
             SalesDisplayStatus status,
@@ -46,7 +53,7 @@ public class CatalogQueryService {
             throw invalid("검색어는 100자 이하이며 공개 상태는 ON_SALE 또는 SOLD_OUT 이어야 합니다.");
         }
         ProductSort ordering = sort == null ? ProductSort.LATEST : sort;
-        // 카테고리가 없을 때는 기존 커서 형식을 그대로 받는다.
+        // 카테고리가 없을 때는 카테고리 도입 전 커서와 같은 조건 문자열을 쓴다.
         String fingerprint =
                 keyword
                         + "\n"
@@ -54,106 +61,59 @@ public class CatalogQueryService {
                         + "\n"
                         + ordering
                         + (category == null ? "" : "\n" + category);
-        Map<String, Object> params = new HashMap<>();
-        params.put(
-                "keyword",
-                "%" + keyword.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%");
-        params.put("size", size + 1);
-        String where =
-                " WHERE p.deleted_at IS NULL AND s.status IN ('ON_SALE', 'SOLD_OUT') AND LOWER(p.name) LIKE :keyword ESCAPE '!'";
-        if (status != null) {
-            where += " AND s.status = :status";
-            params.put("status", status.name());
-        }
-        if (category != null) {
-            where += " AND p.category = :category";
-            params.put("category", category.name());
-        }
-        // 단일 판매정보 계약은 SKU 상태 필터나 페이지 경계로 우회할 수 없다.
-        // 두 조회는 같은 스냅샷을 사용하므로 검사 직후 도착한 두 번째 SKU도 섞이지 않는다.
-        String matchingProducts = where;
+        List<Long> after = null;
         if (cursor != null && !cursor.isBlank()) {
-            Position after = decode(cursor);
-            if (!fingerprint.equals(after.fingerprint())
-                    || after.id() <= 0
-                    || after.price() < 0
-                    || after.createdAt() == null) {
+            Position position = decode(cursor);
+            if (!fingerprint.equals(position.fingerprint())) {
                 throw invalid("cursor 는 같은 검색·상태·카테고리·정렬 조건에서만 사용할 수 있습니다.");
             }
-            params.put("id", after.id());
-            params.put("createdAt", java.sql.Timestamp.from(after.createdAt()));
-            params.put("price", after.price());
-            where +=
-                    switch (ordering) {
-                        case LATEST ->
-                                " AND (p.created_at < :createdAt OR (p.created_at = :createdAt AND p.id < :id))";
-                        case PRICE_ASC ->
-                                " AND (s.price > :price OR (s.price = :price AND p.id > :id))";
-                        case PRICE_DESC ->
-                                " AND (s.price < :price OR (s.price = :price AND p.id < :id))";
-                    };
+            after = position.after();
         }
-        Boolean multipleSkus =
-                jdbc.queryForObject(
-                        "SELECT EXISTS (SELECT 1 FROM product p JOIN product_sales s ON s.product_id=p.id"
-                                + matchingProducts
-                                + " AND (p.initial_sku_count>1 OR (SELECT COUNT(*) FROM product_sales all_s WHERE all_s.product_id=p.id)>1))",
-                        params,
-                        Boolean.class);
-        if (Boolean.TRUE.equals(multipleSkus)) {
-            throw new SalesInfoUnavailableException("상품의 여러 SKU를 단일 판매정보로 조회할 수 없습니다.");
-        }
-        String order =
-                switch (ordering) {
-                    case LATEST -> "p.created_at DESC, p.id DESC";
-                    case PRICE_ASC -> "s.price ASC, p.id ASC";
-                    case PRICE_DESC -> "s.price DESC, p.id DESC";
-                };
-        List<CatalogRow> rows =
-                jdbc.query(
-                        "SELECT p.id, p.name, p.main_image_url, p.category, p.created_at, p.sale_enabled, s.price, s.status, s.available FROM product p JOIN product_sales s ON s.product_id = p.id"
-                                + where
-                                + " ORDER BY "
-                                + order
-                                + " LIMIT :size",
-                        params,
-                        (rs, n) ->
-                                new CatalogRow(
-                                        rs.getLong("id"),
-                                        rs.getString("name"),
-                                        rs.getString("main_image_url"),
-                                        rs.getTimestamp("created_at").toInstant(),
-                                        rs.getLong("price"),
-                                        SalesDisplayStatus.valueOf(rs.getString("status")),
-                                        rs.getInt("available"),
-                                        rs.getString("category"),
-                                        rs.getBoolean("sale_enabled")));
-        boolean hasNext = rows.size() > size;
-        List<CatalogRow> page = rows.subList(0, Math.min(size, rows.size()));
-        String next = null;
-        if (hasNext) {
-            CatalogRow last = page.getLast();
-            next = encode(new Position(fingerprint, last.createdAt(), last.id(), last.price()));
-        }
+        ProductSearch.Page found = search.find(keyword, status, category, ordering, after, size);
+        Map<Long, PublicProductItemResponse> rows = load(found.productIds());
+        String next = found.hasNext() ? encode(new Position(fingerprint, found.lastSort())) : null;
         return new PublicProductListResponse(
-                page.stream()
-                        .map(
-                                row ->
-                                        new PublicProductItemResponse(
-                                                row.id(),
-                                                row.name(),
-                                                row.imageUrl(),
-                                                row.price(),
-                                                row.available(),
-                                                row.status(),
-                                                row.saleEnabled()
-                                                        && row.status().isPubliclyVisible(),
-                                                row.category() == null
-                                                        ? null
-                                                        : ProductCategory.valueOf(row.category())))
-                        .toList(),
+                found.productIds().stream().map(rows::get).filter(Objects::nonNull).toList(),
                 next,
-                hasNext);
+                found.hasNext());
+    }
+
+    private Map<Long, PublicProductItemResponse> load(List<Long> ids) {
+        Map<Long, PublicProductItemResponse> rows = new HashMap<>();
+        if (ids.isEmpty()) return rows;
+        jdbc.query(
+                """
+                SELECT p.id, p.name, p.main_image_url, p.category, p.sale_enabled,
+                       MIN(CASE WHEN s.status = 'ON_SALE' THEN s.price END) AS on_sale_price,
+                       SUM(CASE WHEN s.status = 'ON_SALE' THEN s.available END) AS on_sale_available,
+                       MIN(CASE WHEN s.status = 'SOLD_OUT' THEN s.price END) AS sold_out_price,
+                       SUM(CASE WHEN s.status = 'SOLD_OUT' THEN s.available END) AS sold_out_available
+                FROM product p JOIN product_sales s ON s.product_id = p.id
+                WHERE p.id IN (:ids) AND p.deleted_at IS NULL
+                GROUP BY p.id, p.name, p.main_image_url, p.category, p.sale_enabled
+                HAVING MIN(CASE WHEN s.status IN ('ON_SALE', 'SOLD_OUT') THEN s.price END) IS NOT NULL
+                """,
+                Map.of("ids", ids),
+                rs -> {
+                    long onSalePrice = rs.getLong("on_sale_price");
+                    boolean onSale = !rs.wasNull();
+                    SalesDisplayStatus state =
+                            onSale ? SalesDisplayStatus.ON_SALE : SalesDisplayStatus.SOLD_OUT;
+                    String category = rs.getString("category");
+                    long id = rs.getLong("id");
+                    rows.put(
+                            id,
+                            new PublicProductItemResponse(
+                                    id,
+                                    rs.getString("name"),
+                                    rs.getString("main_image_url"),
+                                    onSale ? onSalePrice : rs.getLong("sold_out_price"),
+                                    rs.getInt(onSale ? "on_sale_available" : "sold_out_available"),
+                                    state,
+                                    rs.getBoolean("sale_enabled"),
+                                    category == null ? null : ProductCategory.valueOf(category)));
+                });
+        return rows;
     }
 
     private Position decode(String cursor) {
@@ -163,11 +123,11 @@ public class CatalogQueryService {
                     Objects.requireNonNull(
                             mapper.readValue(
                                     Base64.getUrlDecoder().decode(cursor), Position.class));
-            // JDBC 시각 변환의 범위 초과·잘림이 입력 오류 대신 쿼리 오류가 되지 않게 막는다.
-            if (position.createdAt() == null
-                    || position.createdAt().isBefore(Instant.parse("0001-01-01T00:00:00Z"))
-                    || position.createdAt()
-                            .isAfter(Instant.parse("9999-12-31T23:59:59.999999999Z"))) {
+            // 이전 형식 커서(createdAt, id, price)에는 after 가 없다.
+            if (position.fingerprint() == null
+                    || position.after() == null
+                    || position.after().size() != 2
+                    || position.after().contains(null)) {
                 throw new IllegalArgumentException();
             }
             return position;
@@ -191,16 +151,8 @@ public class CatalogQueryService {
         return new BusinessException(ErrorCode.INVALID_REQUEST, message);
     }
 
-    private record Position(String fingerprint, Instant createdAt, long id, long price) {}
-
-    private record CatalogRow(
-            long id,
-            String name,
-            String imageUrl,
-            Instant createdAt,
-            long price,
-            SalesDisplayStatus status,
-            int available,
-            String category,
-            boolean saleEnabled) {}
+    /**
+     * @param after 페이지 마지막 상품의 ES 정렬 값. 최신순은 [생성 시각(밀리초), id], 가격순은 [대표 가격, id]
+     */
+    private record Position(String fingerprint, List<Long> after) {}
 }
