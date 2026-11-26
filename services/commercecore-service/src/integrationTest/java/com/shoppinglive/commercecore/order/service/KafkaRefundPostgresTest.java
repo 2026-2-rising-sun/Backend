@@ -1502,6 +1502,40 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
+    @DisplayName("보상 대기 전환 때 재고 해제가 SQL 오류로 실패하면 보상 요청까지 롤백하고 다음 만료 판정에서 다시 만든다")
+    void releaseSqlErrorRollsBackCompensationAndRetries() {
+        String n = prepare(true);
+        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        jdbc.update(
+                "UPDATE payment_group SET processing_expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                id(n));
+        jdbc.execute(
+                "CREATE OR REPLACE FUNCTION test_fail_sku_release() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'SKU 해제 장애'; END $$ LANGUAGE plpgsql");
+        jdbc.execute(
+                "CREATE TRIGGER test_fail_sku_release BEFORE UPDATE ON sku FOR EACH ROW WHEN (NEW.reserved < OLD.reserved) EXECUTE FUNCTION test_fail_sku_release()");
+        try {
+            // 해제 예외가 트랜잭션 프록시를 지나 바깥이 rollback-only가 된다.
+            assertThatThrownBy(() -> lifecycle.expire(id(n)))
+                    .isInstanceOf(
+                            org.springframework.transaction.UnexpectedRollbackException.class);
+            assertThat(state(n)).isEqualTo("PAYMENT_CONFIRMING");
+            assertThat(intents.fenced(id(n))).isFalse();
+            assertThat(compensationRequests(n)).isZero();
+            assertThat(reserved(501)).isEqualTo(3);
+            assertThat(couponStatus()).isEqualTo("RESERVED");
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS test_fail_sku_release ON sku");
+            jdbc.execute("DROP FUNCTION IF EXISTS test_fail_sku_release()");
+        }
+        assertThat(lifecycle.expire(id(n))).isTrue();
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
     @DisplayName("동시에 같은 완료 결과를 받아도 취소·재고·쿠폰은 한 번만 확정한다")
     void concurrentCompensationCompletionReleasesOnce() throws Exception {
         String n = prepare(true);
