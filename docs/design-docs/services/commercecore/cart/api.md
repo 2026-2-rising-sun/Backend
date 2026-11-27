@@ -1968,7 +1968,9 @@ components:
         없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미
         생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는
         할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. 0원 묶음의 결제 시작과 policy0
-        환불 경로는
+        환불 경로는 삭제됐다(#390. 새 주문서는 실결제액이 양수여야 하고, policy0 환불은 409). legacy 실행은 processingExpiresAt
+        기한에 만료하고 선점을 해제한다(새 주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은
+        기한을 임의 역산하지 않아 processingExpiresAt이 null이다.
   responses:
     Unauthorized:
       description: 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.
@@ -2167,4 +2169,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `c202e5ee67ae58be5c90ebcf623368c3d1eb8bdd466caf6c5a00c89c853e67cb`
+입력 SHA-256: `db9ce1f2fccdf47d91cbe7c56fcf7e10a2917effa3475c7be1843465900e9874`

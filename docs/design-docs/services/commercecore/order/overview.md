@@ -62,7 +62,7 @@ UNKNOWN은 수량·금액 예약을 유지한다. SUCCEEDED만 이번 수량을 
 
 ## 호환·설정·Frontend 영향
 
-policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. 이전 정책의 CANCEL_PENDING 행은 마이그레이션하지 않고, 결과 반영이 PAID·PARTIALLY_REFUNDED·REFUNDED로 끝낸다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 토글은 legacy HTTP에만 적용한다. 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
+policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. 이전 정책의 CANCEL_PENDING 행은 마이그레이션하지 않고, 결과 반영이 PAID·PARTIALLY_REFUNDED·REFUNDED로 끝낸다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 설정은 현재 코드가 읽지 않는다(legacy HTTP는 #390에서 삭제). 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
 
 Frontend는 새 주문/항목 COMPENSATION_PENDING, PARTIALLY_REFUNDED와 이전 정책 데이터의 CANCEL_PENDING, `payment.compensation{requestId,status,outcome,completedAt}`, `refundRequestId`, 요청 targets.quantity와 환불 가능 누계 필드를 처리해야 한다. UNKNOWN이나201/202를 성공으로 표시하지 않아야 한다. Frontend 파일은 수정하지 않았다.
 
