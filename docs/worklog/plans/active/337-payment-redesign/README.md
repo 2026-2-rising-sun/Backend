@@ -1,6 +1,6 @@
 # #337 결제 서비스 재설계
 
-상태: 진행 중 — Backend 코드 작업(Phase 1~3과 CommerceCore #416~#418)은 dev에 머지됐다(2026-11-27, `ba9be27c`). 남은 일은 Frontend #89 화면 연동, Infra #64 알림의 실제 확인, #387의 완료 조건 확인이다. 이 둘이 확인되기 전에는 계획을 `completed/`로 옮기지 않는다.
+상태: 진행 중 — Backend 코드 작업(Phase 1~3과 CommerceCore #416~#418)은 dev에 머지됐다(2026-11-27, `ba9be27c`). 남은 일은 Frontend #89 화면 연동, Infra #64 알림의 실제 확인, #387의 완료 조건 확인이다. 이 셋이 확인되기 전에는 계획을 `completed/`로 옮기지 않는다.
 관련 이슈: [#337 재설계](https://github.com/2026-2-rising-sun/Backend/issues/337)(상위). 남은 이슈는 [서비스별 표](#phase-23의-남은-일)에 있다.
 관련 요구사항: [결제](../../../../design-docs/services/payment/requirements/payment.md) · [원장](../../../../design-docs/services/payment/requirements/ledger.md) · [환불](../../../../design-docs/services/payment/requirements/refund.md)
 관련 결정: [ADR 0337-1](../../../../adr/0337-1-commerce-relay-internal-api.md) · [0337-2](../../../../adr/0337-2-payment-replacement.md) · [0337-3](../../../../adr/0337-3-payment-result-delivery.md) · [0337-4](../../../../adr/0337-4-ledger-double-entry.md) · [0337-5](../../../../adr/0337-5-pg-timeout-and-unknown.md)

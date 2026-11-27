@@ -36,7 +36,7 @@
 </li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Backend 코드 작업(Phase 1~3과 CommerceCore #416~#418)은 dev에 머지됐다(2026-11-27, <code>ba9be27c</code>). 남은 일은 Frontend #89 화면 연동, Infra #64 알림의 실제 확인, #387의 완료 조건 확인이다. 이 둘이 확인되기 전에는 계획을 <code>completed/</code>로 옮기지 않는다.
+</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Backend 코드 작업(Phase 1~3과 CommerceCore #416~#418)은 dev에 머지됐다(2026-11-27, <code>ba9be27c</code>). 남은 일은 Frontend #89 화면 연동, Infra #64 알림의 실제 확인, #387의 완료 조건 확인이다. 이 셋이 확인되기 전에는 계획을 <code>completed/</code>로 옮기지 않는다.
 관련 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/337">#337 재설계</a>(상위). 남은 이슈는 <a href="#phase-23의-남은-일">서비스별 표</a>에 있다.
 관련 요구사항: <a href="../../../../design-docs/services/payment/requirements/payment.html">결제</a> · <a href="../../../../design-docs/services/payment/requirements/ledger.html">원장</a> · <a href="../../../../design-docs/services/payment/requirements/refund.html">환불</a>
 관련 결정: <a href="../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../adr/0337-2-payment-replacement.html">0337-2</a> · <a href="../../../../adr/0337-3-payment-result-delivery.html">0337-3</a> · <a href="../../../../adr/0337-4-ledger-double-entry.html">0337-4</a> · <a href="../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a>
@@ -530,6 +530,6 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <li>완료: 목표 설계, 요구사항, ADR, Phase 1 구현과 토스 샌드박스 확인, Core 결제 중계, Payment 환불 실행(#385·#370·#386), Phase 2·3의 Backend 코드 작업(위 표의 닫힌 이슈).</li>
 <li>남은 일: 위 <a href="#phase-23의-남은-일">Phase 2·3의 남은 일</a>의 열린 이슈와 <a href="#처음-읽는-사람을-위한-요약">다음 Phase 후보</a>.</li>
 <li>결제 재설계가 끝나면 <code>design-docs/services/payment/design.html</code> 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>bca3f3dcf2038cab71790f9f74e2f5c32f49d65feed4f78677e7d119bfac5eab</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>5596f728186341f7fcf98df91cf6de72ad1b4d7a7f8a88378b9a6c0db2e68b41</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
