@@ -14,7 +14,7 @@
 
 회원 구매 guard → Cart 출처 → Product 공유 잠금 → SKU 쓰기 잠금 순으로 새 주문과 재고·쿠폰 예약을 원자적으로 만든다. Product 판매중지·삭제는 신규 주문을 막으며 이미 선점한 유효 주문의 결제까지 취소하지 않는다. 판매자별 양수 실결제액과 `commerce.commission-rate`를 생성 시 보존하며 설정 누락은 주문 전체를 롤백한다. legacy 0원 경로는 유지한다.
 
-준비 PENDING_PAYMENT는 생성부터600초, 승인 진입 PAYMENT_CONFIRMING은 그 승인 시도의 접수부터 별도600초다. PREPARE/APPROVAL 원문·고정 전달ID와 상태는 같은 Core TX에 저장하고 승인 HTTP는 커밋 뒤 수행한다. 정상202 PENDING과 명시적 UNKNOWN은 처리 중 응답이며 보상 의도를 만들지 않는다(#416). 단순 조회 실패도 보상 접수 근거가 아니다. 복구 루프는 1초마다 `next_action_at, id` 순으로 미완료 전달을 집어 Payment를 조회한다.
+준비 PENDING_PAYMENT는 생성부터600초, 승인 진입 PAYMENT_CONFIRMING은 그 승인 시도의 접수부터 별도600초다. PREPARE/APPROVAL 원문·고정 전달ID와 상태는 같은 Core TX에 저장하고 승인 HTTP는 커밋 뒤 수행한다. 정상202 PENDING과 명시적 UNKNOWN은 처리 중 응답이며 보상 의도를 만들지 않는다(#416). 단순 조회 실패도 보상 접수 근거가 아니다. 복구 루프는 1초마다 `next_action_at, id` 순으로 미완료 전달을 집어 승인 전달은 Payment를 조회하고, 준비 전달은 결제 생성을 다시 부른다.
 
 승인 거절(422 `DECLINED`, 또는 조회가 CREATED이고 결제창이 그 시도와 다름)은 주문을 PENDING_PAYMENT로 되돌리고 처리 기한을 비운다. 예약은 유지하고 Core 결제창(`pg_order_id`)과 송신 표시를 비운다. 원래 생성 기한 전까지 같은 주문에서 새 결제창·새 `X-Idempotency-Key`로 다시 승인한다. 승인 전달은 시도마다 한 건이고(V119) 진행·성공 시도는 주문당 하나다. 이미 끝난 시도의 늦은 거절·처리중 응답은 뒤 시도의 상태를 덮지 않는다. Payment CANCELED만 주문을 FAILED로 끝내고 PaymentFailed를 보낸다(#418).
 
