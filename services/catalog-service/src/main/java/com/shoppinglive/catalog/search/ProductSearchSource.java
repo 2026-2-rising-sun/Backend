@@ -22,9 +22,11 @@ public class ProductSearchSource {
         jdbc.query(
                 """
                 SELECT p.id, p.name, p.description, p.category, p.seller_id, p.created_at,
+                       COALESCE(MAX(v.score), 0) AS view_score,
                        MIN(CASE WHEN s.status = 'ON_SALE' THEN s.price END) AS on_sale_price,
                        MIN(CASE WHEN s.status = 'SOLD_OUT' THEN s.price END) AS sold_out_price
                 FROM product p JOIN product_sales s ON s.product_id = p.id
+                LEFT JOIN product_view_score v ON v.product_id = p.id
                 WHERE p.id IN (:ids) AND p.deleted_at IS NULL
                 GROUP BY p.id, p.name, p.description, p.category, p.seller_id, p.created_at
                 HAVING MIN(CASE WHEN s.status IN ('ON_SALE', 'SOLD_OUT') THEN s.price END) IS NOT NULL
@@ -44,7 +46,8 @@ public class ProductSearchSource {
                                     rs.getString("seller_id"),
                                     soldOut ? rs.getLong("sold_out_price") : onSale,
                                     soldOut,
-                                    rs.getTimestamp("created_at").toInstant()));
+                                    rs.getTimestamp("created_at").toInstant(),
+                                    rs.getLong("view_score")));
                 });
         return documents;
     }

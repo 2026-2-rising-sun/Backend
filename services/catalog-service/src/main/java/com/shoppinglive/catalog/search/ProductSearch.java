@@ -121,7 +121,12 @@ public class ProductSearch {
     }
 
     private static List<SortOptions> order(ProductSort sort) {
-        String first = sort == ProductSort.LATEST ? "createdAt" : "price";
+        String first =
+                switch (sort) {
+                    case LATEST -> "createdAt";
+                    case RANKING -> "viewScore";
+                    case PRICE_ASC, PRICE_DESC -> "price";
+                };
         SortOrder direction = sort == ProductSort.PRICE_ASC ? SortOrder.Asc : SortOrder.Desc;
         return List.of(
                 SortOptions.of(o -> o.field(f -> f.field(first).order(direction))),
