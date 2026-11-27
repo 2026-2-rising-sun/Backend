@@ -231,7 +231,7 @@
     }
   },
   "mappings": {
-    "_meta": { "version": 2 },
+    "_meta": { "version": 3 },
     "dynamic": "strict",
     "properties": {
       "productId": { "type": "long" },
@@ -250,7 +250,8 @@
       "price": { "type": "long" },
       "soldOut": { "type": "boolean" },
       "status": { "type": "keyword" },
-      "createdAt": { "type": "date" }
+      "createdAt": { "type": "date" },
+      "viewScore": { "type": "long" }
     }
   }
 }

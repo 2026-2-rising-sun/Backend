@@ -43,6 +43,8 @@ paths:
 
         minPrice, maxPrice는 대표 가격이 양 끝 값을 포함해 범위 안인 상품만 반환한다. 하나만 보내면 그쪽 경계만 적용한다.
 
+        sort=RANKING은 최근 7일 상품 상세 조회수가 많은 순이며 같으면 최신 상품이 먼저다. 순위는 1시간마다 다시 계산한다.
+
         q/status/category/sort를 모두 생략하면 sort=LATEST와 같은 결과를 반환한다. 이전 형식의 cursor는 400 INVALID_REQUEST다.
         SKU가 여러 개인 상품은 한 줄로 반환한다. 판매 중 SKU가 하나라도 있으면 ON_SALE이고 price는 판매 중 SKU 최저가, available은 판매 중 SKU
         재고의 합이다. 모두 품절이면 SOLD_OUT이고 품절 SKU의 최저가와 재고 합이다. 가격 정렬과 가격 기준도 이 대표 가격이다. 비공개 SKU는 계산에서 뺀다.
@@ -95,6 +97,7 @@ paths:
           - LATEST
           - PRICE_ASC
           - PRICE_DESC
+          - RANKING
           default: LATEST
       - name: cursor
         in: query

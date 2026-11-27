@@ -3,6 +3,7 @@ package com.shoppinglive.catalog.product.controller;
 import com.shoppinglive.catalog.product.dto.PublicProductDetailResponse;
 import com.shoppinglive.catalog.product.dto.PurchaseCheckResponse;
 import com.shoppinglive.catalog.product.service.PublicProductDetailService;
+import com.shoppinglive.catalog.ranking.ProductViewCounter;
 import com.shoppinglive.common.core.ApiResponse;
 import com.shoppinglive.common.web.QuantityParser;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,15 +18,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicProductDetailController {
 
     private final PublicProductDetailService detailService;
+    private final ProductViewCounter views;
 
-    public PublicProductDetailController(PublicProductDetailService detailService) {
+    public PublicProductDetailController(
+            PublicProductDetailService detailService, ProductViewCounter views) {
         this.detailService = detailService;
+        this.views = views;
     }
 
-    /** 없거나 비공개면 404 NOT_FOUND, 판매정보 조회 실패면 503 SALES_INFO_UNAVAILABLE. */
+    /** 없거나 비공개면 404 NOT_FOUND, 판매정보 조회 실패면 503 SALES_INFO_UNAVAILABLE. 정상 응답만 랭킹 조회수로 센다. */
     @GetMapping
     public ApiResponse<PublicProductDetailResponse> get(@PathVariable Long productId) {
-        return ApiResponse.ok(PublicProductDetailResponse.from(detailService.getDetail(productId)));
+        var detail = PublicProductDetailResponse.from(detailService.getDetail(productId));
+        views.record(productId);
+        return ApiResponse.ok(detail);
     }
 
     /**

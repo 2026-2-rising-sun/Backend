@@ -46,7 +46,7 @@ class CatalogSchemaPostgresTest {
     }
 
     @Test
-    @DisplayName("빈 Catalog DB에는 조회 사본, 스냅샷 적용 상태와 수신 원문, 검색 색인 작업과 잠금만 생성한다")
+    @DisplayName("빈 Catalog DB에는 조회 사본, 스냅샷 적용 상태와 수신 원문, 검색 색인 작업과 잠금, 조회수 랭킹만 생성한다")
     void initializesOnlyReplicasAndSnapshotTracking() {
         assertThat(
                         jdbc.queryForList(
@@ -62,6 +62,8 @@ class CatalogSchemaPostgresTest {
                         "catalog_snapshot_receipt",
                         "index_task",
                         "shedlock",
+                        "product_view_hourly",
+                        "product_view_score",
                         "flyway_schema_history");
         assertThat(
                         jdbc.queryForObject(

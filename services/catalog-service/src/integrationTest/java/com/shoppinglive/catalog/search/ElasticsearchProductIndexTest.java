@@ -60,7 +60,8 @@ class ElasticsearchProductIndexTest {
                 null,
                 15000,
                 soldOut,
-                Instant.parse("2026-11-24T00:00:00Z"));
+                Instant.parse("2026-11-24T00:00:00Z"),
+                0);
     }
 
     private List<Long> search(String query) throws IOException {

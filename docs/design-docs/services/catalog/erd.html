@@ -18,6 +18,7 @@
 <li><a href="#alias-되돌리기">alias 되돌리기</a></li>
 </ul>
 </li>
+<li><a href="#조회수-랭킹-434">조회수 랭킹 (#434)</a></li>
 </ul>
 </div>
 </div></aside><main id="content"><h1>Catalog DB ERD</h1><section class="graph"><h2>전체 관계도 1</h2><p class="muted">화살표 번호는 아래 관계·처리 조건표의 행 순서입니다. 배치는 실행 순서가 아닙니다.</p><div class="controls"><button type="button" data-zoom="in">확대</button><button type="button" data-zoom="out">축소</button><button type="button" data-zoom="fit">전체 보기</button></div><div class="diagram" tabindex="0" aria-label="관계도 가로 이동"><svg viewBox="0 0 1140 390" role="img" aria-label="전체 관계도 1"><defs><marker id="arrow-1" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z"/></marker></defs><g class="edge-row" data-source="coupon_display_product.coupon_id" data-target="coupon_display.coupon_id"><title>coupon_display_product.coupon_id → coupon_display.coupon_id: 물리 FK · ON DELETE CASCADE</title><path class="connector" d="M350,77 L405,77" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="72.0">1</text></g><g class="edge-row" data-source="product_sales.product_id" data-target="product.id"><title>product_sales.product_id → product.id: 논리 참조 · 이벤트 도착 순서 차이, FK 없음</title><path class="connector" d="M940,120 L190,205" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="157.5">2</text></g><g class="edge-row" data-source="coupon_display_product.product_id" data-target="product.id"><title>coupon_display_product.product_id → product.id: 논리 참조 · FK 없음</title><path class="connector" d="M405,247 L350,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="377.5" y="242.0">3</text></g><g class="edge-row" data-source="product.id" data-target="Core.product.id"><title>product.id → Core.product.id: 서비스 간 원본 ID · FK 없음</title><path class="connector" d="M350,247 L780,247" marker-end="url(#arrow-1)"/><text class="edge-number" x="565.0" y="242.0">4</text></g><g><title>coupon_display_product.coupon_id</title><rect x="30" y="35" width="320" height="85" rx="5"/><text x="190" y="63" text-anchor="middle"><tspan x="190" dy="0">coupon_display_product.coupon_</tspan><tspan x="190" dy="17">id</tspan></text></g><g><title>coupon_display.coupon_id</title><rect x="405" y="35" width="320" height="85" rx="5"/><text x="565" y="63" text-anchor="middle"><tspan x="565" dy="0">coupon_display.coupon_id</tspan></text></g><g><title>product_sales.product_id</title><rect x="780" y="35" width="320" height="85" rx="5"/><text x="940" y="63" text-anchor="middle"><tspan x="940" dy="0">product_sales.product_id</tspan></text></g><g><title>product.id</title><rect x="30" y="205" width="320" height="85" rx="5"/><text x="190" y="233" text-anchor="middle"><tspan x="190" dy="0">product.id</tspan></text></g><g><title>coupon_display_product.product_id</title><rect x="405" y="205" width="320" height="85" rx="5"/><text x="565" y="233" text-anchor="middle"><tspan x="565" dy="0">coupon_display_product.product</tspan><tspan x="565" dy="17">_id</tspan></text></g><g><title>Core.product.id</title><rect x="780" y="205" width="320" height="85" rx="5"/><text x="940" y="233" text-anchor="middle"><tspan x="940" dy="0">Core.product.id</tspan></text></g></svg></div></section><p>기준: Product V2·SKU V3를 반영한 현재 모듈 모델이다. product_sales는 SKU별 사본이며 sales_id가 PK다. 통합 감사 기준은 <a href="https://github.com/2026-2-rising-sun/Backend/tree/5048413b26337cbdc84e258347750d1870f763a8">Order <code>5048413b</code></a>이다. 해당 후행 브랜치에는 Product·SKU·Cart·Order 연결이 존재한다. 이 SKU PR은 Product 위에 쌓인 모듈 체크포인트이며 Order를 역병합하지 않는다. 최종 통합 검사·배포 완료를 이 문서의 모듈 검사와 혼동하지 않는다. 운영 DB 적용이나 실제 Kafka 전달 검증 결과는 아니다.</p>
@@ -70,8 +71,18 @@
 </tr>
 <tr>
 <td>shedlock</td>
-<td>PK name; lock_until; locked_at; locked_by. 검색 색인 잠금</td>
+<td>PK name; lock_until; locked_at; locked_by. 검색 색인 잠금, 랭킹 계산 잠금</td>
 <td><a href="../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql">V6</a></td>
+</tr>
+<tr>
+<td>product_view_hourly</td>
+<td>PK(product_id, hour_start); views. 상세 조회수 시간 칸</td>
+<td><a href="../../../../services/catalog-service/src/main/resources/db/migration/V7__product_view_ranking.sql">V7</a></td>
+</tr>
+<tr>
+<td>product_view_score</td>
+<td>PK product_id; score &gt; 0. 최근 7일 조회수 합</td>
+<td><a href="../../../../services/catalog-service/src/main/resources/db/migration/V7__product_view_ranking.sql">V7</a></td>
 </tr>
 </tbody>
 </table></div>
@@ -153,6 +164,10 @@ curl -s -X POST &quot;$ES/_aliases&quot; -H 'Content-Type: application/json' -d 
   ]
 }'
 </code></pre>
-<p>되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 <code>CATALOG_SEARCH_ENABLED=false</code>로 색인을 끈다. 꺼도 <code>index_task</code>는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.</p><p class="muted fingerprint">MD SHA-256: <code>f019bb98230ea11c0e494ae112a20f2dd7b7097900cd1be3bbb5ef7063a1eaca</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 <code>CATALOG_SEARCH_ENABLED=false</code>로 색인을 끈다. 꺼도 <code>index_task</code>는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.</p>
+<h2 id="조회수-랭킹-434">조회수 랭킹 (#434)</h2>
+<p>공개 상품 상세(<code>GET /v1/products/{id}</code>)가 정상 응답하면 조회수를 센다. 조회마다 DB에 쓰지 않고 앱 메모리에 모았다가 <code>catalog.ranking.flush-interval</code>(기본 1분)마다 지금 시각이 속한 <code>product_view_hourly</code> 칸에 더한다. 앱이 여러 대면 같은 칸에 함께 더하고, 처음 칸을 동시에 만들어 키가 충돌하면 더하기로 바꾼다. 앱이 갑자기 종료되면 아직 쓰지 않은 최대 1분 치를 잃는다. 정상 종료 때는 남은 조회수를 쓰고 끝낸다.</p>
+<p><code>catalog.ranking.cron</code>(기본 매시 5분, Asia/Seoul)마다 최근 <code>window</code>(기본 7일) 칸의 합으로 <code>product_view_score</code>를 다시 계산한다. 점수가 바뀌거나 0이 된 상품만 고치고 같은 TX에서 <code>index_task</code>를 남겨, 부분 색인이 ES 문서의 <code>viewScore</code>를 고친다. 집계 기간보다 오래된 칸은 지운다. <code>shedlock</code>의 <code>catalog-view-ranking</code> 잠금으로 Pod가 여러 개여도 한 번만 돈다. 색인 잠금과 이름이 달라 색인과 동시에 돌 수 있지만 <code>index_task</code>만 남기므로 다음 부분 색인이 반영한다. 검색 색인을 꺼도 조회수와 점수는 계속 쌓인다.</p>
+<p>목록의 <code>sort=RANKING</code>은 <code>viewScore</code> 내림차순이고 같으면 상품 ID 내림차순(최신 상품 먼저)이다. <code>viewScore</code>를 추가하면서 매핑 버전을 3으로 올려, 배포 직후 전체 색인을 다시 한다.</p><p class="muted fingerprint">MD SHA-256: <code>687a3af66da698d2d75880dc90a05c1cf039ff90400fa0547d802eabe4827bfb</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

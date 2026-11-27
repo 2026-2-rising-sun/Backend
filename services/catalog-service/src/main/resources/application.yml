@@ -56,6 +56,12 @@ catalog:
       check-interval: 1m
       batch-size: 500
       lock-at-most-for: 30m
+  # 조회수 랭킹. 상세 조회수를 메모리에 모아 flush-interval 마다 시간 칸에 더하고, cron 마다 최근 window 합으로 점수를 다시 계산한다.
+  ranking:
+    flush-interval: 1m
+    cron: "0 5 * * * *"
+    zone: Asia/Seoul
+    window: 7d
 
 shoppinglive:
   security:
