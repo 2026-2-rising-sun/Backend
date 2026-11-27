@@ -15,6 +15,8 @@ import com.shoppinglive.catalog.client.commercecore.SalesInfo;
 import com.shoppinglive.catalog.client.commercecore.SalesStatus;
 import com.shoppinglive.catalog.product.entity.ProductCategory;
 import com.shoppinglive.catalog.product.repository.ProductRepository;
+import com.shoppinglive.catalog.ranking.ProductViewCounter;
+import com.shoppinglive.catalog.ranking.ViewRanking;
 import com.shoppinglive.catalog.sales.repository.ProductSalesRepository;
 import com.shoppinglive.catalog.search.FullIndexer;
 import com.shoppinglive.catalog.security.CatalogSecuritySupport;
@@ -58,6 +60,8 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     @Autowired JdbcTemplate jdbc;
     @Autowired FullIndexer fullIndexer;
     @Autowired ElasticsearchClient client;
+    @Autowired ProductViewCounter views;
+    @Autowired ViewRanking ranking;
     @MockitoBean HttpSalesInfoClient commerce;
     private long imageId;
 
@@ -76,6 +80,9 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
     void clean() throws IOException {
         verifyNoInteractions(commerce);
         jdbc.update("DELETE FROM product_sales");
+        jdbc.update("DELETE FROM product_view_hourly");
+        jdbc.update("DELETE FROM product_view_score");
+        jdbc.update("DELETE FROM index_task");
         products.deleteAll();
         deleteProductIndices();
     }
@@ -329,6 +336,46 @@ class CatalogQueryHttpTest extends CatalogSecuritySupport {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
         }
+    }
+
+    @Test
+    @DisplayName("상세 조회는 랭킹 조회수로 쌓이고, 랭킹순은 최근 7일 조회수가 많은 순이며 같으면 최신 상품이 먼저다")
+    void ranksByRecentDetailViews() throws Exception {
+        long knit = product("니트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long coat = product("코트", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long scarf = product("목도리", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+        long gloves = product("장갑", 100, SalesStatus.ON_SALE, JwtTestTokens.SELLER);
+
+        // 정상 응답만 센다. 없는 상품의 404 는 세지 않는다.
+        for (int i = 0; i < 2; i++)
+            mvc.perform(get("/v1/products/{id}", knit)).andExpect(status().isOk());
+        mvc.perform(get("/v1/products/{id}", 999_999L)).andExpect(status().isNotFound());
+        views.flush();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COALESCE(SUM(views), 0) FROM product_view_hourly WHERE product_id = ?",
+                                Long.class,
+                                knit))
+                .isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM product_view_hourly WHERE product_id = 999999",
+                                Long.class))
+                .isZero();
+
+        jdbc.update(
+                "INSERT INTO product_view_hourly (product_id, hour_start, views) VALUES (?, ?, 5)",
+                coat,
+                java.sql.Timestamp.from(
+                        java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.HOURS)));
+        ranking.recalculate();
+        indexed();
+
+        JsonNode first = listing("", null, "RANKING", "");
+        assertThat(ids(first.path("items"))).containsExactly(coat, knit);
+        JsonNode second = listing("", null, "RANKING", first.path("nextCursor").asText());
+        assertThat(ids(second.path("items"))).containsExactly(gloves, scarf);
+        assertThat(second.path("hasNext").asBoolean()).isFalse();
     }
 
     @Test

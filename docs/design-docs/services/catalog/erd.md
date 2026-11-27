@@ -19,7 +19,9 @@
 | coupon_display | PK coupon_id; fixed_discount; sold_out; version; 유효 기간 | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | coupon_display_product | PK (coupon_id,product_id) | [V1](../../../../services/catalog-service/src/main/resources/db/migration/V1__catalog_baseline.sql) |
 | index_task | PK id(증가); product_id 비유일; requested_at. 사본과 같은 TX로 기록 | [V6](../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql) |
-| shedlock | PK name; lock_until; locked_at; locked_by. 검색 색인 잠금 | [V6](../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql) |
+| shedlock | PK name; lock_until; locked_at; locked_by. 검색 색인 잠금, 랭킹 계산 잠금 | [V6](../../../../services/catalog-service/src/main/resources/db/migration/V6__search_index_task.sql) |
+| product_view_hourly | PK(product_id, hour_start); views. 상세 조회수 시간 칸 | [V7](../../../../services/catalog-service/src/main/resources/db/migration/V7__product_view_ranking.sql) |
+| product_view_score | PK product_id; score > 0. 최근 7일 조회수 합 | [V7](../../../../services/catalog-service/src/main/resources/db/migration/V7__product_view_ranking.sql) |
 
 ## 관계
 
@@ -105,3 +107,10 @@ curl -s -X POST "$ES/_aliases" -H 'Content-Type: application/json' -d '{
 
 되돌린 인덱스를 만든 뒤 cron 시각이 이미 지났다면 다음 확인 때 전체 색인이 다시 돈다. 원인을 고치기 전까지 다시 만들지 않으려면 `CATALOG_SEARCH_ENABLED=false`로 색인을 끈다. 꺼도 `index_task`는 쌓이므로 다시 켜면 밀린 상품부터 반영된다. 되돌린 뒤 전체 색인이 돌면 문제 있던 인덱스는 오래된 인덱스로 지워진다.
 
+## 조회수 랭킹 (#434)
+
+공개 상품 상세(`GET /v1/products/{id}`)가 정상 응답하면 조회수를 센다. 조회마다 DB에 쓰지 않고 앱 메모리에 모았다가 `catalog.ranking.flush-interval`(기본 1분)마다 지금 시각이 속한 `product_view_hourly` 칸에 더한다. 앱이 여러 대면 같은 칸에 함께 더하고, 처음 칸을 동시에 만들어 키가 충돌하면 더하기로 바꾼다. 앱이 갑자기 종료되면 아직 쓰지 않은 최대 1분 치를 잃는다. 정상 종료 때는 남은 조회수를 쓰고 끝낸다.
+
+`catalog.ranking.cron`(기본 매시 5분, Asia/Seoul)마다 최근 `window`(기본 7일) 칸의 합으로 `product_view_score`를 다시 계산한다. 점수가 바뀌거나 0이 된 상품만 고치고 같은 TX에서 `index_task`를 남겨, 부분 색인이 ES 문서의 `viewScore`를 고친다. 집계 기간보다 오래된 칸은 지운다. `shedlock`의 `catalog-view-ranking` 잠금으로 Pod가 여러 개여도 한 번만 돈다. 색인 잠금과 이름이 달라 색인과 동시에 돌 수 있지만 `index_task`만 남기므로 다음 부분 색인이 반영한다. 검색 색인을 꺼도 조회수와 점수는 계속 쌓인다.
+
+목록의 `sort=RANKING`은 `viewScore` 내림차순이고 같으면 상품 ID 내림차순(최신 상품 먼저)이다. `viewScore`를 추가하면서 매핑 버전을 3으로 올려, 배포 직후 전체 색인을 다시 한다.
