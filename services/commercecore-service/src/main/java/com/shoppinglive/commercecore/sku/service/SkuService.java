@@ -121,10 +121,16 @@ public class SkuService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void release(Long skuId, int quantity) {
+        if (!tryRelease(skuId, quantity))
+            throw new IllegalStateException("해제할 예약 재고가 부족하거나 복구 범위를 벗어났습니다: skuId=" + skuId);
+    }
+
+    /** 해제 실패를 예외 대신 false로 알려 호출 트랜잭션을 rollback-only로 만들지 않는다. 되돌리기는 호출자 savepoint가 맡는다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean tryRelease(Long skuId, int quantity) {
         requireQuantity(quantity);
         watch(skuId);
-        if (repository.release(skuId, quantity) != 1)
-            throw new IllegalStateException("해제할 예약 재고가 부족하거나 복구 범위를 벗어났습니다: skuId=" + skuId);
+        return repository.release(skuId, quantity) == 1;
     }
 
     /** Order가 판매된 항목에 환불 성공을 처음 적용할 때 호출한다. 만료 후 보상 환불은 제외한다. */

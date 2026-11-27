@@ -244,17 +244,12 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
             }
         }
         assertThat(cartExists(cart)).isTrue();
-        if (outcome.equals("late")) {
+        if (outcome.equals("late"))
             assertThat(relay.state(MEMBER_A, number).orderStatus())
                     .isEqualTo("COMPENSATION_PENDING");
-            assertThat(reserved(501)).isEqualTo(2);
-            assertThat(available(501)).isEqualTo(18);
-            assertThat(couponStatus()).isEqualTo("RESERVED");
-        } else {
-            assertThat(reserved(501)).isZero();
-            assertThat(available(501)).isEqualTo(20);
-            assertThat(couponStatus()).isEqualTo("AVAILABLE");
-        }
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -501,8 +496,8 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         relayDispatcher.dispatch(delivery);
         verify(remote, never()).approve(anyString(), any());
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
-        assertThat(available(501)).isEqualTo(18);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_relay_refund", Long.class))
                 .isZero();
     }
@@ -528,8 +523,8 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
                                 "SELECT COUNT(*) FROM event_outbox WHERE event_type='RefundRequested' AND topic='commerce.refund.requests.v1'",
                                 Long.class))
                 .isEqualTo(1);
-        assertThat(available(501)).isEqualTo(18);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -555,7 +550,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인과 처리기한이 경합하면 보상 요청 한 건과 예약보존에 수렴한다")
+    @DisplayName("승인과 처리기한이 경합하면 보상 요청 한 건과 예약 단일 해제에 수렴한다")
     void expiryAndApprovalSerializeAtBoundary() throws Exception {
         String number = createRelay("race", true).number();
         prepare(number);
@@ -582,8 +577,8 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         }
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
                 .isEqualTo(1);
-        assertThat(available(501)).isEqualTo(18);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -865,7 +860,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         relayDispatcher.dispatch(delivery);
         verify(remote, never()).approve(anyString(), any());
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
-        assertThat(available(501)).isEqualTo(18);
+        assertThat(available(501)).isEqualTo(20);
     }
 
     @Test
@@ -1038,7 +1033,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("활성 조회의 처리기한 경계는 보상대기 주문과 예약을 유지한다")
+    @DisplayName("활성 조회의 처리기한 경계는 보상대기로 바꾸고 예약을 한 번 해제한다")
     void activeReadExpiresAtBoundaryOnce() throws Exception {
         String number = createRelay("active-expiry", true).number();
         prepare(number);
@@ -1049,9 +1044,9 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         mvc.perform(get("/v1/order-sheets/active").header("Authorization", bearer(MEMBER_A)))
                 .andExpect(status().isNoContent());
         assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
-        assertThat(available(501)).isEqualTo(18);
-        assertThat(reserved(501)).isEqualTo(2);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @ParameterizedTest(name = "정책 {0}")

@@ -348,7 +348,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인 응답 유실은 별도 보상을 기록하고 늦은 승인·만료·재전달로 주문을 성공시키지 않는다")
+    @DisplayName("승인 처리 기한 도달은 별도 보상을 기록하고 늦은 승인·만료·재전달로 주문을 성공시키지 않는다")
     void lostApprovalFencesLateSuccessAndExpiry() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
@@ -364,9 +364,9 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         verifyNoInteractions(remote);
         relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(available(501)).isEqualTo(17);
-        assertThat(reserved(501)).isEqualTo(3);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         String request = requestId(n);
         var done = result(request, "SUCCEEDED", 1, UUID.randomUUID().toString());
         apply(done);
@@ -460,7 +460,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @Test
     @DisplayName("승인과 보상 intent 경합은 같은 그룹 잠금으로 정상성공 또는 보상 중 하나에 수렴한다")
     void approvalCompensationRace() throws Exception {
-        String n = prepare(false);
+        String n = prepare(true);
         var delivery = accept(n);
         var gate = new CyclicBarrier(2);
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -468,7 +468,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                     pool.submit(
                             () -> {
                                 gate.await();
-                                relay.approved(new Approved(PAYMENT, n, 12000, Instant.now()));
+                                relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
                                 return true;
                             });
             var b =
@@ -481,12 +481,17 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
             a.get(20, TimeUnit.SECONDS);
             b.get(20, TimeUnit.SECONDS);
         }
+        // 보상이 먼저 이기는 순서의 결정적 검증은 lostApprovalFencesLateSuccessAndExpiry가 맡는다.
         if (intents.fenced(id(n))) {
             assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-            assertThat(reserved(501)).isEqualTo(3);
+            assertThat(reserved(501)).isZero();
+            assertThat(available(501)).isEqualTo(20);
+            assertThat(couponStatus()).isEqualTo("AVAILABLE");
         } else {
             assertThat(state(n)).isEqualTo("PAID");
             assertThat(reserved(501)).isZero();
+            assertThat(available(501)).isEqualTo(17);
+            assertThat(couponStatus()).isEqualTo("USED");
         }
     }
 
@@ -515,7 +520,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         verify(remote, times(1)).approve(eq(n), any());
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
-        assertThat(reserved(501)).isEqualTo(3);
+        assertThat(reserved(501)).isZero();
     }
 
     @Test
@@ -647,7 +652,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("시스템 보상 실패·미확정은 주문 예약을 유지하고 사용자 취소 대기로 바꾸지 않는다")
+    @DisplayName("시스템 보상 실패·미확정은 해제한 예약을 다시 잡지 않고 사용자 취소 대기로 바꾸지 않는다")
     void systemFailedAndUnknownKeepReservations() throws Exception {
         String n = prepare(true);
         compensate(accept(n));
@@ -657,8 +662,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         apply(result(request, "FAILED", 2, execution));
         assertThat(intents.compensation(id(n)).status()).isEqualTo("FAILED");
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(reserved(501)).isEqualTo(3);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         assertThat(lifecycle.expire(id(n))).isFalse();
     }
 
@@ -1167,7 +1172,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("첫 처리 시작599초는 예약을 유지하고600초에 그룹·항목·고정원문을 함께 보상대기로 바꾼다")
+    @DisplayName("첫 처리 시작599초는 예약을 유지하고600초에 그룹·항목·고정원문을 함께 보상대기로 바꾸며 예약을 해제한다")
     void processingDeadlineHasExactBoundaryAndDoesNotExtend() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
@@ -1203,9 +1208,9 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                                 request));
         assertThat(outgoing.path("purpose").asText()).isEqualTo("SYSTEM_COMPENSATION");
         assertThat(outgoing.path("orderRef").asText()).isEqualTo(n);
-        assertThat(available(501)).isEqualTo(17);
-        assertThat(reserved(501)).isEqualTo(3);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         assertThat(relay.view(MEMBER_A, n).order().status()).isEqualTo("COMPENSATION_PENDING");
         assertThat(relay.view(MEMBER_A, n).order().items())
                 .allSatisfy(item -> assertThat(item.status()).isEqualTo("COMPENSATION_PENDING"));
@@ -1288,8 +1293,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("동시 만료와UNKNOWN은 회원·그룹 잠금으로 요청1개와 예약보존에 수렴한다")
-    void concurrentDeadlineAndUnknownCreateOneIntent() throws Exception {
+    @DisplayName("UNKNOWN 기록 뒤 만료와 겹친 동시 처리기한 만료는 회원·그룹 잠금으로 요청1개와 예약 단일 해제에 수렴한다")
+    void concurrentDeadlineExpiriesCreateOneIntent() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
         doReturn(groups.findById(id(n)).orElseThrow().getProcessingExpiresAt()).when(time).now();
@@ -1313,8 +1318,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         }
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(compensationRequests(n)).isEqualTo(1);
-        assertThat(reserved(501)).isEqualTo(3);
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -1336,7 +1341,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         verifyNoInteractions(remote);
         relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(reserved(501)).isEqualTo(3);
+        assertThat(reserved(501)).isZero();
     }
 
     @Test
@@ -1345,15 +1350,15 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         String old = prepare(true);
         compensate(accept(old));
         assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
         String fresh = prepare(false, PAYMENT + 1);
         assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
-        assertThat(couponStatus()).isEqualTo("RESERVED");
-        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(reserved(501)).isEqualTo(3);
         assertThat(relay.active(MEMBER_A).orElseThrow().order().orderNumber()).isEqualTo(fresh);
         assertThatThrownBy(() -> prepare(false)).isInstanceOf(BusinessException.class);
         assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(reserved(501)).isEqualTo(6);
+        assertThat(reserved(501)).isEqualTo(3);
         assertThat(state(fresh)).isEqualTo("PENDING_PAYMENT");
     }
 
@@ -1369,7 +1374,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         apply(unknown);
         apply(failed);
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
-        assertThat(reserved(501)).isEqualTo(3);
+        assertThat(reserved(501)).isZero();
         assertThat(intents.compensation(id(n)).completedAt()).isNull();
         var done = result(request, finalStatus, 3, execution);
         apply(done);
@@ -1419,6 +1424,131 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(reserved(501)).isEqualTo(3);
         assertThat(compensationRequests(n)).isZero();
         verifyNoInteractions(remote);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SUCCEEDED", "NO_CHARGE"})
+    @DisplayName("보상 대기 전환 때 해제한 재고·쿠폰을 다른 주문이 잡아도 보상 결과가 여러 번 와 그 예약을 건드리지 않는다")
+    void releasedStockStaysWithOtherOrder(String finalStatus) throws Exception {
+        String n = prepare(true);
+        compensate(accept(n));
+        assertThat(reserved(501)).isZero();
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        String other = prepare(true, PAYMENT + 1);
+        assertThat(reserved(501)).isEqualTo(3);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        String request = requestId(n), execution = UUID.randomUUID().toString();
+        apply(result(request, "UNKNOWN", 1, execution));
+        var done = result(request, finalStatus, 2, execution);
+        apply(done);
+        apply(done);
+        assertThat(state(n)).isEqualTo("CANCELLED");
+        assertThat(state(other)).isEqualTo("PENDING_PAYMENT");
+        assertThat(reserved(501)).isEqualTo(3);
+        assertThat(available(501)).isEqualTo(17);
+        assertThat(couponStatus()).isEqualTo("RESERVED");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT compensation_released_at IS NOT NULL FROM payment_group WHERE id=?",
+                                Boolean.class,
+                                id(n)))
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("해제 표시가 없는 배포 전 보상 대기 주문은 보상 완료 때 예약을 한 번 해제한다")
+    void legacyCompensationPendingReleasesOnCompletion() throws Exception {
+        String n = prepare(true);
+        compensate(accept(n));
+        // 배포 전 행: 예약을 잡은 채 보상 대기로 바뀌었고 해제 표시가 없다.
+        jdbc.update("UPDATE payment_group SET compensation_released_at=NULL WHERE id=?", id(n));
+        jdbc.update("UPDATE sku SET available=available-3,reserved=reserved+3 WHERE id=501");
+        jdbc.update(
+                "UPDATE member_coupon SET status='RESERVED' WHERE member_id=? AND coupon_id=?",
+                MEMBER_A,
+                COUPON);
+        var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
+        apply(done);
+        apply(done);
+        assertThat(state(n)).isEqualTo("CANCELLED");
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sku", "coupon"})
+    @DisplayName("보상 대기 전환 때 예약 해제가 실패하면 savepoint만 롤백해 보상 요청은 커밋하고 보상 완료 때 다시 해제한다")
+    void releaseFailureKeepsCompensationRequest(String failing) throws Exception {
+        String n = prepare(true);
+        var delivery = accept(n);
+        // sku: 트랜잭션 참여 메서드의 실패, coupon: 재고 해제 뒤 실패라 savepoint가 앞선 재고 해제까지 되돌려야 한다.
+        String broken =
+                failing.equals("sku")
+                        ? "UPDATE sku SET reserved=0 WHERE id=501"
+                        : "UPDATE member_coupon SET status='USED' WHERE coupon_id='" + COUPON + "'";
+        String restored =
+                failing.equals("sku")
+                        ? "UPDATE sku SET reserved=3 WHERE id=501"
+                        : "UPDATE member_coupon SET status='RESERVED' WHERE coupon_id='"
+                                + COUPON
+                                + "'";
+        jdbc.update(broken);
+        compensate(delivery);
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(available(501)).isEqualTo(17);
+        assertThat(reserved(501)).isEqualTo(failing.equals("sku") ? 0 : 3);
+        assertThat(couponStatus()).isEqualTo(failing.equals("sku") ? "RESERVED" : "USED");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT compensation_released_at IS NULL FROM payment_group WHERE id=?",
+                                Boolean.class,
+                                id(n)))
+                .isTrue();
+        jdbc.update(restored);
+        var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
+        apply(done);
+        apply(done);
+        assertThat(state(n)).isEqualTo("CANCELLED");
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("보상 대기 전환 때 재고 해제가 SQL 오류로 실패하면 보상 요청까지 롤백하고 다음 만료 판정에서 다시 만든다")
+    void releaseSqlErrorRollsBackCompensationAndRetries() {
+        String n = prepare(true);
+        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        jdbc.update(
+                "UPDATE payment_group SET processing_expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                id(n));
+        jdbc.execute(
+                "CREATE OR REPLACE FUNCTION test_fail_sku_release() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'SKU 해제 장애'; END $$ LANGUAGE plpgsql");
+        jdbc.execute(
+                "CREATE TRIGGER test_fail_sku_release BEFORE UPDATE ON sku FOR EACH ROW WHEN (NEW.reserved < OLD.reserved) EXECUTE FUNCTION test_fail_sku_release()");
+        try {
+            // 해제 예외가 트랜잭션 프록시를 지나 바깥이 rollback-only가 된다.
+            assertThatThrownBy(() -> lifecycle.expire(id(n)))
+                    .isInstanceOf(
+                            org.springframework.transaction.UnexpectedRollbackException.class);
+            assertThat(state(n)).isEqualTo("PAYMENT_CONFIRMING");
+            assertThat(intents.fenced(id(n))).isFalse();
+            assertThat(compensationRequests(n)).isZero();
+            assertThat(reserved(501)).isEqualTo(3);
+            assertThat(couponStatus()).isEqualTo("RESERVED");
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS test_fail_sku_release ON sku");
+            jdbc.execute("DROP FUNCTION IF EXISTS test_fail_sku_release()");
+        }
+        assertThat(lifecycle.expire(id(n))).isTrue();
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -1474,7 +1604,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("보상 완료 저장 실패는 취소·자원해제·결과원장을 함께 롤백하고 같은결과 재수신으로 복구한다")
+    @DisplayName("보상 완료 저장 실패는 취소·결과원장을 함께 롤백하고 같은결과 재수신으로 복구한다")
     void systemCompletionDatabaseFailureRollsBackResources() throws Exception {
         String n = prepare(true);
         compensate(accept(n));
@@ -1492,9 +1622,9 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                                     String.class,
                                     id(n)))
                     .containsOnly("COMPENSATION_PENDING");
-            assertThat(available(501)).isEqualTo(17);
-            assertThat(reserved(501)).isEqualTo(3);
-            assertThat(couponStatus()).isEqualTo("RESERVED");
+            assertThat(available(501)).isEqualTo(20);
+            assertThat(reserved(501)).isZero();
+            assertThat(couponStatus()).isEqualTo("AVAILABLE");
             assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
             assertThat(
                             jdbc.queryForObject(
