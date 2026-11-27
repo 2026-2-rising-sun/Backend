@@ -247,6 +247,10 @@ components:
             paidAmount: 10000
     PaymentFailed:
       name: PaymentFailed
+      description: >-
+        새 주문서는 Payment가 결제를 CANCELED로 끝내 주문이 FAILED가 될 때만 보낸다(failureCode REJECTED).
+        승인 거절(DECLINED)은 주문을 결제 대기로 되돌려 재결제하므로 보내지 않는다(#418). 시스템 보상 완료도
+        보내지 않는다.
       payload:
         type: object
         required:

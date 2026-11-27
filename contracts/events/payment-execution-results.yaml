@@ -11,7 +11,9 @@ channels:
       분개와 함께 common Outbox에 기록한다. 같은 결제의 승인은 한 번만 반영되므로 정상이라면 결제마다 1건이지만, 릴레이는 최소 1회
       전달이라 소비자는 paymentId로 중복을 걸러야 한다. 2.0.0에서 옛 PaymentExecutionResolved(requestId 키)를 지우고
       PaymentApproved로 교체했다(호환 깨짐, #338).
-      3.0.0에서 토픽을 점 표기 payment.execution.results.v1로 바꿨다(#385). Core(#378)는 점·하이픈 두 토픽을 모두 소비한다.
+      3.0.0에서 토픽을 점 표기 payment.execution.results.v1로 바꿨다(#385). Core는 #390 뒤 점 토픽만 소비한다.
+      Core가 승인 결과를 받는 주 경로는 1초 폴링의 HTTP 조회이고 이 이벤트는 보조다. 기한 뒤 보상이 먼저 결제를
+      CANCELED로 선점하면 늦은 토스 승인은 반영되지 않고 이 이벤트도 보내지 않는다.
     messages:
       PaymentApproved:
         $ref: '#/components/messages/PaymentApproved'

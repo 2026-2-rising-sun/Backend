@@ -13,7 +13,7 @@
 | GET `/v1/order-sheets/{number}` | 저장한 `order.orderNumber` | 200 `{order,payment}` |
 | POST `/{number}/payment` (접두어 `/v1/order-sheets`) | 본문/새 키 없음 | 200 `payment` 객체. 미준비 생성 원문 재전달 |
 | POST `/{number}/payment/checkouts` | 본문 없음 | 200 `payment` 객체. 새 결제창은 비멱등이며 pgOrderId 변경 가능 |
-| POST `/{number}/payment/approval` | 별도 고정 `X-Idempotency-Key`, `{paymentKey,pgOrderId,amount}` | 202+Location 또는200 `payment` 객체 |
+| POST `/{number}/payment/approval` | 승인 시도마다 새 `X-Idempotency-Key`(같은 시도의 재전송은 같은 키), `{paymentKey,pgOrderId,amount}` | 202+Location 또는200 `payment` 객체 |
 | POST `/{number}/cancel` | 본문 없음 | 204. PENDING 준비 전후 취소 가능, PROCESSING409 |
 
 생성 본문은 아래 둘 중 하나다. 상품 ID와 SKU ID는 서로 다른 식별자다.
@@ -31,10 +31,12 @@ Cart는 `items` 대신 `cartItems:[{itemId,version}]`를 보낸다. Cart GET의 
 ## 상태·재시도·SDK
 
 - 생성→PENDING/생성부터600초. 준비 성공과 결제창 열기는 PROCESSING을 시작하지 않는다.
-- 실제 인증 callback 뒤 승인 접수→PROCESSING/최초접수부터별도600초. 승인 재요청은 같은 키·원문을 보존하며 연장하지 않는다. 네트워크 실패로 새 주문/새 승인 키를 발급하지 않는다.
-- 202/UNKNOWN은 실패가 아니다. Location 또는 위 GET으로 조회하며 PROCESSING을 유지한다. 이 GET은 DB 상태 조회이며 브라우저가 Payment 내부 API를 호출하지 않는다.
-- 유효 승인→PAID, 확정 거절→FAILED. 사용자 확정 정책으로 이번 주문의 거절 뒤 PENDING 복귀/재시작은 없다. 결제창 인증 실패·닫힘은 아직 승인 접수 전이라 PENDING 유지하고 새 checkouts를 요청할 수 있다.
-- 기한 도달→EXPIRED. 이후 승인→주문 종료 유지/환불 REQUESTED. REQUESTED·Kafka 발행 성공은 환불 완료가 아니다. 환불 결과 SUCCEEDED/FAILED는 별도다.
+- 실제 인증 callback 뒤 승인 접수→PROCESSING/이 시도의 접수부터 별도600초. 같은 시도의 재요청은 같은 키·원문을 보존하며 연장하지 않는다. 네트워크 실패로 새 주문/새 승인 키를 발급하지 않는다.
+- 202/UNKNOWN은 실패가 아니다. Location 또는 위 GET으로 조회하며 처리 기한까지 PROCESSING을 유지한다. 이 GET은 DB 상태 조회이며 브라우저가 Payment 내부 API를 호출하지 않는다. Core가 1초마다 Payment를 조회해 결과를 반영한다.
+- 유효 승인→PAID. 승인 거절→주문이 PENDING으로 돌아오고 예약은 유지된다(#418). 응답 모양은 `orderStatus: PENDING`, `paymentStatus: DECLINED`, `pgOrderId: null`이다. 거절이 202 뒤에 확정되거나 Payment가 토스에 보내지 못해 503 `PG_UNAVAILABLE`로 답한 경우에는 승인 응답이 먼저 202 PROCESSING이고, 1초쯤 뒤 GET이 같은 모양을 보여 준다.
+- 거절 뒤에는 원래 `expiresAt` 전까지 새 checkouts로 결제창을 다시 열고, 새 `pgOrderId`와 **새 `X-Idempotency-Key`**로 승인한다. 거절된 시도의 키를 새 결제창 정보로 다시 쓰면 409("거절된 승인 시도의 키입니다…")다. 같은 키·같은 본문 재전송은 그 시도의 결과(새 승인 없음)를 돌려준다. 결제창 인증 실패·닫힘은 아직 승인 접수 전이라 PENDING 유지하고 새 checkouts를 요청할 수 있다.
+- Payment가 결제를 CANCELED로 끝내면(토스 승인 응답이 결제와 다름) 주문은 FAILED다. 재결제 대상이 아니다.
+- PENDING이 `expiresAt`에 닿으면 EXPIRED. PROCESSING이 처리 기한에 닿으면 COMPENSATION_PENDING(보상 대기)이고 예약은 이때 해제된다. 결과 SUCCEEDED/NO_CHARGE로 CANCELLED가 된다. 보상 없이 닫힌 주문에 늦게 승인이 오면 주문 종료를 유지하고 시스템 보상을 요청한다. 요청·Kafka 발행 성공은 환불 완료가 아니다.
 - 성공 시 같은 Cart ID/version만 제거한다. 사용자가 수정한 Cart는 보존한다. 쿠폰 사용은 승인 확정 시 반영한다.
 
 Core가 SDK 준비 값으로 주는 것은 `pgOrderId,amount,expiresAt`이다. SDK의 `orderId`에는 **받은 pgOrderId**를 쓴다. callback의 `paymentKey,orderId,amount`에서 `orderId`를 Core 승인 본문의 `pgOrderId`에 매핑한다. 결제창을 재발급했다면 이전 ID를 재사용하지 않는다. `buyerId`는 본문으로 보내지 않고 Core가 JWT에서 공급한다.

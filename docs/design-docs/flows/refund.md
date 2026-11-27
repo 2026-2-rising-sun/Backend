@@ -2,7 +2,7 @@
 
 <!-- visual: relations -->
 
-기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 Core 코드와 그 뒤 #378(사용자 환불·시스템 보상 분리), #384(환불 결과 계약) 변경. Payment 환불 연동 완료나 실제 금전 환불을 확인한 문서가 아니다.
+기준: 2026-11-27 dev `ba9be27c`(#416~#418 머지 뒤). 처음 작성 기준은 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`와 #378(사용자 환불·시스템 보상 분리), #384(환불 결과 계약)다. 실 PG의 금전 환불을 확인한 문서가 아니다.
 
 [시각 자료](refund.html) · [주문·결제](order-payment.md) · [확인 근거와 잔여 과제](../../worklog/2026-11-20-cdc-refund-status.md)
 
@@ -19,11 +19,11 @@
 | PROCESSING/UNKNOWN | FAILED | 확정 실패만 반영하며 성공 재고 복원을 하지 않는다. |
 | 일부 항목 환불 | 묶음 PAID 유지 | 모든 자식 주문이 REFUNDED일 때만 묶음도 REFUNDED가 된다. |
 
-현재 서비스 application.yml의 `commercecore.refunds.api-enabled`와 `execution-enabled`는 true다. 코드 생성자의 기본 false와 구분한다. 다만 dev Payment에서 기존 내부 환불 실행 API는 삭제됐고 이를 대체할 환불 provider가 없다. 따라서 토글이 켜졌거나 Core에 접수/결과 코드가 있다는 사실로 실제 환불 가능을 주장하지 않는다. 구 Mock 시나리오·과거 테스트 성공도 현재 Payment 실행 증거가 아니다.
+현재 서비스 application.yml의 `commercecore.refunds.api-enabled`와 `execution-enabled`는 true다. 코드 생성자의 기본 false와 구분한다. dev Payment의 기존 내부 환불 실행 API는 삭제됐고, 새 주문서 환불은 Kafka 요청·결과 경로(아래 결과 계약)로 Payment가 실행한다(#385·#395·#396). 구 Mock 시나리오·과거 테스트 성공은 현재 Payment 실행 증거가 아니다.
 
 ## 현재 dev: 종료 주문의 늦은 승인
 
-새 주문서가 EXPIRED/CANCELLED/FAILED가 된 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `KafkaRefundService.compensateLocked`로 `core_refund_intent`(purpose SYSTEM_COMPENSATION, reason LATE_APPROVAL)와 `commerce.refund.requests.v1`의 RefundRequested Outbox를 같은 TX에 저장한다. Payment가 이 요청을 실행하고 `payment.refund.results.v1`의 RefundResultRecorded로 결과를 보낸다. Core는 구 `payment.refund-results.v1`을 구독하지 않는다(#390). 환불 결과는 `CommonRefundResultConsumer`가 받아 [KafkaRefundService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/KafkaRefundService.java)가 `core_refund_intent` 원요청과 대조해 반영한다. 옛 `late_approval_refund`·`payment_relay_refund` 행은 지우지 않은 과거 기록이고 새 늦은 승인은 쓰지 않는다.
+새 주문서가 보상 없이 EXPIRED/CANCELLED/FAILED로 닫힌 뒤 승인 사실을 확인하면 주문을 되살리지 않는다. 새 주문서가 FAILED가 되는 경우는 Payment가 결제를 CANCELED로 끝낸 경우뿐이다. 승인 거절은 주문을 FAILED로 끝내지 않고 PENDING_PAYMENT로 되돌린다(#418). [PaymentRelayService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/relay/PaymentRelayService.java)는 `KafkaRefundService.compensateLocked`로 `core_refund_intent`(purpose SYSTEM_COMPENSATION, reason LATE_APPROVAL)와 `commerce.refund.requests.v1`의 RefundRequested Outbox를 같은 TX에 저장한다. Payment가 이 요청을 실행하고 `payment.refund.results.v1`의 RefundResultRecorded로 결과를 보낸다. Core는 구 `payment.refund-results.v1`을 구독하지 않는다(#390). 환불 결과는 `CommonRefundResultConsumer`가 받아 [KafkaRefundService](../../../services/commercecore-service/src/main/java/com/shoppinglive/commercecore/payment/service/KafkaRefundService.java)가 `core_refund_intent` 원요청과 대조해 반영한다. 옛 `late_approval_refund`·`payment_relay_refund` 행은 지우지 않은 과거 기록이고 새 늦은 승인은 쓰지 않는다.
 
 Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka 발행·계약 검사는 Payment 접수나 금전 환불 완료가 아니다.
 
@@ -34,9 +34,9 @@ Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka �
 | 구분 | 현재 구현 | 완료 전제 |
 |---|---|---|
 | 사용자 환불 | 주문 상태는 PAID·PARTIALLY_REFUNDED를 유지하고 진행은 refund_request가 가진다. 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED | 원요청·금액·대상과 맞는 결과만 반영 |
-| 시스템 보상 | 명시적 Payment UNKNOWN 또는 최초 PROCESSING부터 600초 경과는 COMPENSATION_PENDING | 시작 때 재고·쿠폰을 해제하지 않고 성공 결과 뒤 한 번 해제·CANCELLED |
+| 시스템 보상 | 그 승인 시도의 접수부터 600초 처리 기한에 닿은 PAYMENT_CONFIRMING만 COMPENSATION_PENDING(사유 `APPROVAL_UNKNOWN`). 명시적 UNKNOWN은 기한까지 조회를 이어 간다 | 전환 TX에서 재고·쿠폰을 한 번 해제(savepoint). SUCCEEDED/NO_CHARGE 결과로 CANCELLED가 되며 다시 해제하지 않는다. 전환 때 해제하지 못한 주문만 이때 해제 |
 | 공통 요청/결과 | commerce.refund.requests.v1 → payment.refund.results.v1 | dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현 |
-| 종료 뒤 승인 | 주문 부활 없이 고정된 요청 ID로 보상 재요청·대조 | 원결제 ID 연결과 결과 원문 검증 유지 |
+| 종료 뒤 승인 | 보상 없이 닫힌 주문만 주문 부활 없이 `LATE_APPROVAL` 보상을 요청한다. 이미 보상 중이면 승인 사실만 남기고 기존 요청으로 수렴한다 | 주문당 보상 1건은 Core가 fence 확인으로 지킨다. 요청 ID는 UUID다. 원결제 ID 연결과 결과 원문 검증 유지 |
 
 ## 결과 계약 (#384)
 
@@ -55,5 +55,14 @@ Payment 결과 계약은 [payment-refund-results.yaml](../../../contracts/events
 | 미승인 종료 | NO_CHARGE | 시스템 보상만 쓴다. `failureCode: NO_CHARGE`, 환불 금액 0. |
 
 Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 paymentId 없는 보상 요청을 만들지 않는다. Payment 파서는 #402에서 계약만 받는다(paymentId 필수, 사유 3개). 계약 밖 요청은 결과를 만들지 않고 DLT로 보낸다. 이 문서의 계약 검사는 실제 토스 환불 완료를 증명하지 않는다.
+
+## 재시도와 사람 확인
+
+| 구분 | 재시도 | 멈춤 | 토스 멱등 키 |
+|---|---|---|---|
+| 고객 환불(USER_REFUND) | 첫 시도부터 30분까지 3분, 그 뒤 10분 간격 | 24시간 뒤 UNKNOWN으로 멈추고 `[사람 확인 필요]` ERROR. 토스가 PARTIAL_CANCELED로 답해도 바로 보류하지 않고 이 상한까지 재시도한 뒤 사람 확인으로 넘긴다(REF-EXEC-04) | `refund_request_id` |
+| 시스템 보상(SYSTEM_COMPENSATION) | 30초부터 두 배씩, 상한 10분 | 첫 예약부터 24시간. 토스 PARTIAL_CANCELED·취소 불가는 바로 보류해 사람이 확인한다 | `cancel-{pg_order_id}`(승인 시도의 결제창 ID) |
+
+고객 환불은 승인 시각부터 7일(168시간) 안에만 접수하고, Payment는 판매자 주문별 환불 합이 그 판매자 금액을 넘으면 FAILED(`OVER_REFUND`)로 답한다. 시스템 보상의 FAILED는 나중에 더 높은 `resultVersion`의 SUCCEEDED·NO_CHARGE로 바뀔 수 있다.
 
 [현재 Core 모듈](../services/commercecore/order/overview.md) · [Payment 소유 설계](../services/payment/overview.md) · [계약 원본](../../../contracts/events). Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.
