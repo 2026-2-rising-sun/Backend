@@ -2800,7 +2800,7 @@ components:
         refundStatus: {type: [string, 'null'], enum: [null, REQUESTED, UNKNOWN, COMPLETED, SUCCEEDED, FAILED], description: 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다.}
         compensation:
           type: [object, 'null']
-          description: 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다.
+          description: 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정하며, 전환 때 해제하지 못한 예약만 이때 해제한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태와 예약을 바꾸지 않는다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다.
           required: [requestId, status, outcome, completedAt]
           properties:
             requestId: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}
