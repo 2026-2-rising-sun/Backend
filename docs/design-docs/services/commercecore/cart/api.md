@@ -1968,9 +1968,9 @@ components:
         생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는
         할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인
         묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를
-        유지하고 전량 환불이면 REFUNDED다. 새 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다. V105
-        이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 신규 내부 주문서 공개 결제/수량환불
-        및 새 Payment 생성·승인·환불 이벤트 연동은 미완이다.
+        유지하고 전량 환불이면 REFUNDED다. legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새
+        주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이
+        null이다.
   responses:
     Unauthorized:
       description: 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.
@@ -2169,4 +2169,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `a90b04ca3bc055d728c022210eebbe858438d350cd665c417ab8cd91b7e75680`
+입력 SHA-256: `fd5d534bb37a05bfdac843f096fa458921db75c9c95e0672d0f964c763c88aae`

@@ -8,10 +8,10 @@ info:
     USER와 SELLER의 타인 주문·결제·장바구니 접근은 404.
     주문·결제·장바구니·판매정보의 JSON 성공 응답은 봉투 없는 DTO/배열이고, 쿠폰·환불은 ApiResponse 봉투이다. 오류는 공통 ApiResponse 봉투이며 204는 본문이 없다.
     현재 결제 연동은 독립 Payment 서비스의 토스페이먼츠 연동(테스트 키)이며 서비스가 JWT를 직접 검증한다.
-    공개 결제/환불 facade는 Core가 유지한다. Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다.
-    0원도 Payment에 원본 성공과 Outbox를 저장한 뒤 Core가 즉시 주문·재고·쿠폰을 반영해 200을 반환한다. Payment 불가용·응답 유실은 같은 requestId로 복구하며 UNKNOWN을 실패로 확정하지 않는다.
+    공개 결제/환불 facade는 Core가 유지한다. 결제(생성·승인·조회)는 Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다. 환불은 Kafka 요청(commerce.refund.requests.v1)·결과(payment.refund.results.v1)로 오간다.
+    정책0(legacy) 주문의 0원·Payment 호출 경로는 #390에서 삭제됐고, 새 주문서는 실결제액이 양수여야 한다. Payment 불가용·응답 유실은 같은 requestId로 복구하며 UNKNOWN을 실패로 확정하지 않는다.
 
-    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 새 주문 생성 기한은 기본600초다. 기존 PAYMENT_CONFIRMING 상태명을 PROCESSING 의미로 유지하고 승인 시도마다 그 접수부터 별도600초 처리 기한을 저장한다. 신규 order-sheets는 처리 기한까지 PROCESSING을 유지하며 1초마다 Payment를 조회하고, 기한에 닿을 때만 COMPENSATION_PENDING과 SYSTEM_COMPENSATION Outbox로 전환하며 같은 TX에서 예약을 해제한다. 명시적 UNKNOWN·단순 통신오류는 즉시 보상하지 않으며 정상202는 UNKNOWN이 아니다. 보상 완료(SUCCEEDED·NO_CHARGE) 후 CANCELLED로 확정한다. 결제 전 미결제 주문의 EXPIRED는 기존대로 유지한다. Kafka 환불 요청은 Payment가 소비·실행하고 결과를 돌려준다(#385·#370·#386). 실제 PG 환불 실행은 검증하지 않았다. 기존 저장기한·번호·금액·참조는 바꾸지 않는다.
+    단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 새 주문 생성 기한은 기본600초다. 기존 PAYMENT_CONFIRMING 상태명을 PROCESSING 의미로 유지하고 승인 시도마다 그 접수부터 별도600초 처리 기한을 저장한다. 신규 order-sheets는 처리 기한까지 PROCESSING을 유지하며 1초마다 Payment를 조회하고, 기한에 닿을 때만 COMPENSATION_PENDING과 SYSTEM_COMPENSATION Outbox로 전환하며 같은 TX에서 예약을 해제한다. 명시적 UNKNOWN·단순 통신오류는 즉시 보상하지 않으며 정상202는 UNKNOWN이 아니다. 보상 완료(SUCCEEDED·NO_CHARGE) 후 CANCELLED로 확정한다. 결제 전 미결제 주문의 EXPIRED는 기존대로 유지한다. Kafka 환불 요청은 Payment가 소비·실행하고 결과를 돌려준다(#385·#370·#386). 운영 PG 환불은 검증하지 않았다(토스 테스트 환경 확인은 #367). 기존 저장기한·번호·금액·참조는 바꾸지 않는다.
     장바구니는 주문 생성 뒤에도 편집할 수 있으며 결제 성공 때 원본 ID·version 일치 항목만 삭제한다.
 
     JWT가 있으면 로컬 서명 검증 후 Member 세션을 매번 확인한다. 상태 확인 실패는 SERVICE_UNAVAILABLE 503이며 캐시로 우회하지 않는다. 서비스 토큰 전용 요청은 Member 세션 확인과 독립이다.
@@ -2796,7 +2796,7 @@ components:
         pgOrderId: {type: [string, 'null']}
         amount: {type: integer, format: int64, minimum: 1}
         expiresAt: {type: string, format: date-time, description: 변경하지 않는 PENDING 생성 기한}
-        processingExpiresAt: {type: [string, 'null'], format: date-time, description: 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다.}
+        processingExpiresAt: {type: [string, 'null'], format: date-time, description: 승인 시도 접수+600초. 준비 단계와 거절로 PENDING에 돌아온 동안은 null이며 같은 시도의 재요청으로 연장하지 않는다.}
         refundStatus: {type: [string, 'null'], enum: [null, REQUESTED, UNKNOWN, COMPLETED, SUCCEEDED, FAILED], description: 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다.}
         compensation:
           type: [object, 'null']
@@ -2916,7 +2916,7 @@ components:
           format: int64
           minimum: 1
       description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가 없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미 생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는
-        null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. 새 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다. V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 신규 내부 주문서 공개 결제/수량환불 및 새 Payment 생성·승인·환불 이벤트 연동은 미완이다.
+        null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새 주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 
     CreateOrderRequest:
       type: "object"
       required: ["productId", "quantity", "buyerName", "buyerPhone"]
@@ -3140,11 +3140,11 @@ components:
           type: [string, 'null']
           format: date-time
           description: "미확정 결제의 다음 자동 처리 대상 시각이며 완료 시각을 보장하지 않는다. 확정 결제에서도 마지막 예약 시각은 남는다."
-      description: "현재 결제 게이트웨이는 Mock이다. scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
+      description: "삭제된 legacy Mock 결제 스키마다(참조 없음). scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
     PaymentScenario:
       type: "string"
       enum: ["INSTANT_SUCCESS", "INSTANT_FAIL", "DELAYED_SUCCESS", "DELAYED_FAIL", "SUCCESS_RESPONSE_LOST", "FAILURE_RESPONSE_LOST", "UNAVAILABLE_BEFORE_RESULT"]
-      description: "Mock 결과 시나리오이며 일반 결제 요청에서 선택할 수 없다. local/test의 서버 시나리오 설정으로만 제어한다. SUCCESS_RESPONSE_LOST와 FAILURE_RESPONSE_LOST는 각각 승인 성공·확정 실패 결과를 저장한 뒤 최초 응답을 유실하고 같은 결제 시도 ID의 저장 결과는 보존한다. UNAVAILABLE_BEFORE_RESULT는 결과 저장 전 일시 장애로 승인·확정 실패 결과를 만들지 않는다. 결과 조회는 저장 결과만 확인하며 새 승인을 만들지 않는다. 자동 재실행 횟수·조회 주기는 별도 복구 정책이다."
+      description: "삭제된 legacy Mock 결과 시나리오다(참조 없음). 일반 결제 요청에서 선택할 수 없었다. local/test의 서버 시나리오 설정으로만 제어한다. SUCCESS_RESPONSE_LOST와 FAILURE_RESPONSE_LOST는 각각 승인 성공·확정 실패 결과를 저장한 뒤 최초 응답을 유실하고 같은 결제 시도 ID의 저장 결과는 보존한다. UNAVAILABLE_BEFORE_RESULT는 결과 저장 전 일시 장애로 승인·확정 실패 결과를 만들지 않는다. 결과 조회는 저장 결과만 확인하며 새 승인을 만들지 않는다. 자동 재실행 횟수·조회 주기는 별도 복구 정책이다."
     SetPaymentScenarioRequest:
       type: "object"
       required: ["scenario"]

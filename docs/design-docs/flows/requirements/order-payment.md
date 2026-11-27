@@ -30,4 +30,4 @@
 
 ## 기존 Mock 기준과 Payment 목표 설계
 
-기존 Mock 설명은 결제 재설계(#337)에서 교체할 예정이며 새 Payment 설계 원본은 [Payment 도메인 홈](../../services/payment/overview.md)이다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). 그 뒤 CommerceCore 결제 모듈을 바꿀 때까지 Core의 기존 결제·환불 호출은 403을 받는다. 이전 동일 키/원문 연결·유효 확인중 예약 유지·중복 결과 방지 기준은 위 Core 조건으로 검증 범위를 명시했다. [이전 보존 기록](../../../worklog/plans/completed/331-order-module/verification.md)을 최신 실제 PG/환불 실행 완료로 재사용하지 않는다. Payment 소유 원문·계약은 이 작업에서 임의 변경하지 않는다.
+기존 Mock 설명은 결제 재설계(#337)에서 교체됐으며 새 Payment 설계 원본은 [Payment 도메인 홈](../../services/payment/overview.md)이다. Payment 쪽 Mock 실행 코드와 내부 API는 #347에서 삭제됐다(테이블은 #348 V4에서 삭제). Core의 기존 결제·환불 호출은 #390에서 삭제됐고, 새 중계는 `/v1/internal/payments` 생성·결제창·승인·조회만 부른다. 이전 동일 키/원문 연결·유효 확인중 예약 유지·중복 결과 방지 기준은 위 Core 조건으로 검증 범위를 명시했다. [이전 보존 기록](../../../worklog/plans/completed/331-order-module/verification.md)을 최신 실제 PG/환불 실행 완료로 재사용하지 않는다. Payment 소유 원문·계약은 이 작업에서 임의 변경하지 않는다.

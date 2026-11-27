@@ -26,7 +26,7 @@
 | Core 환불 요청 발행 | Payment 환불 소비 | Payment가 `commerce.refund.requests.v1`을 소비해 refundRequestId로 한 번만 접수하고 토스 취소를 실행한다. 발행 성공은 환불 완료가 아님 |
 | Payment 환불 결과 | Core 환불 상태 | payment.refund.results.v1의 RefundResultRecorded를 core_refund_intent 원요청과 대조해 반영. 구 payment.refund-results.v1 구독은 #390에서 삭제됨 |
 
-과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 1차 77건 중 71건 통과(부분 3·실패 1·미검증 2)했고, 실패 1건은 고친 뒤 재검증했으며 최종 코드는 회귀 20건이 통과했다([기록](../../worklog/2026-11-27-core-payment-retry.md)). 실 PG와 실제 환불 실행은 미실행이다.
+과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 1차 77건 중 71건 통과(부분 3·실패 1·미검증 2)했고, 실패 1건은 고친 뒤 재검증했으며 최종 코드는 회귀 20건이 통과했다([기록](../../worklog/2026-11-27-core-payment-retry.md)). 이 기록은 Mock 토스까지이고, 토스 테스트 환경의 승인·환불 확인은 #367에 있다. 운영 PG는 미확인이다.
 
 ## 보상 대기와 재고 사본
 

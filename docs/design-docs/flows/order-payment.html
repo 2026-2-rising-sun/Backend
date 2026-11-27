@@ -92,7 +92,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 1차 77건 중 71건 통과(부분 3·실패 1·미검증 2)했고, 실패 1건은 고친 뒤 재검증했으며 최종 코드는 회귀 20건이 통과했다(<a href="../../worklog/2026-11-27-core-payment-retry.html">기록</a>). 실 PG와 실제 환불 실행은 미실행이다.</p>
+<p>과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 1차 77건 중 71건 통과(부분 3·실패 1·미검증 2)했고, 실패 1건은 고친 뒤 재검증했으며 최종 코드는 회귀 20건이 통과했다(<a href="../../worklog/2026-11-27-core-payment-retry.html">기록</a>). 이 기록은 Mock 토스까지이고, 토스 테스트 환경의 승인·환불 확인은 #367에 있다. 운영 PG는 미확인이다.</p>
 <h2 id="보상-대기와-재고-사본">보상 대기와 재고 사본</h2>
 <p>처리 기한(승인 접수부터 600초)까지 결과를 모르면 주문을 COMPENSATION_PENDING(보상 대기)으로 바꾸고 <code>SYSTEM_COMPENSATION</code> 환불 요청을 보낸다. 명시적 UNKNOWN만으로는 보상하지 않고 기한까지 조회를 이어 간다. 보상 대기로 바꾸는 TX에서 재고·쿠폰 예약을 한 번 해제한다(<code>payment_group.compensation_released_at</code>, V118). 해제가 논리적으로 실패하면 JDBC savepoint까지만 되돌리고 보상 요청은 커밋한 뒤, 보상 완료(SUCCEEDED 또는 NO_CHARGE)로 CANCELLED가 될 때 다시 해제한다. 락 타임아웃·SQL 오류처럼 트랜잭션 밖으로 나간 예외는 보상 요청까지 롤백하고 다음 기한 판정에서 다시 시도한다. 전환 때 이미 해제했으면 보상 결과가 예약을 다시 해제하지 않는다. 보상 대기 주문은 되살아나지 않는다.</p>
 <p>보상 행은 완료 뒤에도 정상 승인 재개를 막는 영속 fence다. 보상이 있는 주문은 승인 API 재진입, 결제창 열기, 전달 재송신, 구매자 취소, 만료 판정, 사용자 환불 접수를 모두 거절하거나 건너뛴다. 보상됐거나 닫힌 주문의 남은 승인 전달은 dispatch 때 <code>TIMEOUT</code>(<code>ORDER_CLOSED</code>)으로 닫아 복구 루프가 계속 집지 않게 한다.</p>
@@ -125,6 +125,6 @@
 <p>알려진 테스트 공백: 정책0 주문 환불 409, 옛 <code>payment_relay_refund</code> 행이 있을 때 늦은 승인 롤백은 단언하는 테스트가 없다.</p>
 <p><a href="../services/commercecore/order/overview.html">Core 상세</a> · <a href="../../worklog/plans/active/331-order-audit-fixes/processing-deadline.html">과거 기준(#331)</a> · <a href="../../worklog/2026-11-16.html">실행 기록</a> · <a href="../services/payment/overview.html">Payment 설계</a></p>
 <h2 id="이전-mock-설명의-기준">이전 Mock 설명의 기준</h2>
-<p>기존 공통 설명은 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사와 #330 문서 변경을 기준으로 했다. 당시 업무 코드나 실제 DB·HTTP·Kafka·PG 실행을 검증한 것으로 보지 않는다. 기존 Mock의 PAYMENT_CONFIRMING+PAYMENT 전달, Payment Mock 실행/결과 Outbox, Core의 재고·쿠폰 결과 반영은 legacy 경로의 설명이며 새 승인/환불 전체 통합의 증거로 합산하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>e33a25855694b9c23796900683e3cfa2210b35b4c16f6e8fb4a967207c10807a</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>기존 공통 설명은 <code>e5a1b66bf3b06a971b1242dd02bd623e717c2902</code>의 코드·계약 조사와 #330 문서 변경을 기준으로 했다. 당시 업무 코드나 실제 DB·HTTP·Kafka·PG 실행을 검증한 것으로 보지 않는다. 기존 Mock의 PAYMENT_CONFIRMING+PAYMENT 전달, Payment Mock 실행/결과 Outbox, Core의 재고·쿠폰 결과 반영은 legacy 경로의 설명이며 새 승인/환불 전체 통합의 증거로 합산하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>7197cd0f5492a559f156669c5a76805fe4ed98131f4433e436294293fadeabf0</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
