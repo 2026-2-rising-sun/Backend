@@ -80,12 +80,12 @@
 <tr>
 <td>시스템 보상</td>
 <td>그 승인 시도의 접수부터 600초 처리 기한에 닿은 PAYMENT_CONFIRMING만 COMPENSATION_PENDING(사유 <code>APPROVAL_UNKNOWN</code>). 명시적 UNKNOWN은 기한까지 조회를 이어 간다</td>
-<td>전환 TX에서 재고·쿠폰을 한 번 해제(savepoint). SUCCEEDED/NO_CHARGE 결과로 CANCELLED가 되며 다시 해제하지 않는다. 전환 때 해제하지 못한 주문만 이때 해제</td>
+<td>전환 TX에서 재고·쿠폰을 한 번 해제(savepoint). SUCCEEDED/NO_CHARGE 결과로 CANCELLED가 되며 전환 때 해제했으면 다시 해제하지 않는다. 전환 때 해제하지 못한 주문만 이때 해제</td>
 </tr>
 <tr>
 <td>공통 요청/결과</td>
 <td>commerce.refund.requests.v1 → payment.refund.results.v1</td>
-<td>dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현</td>
+<td>dot 토픽과 purpose·금액·판매자별 원문. Payment가 소비·실행·결과 발행을 구현</td>
 </tr>
 <tr>
 <td>종료 뒤 승인</td>
@@ -167,7 +167,7 @@
 <tr>
 <td>고객 환불(USER_REFUND)</td>
 <td>첫 시도부터 30분까지 3분, 그 뒤 10분 간격</td>
-<td>24시간 뒤 UNKNOWN으로 멈추고 <code>[사람 확인 필요]</code> ERROR. 토스가 PARTIAL_CANCELED로 답해도 바로 보류하지 않고 이 상한까지 재시도한 뒤 사람 확인으로 넘긴다(REF-EXEC-04)</td>
+<td>24시간 뒤 UNKNOWN으로 멈추고 <code>[사람 확인 필요]</code> ERROR. 고객 전액 환불에 토스가 PARTIAL_CANCELED로 답해도 바로 보류하지 않고 이 상한까지 재시도한 뒤 사람 확인으로 넘긴다(REF-EXEC-04)</td>
 <td><code>refund_request_id</code></td>
 </tr>
 <tr>
@@ -179,6 +179,6 @@
 </tbody>
 </table></div>
 <p>고객 환불은 승인 시각부터 7일(168시간) 안에만 접수하고, Payment는 판매자 주문별 환불 합이 그 판매자 금액을 넘으면 FAILED(<code>OVER_REFUND</code>)로 답한다. 시스템 보상의 FAILED는 나중에 더 높은 <code>resultVersion</code>의 SUCCEEDED·NO_CHARGE로 바뀔 수 있다.</p>
-<p><a href="../services/commercecore/order/overview.html">현재 Core 모듈</a> · <a href="../services/payment/overview.html">Payment 소유 설계</a> · <a href="../../../contracts/events">계약 원본</a>. Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>06617cfa0d102bfcea91734d19513ce6aad6028953a4e144fea921d18a3819e3</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p><a href="../services/commercecore/order/overview.html">현재 Core 모듈</a> · <a href="../services/payment/overview.html">Payment 소유 설계</a> · <a href="../../../contracts/events">계약 원본</a>. Payment 설계 링크는 담당자의 목표 자료이며 이 문서가 구현 완료를 선언하지 않는다.</p><p class="muted fingerprint">MD SHA-256: <code>902e9d87a51958b5d02611ad6c3fee4ae38c5bea08221c62a4e6a2ea48883f26</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

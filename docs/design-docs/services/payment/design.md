@@ -781,7 +781,7 @@ paymentstatus \= APPROVED\+event\_outbox"결제 승인됨" · event\_id커밋 �
 **판단은 주문 상태를 가진 Commerce가 합니다.** Payment는 "토스에서 승인됐다"는 사실만 "결제 승인됨"으로 알립니다. Commerce는 그 이벤트를 받을 때 주문 행 하나로 판단합니다. 결제 전에 구매자가 주문을 취소한 경우도 같은 규칙으로 처리됩니다. 결제창에서 나가거나 결과를 기다리다 **페이지만 떠난** 경우는 주문이 PENDING이므로, 승인되면 **정상 결제 완료**입니다.
 
 
-**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다. 예외: 시스템 보상이 APPROVING·UNKNOWN 결제를 선점해 토스 취소만 보낸 경우는 돈이 돌아가도 CANCELED입니다(분개 없음).
+**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다. 예외: 시스템 보상 선점, 승인 응답 불일치 즉시 취소, 결과 불명 조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED입니다(분개 없음).
 
 
 **"취소"가 세 가지라서 헷갈리기 쉽습니다.** ① **주문 취소**: Commerce의 주문 상태. ② **결제 취소됨(CANCELED)**: 돈이 안 나간 결제를 닫음. ③ **토스 취소 API**: 나간 돈을 돌려줌 \= 우리 말로 **환불**. 늦은 승인 환불은 "취소된 주문을 또 취소"하는 것이 아닙니다. 주문은 이미 닫혀 있고 그대로 둡니다. **주문이 닫힌 뒤 늦게 빠져나간 돈만 돌려줍니다**(③). Commerce는 사유가 LATE\_APPROVAL인 환불 완료를 받으면 주문을 건드리지 않고 고객에게 알리기만 합니다.
@@ -808,7 +808,7 @@ UPDATE orders SET status = 'CANCELLED'
  WHERE order_number = :ref AND status = 'PENDING_PAYMENT';   -- 결제 확인 중이면 0행 → 409
 ```
 
-* **경쟁은 주문 행 하나에서 끝납니다.** PAID와 EXPIRED 둘 다 같은 이전 상태(결제 대기·결제 확인 중)에서만 바뀌므로 하나만 성공합니다. 구현은 조건부 UPDATE 하나가 아니라 회원 guard → 주문 묶음 행 잠금 아래에서 상태를 읽고 판단합니다. 결과(먼저 온 쪽이 이김)는 같습니다. 이벤트가 엇갈려도 따로 처리할 것이 없습니다.
+* **경쟁은 주문 행 하나에서 끝납니다.** 목표 설계는 PAID와 EXPIRED 둘 다 같은 이전 상태(결제 대기·결제 확인 중)에서만 바뀌므로 하나만 성공합니다. 구현은 PAID를 결제 확인 중에서만 허용합니다. 구현은 조건부 UPDATE 하나가 아니라 회원 guard → 주문 묶음 행 잠금 아래에서 상태를 읽고 판단합니다. 결과(먼저 온 쪽이 이김)는 같습니다. 이벤트가 엇갈려도 따로 처리할 것이 없습니다.
 * **환불 요청이 사라지지 않습니다.** "주문이 닫혀 있음" 판단과 "환불 요청됨" outbox 기록이 한 트랜잭션입니다. 따로 이벤트로 보내면 판단과 요청 사이에서 유실될 수 있습니다([사례](https://github.com/woowacourse-teams/2026-setty/pull/608)).
 * **Payment는 판단하지 않습니다.** 주문 상태의 복사본(플래그)도, Commerce 이벤트 구독도 없습니다. 환불 요청이 오면 흐름 7로 실행만 합니다.
 
@@ -1389,7 +1389,7 @@ ledger\_journal.ref\_type·ref\_id는 결제·환불·
 | `payment.buyer_id` | VARCHAR(36\) | NOT NULL | 결제 생성 때 Commerce가 보낸 구매자 ID. 승인 요청자가 이 구매자인지 확인한다 (흐름 2\) |
 | `payment.amount` | BIGINT | \> 0 | 승인 때 `successUrl`의 금액과 비교한다 (흐름 2\) |
 | `payment.refunded_amount` | BIGINT | 0 ≤ 값 ≤ amount | 조건부 UPDATE로 과다 환불을 막는다 (흐름 7\) |
-| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED(보상이 APPROVING·UNKNOWN을 선점해 토스 취소만 보낸 경우는 CANCELED). 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
+| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED(보상 선점·승인 응답 불일치 취소·조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED). 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
 | `payment.expires_at` | TIMESTAMP | NOT NULL | 이 시각 뒤에는 승인을 거절한다 (흐름 6\) |
 | `payment.partial_cancelable` | BOOLEAN |  | 승인 응답에서 저장. false면 부분 환불을 거절한다 (흐름 7\) |
 | `payment.pg_provider` | VARCHAR | NOT NULL | 환불과 조회를 원래 PG로 보낸다 (흐름 8\) |
@@ -1907,7 +1907,7 @@ stateDiagram-v2
   PENDING_PAYMENT --> PAYMENT_CONFIRMING: 승인 요청 중계 시작
   PAYMENT_CONFIRMING --> PENDING_PAYMENT: 422 거절 · 조회 결과 CREATED (예약 유지)
   PAYMENT_CONFIRMING --> PAID: 결제 승인됨 (동기 200 또는 이벤트)
-  PENDING_PAYMENT --> PAID: 결제 승인됨 (이벤트, 구현 갭: 지금은 충돌로 거부)
+  PENDING_PAYMENT --> PAID: 결제 승인됨 (이벤트, 구현 갭 · 지금은 충돌로 거부)
   PENDING_PAYMENT --> CANCELLED: 구매자 취소 · 반환
   PENDING_PAYMENT --> EXPIRED: T + 3분 · 반환 (목표. 구현은 결제 대기 600초)
   PAYMENT_CONFIRMING --> COMPENSATION_PENDING: 처리 기한 600초 · 반환 · 보상 요청
@@ -2050,7 +2050,7 @@ UPDATE orders SET status = 'PENDING_PAYMENT', confirming_started_at = NULL, upda
 | 결제 생성 재시도 | 타이머(1초) | `PaymentDeliveryStore` \+ `PaymentDispatcher.recover()`: 요청 행을 저장하고 끝나지 않은 행을 다시 보냅니다 |
 | 승인 중계 | HTTP | `PaymentController`·`PaymentService`(Mock 결제 시작). 새 승인 API로 바꿉니다 |
 | 결제 완료 처리 함수 | HTTP·Kafka·조회 공통 | `OrderPaymentOutcomeService.apply()`. 재고·쿠폰·알림까지 한 번에 처리해서 범위가 큽니다 |
-| "결제 승인됨" 소비 | Kafka | `PaymentEventConsumerConfiguration`: 토픽 `payment.execution.results.v1`(#385에서 점 표기로 바꿈. Core는 옛 하이픈 토픽도 함께 소비), 실패 시 재전달. 이벤트 이름·본문만 바뀝니다 |
+| "결제 승인됨" 소비 | Kafka | `PaymentEventConsumerConfiguration`: 토픽 `payment.execution.results.v1`(#385에서 점 표기로 바꿈. Core는 #390 뒤 점 토픽만 소비), 실패 시 재전달. 이벤트 이름·본문만 바뀝니다 |
 | 정체 해소 | 주문 조회(`GET /orders/{no}`) | 없음. 새로 만듭니다. 아무도 조회하지 않으면 만료 배치가 닫습니다 |
 | 만료 배치 | 타이머 | `PaymentGroupExpirationScheduler`(1분, 100건) |
 | 늦은 승인 환불 요청 | 완료 처리 0행 | 없음. 공통 모듈 `EventOutbox`로 발행합니다 |
@@ -2420,7 +2420,7 @@ stateDiagram-v2
 | 1 | Commerce | 주문 PENDING\_PAYMENT · 재고·쿠폰 예약 | `POST /v1/internal/payments` (동기, 결제창 정보 반환) | 주문 만료(EXPIRED) · 재고 반환. 만료 시각 \+ 여유 3분 | 보상 가능 |
 | 2 | Payment | 결제 CREATED (`expires_at` \= T, 주문 만료는 T \+ 3분) | 구매자 승인 요청 → Commerce 중계(결제 확인 중) → confirm | 자체 만료(CANCELED). 돈이 안 움직였으므로 PG 호출 없음 | 보상 가능 |
 | 3 | Payment | APPROVED \+ 승인 분개 \+ outbox "결제 승인됨" | 이벤트 "결제 승인됨" | 환불(흐름 7\) | **피벗**. 돈이 움직인 지점. 여기부터는 앞으로만 간다 |
-| 4 | Commerce | 회원 guard → 주문 묶음 잠금 아래 결제 대기·확인 중이면 PAID \+ 재고 확정. 1초 폴링의 조회와 이벤트가 같은 함수. 보상 없이 닫힌 주문일 때만 같은 트랜잭션에서 outbox "환불 요청됨"(LATE_APPROVAL), 이미 보상 중이면 기존 보상으로 수렴 | 이벤트 "환불 요청됨" (0행일 때만) | 없음. 재시도로 끝까지 간다 | 재시도 |
+| 4 | Commerce | 회원 guard → 주문 묶음 잠금 아래 결제 확인 중이면 PAID(결제 대기에서의 PAID는 구현 갭: 지금은 충돌로 거부) \+ 재고 확정. 1초 폴링의 조회와 이벤트가 같은 함수. 보상 없이 닫힌 주문일 때만 같은 트랜잭션에서 outbox "환불 요청됨"(LATE_APPROVAL), 이미 보상 중이면 기존 보상으로 수렴 | 이벤트 "환불 요청됨" (0행일 때만) | 없음. 재시도로 끝까지 간다 | 재시도 |
 | 5 | Payment | 환불 SUCCEEDED \+ 환불 분개 \+ outbox "환불 성공됨" | 이벤트 "환불 성공됨" | 없음. UNKNOWN은 조회로 확정 | 재시도 |
 
 
@@ -2504,7 +2504,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 ### 토스 상태 ↔ 우리 상태
 
 
-우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다(예외: 시스템 보상이 APPROVING·UNKNOWN 결제를 선점해 토스 취소만 보낸 경우는 돈이 돌아가도 CANCELED입니다(분개 없음)). 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
+우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다(예외: 시스템 보상 선점, 승인 응답 불일치 즉시 취소, 결과 불명 조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED입니다(분개 없음)). 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
 
 
 

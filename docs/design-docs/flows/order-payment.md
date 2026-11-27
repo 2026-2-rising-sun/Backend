@@ -21,7 +21,7 @@
 | 202 응답 뒤 거절 | Core PENDING_PAYMENT | 1초 폴링이 Payment 결제를 CREATED이고 결제창이 이 시도와 다르다고 보면 위 거절과 같이 처리한다. 503 `PG_UNAVAILABLE`(토스에 가지 않음)과 UNKNOWN 뒤 토스 ABORTED·EXPIRED도 같은 판정으로 덮는다 |
 | Payment CANCELED | Core FAILED | 보상이 없는 주문에서 Payment가 결제를 CANCELED로 닫은 경우다(승인 응답 불일치 전액 취소, UNKNOWN 조회에서 토스 전액 취소 확인, Payment 만료 배치 등). 재결제 대상이 아니다. 예약을 해제하고 PaymentFailed(`REJECTED`)를 보낸다 |
 | 결제 대기 만료 | EXPIRED | PENDING_PAYMENT가 생성 기한에 닿으면 재고/쿠폰 선점을 한 번 해제한다 |
-| 처리 기한 도달 | COMPENSATION_PENDING | PAYMENT_CONFIRMING이 600초 처리 기한에 닿으면 같은 TX에서 재고·쿠폰 예약을 해제하고(savepoint) 시스템 보상(사유 `APPROVAL_UNKNOWN`)을 요청한다(#417). 보상은 기한 판정만 만든다 |
+| 처리 기한 도달 | COMPENSATION_PENDING | PAYMENT_CONFIRMING이 600초 처리 기한에 닿으면 같은 TX에서 재고·쿠폰 예약을 해제하고(savepoint) 시스템 보상(사유 `APPROVAL_UNKNOWN`)을 요청한다(#417). COMPENSATION_PENDING 전환은 기한 판정만 만든다 |
 | 보상 없이 닫힌 주문의 늦은 승인 | 시스템 보상 요청+Outbox | EXPIRED/CANCELLED/FAILED 주문에 승인 사실이 오면 주문 부활 없이 `core_refund_intent`(SYSTEM_COMPENSATION, 사유 LATE_APPROVAL)와 `commerce.refund.requests.v1`의 RefundRequested Outbox를 같은 TX에 저장한다. 이미 보상 중인 주문은 승인 사실만 남기고 기존 보상으로 수렴한다 |
 | Core 환불 요청 발행 | Payment 환불 소비 | Payment가 `commerce.refund.requests.v1`을 소비해 refundRequestId로 한 번만 접수하고 토스 취소를 실행한다. 발행 성공은 환불 완료가 아님 |
 | Payment 환불 결과 | Core 환불 상태 | payment.refund.results.v1의 RefundResultRecorded를 core_refund_intent 원요청과 대조해 반영. 구 payment.refund-results.v1 구독은 #390에서 삭제됨 |
@@ -30,11 +30,11 @@
 
 ## 보상 대기와 재고 사본
 
-처리 기한(승인 접수부터 600초)까지 결과를 모르면 주문을 COMPENSATION_PENDING(보상 대기)으로 바꾸고 `SYSTEM_COMPENSATION` 환불 요청을 보낸다. 명시적 UNKNOWN만으로는 보상하지 않고 기한까지 조회를 이어 간다. 보상 대기로 바꾸는 TX에서 재고·쿠폰 예약을 한 번 해제한다(`payment_group.compensation_released_at`, V118). 해제가 논리적으로 실패하면 JDBC savepoint까지만 되돌리고 보상 요청은 커밋한 뒤, 보상 완료(SUCCEEDED 또는 NO_CHARGE)로 CANCELLED가 될 때 다시 해제한다. 락 타임아웃·SQL 오류처럼 트랜잭션 밖으로 나간 예외는 보상 요청까지 롤백하고 다음 기한 판정에서 다시 시도한다. 보상 결과는 예약을 다시 해제하지 않는다. 보상 대기 주문은 되살아나지 않는다.
+처리 기한(승인 접수부터 600초)까지 결과를 모르면 주문을 COMPENSATION_PENDING(보상 대기)으로 바꾸고 `SYSTEM_COMPENSATION` 환불 요청을 보낸다. 명시적 UNKNOWN만으로는 보상하지 않고 기한까지 조회를 이어 간다. 보상 대기로 바꾸는 TX에서 재고·쿠폰 예약을 한 번 해제한다(`payment_group.compensation_released_at`, V118). 해제가 논리적으로 실패하면 JDBC savepoint까지만 되돌리고 보상 요청은 커밋한 뒤, 보상 완료(SUCCEEDED 또는 NO_CHARGE)로 CANCELLED가 될 때 다시 해제한다. 락 타임아웃·SQL 오류처럼 트랜잭션 밖으로 나간 예외는 보상 요청까지 롤백하고 다음 기한 판정에서 다시 시도한다. 전환 때 이미 해제했으면 보상 결과가 예약을 다시 해제하지 않는다. 보상 대기 주문은 되살아나지 않는다.
 
 보상 행은 완료 뒤에도 정상 승인 재개를 막는 영속 fence다. 보상이 있는 주문은 승인 API 재진입, 결제창 열기, 전달 재송신, 구매자 취소, 만료 판정, 사용자 환불 접수를 모두 거절하거나 건너뛴다. 보상됐거나 닫힌 주문의 남은 승인 전달은 dispatch 때 `TIMEOUT`(`ORDER_CLOSED`)으로 닫아 복구 루프가 계속 집지 않게 한다.
 
-회원의 진행 중 주문 제한은 결제 대기(PENDING_PAYMENT)와 결제 확인 중(PAYMENT_CONFIRMING) 주문에만 걸린다. 보상 대기 주문이 있어도 같은 회원은 새 주문을 만들고 결제할 수 있다. 두 주문의 재고·쿠폰 예약은 서로 섞이지 않는다. 이 제한은 `PurchaseGuard.requireNoActive`, 부분 unique 인덱스(V117), `PaymentRelayService.active`가 함께 지킨다. 보상 대기 주문은 활성 주문 조회에 나오지 않는다. provider 부재·계약 불일치·paymentId 복구 차단이 남아 있다.
+회원의 진행 중 주문 제한은 결제 대기(PENDING_PAYMENT)와 결제 확인 중(PAYMENT_CONFIRMING) 주문에만 걸린다. 보상 대기 주문이 있어도 같은 회원은 새 주문을 만들고 결제할 수 있다. 두 주문의 재고·쿠폰 예약은 서로 섞이지 않는다. 이 제한은 `PurchaseGuard.requireNoActive`, 부분 unique 인덱스(V117), `PaymentRelayService.active`가 함께 지킨다. 보상 대기 주문은 활성 주문 조회에 나오지 않는다. paymentId 복구 차단이 남아 있다.
 
 예약·소진·해제·환불 복원으로 바뀐 재고는 SKU dirty revision을 올리고 기본 60초 배치가 Catalog로 보낸다. Catalog 재고는 표시 정보이며 이 주문 처리의 원본 검증·잠금을 대신하지 않는다. [CDC 경로](catalog-sync.md)와 [최종 검증 범위](../../worklog/2026-11-20-cdc-refund-status.md)를 따른다.
 
@@ -51,7 +51,7 @@
 
 알려진 테스트 공백: 정책0 주문 환불 409, 옛 `payment_relay_refund` 행이 있을 때 늦은 승인 롤백은 단언하는 테스트가 없다.
 
-[Core 상세](../services/commercecore/order/overview.md) · [현재 원본·남은 기준](../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 기록](../../worklog/2026-11-16.md) · [Payment 설계](../services/payment/overview.md)
+[Core 상세](../services/commercecore/order/overview.md) · [과거 기준(#331)](../../worklog/plans/active/331-order-audit-fixes/processing-deadline.md) · [실행 기록](../../worklog/2026-11-16.md) · [Payment 설계](../services/payment/overview.md)
 
 ## 이전 Mock 설명의 기준
 

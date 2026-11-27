@@ -34,8 +34,8 @@ Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Kafka �
 | 구분 | 현재 구현 | 완료 전제 |
 |---|---|---|
 | 사용자 환불 | 주문 상태는 PAID·PARTIALLY_REFUNDED를 유지하고 진행은 refund_request가 가진다. 성공 수량에 따라 REFUNDED/PARTIALLY_REFUNDED | 원요청·금액·대상과 맞는 결과만 반영 |
-| 시스템 보상 | 그 승인 시도의 접수부터 600초 처리 기한에 닿은 PAYMENT_CONFIRMING만 COMPENSATION_PENDING(사유 `APPROVAL_UNKNOWN`). 명시적 UNKNOWN은 기한까지 조회를 이어 간다 | 전환 TX에서 재고·쿠폰을 한 번 해제(savepoint). SUCCEEDED/NO_CHARGE 결과로 CANCELLED가 되며 다시 해제하지 않는다. 전환 때 해제하지 못한 주문만 이때 해제 |
-| 공통 요청/결과 | commerce.refund.requests.v1 → payment.refund.results.v1 | dot 토픽과 purpose·금액·판매자별 원문을 실제 provider가 함께 구현 |
+| 시스템 보상 | 그 승인 시도의 접수부터 600초 처리 기한에 닿은 PAYMENT_CONFIRMING만 COMPENSATION_PENDING(사유 `APPROVAL_UNKNOWN`). 명시적 UNKNOWN은 기한까지 조회를 이어 간다 | 전환 TX에서 재고·쿠폰을 한 번 해제(savepoint). SUCCEEDED/NO_CHARGE 결과로 CANCELLED가 되며 전환 때 해제했으면 다시 해제하지 않는다. 전환 때 해제하지 못한 주문만 이때 해제 |
+| 공통 요청/결과 | commerce.refund.requests.v1 → payment.refund.results.v1 | dot 토픽과 purpose·금액·판매자별 원문. Payment가 소비·실행·결과 발행을 구현 |
 | 종료 뒤 승인 | 보상 없이 닫힌 주문만 주문 부활 없이 `LATE_APPROVAL` 보상을 요청한다. 이미 보상 중이면 승인 사실만 남기고 기존 요청으로 수렴한다 | 주문당 보상 1건은 Core가 fence 확인으로 지킨다. 요청 ID는 UUID다. 원결제 ID 연결과 결과 원문 검증 유지 |
 
 ## 결과 계약 (#384)
@@ -60,7 +60,7 @@ Payment의 요청 consumer와 결과 producer는 #385로 dev에 있다. Core는 
 
 | 구분 | 재시도 | 멈춤 | 토스 멱등 키 |
 |---|---|---|---|
-| 고객 환불(USER_REFUND) | 첫 시도부터 30분까지 3분, 그 뒤 10분 간격 | 24시간 뒤 UNKNOWN으로 멈추고 `[사람 확인 필요]` ERROR. 토스가 PARTIAL_CANCELED로 답해도 바로 보류하지 않고 이 상한까지 재시도한 뒤 사람 확인으로 넘긴다(REF-EXEC-04) | `refund_request_id` |
+| 고객 환불(USER_REFUND) | 첫 시도부터 30분까지 3분, 그 뒤 10분 간격 | 24시간 뒤 UNKNOWN으로 멈추고 `[사람 확인 필요]` ERROR. 고객 전액 환불에 토스가 PARTIAL_CANCELED로 답해도 바로 보류하지 않고 이 상한까지 재시도한 뒤 사람 확인으로 넘긴다(REF-EXEC-04) | `refund_request_id` |
 | 시스템 보상(SYSTEM_COMPENSATION) | 30초부터 두 배씩, 상한 10분 | 첫 예약부터 24시간. 토스 PARTIAL_CANCELED·취소 불가는 바로 보류해 사람이 확인한다 | `cancel-{pg_order_id}`(승인 시도의 결제창 ID) |
 
 고객 환불은 승인 시각부터 7일(168시간) 안에만 접수하고, Payment는 판매자 주문별 환불 합이 그 판매자 금액을 넘으면 FAILED(`OVER_REFUND`)로 답한다. 시스템 보상의 FAILED는 나중에 더 높은 `resultVersion`의 SUCCEEDED·NO_CHARGE로 바뀔 수 있다.

@@ -2473,7 +2473,7 @@ responses:
 
 새 Payment 계약의 주문 생성과 결제 준비
 
-SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 팀원 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
+SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Orders
@@ -2556,7 +2556,7 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -2604,7 +2604,7 @@ SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자�
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -2675,7 +2675,8 @@ summary: 새 Payment 계약의 주문 생성과 결제 준비
 description: SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달
   원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은
   orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과
-  각 판매자 금액은 팀원 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
+  각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을
+  돌려준다.
 x-required-roles:
 - USER
 - SELLER
@@ -2780,7 +2781,7 @@ responses:
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -2921,7 +2922,7 @@ responses:
 | payment.expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | payment.refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| payment.compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | payment.compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | payment.compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | payment.compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -3035,7 +3036,7 @@ responses:
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -3164,7 +3165,7 @@ Payment의 비멱등 checkout 계약을 사용하므로 호출마다 pgOrderId�
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -3287,7 +3288,7 @@ JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING
 
 | 상태 코드 | 설명 |
 |---|---|
-| 200 | 현재 완료·실패·종료 상태. orderStatus와 refundStatus를 확인하며 HTTP 200 자체는 결제 성공을 뜻하지 않는다. |
+| 200 | 현재 완료·실패·종료 상태 또는 승인 거절로 결제 대기(PENDING·DECLINED)로 돌아간 상태. orderStatus와 refundStatus를 확인하며 HTTP 200 자체는 결제 성공을 뜻하지 않는다. |
 | 202 | 승인 결과 미확정 |
 | 400 | 요청 값·형식 또는 금액 범위 오류 |
 | 401 | 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다. |
@@ -3308,7 +3309,7 @@ JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -3327,7 +3328,7 @@ JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING
 | expiresAt | string | 필수 | 변경하지 않는 PENDING 생성 기한 | {&quot;format&quot;: &quot;date-time&quot;} |
 | processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 접수+600초. 준비 단계는 null이며 재요청으로 연장하지 않는다. | {&quot;format&quot;: &quot;date-time&quot;} |
 | refundStatus | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 시스템 보상 상태. 구 late 승인 이력 SUCCEEDED는 호환 보존한다. | {&quot;enum&quot;: &#91;null, &quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;&#93;} |
-| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
+| compensation | &#91;&#x27;object&#x27;, &#x27;null&#x27;&#93; | 선택 | 시스템 보상은 사용자 환불 예약과 별도다. 주문 상태 CANCEL_PENDING은 이전 정책 데이터의 결과 대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를 함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을 유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로 확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도 주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다. | — |
 | compensation.requestId | string | 필수 |  | {&quot;pattern&quot;: &quot;^&#91;A-Za-z0-9_-&#93;{1,64}$&quot;} |
 | compensation.status | string | 필수 |  | {&quot;enum&quot;: &#91;&quot;REQUESTED&quot;, &quot;UNKNOWN&quot;, &quot;COMPLETED&quot;, &quot;FAILED&quot;&#93;} |
 | compensation.outcome | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;enum&quot;: &#91;null, &quot;UNKNOWN&quot;, &quot;SUCCEEDED&quot;, &quot;FAILED&quot;, &quot;NO_CHARGE&quot;&#93;} |
@@ -3440,8 +3441,8 @@ requestBody:
             minimum: 1
 responses:
   '200':
-    description: 현재 완료·실패·종료 상태. orderStatus와 refundStatus를 확인하며 HTTP 200 자체는 결제 성공을
-      뜻하지 않는다.
+    description: 현재 완료·실패·종료 상태 또는 승인 거절로 결제 대기(PENDING·DECLINED)로 돌아간 상태. orderStatus와
+      refundStatus를 확인하며 HTTP 200 자체는 결제 성공을 뜻하지 않는다.
     content:
       application/json:
         schema:
@@ -4540,8 +4541,9 @@ components:
             대기에만 남는다. 승인 시도의 600초 처리 기한에 닿을 때만 COMPENSATION_PENDING과 보상 요청(UUID)·Outbox를
             함께 저장하고 같은 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다. 명시적 UNKNOWN·통신 오류·정상202는 기한까지 PROCESSING을
             유지한다. REQUESTED/UNKNOWN/FAILED는 보상대기를 유지하고 검증된 SUCCEEDED/NO_CHARGE에서 CANCELLED로
-            확정한다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전 완료 결과는 재검증한다.
-            이미 종료한 과거 주문은 유지한다.
+            확정한다. 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)의 LATE_APPROVAL 보상은 결과가 와도
+            주문 상태를 바꾸지 않는다. 전환 때 해제하지 못한 예약만 이때 해제한다. FAILED 뒤에도 같은 요청·실행의 더 높은 버전
+            완료 결과는 재검증한다. 이미 종료한 과거 주문은 유지한다.
           required:
           - requestId
           - status
@@ -4802,4 +4804,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `17d854aa831f40ad71964f68a2e76c70affec04383837853b655a98fe04e8ce5`
+입력 SHA-256: `a90b04ca3bc055d728c022210eebbe858438d350cd665c417ab8cd91b7e75680`

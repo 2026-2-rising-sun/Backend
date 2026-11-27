@@ -6,7 +6,7 @@
 
 2026-11-20 기준 Core는 새 주문서의 결제 준비·승인을 HTTP로 중계했다. 사용자 환불은 기존 주문에서만 접수했고, 새 주문서가 닫힌 뒤 승인이 도착하면 `payment_relay_refund`에 요청을 저장하고 하이픈 토픽으로 발행했다. 당시 주문·결제 상태표와 PR343의 검증 범위는 [변경 전 주문 문서](https://github.com/2026-2-rising-sun/Backend/blob/9b807f91e02483c6ecf9b089ea42fa1f85b5f099/docs/design-docs/services/commercecore/order/overview.md)와 [11월 20일 검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)에 있다.
 
-[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 신규 주문서의 사용자 환불과 시스템 보상 요청을 각각 저장하고 공통 Kafka 토픽으로 발행하는 Core 경로를 추가한다. 기존 주문과 이미 저장한 하이픈 토픽 요청의 결과는 기존 경로에서 처리한다.
+[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 신규 주문서의 사용자 환불과 시스템 보상 요청을 각각 저장하고 공통 Kafka 토픽으로 발행하는 Core 경로를 추가한다. 기존 하이픈 토픽 요청·결과 경로는 #390에서 삭제됐다.
 
 ## 주문과 승인
 
@@ -26,7 +26,7 @@ Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환�
 
 ## 시스템 응답 유실과 보상 fence
 
-보상 대기(COMPENSATION_PENDING) 전환은 승인 시도의 600초 처리 기한에 닿을 때만이며(사유 `APPROVAL_UNKNOWN`), 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)에 늦게 온 승인은 같은 저장을 사유 `LATE_APPROVAL`로 따로 한다. 기한 판정에서는 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·UUID 요청ID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다(사유 `APPROVAL_UNKNOWN`). 보상은 기한 판정(`OrderSheetLifecycleService.expire`)만 만든다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 재고·쿠폰 예약을 한 번 해제한다(`compensation_released_at`, V118). 해제의 논리적 실패는 JDBC savepoint까지만 되돌려 보상 요청을 커밋하고, 보상 완료 때 다시 해제한다. 명시적 UNKNOWN·HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 PAYMENT_CONFIRMING에서 기한까지 조회한다. 같은 시도의 재요청으로 기한을 늘리지 않는다.
+보상 대기(COMPENSATION_PENDING) 전환은 승인 시도의 600초 처리 기한에 닿을 때만이며(사유 `APPROVAL_UNKNOWN`), 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)에 늦게 온 승인은 같은 저장을 사유 `LATE_APPROVAL`로 따로 한다. 기한 판정에서는 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·UUID 요청ID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다(사유 `APPROVAL_UNKNOWN`). COMPENSATION_PENDING 전환은 기한 판정(`OrderSheetLifecycleService.expire`)만 만든다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 재고·쿠폰 예약을 한 번 해제한다(`compensation_released_at`, V118). 해제의 논리적 실패는 JDBC savepoint까지만 되돌려 보상 요청을 커밋하고, 보상 완료 때 다시 해제한다. 명시적 UNKNOWN·HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 PAYMENT_CONFIRMING에서 기한까지 조회한다. 같은 시도의 재요청으로 기한을 늘리지 않는다.
 
 보상 행은 완료 뒤에도 정상 승인 재개를 차단하는 영속 fence다. 승인 API 재진입, checkout, dispatcher 재전달과 만료/취소는 이를 확인한다. 송신 직전에는 같은 그룹 잠금 아래 `approval_send_started_at`을 기록하는 조건부 송신 시작 TX를 커밋한다. 이 지점보다 보상이 먼저면 HTTP를 보내지 않으며, 시작권한 커밋 뒤의 호출은 이미 진행 중인 호출로 분류한다. DB 잠금을 HTTP 동안 유지하지 않는다. 이미 시작된 HTTP와 보상 접수의 경합은 늦은 승인 사실을 저장하되 기존 요청ID의 보상으로 수렴시킨다. 새 `late-*` 요청을 만들거나 정상 PAID로 부활시키지 않는다.
 

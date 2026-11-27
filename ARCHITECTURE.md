@@ -1,6 +1,6 @@
 # Backend 아키텍처
 
-기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 코드·계약·설정. [CDC/Catalog #379](https://github.com/2026-2-rising-sun/Backend/pull/379)는 병합됐고 [Core 환불 #378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 미병합 Draft다. 로컬 실행 근거와 운영·외부 서비스 미확인 범위는 [검증 기록](docs/worklog/2026-11-20-cdc-refund-status.md)에서 구분한다.
+기준: 2026-11-20 dev `d42c3b787f12b716789d35c8df37dd63a2b42ddc`의 코드·계약·설정. 결제·환불 부분만 2026-11-27 dev `ba9be27c`(#416~#418 머지 뒤)로 고쳤다. [CDC/Catalog #379](https://github.com/2026-2-rising-sun/Backend/pull/379)와 [Core 환불 #378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 병합됐다. 로컬 실행 근거와 운영·외부 서비스 미확인 범위는 [검증 기록](docs/worklog/2026-11-20-cdc-refund-status.md)에서 구분한다.
 
 [프로젝트 소개](README.md) · [모듈 문서](docs/design-docs/README.md) · [업무 흐름](docs/design-docs/README.md)
 
@@ -35,8 +35,8 @@
 
 각 서비스의 PostgreSQL 스키마는 Flyway와 엔티티가 설명한다. Payment는 `db/payment-migration/`, 다른 서비스는 `db/migration/`를 사용한다. Outbox는 DB 상태와 발행 요청을 같은 트랜잭션에 저장하지만 브로커 전달·소비 반영까지 한 번에 보장하는 것은 아니다.
 
-결제 PG 어댑터는 토스페이먼츠를 대상으로 한다. 현재 dev의 Payment에는 Core가 요구하는 환불 실행 소비자·결과 생산자가 없다. Core의 접수·발행·결과 처리 코드가 실제 금전 환불을 보장하지 않는다. UNKNOWN은 확정 실패와 구분한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
+결제 PG 어댑터는 토스페이먼츠를 대상으로 한다. Payment는 `commerce.refund.requests.v1`을 소비해 토스 취소를 실행하고 `payment.refund.results.v1`으로 결과를 보낸다(이슈 #385·#370·#386). 실제 PG 환불은 토스 테스트 환경 확인(#367)까지이고 운영은 미확인이다. UNKNOWN은 확정 실패와 구분한다. IVS 로컬 stub과 실제 어댑터, H2·PostgreSQL, EmbeddedKafka·외부 Kafka의 검증을 분리한다. [실행 조건](docs/guides/tooling.md)을 따른다.
 
 ## Order 처리 기한 후속
 
-현재 dev는 주문 생성부터 600초, 최초 승인 접수부터 별도 600초를 적용한다. 기한 종료는 EXPIRED와 선점 해제이며 Payment 실패 확정이 아니다. legacy 늦은 승인은 REQUIRED, 새 주문서의 늦은 승인은 payment_relay_refund REQUESTED와 구 하이픈 토픽 요청으로 보존한다. #378의 사용자 CANCEL_PENDING·시스템 COMPENSATION_PENDING과 공통 dot 토픽 전환은 현재 dev에 없다. [현행과 미병합 목표](docs/design-docs/flows/refund.md)를 함께 확인한다.
+현재 dev는 주문 생성부터 600초(결제 대기), 승인 시도마다 그 접수부터 별도 600초(처리 기한)를 적용한다. 결제 대기 만료는 EXPIRED와 선점 해제다. 처리 기한에 닿은 결제 확인 중 주문은 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 선점을 해제하고 시스템 보상(`APPROVAL_UNKNOWN`)을 공통 dot 토픽으로 요청한다. 보상 없이 닫힌 주문의 늦은 승인은 `core_refund_intent`에 `LATE_APPROVAL` 보상으로 저장한다. 옛 `payment_relay_refund`와 하이픈 토픽 경로는 #390에서 삭제됐다. [주문·결제 흐름](docs/design-docs/flows/order-payment.md)과 [환불 흐름](docs/design-docs/flows/refund.md)을 함께 확인한다.
