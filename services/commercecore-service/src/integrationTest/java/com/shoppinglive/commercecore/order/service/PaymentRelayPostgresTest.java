@@ -359,7 +359,7 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("승인202와 UNKNOWN 조회는 실패로 처리하지 않고 같은 원문을 보존한다")
+    @DisplayName("승인202와 UNKNOWN 조회는 처리 기한 전 주문·예약을 유지하고 보상을 만들지 않는다")
     void pendingAndUnknownNeverReleaseInventory() {
         String number = createRelay("unknown", true).number();
         prepare(number);
@@ -367,11 +367,74 @@ class PaymentRelayPostgresTest extends OrderSheetPostgresSupport {
         relayDispatcher.dispatch(delivery);
         remoteStatus = "UNKNOWN";
         relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
-        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
+        relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(relay.state(MEMBER_A, number).paymentStatus()).isEqualTo("UNKNOWN");
+        assertThat(relay.state(MEMBER_A, number).compensation()).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
+                .isZero();
         assertThat(reserved(501)).isEqualTo(2);
         assertThat(couponStatus()).isEqualTo("RESERVED");
         verify(remote, times(1)).approve(anyString(), any());
         assertThat(deliveries.get(delivery.requestId()).status()).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    @DisplayName("승인 응답이 UNKNOWN이어도 기한 전 조회에서 승인되면 보상 없이 PAID가 된다")
+    void unknownApprovalResolvesToPaidBeforeDeadline() {
+        String number = createRelay("unknown-paid", true).number();
+        prepare(number);
+        doAnswer(
+                        i -> {
+                            remoteStatus = "UNKNOWN";
+                            return new Reply<>(
+                                    200,
+                                    true,
+                                    new ApprovalResult(paymentId, "UNKNOWN", null, null),
+                                    null,
+                                    null);
+                        })
+                .when(remote)
+                .approve(anyString(), any());
+        var delivery = accept(number);
+        relayDispatcher.dispatch(delivery);
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PROCESSING");
+        assertThat(relay.state(MEMBER_A, number).compensation()).isNull();
+        remoteStatus = "APPROVED";
+        approvedAt = Instant.now();
+        relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM core_refund_intent", Long.class))
+                .isZero();
+        assertThat(couponStatus()).isEqualTo("USED");
+        verify(remote, times(1)).approve(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("UNKNOWN이 처리 기한까지 이어지면 보상 대기로 바꾸고 보상 요청을 한 번만 만든다")
+    void unknownPastDeadlineCompensatesOnce() {
+        String number = createRelay("unknown-deadline", true).number();
+        prepare(number);
+        var delivery = accept(number);
+        relayDispatcher.dispatch(delivery);
+        remoteStatus = "UNKNOWN";
+        relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
+        expiry(number);
+        relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
+        relayDispatcher.dispatch(deliveries.get(delivery.requestId()));
+        assertThat(lifecycle.expire(id(number))).isFalse();
+        assertThat(relay.state(MEMBER_A, number).orderStatus()).isEqualTo("COMPENSATION_PENDING");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM core_refund_intent WHERE purpose='SYSTEM_COMPENSATION'",
+                                Long.class))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='RefundRequested'",
+                                Long.class))
+                .isEqualTo(1);
+        verify(remote, times(1)).approve(anyString(), any());
     }
 
     @Test

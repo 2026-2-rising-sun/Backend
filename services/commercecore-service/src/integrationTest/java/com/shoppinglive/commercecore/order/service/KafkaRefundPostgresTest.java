@@ -87,6 +87,16 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         return n;
     }
 
+    /** 결과 불명 응답 뒤 처리 기한이 지나 보상 대기로 바뀐 상태를 만든다. */
+    void compensate(PaymentDeliveryStore.Delivery delivery) {
+        relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+        long group = relay.deliveryGroup(delivery).getId();
+        jdbc.update(
+                "UPDATE payment_group SET processing_expires_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                group);
+        lifecycle.expire(group);
+    }
+
     long id(String number) {
         return jdbc.queryForObject(
                 "SELECT id FROM payment_group WHERE group_number=?", Long.class, number);
@@ -342,7 +352,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     void lostApprovalFencesLateSuccessAndExpiry() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
-        relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+        compensate(delivery);
         requestSample(n, "SystemRefundRequested");
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
@@ -373,7 +383,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     void noChargeAndAlreadyClosed() throws Exception {
         String n = prepare(true);
         var delivery = accept(n);
-        relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+        compensate(delivery);
         var done = result(requestId(n), "NO_CHARGE", 1, UUID.randomUUID().toString());
         apply(done);
         apply(done);
@@ -400,6 +410,53 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
     }
 
+    boolean relayDue(PaymentDeliveryStore.Delivery delivery) {
+        jdbc.update(
+                "UPDATE payment_delivery_request SET next_action_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                delivery.id());
+        return deliveries.relayDue().stream().anyMatch(d -> d.id() == delivery.id());
+    }
+
+    @Test
+    @DisplayName("복구 대상은 id가 아니라 다음 처리 시각 순으로 뽑아 매초 due인 UNKNOWN이 뒤 전달을 밀어내지 않는다")
+    void relayDueOrdersByNextActionAt() {
+        String n = prepare(false);
+        var approval = accept(n);
+        var prepare = deliveries.relay(id(n), "PREPARE");
+        assertThat(approval.id()).isGreaterThan(prepare.id());
+        jdbc.update(
+                "UPDATE payment_delivery_request SET status='PROCESSING',next_action_at=CURRENT_TIMESTAMP-INTERVAL '1 second' WHERE id=?",
+                prepare.id());
+        jdbc.update(
+                "UPDATE payment_delivery_request SET next_action_at=CURRENT_TIMESTAMP-INTERVAL '10 seconds' WHERE id=?",
+                approval.id());
+        assertThat(deliveries.relayDue().stream().map(PaymentDeliveryStore.Delivery::id).toList())
+                .containsSubsequence(approval.id(), prepare.id());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"COMPENSATION_PENDING", "EXPIRED"})
+    @DisplayName("보상됐거나 닫힌 주문의 승인 전달은 dispatch에서 종료돼 복구 대상에서 빠지고 늦은 승인은 보상으로 수렴한다")
+    void closedOrderApprovalDeliveryLeavesRelayDue(String closed) {
+        String n = prepare(true);
+        var delivery = accept(n);
+        if (closed.equals("EXPIRED")) {
+            relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+            jdbc.update("UPDATE payment_group SET status='EXPIRED' WHERE id=?", id(n));
+            jdbc.update("UPDATE orders SET status='EXPIRED' WHERE payment_group_id=?", id(n));
+        } else compensate(delivery);
+        assertThat(relayDue(delivery)).isTrue();
+        relayDispatcher.dispatch(delivery);
+        verifyNoInteractions(remote);
+        assertThat(deliveries.get(delivery.requestId()).status()).isEqualTo("TIMEOUT");
+        assertThat(deliveries.get(delivery.requestId()).result()).contains("ORDER_CLOSED");
+        assertThat(relayDue(delivery)).isFalse();
+        relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
+        assertThat(state(n)).isEqualTo(closed);
+        assertThat(compensationRequests(n)).isEqualTo(1);
+        assertThat(deliveries.get(delivery.requestId()).status()).isEqualTo("TIMEOUT");
+    }
+
     @Test
     @DisplayName("승인과 보상 intent 경합은 같은 그룹 잠금으로 정상성공 또는 보상 중 하나에 수렴한다")
     void approvalCompensationRace() throws Exception {
@@ -418,7 +475,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                     pool.submit(
                             () -> {
                                 gate.await();
-                                relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+                                compensate(delivery);
                                 return true;
                             });
             a.get(20, TimeUnit.SECONDS);
@@ -593,7 +650,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("시스템 보상 실패·미확정은 주문 예약을 유지하고 사용자 취소 대기로 바꾸지 않는다")
     void systemFailedAndUnknownKeepReservations() throws Exception {
         String n = prepare(true);
-        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        compensate(accept(n));
         String request = requestId(n), execution = UUID.randomUUID().toString();
         apply(result(request, "UNKNOWN", 1, execution));
         assertThat(intents.compensation(id(n)).status()).isEqualTo("UNKNOWN");
@@ -784,7 +841,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         when(remote.get(n))
                 .thenAnswer(
                         call -> {
-                            relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+                            compensate(delivery);
                             return new Reply<>(
                                     200,
                                     true,
@@ -807,7 +864,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("늦은 승인 뒤 시스템 환불 완료는 승인 사실을 보존하고 결제실패 알림을 발행하지 않는다")
     void systemCompletionDoesNotPublishRejectedPayment() throws Exception {
         String n = prepare(true);
-        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        compensate(accept(n));
         relay.approved(new Approved(PAYMENT, n, 10000, Instant.now()));
         var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         apply(done);
@@ -1157,8 +1214,8 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    @DisplayName("인증조회 또는 승인 응답의 명시적UNKNOWN은600초 전 즉시 보상대기로 전환한다")
-    void explicitUnknownImmediatelyCompensates(boolean lookupUnknown) {
+    @DisplayName("인증조회 또는 승인 응답의 명시적UNKNOWN은600초 전에는 주문을 유지하고 기한 도달 때 보상을 한 번 만든다")
+    void explicitUnknownWaitsUntilDeadline(boolean lookupUnknown) {
         String n = prepare(true);
         var delivery = accept(n);
         when(remote.get(n))
@@ -1185,10 +1242,14 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                                     null,
                                     null));
         relayDispatcher.dispatch(delivery);
+        assertThat(state(n)).isEqualTo("PAYMENT_CONFIRMING");
+        assertThat(compensationRequests(n)).isZero();
+        assertThat(reserved(501)).isEqualTo(3);
+        doReturn(groups.findById(id(n)).orElseThrow().getProcessingExpiresAt()).when(time).now();
+        relayDispatcher.dispatch(delivery);
+        relayDispatcher.dispatch(delivery);
         assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
         assertThat(compensationRequests(n)).isEqualTo(1);
-        assertThat(reserved(501)).isEqualTo(3);
-        relayDispatcher.dispatch(delivery);
         verify(remote, times(1)).get(n);
         verify(remote, times(lookupUnknown ? 0 : 1)).approve(eq(n), any());
     }
@@ -1244,7 +1305,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
                     pool.submit(
                             () -> {
                                 gate.await();
-                                relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+                                compensate(delivery);
                                 return true;
                             });
             a.get(20, TimeUnit.SECONDS);
@@ -1261,7 +1322,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     void compensationPendingCannotBeBypassed() {
         String n = prepare(true);
         var delivery = accept(n);
-        relay.approvalUnknown(delivery, Map.of("code", "UNKNOWN"));
+        compensate(delivery);
         assertThatThrownBy(() -> accept(n)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> lifecycle.cancel(MEMBER_A, n))
                 .isInstanceOf(BusinessException.class);
@@ -1282,7 +1343,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("보상 대기 주문이 있어도 같은 회원은 새 주문을 만들 수 있고 결제 대기 주문은 1건만 허용한다")
     void compensationPendingAllowsNewPurchaseWithOneActive() throws Exception {
         String old = prepare(true);
-        relay.approvalUnknown(accept(old), Map.of("code", "UNKNOWN"));
+        compensate(accept(old));
         assertThat(state(old)).isEqualTo("COMPENSATION_PENDING");
         assertThat(couponStatus()).isEqualTo("RESERVED");
         String fresh = prepare(false, PAYMENT + 1);
@@ -1301,7 +1362,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("보상실패는 취소완료가 아니며 같은실행의 검증된상위버전 완료만 CANCELLED와 자원단일해제를 확정한다")
     void failedSystemResultCanConvergeWithoutNewRequest(String finalStatus) throws Exception {
         String n = prepare(true);
-        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        compensate(accept(n));
         String request = requestId(n), execution = UUID.randomUUID().toString();
         var unknown = result(request, "UNKNOWN", 1, execution);
         var failed = result(request, "FAILED", 2, execution);
@@ -1364,7 +1425,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("동시에 같은 완료 결과를 받아도 취소·재고·쿠폰은 한 번만 확정한다")
     void concurrentCompensationCompletionReleasesOnce() throws Exception {
         String n = prepare(true);
-        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        compensate(accept(n));
         var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         var gate = new CyclicBarrier(2);
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -1416,7 +1477,7 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     @DisplayName("보상 완료 저장 실패는 취소·자원해제·결과원장을 함께 롤백하고 같은결과 재수신으로 복구한다")
     void systemCompletionDatabaseFailureRollsBackResources() throws Exception {
         String n = prepare(true);
-        relay.approvalUnknown(accept(n), Map.of("code", "UNKNOWN"));
+        compensate(accept(n));
         var done = result(requestId(n), "SUCCEEDED", 1, UUID.randomUUID().toString());
         jdbc.execute(
                 "CREATE FUNCTION reject_compensation_completion() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '완료저장 장애'; END $$");
