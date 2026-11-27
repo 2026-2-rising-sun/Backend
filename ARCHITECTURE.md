@@ -22,7 +22,7 @@
 
 서비스 내부는 업무 도메인 아래 Controller → Service → Repository/Entity, 외부 호출은 대상별 Client로 구성한다. 트랜잭션·멱등성·잠금·복구 경계는 실제 서비스 코드에서 확인한다.
 
-- Core → Payment: 새 주문서의 결제 생성·결제창·승인·조회는 영속 원문을 둔 HTTP 중계다. 환불은 Kafka 요청(`commerce.refund.requests.v1`)·결과(`payment.refund.results.v1`)로만 오가고, 옛 환불 HTTP·하이픈 토픽은 #390에서 삭제됐다. Payment → Core: 결제 결과 이벤트·대조 조회와 환불 결과 이벤트다.
+- Core → Payment: 새 주문서의 결제 생성·승인은 영속 원문을 둔 HTTP 중계이고, 조회는 승인 전달의 복구 루프가, 재결제용 결제창 발급은 사용자 요청 안의 동기 HTTP가 한다. 환불은 Kafka 요청(`commerce.refund.requests.v1`)·결과(`payment.refund.results.v1`)로만 오가고, 옛 환불 HTTP·하이픈 토픽은 #390에서 삭제됐다. Payment → Core: 결제 결과 이벤트·대조 조회와 환불 결과 이벤트다.
 - Core → Catalog: 상품·SKU 메타데이터는 업무 변경과 같은 트랜잭션의 Outbox에 기록하고, 변경된 재고는 기본 60초 fixedDelay 배치로 합친다. Connect가 Catalog 토픽의 삽입·초기 snapshot만 선별해 Kafka로 보낸다. Core relay는 이 토픽을 제외하고 기존 판매·쿠폰·주문 알림 경로는 유지한다.
 - Catalog는 상품·SKU 메타데이터와 재고의 버전을 독립 적용한다. 사본 재고는 지연된 표시 정보이며 주문 시 실제 가격·재고는 Core가 최종 검증한다. 기존 HTTP 판매/쿠폰 조회 설정과 새 CDC 초기 적재를 구분한다.
 - Live → Core/Member: 상품·판매·회원 표시 정보 확인. 방송·프로모션 이벤트는 관련 소비자에 전달한다.
