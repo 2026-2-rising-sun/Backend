@@ -19,7 +19,7 @@
 | PROCESSING/UNKNOWN | FAILED | 확정 실패만 반영하며 성공 재고 복원을 하지 않는다. |
 | 일부 항목 환불 | 묶음 PAID 유지 | 모든 자식 주문이 REFUNDED일 때만 묶음도 REFUNDED가 된다. |
 
-현재 서비스 application.yml의 `commercecore.refunds.api-enabled`와 `execution-enabled`는 true다. 코드 생성자의 기본 false와 구분한다. dev Payment의 기존 내부 환불 실행 API는 삭제됐고, 새 주문서 환불은 Kafka 요청·결과 경로(아래 결과 계약)로 Payment가 실행한다(#385·#395·#396). 구 Mock 시나리오·과거 테스트 성공은 현재 Payment 실행 증거가 아니다.
+현재 서비스 application.yml의 `commercecore.refunds.api-enabled`와 `execution-enabled`는 true다. 코드 생성자의 기본 false와 구분한다. dev Payment의 기존 내부 환불 실행 API는 삭제됐고, 새 주문서 환불은 Kafka 요청·결과 경로(아래 결과 계약)로 Payment가 실행한다(이슈 #385·#370·#386, PR #394~#396). 구 Mock 시나리오·과거 테스트 성공은 현재 Payment 실행 증거가 아니다.
 
 ## 현재 dev: 종료 주문의 늦은 승인
 

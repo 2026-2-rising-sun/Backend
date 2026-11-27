@@ -26,7 +26,7 @@ Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환�
 
 ## 시스템 응답 유실과 보상 fence
 
-승인 시도의 600초 처리 기한에 닿을 때만 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·UUID 요청ID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다(사유 `APPROVAL_UNKNOWN`). 보상은 기한 판정(`OrderSheetLifecycleService.expire`)만 만든다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 재고·쿠폰 예약을 한 번 해제한다(`compensation_released_at`, V118). 해제의 논리적 실패는 JDBC savepoint까지만 되돌려 보상 요청을 커밋하고, 보상 완료 때 다시 해제한다. 명시적 UNKNOWN·HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 PAYMENT_CONFIRMING에서 기한까지 조회한다. 같은 시도의 재요청으로 기한을 늘리지 않는다.
+보상 대기(COMPENSATION_PENDING) 전환은 승인 시도의 600초 처리 기한에 닿을 때만이며(사유 `APPROVAL_UNKNOWN`), 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)에 늦게 온 승인은 같은 저장을 사유 `LATE_APPROVAL`로 따로 한다. 기한 판정에서는 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·UUID 요청ID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다(사유 `APPROVAL_UNKNOWN`). 보상은 기한 판정(`OrderSheetLifecycleService.expire`)만 만든다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 재고·쿠폰 예약을 한 번 해제한다(`compensation_released_at`, V118). 해제의 논리적 실패는 JDBC savepoint까지만 되돌려 보상 요청을 커밋하고, 보상 완료 때 다시 해제한다. 명시적 UNKNOWN·HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 PAYMENT_CONFIRMING에서 기한까지 조회한다. 같은 시도의 재요청으로 기한을 늘리지 않는다.
 
 보상 행은 완료 뒤에도 정상 승인 재개를 차단하는 영속 fence다. 승인 API 재진입, checkout, dispatcher 재전달과 만료/취소는 이를 확인한다. 송신 직전에는 같은 그룹 잠금 아래 `approval_send_started_at`을 기록하는 조건부 송신 시작 TX를 커밋한다. 이 지점보다 보상이 먼저면 HTTP를 보내지 않으며, 시작권한 커밋 뒤의 호출은 이미 진행 중인 호출로 분류한다. DB 잠금을 HTTP 동안 유지하지 않는다. 이미 시작된 HTTP와 보상 접수의 경합은 늦은 승인 사실을 저장하되 기존 요청ID의 보상으로 수렴시킨다. 새 `late-*` 요청을 만들거나 정상 PAID로 부활시키지 않는다.
 
@@ -84,7 +84,7 @@ V115는 신규 intent/결과event 원장·이전 항목 상태·CANCEL_PENDING C
 
 ## 현재 검증 경계
 
-환불 공통 요청은 `commerce.refund.requests.v1`, 공통 결과는 `payment.refund.results.v1`이며 두 목적 모두 처음부터 존재하는 orderRef(groupNumber)를 key로 쓴다. Core는 저장된 refundRequestId·목적·원문으로 결과를 검증한다. Payment의 consumer·PG 환불·결과 producer는 Payment 서비스가 구현했다(#394~#396). 대사는 후순위다. Core 결과 테스트는 fixture 주입이고, 두 서비스를 함께 띄운 확인은 [#416~#418 기록](../../../../worklog/2026-11-27-core-payment-retry.md)에 있다. 기존 원문에 paymentId가 없고 결과에만 새 ID가 있는 경우에는 검증된 기존 binding이 없으면 적용을 보류하고 재전달한다. 현재 Payment GET 계약의 필드로 안전한 연결 복구를 증명하지 못했으므로 미해결이며 새 필드를 가정하거나 검증을 완화하지 않는다.
+환불 공통 요청은 `commerce.refund.requests.v1`, 공통 결과는 `payment.refund.results.v1`이며 두 목적 모두 처음부터 존재하는 orderRef(groupNumber)를 key로 쓴다. Core는 저장된 refundRequestId·목적·원문으로 결과를 검증한다. Payment의 consumer·PG 환불·결과 producer는 Payment 서비스가 구현했다(이슈 #385·#370·#386, PR #394~#396). 대사는 후순위다. Core 결과 테스트는 fixture 주입이고, 두 서비스를 함께 띄운 확인은 [#416~#418 기록](../../../../worklog/2026-11-27-core-payment-retry.md)에 있다. 기존 원문에 paymentId가 없고 결과에만 새 ID가 있는 경우에는 검증된 기존 binding이 없으면 적용을 보류하고 재전달한다. 현재 Payment GET 계약의 필드로 안전한 연결 복구를 증명하지 못했으므로 미해결이며 새 필드를 가정하거나 검증을 완화하지 않는다.
 
 V116은 기적용 V115를 변경하지 않고 상태 CHECK와 활성 회원 인덱스를 확장한다. 기존 미완료 시스템 보상과 진행 주문만 새 대기 상태로 이행하고 원문·요청ID·예약과 이미 종료한 주문은 보존한다.
 

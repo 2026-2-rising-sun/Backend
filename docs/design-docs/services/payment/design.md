@@ -781,7 +781,7 @@ paymentstatus \= APPROVED\+event\_outbox"결제 승인됨" · event\_id커밋 �
 **판단은 주문 상태를 가진 Commerce가 합니다.** Payment는 "토스에서 승인됐다"는 사실만 "결제 승인됨"으로 알립니다. Commerce는 그 이벤트를 받을 때 주문 행 하나로 판단합니다. 결제 전에 구매자가 주문을 취소한 경우도 같은 규칙으로 처리됩니다. 결제창에서 나가거나 결과를 기다리다 **페이지만 떠난** 경우는 주문이 PENDING이므로, 승인되면 **정상 결제 완료**입니다.
 
 
-**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다.
+**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다. 예외: 시스템 보상이 APPROVING·UNKNOWN 결제를 선점해 토스 취소만 보낸 경우는 돈이 돌아가도 CANCELED입니다(분개 없음).
 
 
 **"취소"가 세 가지라서 헷갈리기 쉽습니다.** ① **주문 취소**: Commerce의 주문 상태. ② **결제 취소됨(CANCELED)**: 돈이 안 나간 결제를 닫음. ③ **토스 취소 API**: 나간 돈을 돌려줌 \= 우리 말로 **환불**. 늦은 승인 환불은 "취소된 주문을 또 취소"하는 것이 아닙니다. 주문은 이미 닫혀 있고 그대로 둡니다. **주문이 닫힌 뒤 늦게 빠져나간 돈만 돌려줍니다**(③). Commerce는 사유가 LATE\_APPROVAL인 환불 완료를 받으면 주문을 건드리지 않고 고객에게 알리기만 합니다.
@@ -1389,7 +1389,7 @@ ledger\_journal.ref\_type·ref\_id는 결제·환불·
 | `payment.buyer_id` | VARCHAR(36\) | NOT NULL | 결제 생성 때 Commerce가 보낸 구매자 ID. 승인 요청자가 이 구매자인지 확인한다 (흐름 2\) |
 | `payment.amount` | BIGINT | \> 0 | 승인 때 `successUrl`의 금액과 비교한다 (흐름 2\) |
 | `payment.refunded_amount` | BIGINT | 0 ≤ 값 ≤ amount | 조건부 UPDATE로 과다 환불을 막는다 (흐름 7\) |
-| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED. 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
+| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED(보상이 APPROVING·UNKNOWN을 선점해 토스 취소만 보낸 경우는 CANCELED). 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
 | `payment.expires_at` | TIMESTAMP | NOT NULL | 이 시각 뒤에는 승인을 거절한다 (흐름 6\) |
 | `payment.partial_cancelable` | BOOLEAN |  | 승인 응답에서 저장. false면 부분 환불을 거절한다 (흐름 7\) |
 | `payment.pg_provider` | VARCHAR | NOT NULL | 환불과 조회를 원래 PG로 보낸다 (흐름 8\) |
@@ -1909,7 +1909,7 @@ stateDiagram-v2
   PAYMENT_CONFIRMING --> PAID: 결제 승인됨 (동기 200 또는 이벤트)
   PENDING_PAYMENT --> PAID: 결제 승인됨 (이벤트, 구현 갭: 지금은 충돌로 거부)
   PENDING_PAYMENT --> CANCELLED: 구매자 취소 · 반환
-  PENDING_PAYMENT --> EXPIRED: T + 3분 · 반환
+  PENDING_PAYMENT --> EXPIRED: T + 3분 · 반환 (목표. 구현은 결제 대기 600초)
   PAYMENT_CONFIRMING --> COMPENSATION_PENDING: 처리 기한 600초 · 반환 · 보상 요청
   COMPENSATION_PENDING --> CANCELLED: 보상 완료 (SUCCEEDED·NO_CHARGE)
   PAYMENT_CONFIRMING --> FAILED: Payment CANCELED · 반환
@@ -2504,7 +2504,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 ### 토스 상태 ↔ 우리 상태
 
 
-우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다. 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
+우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다(예외: 시스템 보상이 APPROVING·UNKNOWN 결제를 선점해 토스 취소만 보낸 경우는 돈이 돌아가도 CANCELED입니다(분개 없음)). 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
 
 
 
@@ -2612,7 +2612,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 | 35 | 만료와 승인이 동시에 | 둘 중 하나만 1행 | 같은 이전 상태 조건 | 6 |
 | 36 | 결제 확인 중에 구매자 취소 | 409 "결제 확인 중" | PAYMENT\_CONFIRMING 잠금 | 주문 |
 | 37 | 결과 불명이 처리 기한(600초)보다 오래감 | 보상 대기·예약 해제 → 나중에 승인 확인 → 토스 취소(결제 CANCELED) | 늦은 승인 보상 | 6 |
-| 38 | 대사에서 "토스 DONE · 우리 CANCELED" 발견 | APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불) | 거래 대사 | 12 |
+| 38 | 대사에서 "토스 DONE · 우리 CANCELED" 발견 | 기록·알림만 하고 자동 보정하지 않음 → 운영자가 확인해 정정하면 "결제 승인됨" → Commerce가 판단(대부분 보상) | 거래 대사(후속) | 12 |
 | 환불 | | | | |
 | 39 | 환불 요청 중복(이벤트 재전달·재시도) | 1번만 실행 | `refund_request_id` UNIQUE · `ON CONFLICT DO NOTHING` | 7 |
 | 40 | 동시 부분 환불의 합이 결제 금액 초과 | 한 건 결과 이벤트 FAILED(`OVER_REFUND`) | `payment` 행 FOR UPDATE 후 합 계산 | DDL |

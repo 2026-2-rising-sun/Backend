@@ -32,4 +32,4 @@ V104의 정책·스냅샷·대상수량·쿠폰출처, V105의 별도 처리기�
 
 ## 시스템 보상 상태 이행
 
-V116은 orders/payment_group의 CHECK에 COMPENSATION_PENDING을 추가하고 활성 회원 유일성에도 포함한다. 첫 처리 시작600초 무응답 또는 명시적UNKNOWN에서 그룹·항목 상태와 SYSTEM_COMPENSATION 원문/Outbox를 한 TX로 기록한다. 검증된 완료 결과에서만 CANCELLED와 예약 단일해제를 확정한다. V115 원문·ID를 보존하며 기적용 미완료 보상만 대기로 이행한다. 이미 종료한 과거 주문은 유지한다. 실패 보상은 대기 상태이며 같은 요청/실행·더 높은 resultVersion 완료를 허용한다.
+V116은 orders/payment_group의 CHECK에 COMPENSATION_PENDING을 추가하고 활성 회원 유일성에도 포함한다. 당시에는 첫 처리 시작600초 무응답 또는 명시적UNKNOWN에서 보상 대기로 바꾸고 완료 결과에서 예약을 풀었다. 지금은 승인 시도의 처리 기한에 닿을 때만 그룹·항목 상태와 SYSTEM_COMPENSATION 원문/Outbox를 한 TX로 기록하고, 같은 TX에서 예약을 한 번 해제한다(V118 `compensation_released_at`). 보상 완료(SUCCEEDED·NO_CHARGE)에서 CANCELLED로 확정한다. V115 원문·ID를 보존하며 기적용 미완료 보상만 대기로 이행한다. 이미 종료한 과거 주문은 유지한다. 실패 보상은 대기 상태이며 같은 요청/실행·더 높은 resultVersion 완료를 허용한다.

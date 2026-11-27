@@ -19,14 +19,14 @@
 | Payment 확정 승인 | Core PAID | 1초 폴링의 HTTP 조회 또는 PaymentApproved 검증·멱등 반영·재고 소진/쿠폰 사용 |
 | 승인 거절(DECLINED) | Core PENDING_PAYMENT | 422 `DECLINED`. 예약을 유지하고 결제창(`pg_order_id`)·송신 표시를 비운다. 원래 만료 시각 전까지 같은 주문에서 새 결제창·새 `X-Idempotency-Key`로 재결제한다. PaymentFailed는 보내지 않는다(#418) |
 | 202 응답 뒤 거절 | Core PENDING_PAYMENT | 1초 폴링이 Payment 결제를 CREATED이고 결제창이 이 시도와 다르다고 보면 위 거절과 같이 처리한다. 503 `PG_UNAVAILABLE`(토스에 가지 않음)과 UNKNOWN 뒤 토스 ABORTED·EXPIRED도 같은 판정으로 덮는다 |
-| Payment CANCELED | Core FAILED | 토스 승인 응답이 결제와 달라 Payment가 전액 취소한 경우다. 재결제 대상이 아니다. 예약을 해제하고 PaymentFailed(`REJECTED`)를 보낸다 |
+| Payment CANCELED | Core FAILED | 보상이 없는 주문에서 Payment가 결제를 CANCELED로 닫은 경우다(승인 응답 불일치 전액 취소, UNKNOWN 조회에서 토스 전액 취소 확인, Payment 만료 배치 등). 재결제 대상이 아니다. 예약을 해제하고 PaymentFailed(`REJECTED`)를 보낸다 |
 | 결제 대기 만료 | EXPIRED | PENDING_PAYMENT가 생성 기한에 닿으면 재고/쿠폰 선점을 한 번 해제한다 |
 | 처리 기한 도달 | COMPENSATION_PENDING | PAYMENT_CONFIRMING이 600초 처리 기한에 닿으면 같은 TX에서 재고·쿠폰 예약을 해제하고(savepoint) 시스템 보상(사유 `APPROVAL_UNKNOWN`)을 요청한다(#417). 보상은 기한 판정만 만든다 |
 | 보상 없이 닫힌 주문의 늦은 승인 | 시스템 보상 요청+Outbox | EXPIRED/CANCELLED/FAILED 주문에 승인 사실이 오면 주문 부활 없이 `core_refund_intent`(SYSTEM_COMPENSATION, 사유 LATE_APPROVAL)와 `commerce.refund.requests.v1`의 RefundRequested Outbox를 같은 TX에 저장한다. 이미 보상 중인 주문은 승인 사실만 남기고 기존 보상으로 수렴한다 |
 | Core 환불 요청 발행 | Payment 환불 소비 | Payment가 `commerce.refund.requests.v1`을 소비해 refundRequestId로 한 번만 접수하고 토스 취소를 실행한다. 발행 성공은 환불 완료가 아님 |
 | Payment 환불 결과 | Core 환불 상태 | payment.refund.results.v1의 RefundResultRecorded를 core_refund_intent 원요청과 대조해 반영. 구 payment.refund-results.v1 구독은 #390에서 삭제됨 |
 
-과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 77건을 확인했다([기록](../../worklog/2026-11-27-core-payment-retry.md)). 실 PG와 실제 환불 실행은 미실행이다.
+과거 실행 기록에서는 Payment 복구 커밋 2c6aa250의 변경 없는 앱과 실제 Core/PostgreSQL/Kafka로 정상 승인, 처리 중 만료 뒤 늦은 승인, 실제8초202 뒤 Kafka만으로 PAID 반영을 확인했다. #416~#418은 Mock 토스(WireMock)와 실제 Core·Payment jar로 1차 77건 중 71건 통과(부분 3·실패 1·미검증 2)했고, 실패 1건은 고친 뒤 재검증했으며 최종 코드는 회귀 20건이 통과했다([기록](../../worklog/2026-11-27-core-payment-retry.md)). 실 PG와 실제 환불 실행은 미실행이다.
 
 ## 보상 대기와 재고 사본
 

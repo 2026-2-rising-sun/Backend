@@ -3259,7 +3259,7 @@ responses:
 
 인증 완료 후 승인 실행 접수
 
-JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 이 시도의 접수+600초 처리 기한과 승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 시도이며 기한을 연장하지 않는다. 202와 UNKNOWN은 실패가 아니고 처리 기한까지 PROCESSING을 유지한다. 처리 기한에 닿으면 시스템 보상 intent·fence·공통 환불 Outbox를 저장하고 예약을 해제한다. 승인 거절이면 200으로 orderStatus PENDING·paymentStatus DECLINED·pgOrderId null을 돌려주고 예약을 유지한다. 202 뒤 거절과 Payment 503 PG_UNAVAILABLE은 처음에 202 PROCESSING이고, 1초 폴링 뒤 GET이 같은 모양을 보여 준다. 재결제는 새 결제창을 열고 새 X-Idempotency-Key로 요청한다. 거절된 시도의 키를 다른 본문으로 보내면 409(거절된 승인 시도의 키)다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 기한 후에는 새 승인을 보내지 않고 조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
+JWT 구매자와 저장 금액·현재 결제창을 확인한다. 유효 PENDING을 PROCESSING으로 바꾸며 이 시도의 접수+600초 처리 기한과 승인 HTTP 전달 원문을 같은 Core 트랜잭션에 저장한다. 같은 키·원문은 같은 시도이며 기한을 연장하지 않는다. 202와 UNKNOWN은 실패가 아니고 처리 기한까지 PROCESSING을 유지한다. 처리 기한에 닿으면 시스템 보상 intent·fence·공통 환불 Outbox를 저장하고 예약을 해제한다. 승인 거절이면 200으로 orderStatus PENDING·paymentStatus DECLINED·pgOrderId null을 돌려주고 예약을 유지한다. 202 뒤 거절과 Payment 503 PG_UNAVAILABLE은 처음에 202 PROCESSING이고, 1초 폴링 뒤 GET이 같은 모양을 보여 준다. 재결제는 새 결제창을 열고 새 X-Idempotency-Key로 요청한다. 거절된 시도의 키를 다른 본문으로 보내면 409(거절된 승인 시도의 키)다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 처리 기한에 닿아 보상 대기가 되면 이 시도의 승인 전달을 TIMEOUT(ORDER_CLOSED)으로 닫아 더 이상 조회하지 않고 새 승인도 보내지 않는다. 이후 도착한 승인 사실(PaymentApproved)은 이미 보상 중이면 기존 보상에 연결하고, 보상 없이 닫힌 주문이면 주문을 복구하지 않고 LATE_APPROVAL RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Orders
@@ -3401,9 +3401,10 @@ description: JWT 구매자와 저장 금액·현재 결제창을 확인한다. �
   예약을 해제한다. 승인 거절이면 200으로 orderStatus PENDING·paymentStatus DECLINED·pgOrderId null을
   돌려주고 예약을 유지한다. 202 뒤 거절과 Payment 503 PG_UNAVAILABLE은 처음에 202 PROCESSING이고, 1초 폴링
   뒤 GET이 같은 모양을 보여 준다. 재결제는 새 결제창을 열고 새 X-Idempotency-Key로 요청한다. 거절된 시도의 키를 다른 본문으로
-  보내면 409(거절된 승인 시도의 키)다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 기한 후에는
-  새 승인을 보내지 않고 조회만 하며, 늦은 승인은 주문을 복구하지 않고 RefundRequested를 기록한다. Payment 실패를 확정할 수
-  없는 조회 상태는 실패로 추정하지 않는다.
+  보내면 409(거절된 승인 시도의 키)다. 보상 fence 뒤 신규 승인·재전달을 차단하며 늦은 승인 사실은 기존 보상에 연결한다. 처리 기한에
+  닿아 보상 대기가 되면 이 시도의 승인 전달을 TIMEOUT(ORDER_CLOSED)으로 닫아 더 이상 조회하지 않고 새 승인도 보내지 않는다.
+  이후 도착한 승인 사실(PaymentApproved)은 이미 보상 중이면 기존 보상에 연결하고, 보상 없이 닫힌 주문이면 주문을 복구하지 않고
+  LATE_APPROVAL RefundRequested를 기록한다. Payment 실패를 확정할 수 없는 조회 상태는 실패로 추정하지 않는다.
 x-required-roles:
 - USER
 - SELLER
@@ -4801,4 +4802,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `5504aa384cb443fb6bf8de3e0a25ec578846063e21ed3996456999a6f0df2834`
+입력 SHA-256: `17d854aa831f40ad71964f68a2e76c70affec04383837853b655a98fe04e8ce5`

@@ -35,7 +35,7 @@ Cart는 `items` 대신 `cartItems:[{itemId,version}]`를 보낸다. Cart GET의 
 - 202/UNKNOWN은 실패가 아니다. Location 또는 위 GET으로 조회하며 처리 기한까지 PROCESSING을 유지한다. 이 GET은 DB 상태 조회이며 브라우저가 Payment 내부 API를 호출하지 않는다. Core가 1초마다 Payment를 조회해 결과를 반영한다.
 - 유효 승인→PAID. 승인 거절→주문이 PENDING으로 돌아오고 예약은 유지된다(#418). 응답 모양은 `orderStatus: PENDING`, `paymentStatus: DECLINED`, `pgOrderId: null`이다. 거절이 202 뒤에 확정되거나 Payment가 토스에 보내지 못해 503 `PG_UNAVAILABLE`로 답한 경우에는 승인 응답이 먼저 202 PROCESSING이고, 1초쯤 뒤 GET이 같은 모양을 보여 준다.
 - 거절 뒤에는 원래 `expiresAt` 전까지 새 checkouts로 결제창을 다시 열고, 새 `pgOrderId`와 **새 `X-Idempotency-Key`**로 승인한다. 거절된 시도의 키를 새 결제창 정보로 다시 쓰면 409("거절된 승인 시도의 키입니다…")다. 같은 키·같은 본문 재전송은 그 시도의 결과(새 승인 없음)를 돌려준다. 결제창 인증 실패·닫힘은 아직 승인 접수 전이라 PENDING 유지하고 새 checkouts를 요청할 수 있다.
-- Payment가 결제를 CANCELED로 끝내면(토스 승인 응답이 결제와 다름) 주문은 FAILED다. 재결제 대상이 아니다.
+- Payment가 결제를 CANCELED로 끝내면(승인 응답 불일치, UNKNOWN 조회에서 토스 전액 취소 확인, Payment 만료 배치 등. 보상 중인 주문은 제외) 주문은 FAILED다. 재결제 대상이 아니다.
 - PENDING이 `expiresAt`에 닿으면 EXPIRED. PROCESSING이 처리 기한에 닿으면 COMPENSATION_PENDING(보상 대기)이고 예약은 이때 해제된다. 결과 SUCCEEDED/NO_CHARGE로 CANCELLED가 된다. 보상 없이 닫힌 주문에 늦게 승인이 오면 주문 종료를 유지하고 시스템 보상을 요청한다. 요청·Kafka 발행 성공은 환불 완료가 아니다.
 - 성공 시 같은 Cart ID/version만 제거한다. 사용자가 수정한 Cart는 보존한다. 쿠폰 사용은 승인 확정 시 반영한다.
 
