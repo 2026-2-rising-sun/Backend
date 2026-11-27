@@ -965,7 +965,7 @@ responses:
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | couponId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;maxLength&quot;: 64} |
 | expiresAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
-| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
+| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온 동안·V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders | array | 필수 |  | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
 | orders&#91;&#93;.orderNumber | string | 필수 |  | — |
 | orders&#91;&#93;.groupNumber | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null. | — |
@@ -1171,7 +1171,7 @@ responses:
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | couponId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;maxLength&quot;: 64} |
 | expiresAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
-| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
+| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온 동안·V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders | array | 필수 |  | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
 | orders&#91;&#93;.orderNumber | string | 필수 |  | — |
 | orders&#91;&#93;.groupNumber | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null. | — |
@@ -1578,11 +1578,11 @@ responses:
 
 본인 주문의 전체·선택 항목·부분 수량 환불 접수
 
-commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이며 execution-enabled는 기존 legacy HTTP 실행에만 적용한다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1 Outbox를 함께 저장한다. 주문 항목과 결제 묶음의 상태는 바꾸지 않는다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
+commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이다. execution-enabled 설정값은 남아 있지만 코드는 읽지 않는다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1 Outbox를 함께 저장한다. 주문 항목과 결제 묶음의 상태는 바꾸지 않는다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
 본문 생략은 전체 잔여 항목·수량이다. items는 orderId와 선택적 quantity로 일부 항목·수량을 지정한다. quantity 생략은 해당 항목 잔여 전량이다. cartItemIds는 저장된 유일한 출처와 연결된 항목 잔여 전량이다. 두 입력 방식을 혼용할 수 없으며 빈 객체·빈 배열·null·중복 ID·소수·알 수 없는 필드는 400이다. expectedAmount는 서버 계산 합계와 다르면 409이다.
 신규 주문서는 저장 승인시각부터 168시간 미만에 접수한다. 시스템 보상 fence와 CANCEL_PENDING(이전 정책 미완료 데이터)만 신규 접수 409다. 같은 결제의 다른 미완료 환불은 접수를 막지 않는다. 잔여 수량은 구매 수량에서 성공·PROCESSING·UNKNOWN을 뺀 값이고, 금액은 항목 실결제액에서 같은 기준의 금액을 뺀 잔액이다. 단가×수량과 잔여 실결제액 중 작은 값을 서버가 계산한다. 요청 수량은 성공 시에만 재고로 복원하며 쿠폰은 전수량 성공 때 원래 만료를 유지하여 한 번 복원한다.
 같은 회원·키와 정렬된 입력 형태·지정 수량·expectedAmount가 같으면 기존 요청을 200으로 반환한다. 완료·기간 경과 후에도 재조회하며 다른 원문은 409다. 최초 201은 접수이며 완료가 아니다. UNKNOWN은 수량·금액 예약을 유지한다. 확정 실패만 예약을 해제해 다시 환불할 수 있게 한다. 주문 상태는 성공으로 확정된 사실(PAID, PARTIALLY_REFUNDED, REFUNDED)만 가진다.
-policyVersion=0의 기존 전체·cartItemIds 경로와 미완료 HTTP 원문은 보존한다. legacy items/부분수량은 지원하지 않으며 자동 Kafka 재발행하지 않는다.
+policyVersion=0 주문의 환불 요청은 409로 거절한다(기존 원문 데이터만 보존). 자동 Kafka 재발행하지 않는다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Payment Groups
@@ -1788,8 +1788,8 @@ tags:
 - Payment Groups
 operationId: requestMyRefund
 summary: 본인 주문의 전체·선택 항목·부분 수량 환불 접수
-description: 'commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이며 execution-enabled는
-  기존 legacy HTTP 실행에만 적용한다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1
+description: 'commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이다. execution-enabled
+  설정값은 남아 있지만 코드는 읽지 않는다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1
   Outbox를 함께 저장한다. 주문 항목과 결제 묶음의 상태는 바꾸지 않는다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은
   지연된다.
 
@@ -1806,8 +1806,7 @@ description: 'commercecore.refunds.api-enabled=true일 때 제공한다. 신규 
   다른 원문은 409다. 최초 201은 접수이며 완료가 아니다. UNKNOWN은 수량·금액 예약을 유지한다. 확정 실패만 예약을 해제해 다시 환불할
   수 있게 한다. 주문 상태는 성공으로 확정된 사실(PAID, PARTIALLY_REFUNDED, REFUNDED)만 가진다.
 
-  policyVersion=0의 기존 전체·cartItemIds 경로와 미완료 HTTP 원문은 보존한다. legacy items/부분수량은 지원하지
-  않으며 자동 Kafka 재발행하지 않는다.'
+  policyVersion=0 주문의 환불 요청은 409로 거절한다(기존 원문 데이터만 보존). 자동 Kafka 재발행하지 않는다.'
 x-required-roles:
 - USER
 - SELLER
@@ -2473,7 +2472,7 @@ responses:
 
 새 Payment 계약의 주문 생성과 결제 준비
 
-SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
+SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 경로는
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Orders
@@ -2675,8 +2674,7 @@ summary: 새 Payment 계약의 주문 생성과 결제 준비
 description: SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달
   원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은
   orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과
-  각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을
-  돌려준다.
+  각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 경로는
 x-required-roles:
 - USER
 - SELLER
@@ -3895,7 +3893,8 @@ components:
           - string
           - 'null'
           format: date-time
-          description: 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.
+          description: 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온
+            동안·V105 이전 확인중 주문은 null.
         orders:
           type: array
           minItems: 1
@@ -3911,11 +3910,8 @@ components:
       description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가
         없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미
         생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는
-        할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인
-        묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를
-        유지하고 전량 환불이면 REFUNDED다. legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새
-        주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이
-        null이다.
+        할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. 0원 묶음의 결제 시작과 policy0
+        환불 경로는
     RefundableTarget:
       type: object
       required:
@@ -4805,4 +4801,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `fd5d534bb37a05bfdac843f096fa458921db75c9c95e0672d0f964c763c88aae`
+입력 SHA-256: `9f384ac228873bb3d7968c46f0649b19f635b35bb6fb0e9997bbc00b0bc4f847`

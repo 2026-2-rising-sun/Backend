@@ -18,7 +18,7 @@
 
 | 방식 | 주요 흐름 |
 |---|---|
-| HTTP | CommerceCore → Payment 내부 결제 생성·승인·조회, Catalog → CommerceCore 판매·쿠폰 대조, Live → CommerceCore 상품·판매 조회, Live → Member 회원 표시 이름 조회 |
+| HTTP | CommerceCore → Payment 내부 결제 생성·결제창·승인·조회, Catalog → CommerceCore 판매·쿠폰 대조, Live → CommerceCore 상품·판매 조회, Live → Member 회원 표시 이름 조회 |
 | 인증 확인 | Catalog·CommerceCore·Live·Notification → Member 세션 활성 상태 확인 |
 | Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. CommerceCore 환불 요청 → Payment, Payment 환불 결과 → CommerceCore. 주문 묶음·쿠폰·판매 상태·방송 → Notification |
 | Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |

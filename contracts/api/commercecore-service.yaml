@@ -8,7 +8,7 @@ info:
     USER와 SELLER의 타인 주문·결제·장바구니 접근은 404.
     주문·결제·장바구니·판매정보의 JSON 성공 응답은 봉투 없는 DTO/배열이고, 쿠폰·환불은 ApiResponse 봉투이다. 오류는 공통 ApiResponse 봉투이며 204는 본문이 없다.
     현재 결제 연동은 독립 Payment 서비스의 토스페이먼츠 연동(테스트 키)이며 서비스가 JWT를 직접 검증한다.
-    공개 결제/환불 facade는 Core가 유지한다. 결제(생성·승인·조회)는 Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다. 환불은 Kafka 요청(commerce.refund.requests.v1)·결과(payment.refund.results.v1)로 오간다.
+    공개 결제/환불 facade는 Core가 유지한다. 결제(생성·결제창·승인·조회)는 Core 영속 전달 요청 커밋 뒤 내부 HTTP로 Payment를 호출하고 결과를 멱등 적용한다. 환불은 Kafka 요청(commerce.refund.requests.v1)·결과(payment.refund.results.v1)로 오간다.
     정책0(legacy) 주문의 0원·Payment 호출 경로는 #390에서 삭제됐고, 새 주문서는 실결제액이 양수여야 한다. Payment 불가용·응답 유실은 같은 requestId로 복구하며 UNKNOWN을 실패로 확정하지 않는다.
 
     단건 구매를 포함해 회원당 활성 주문 묶음/결제는 하나이다. 새 주문 생성 기한은 기본600초다. 기존 PAYMENT_CONFIRMING 상태명을 PROCESSING 의미로 유지하고 승인 시도마다 그 접수부터 별도600초 처리 기한을 저장한다. 신규 order-sheets는 처리 기한까지 PROCESSING을 유지하며 1초마다 Payment를 조회하고, 기한에 닿을 때만 COMPENSATION_PENDING과 SYSTEM_COMPENSATION Outbox로 전환하며 같은 TX에서 예약을 해제한다. 명시적 UNKNOWN·단순 통신오류는 즉시 보상하지 않으며 정상202는 UNKNOWN이 아니다. 보상 완료(SUCCEEDED·NO_CHARGE) 후 CANCELLED로 확정한다. 결제 전 미결제 주문의 EXPIRED는 기존대로 유지한다. Kafka 환불 요청은 Payment가 소비·실행하고 결과를 돌려준다(#385·#370·#386). 운영 PG 환불은 검증하지 않았다(토스 테스트 환경 확인은 #367). 기존 저장기한·번호·금액·참조는 바꾸지 않는다.
@@ -25,7 +25,7 @@ tags:
   - name: Orders
     description: 회원 본인 주문
   - name: Payments
-    description: 회원 본인 결제 시도
+    description: 삭제된 legacy 회원 결제 시도(이 태그를 쓰는 operation 없음)
   - name: Payment Groups
     description: 상품별 주문을 연결한 회원 본인 통합 결제
   - name: Cart
@@ -1147,7 +1147,7 @@ paths:
       tags: ["Cart"]
       summary: "상품별 주문과 결제 묶음 생성"
       operationId: "createMyCartGroup"
-      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 최초 성공 때 본인 장바구니의 구매 SKU 행 전체를 삭제하며 결제 중 수량 변경·삭제 후 재등록도 정리한다. 다른 SKU·회원과 성공 이후 재담기는 보존한다. 새 주문 생성 기한은 기본600초이며 첫 승인 실행 접수부터 별도600초를 적용한다. 같은 승인 재요청은 처리 기한을 연장하지 않는다. 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다."
+      description: "선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 최초 성공 때 본인 장바구니의 구매 SKU 행 전체를 삭제하며 결제 중 수량 변경·삭제 후 재등록도 정리한다. 다른 SKU·회원과 성공 이후 재담기는 보존한다. 새 주문 생성 기한은 기본600초다. 이 legacy 경로의 주문은 #390 뒤 Payment 호출이 없어 결제되지 않고 기한에 만료된다(Frontend #89 전환 전까지 유지). 같은 승인 재요청은 처리 기한을 연장하지 않는다. 취소/만료 뒤에는 새 묶음을 만들어야 한다."
       x-required-roles: ["USER","SELLER"]
       parameters: [{"$ref":"#/components/parameters/RequiredIdempotencyKey"}]
       requestBody:
@@ -1260,11 +1260,11 @@ paths:
       operationId: requestMyRefund
       summary: 본인 주문의 전체·선택 항목·부분 수량 환불 접수
       description: |-
-        commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이며 execution-enabled는 기존 legacy HTTP 실행에만 적용한다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1 Outbox를 함께 저장한다. 주문 항목과 결제 묶음의 상태는 바꾸지 않는다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
+        commercecore.refunds.api-enabled=true일 때 제공한다. 신규 주문서는 Kafka 환불이다. execution-enabled 설정값은 남아 있지만 코드는 읽지 않는다. 신규 접수는 이 옵션과 무관하게 원문·수량 및 금액 예약·commerce.refund.requests.v1 Outbox를 함께 저장한다. 주문 항목과 결제 묶음의 상태는 바꾸지 않는다. 공용 Outbox relay가 중지되면 접수는 보존되지만 전달은 지연된다.
         본문 생략은 전체 잔여 항목·수량이다. items는 orderId와 선택적 quantity로 일부 항목·수량을 지정한다. quantity 생략은 해당 항목 잔여 전량이다. cartItemIds는 저장된 유일한 출처와 연결된 항목 잔여 전량이다. 두 입력 방식을 혼용할 수 없으며 빈 객체·빈 배열·null·중복 ID·소수·알 수 없는 필드는 400이다. expectedAmount는 서버 계산 합계와 다르면 409이다.
         신규 주문서는 저장 승인시각부터 168시간 미만에 접수한다. 시스템 보상 fence와 CANCEL_PENDING(이전 정책 미완료 데이터)만 신규 접수 409다. 같은 결제의 다른 미완료 환불은 접수를 막지 않는다. 잔여 수량은 구매 수량에서 성공·PROCESSING·UNKNOWN을 뺀 값이고, 금액은 항목 실결제액에서 같은 기준의 금액을 뺀 잔액이다. 단가×수량과 잔여 실결제액 중 작은 값을 서버가 계산한다. 요청 수량은 성공 시에만 재고로 복원하며 쿠폰은 전수량 성공 때 원래 만료를 유지하여 한 번 복원한다.
         같은 회원·키와 정렬된 입력 형태·지정 수량·expectedAmount가 같으면 기존 요청을 200으로 반환한다. 완료·기간 경과 후에도 재조회하며 다른 원문은 409다. 최초 201은 접수이며 완료가 아니다. UNKNOWN은 수량·금액 예약을 유지한다. 확정 실패만 예약을 해제해 다시 환불할 수 있게 한다. 주문 상태는 성공으로 확정된 사실(PAID, PARTIALLY_REFUNDED, REFUNDED)만 가진다.
-        policyVersion=0의 기존 전체·cartItemIds 경로와 미완료 HTTP 원문은 보존한다. legacy items/부분수량은 지원하지 않으며 자동 Kafka 재발행하지 않는다.
+        policyVersion=0 주문의 환불 요청은 409로 거절한다(기존 원문 데이터만 보존). 자동 Kafka 재발행하지 않는다.
       x-required-roles: [USER, SELLER]
       parameters: [{"$ref":"#/components/parameters/RequiredRefundIdempotencyKey"}]
       requestBody:
@@ -1662,7 +1662,7 @@ paths:
       tags: [Orders]
       operationId: createRelayOrderSheet
       summary: 새 Payment 계약의 주문 생성과 결제 준비
-      description: SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 API는 바꾸지 않는다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
+      description: SKU 또는 장바구니 선택으로 주문과 재고·쿠폰 선점, 판매자별 할인후 금액·설정 수수료 스냅샷, Payment 생성 전달 원문을 같은 Core 트랜잭션에 저장한다. 커밋 뒤 Payment 생성을 시도하며 준비 성공도 PENDING을 유지한다. 준비 응답 유실은 같은 orderRef·저장 원문으로 복구한다. 설정 commerce.commission-rate가 필요하며 임의 기본 요율은 없다. 이 새 경로의 결제액과 각 판매자 금액은 Payment 서비스 계약대로 양수다. 기존 legacy 0원 경로는 #390에서 삭제됐다. 같은 키·같은 입력은 원래 주문·금액·기한을 돌려준다.
       x-required-roles: [USER, SELLER]
       parameters: [{$ref: '#/components/parameters/RequiredIdempotencyKey'}]
       requestBody:
@@ -2902,7 +2902,7 @@ components:
         processingExpiresAt:
           type: [string, 'null']
           format: date-time
-          description: 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.
+          description: 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온 동안·V105 이전 확인중 주문은 null.
         orders:
           type: array
           minItems: 1
@@ -2916,7 +2916,7 @@ components:
           format: int64
           minimum: 1
       description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가 없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미 생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는 할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는
-        null. payableAmount가 0인 묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를 유지하고 전량 환불이면 REFUNDED다. legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새 주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 
+        null. 0원 묶음의 결제 시작과 policy0 환불 경로는 #390에서 삭제됐다(새 주문서는 실결제액이 양수여야 하고, policy0 환불은 409). legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새 주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이 null이다. 
     CreateOrderRequest:
       type: "object"
       required: ["productId", "quantity", "buyerName", "buyerPhone"]
@@ -3133,19 +3133,20 @@ components:
         status:
           type: string
           enum: [PENDING, PROCESSING, UNKNOWN, SUCCESS, FAILED, TIMEOUT]
-          description: "신규 결제는 PROCESSING으로 시작한다. UNKNOWN은 승인 결과 미확정이다. Order의 PAYMENT_CONFIRMING은 승인 시도 접수부터600초 기한이다. UNKNOWN은 기한 전 실패로 확정하지 않으며 주문 만료 뒤 승인은 환불 필요 사실로 기록한다. 이 스키마는 기존 legacy 경로다. 새 Payment 조회·환불 전달은 별도 order-sheets 중계를 사용한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
+          description: "삭제된 legacy 결제 시도 상태다(어떤 operation도 참조하지 않음). 당시 신규 결제는 PROCESSING으로 시작했다. UNKNOWN은 승인 결과 미확정이다. Order의 PAYMENT_CONFIRMING은 승인 시도 접수부터600초 기한이다. UNKNOWN은 기한 전 실패로 확정하지 않으며 주문 만료 뒤 승인은 환불 필요 사실로 기록한다. 이 스키마는 기존 legacy 경로다. 새 Payment 조회·환불 전달은 별도 order-sheets 중계를 사용한다. 서버가 기존 결제 결과를 재확인하며 재시도 소진만으로 실패 종료하지 않는다. PENDING·TIMEOUT은 기존 데이터 호환용 값이며 새 시간 초과 결과는 UNKNOWN으로 처리한다."
         requestedAt: {"type": "string", "format": "date-time"}
         resolvedAt: {"type": ["string", "null"], "format": "date-time"}
         scheduledResolveAt:
           type: [string, 'null']
           format: date-time
           description: "미확정 결제의 다음 자동 처리 대상 시각이며 완료 시각을 보장하지 않는다. 확정 결제에서도 마지막 예약 시각은 남는다."
-      description: "삭제된 legacy Mock 결제 스키마다(참조 없음). scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
+      description: "삭제된 legacy Mock 결제 스키마다(어떤 operation도 참조하지 않음). scenario는 서버 결과이며 일반 결제 요청에서 선택할 수 없다."
     PaymentScenario:
       type: "string"
       enum: ["INSTANT_SUCCESS", "INSTANT_FAIL", "DELAYED_SUCCESS", "DELAYED_FAIL", "SUCCESS_RESPONSE_LOST", "FAILURE_RESPONSE_LOST", "UNAVAILABLE_BEFORE_RESULT"]
-      description: "삭제된 legacy Mock 결과 시나리오다(참조 없음). 일반 결제 요청에서 선택할 수 없었다. local/test의 서버 시나리오 설정으로만 제어한다. SUCCESS_RESPONSE_LOST와 FAILURE_RESPONSE_LOST는 각각 승인 성공·확정 실패 결과를 저장한 뒤 최초 응답을 유실하고 같은 결제 시도 ID의 저장 결과는 보존한다. UNAVAILABLE_BEFORE_RESULT는 결과 저장 전 일시 장애로 승인·확정 실패 결과를 만들지 않는다. 결과 조회는 저장 결과만 확인하며 새 승인을 만들지 않는다. 자동 재실행 횟수·조회 주기는 별도 복구 정책이다."
+      description: "삭제된 legacy Mock 결과 시나리오다(어떤 operation도 참조하지 않음). 일반 결제 요청에서 선택할 수 없었다. local/test의 서버 시나리오 설정으로만 제어한다. SUCCESS_RESPONSE_LOST와 FAILURE_RESPONSE_LOST는 각각 승인 성공·확정 실패 결과를 저장한 뒤 최초 응답을 유실하고 같은 결제 시도 ID의 저장 결과는 보존한다. UNAVAILABLE_BEFORE_RESULT는 결과 저장 전 일시 장애로 승인·확정 실패 결과를 만들지 않는다. 결과 조회는 저장 결과만 확인하며 새 승인을 만들지 않는다. 자동 재실행 횟수·조회 주기는 별도 복구 정책이다."
     SetPaymentScenarioRequest:
+      description: "삭제된 legacy Mock 시나리오 요청이다(어떤 operation도 참조하지 않음)."
       type: "object"
       required: ["scenario"]
       properties:

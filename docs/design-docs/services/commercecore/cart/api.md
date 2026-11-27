@@ -1045,7 +1045,7 @@ responses:
 
 상품별 주문과 결제 묶음 생성
 
-선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 최초 성공 때 본인 장바구니의 구매 SKU 행 전체를 삭제하며 결제 중 수량 변경·삭제 후 재등록도 정리한다. 다른 SKU·회원과 성공 이후 재담기는 보존한다. 새 주문 생성 기한은 기본600초이며 첫 승인 실행 접수부터 별도600초를 적용한다. 같은 승인 재요청은 처리 기한을 연장하지 않는다. 실패/취소/만료 뒤에는 새 묶음을 만들어야 한다.
+선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서 예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성 묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된 항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰 예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 최초 성공 때 본인 장바구니의 구매 SKU 행 전체를 삭제하며 결제 중 수량 변경·삭제 후 재등록도 정리한다. 다른 SKU·회원과 성공 이후 재담기는 보존한다. 새 주문 생성 기한은 기본600초다. 이 legacy 경로의 주문은 #390 뒤 Payment 호출이 없어 결제되지 않고 기한에 만료된다(Frontend #89 전환 전까지 유지). 같은 승인 재요청은 처리 기한을 연장하지 않는다. 취소/만료 뒤에는 새 묶음을 만들어야 한다.
 
 **인증:** `[{"BearerAuth": []}]`
 **태그:** Cart
@@ -1114,7 +1114,7 @@ responses:
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | couponId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;maxLength&quot;: 64} |
 | expiresAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
-| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
+| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온 동안·V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders | array | 필수 |  | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
 | orders&#91;&#93;.orderNumber | string | 필수 |  | — |
 | orders&#91;&#93;.groupNumber | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null. | — |
@@ -1189,7 +1189,7 @@ responses:
 | payableAmount | integer | 필수 |  | {&quot;format&quot;: &quot;int64&quot;, &quot;minimum&quot;: 0} |
 | couponId | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 |  | {&quot;maxLength&quot;: 64} |
 | expiresAt | string | 필수 |  | {&quot;format&quot;: &quot;date-time&quot;} |
-| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
+| processingExpiresAt | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온 동안·V105 이전 확인중 주문은 null. | {&quot;format&quot;: &quot;date-time&quot;} |
 | orders | array | 필수 |  | {&quot;minItems&quot;: 1, &quot;maxItems&quot;: 100} |
 | orders&#91;&#93;.orderNumber | string | 필수 |  | — |
 | orders&#91;&#93;.groupNumber | &#91;&#x27;string&#x27;, &#x27;null&#x27;&#93; | 필수 | 연결된 결제 묶음 번호. 기존 그룹 없는 주문은 null. | — |
@@ -1326,14 +1326,14 @@ tags:
 - Cart
 summary: 상품별 주문과 결제 묶음 생성
 operationId: createMyCartGroup
-description: 선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서
+description: '선택 상품별 주문을 생성하고 하나의 결제 묶음에 연결한다. couponId는 선택이며 지정 시 회원 쿠폰을 주문 생성 트랜잭션에서
   예약하고, 할인액·대상 주문별 배분·결제 실부담액을 스냅샷으로 저장한다. expectedTotalAmount는 할인 전 총액이다. 회원당 활성
   묶음은 단건 구매를 포함해 하나이며 PENDING_PAYMENT/PAYMENT_CONFIRMING 중 새로운 구매는 409. 회원별 동일 키·정렬된
   항목 ID/버전·구매자·기대 총액·쿠폰 ID가 같은 요청은 기존 묶음을 200으로 반환하고 다른 입력은 409. 카트 잠금·버전/가격/상태 재검증·쿠폰
   예약·전체 주문 저장·재고 예약은 한 트랜잭션이며 하나라도 실패하면 전부 롤백한다. 카트는 생성 시 삭제하지 않으며 편집할 수 있다. 최초 성공
   때 본인 장바구니의 구매 SKU 행 전체를 삭제하며 결제 중 수량 변경·삭제 후 재등록도 정리한다. 다른 SKU·회원과 성공 이후 재담기는 보존한다.
-  새 주문 생성 기한은 기본600초이며 첫 승인 실행 접수부터 별도600초를 적용한다. 같은 승인 재요청은 처리 기한을 연장하지 않는다. 실패/취소/만료
-  뒤에는 새 묶음을 만들어야 한다.
+  새 주문 생성 기한은 기본600초다. 이 legacy 경로의 주문은 #390 뒤 Payment 호출이 없어 결제되지 않고 기한에 만료된다(Frontend
+  #89 전환 전까지 유지). 같은 승인 재요청은 처리 기한을 연장하지 않는다. 취소/만료 뒤에는 새 묶음을 만들어야 한다.'
 x-required-roles:
 - USER
 - SELLER
@@ -1950,7 +1950,8 @@ components:
           - string
           - 'null'
           format: date-time
-          description: 첫 승인 실행 접수부터600초. 재전송으로 연장하지 않는다. 실행 전 및 V105 이전 확인중 주문은 null.
+          description: 승인 시도 접수+600초. 같은 시도의 재전송으로 연장하지 않는다. 준비 단계·거절로 PENDING에 돌아온
+            동안·V105 이전 확인중 주문은 null.
         orders:
           type: array
           minItems: 1
@@ -1966,11 +1967,8 @@ components:
       description: 기존 productId API는 SKU가 하나인 상품만 지원한다. Sales 이력 없는 신규 SKU도 지원하며 SKU가
         없으면404, 여러 개면409이고 신규 SKU 공개 주문은 후속이다. Cart 옵션 SKU를 임의 기본 SKU로 바꾸지 않는다. 이미
         생성된 버전0은 원래 가격과 TTL로 완료·해제한다.  totalAmount는 할인 전 주문 원금 합계, discountAmount는
-        할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. payableAmount가 0인
-        묶음은 결제 시작 요청 안에서 금전 승인 없이 PAID로 확정된다. 공개 구API는 policy0으로 일부 항목 환불 뒤 PAID를
-        유지하고 전량 환불이면 REFUNDED다. legacy 실행은 processingExpiresAt 기한에 만료하고 선점을 해제한다(새
-        주문서는 처리 기한에 COMPENSATION_PENDING으로 바꾼다). V105 이전 확인중 주문은 기한을 임의 역산하지 않아 processingExpiresAt이
-        null이다.
+        할인 합계, payableAmount는 결제 실부담액이다. 결제 시작 전 paymentId는 null. 0원 묶음의 결제 시작과 policy0
+        환불 경로는
   responses:
     Unauthorized:
       description: 인증 누락·위조·만료 토큰. 사용자 JWT와 서비스 토큰은 대체되지 않는다.
@@ -2169,4 +2167,4 @@ components:
         세션 상태를 무캐시 확인한다. 확인 실패 503, 보안 폐기·탈퇴 401. 쿠키·임의 회원/역할 헤더는 인증 수단이 아니다.
 ```
 
-입력 SHA-256: `fd5d534bb37a05bfdac843f096fa458921db75c9c95e0672d0f964c763c88aae`
+입력 SHA-256: `9f384ac228873bb3d7968c46f0649b19f635b35bb6fb0e9997bbc00b0bc4f847`
