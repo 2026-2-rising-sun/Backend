@@ -10,7 +10,7 @@
 |---|---|---|
 | Member | 회원·자격증명·접근/갱신 세션 | 다른 서비스는 Member의 세션 확인 계약을 사용한다. |
 | CommerceCore | 상품·이미지·판매·재고·쿠폰·장바구니·주문·결제/환불 접수와 결과 반영 | 거래 정책과 재고·쿠폰 보상은 Core 책임이다. |
-| Payment | 결제 생성·토스 승인·UNKNOWN 복구·만료·원장 분개·결과 Outbox(환불은 재설계 중) | Core의 영속 전달 ID를 사용하되 독립 DB를 소유한다. |
+| Payment | 결제 생성·토스 승인·UNKNOWN 복구·만료·원장 분개·결과 Outbox·환불과 시스템 보상 실행 | Core의 영속 전달 ID를 사용하되 독립 DB를 소유한다. |
 | Catalog | 공개 상품·판매·쿠폰 조회 사본 | 원본 변경 주체는 Core다. 이벤트 사본과 HTTP 대조/대체 경로를 구분한다. |
 | Live | 방송·상품 연결·프로모션·채팅·좋아요·시청 연결 | Redis Pub/Sub은 Live 인스턴스 간 SSE 전달에 사용한다. |
 | Notification | 알림·구독·이벤트 중복 방지·방송/판매 조회 상태 | 소비한 이벤트로 본인 알림함을 구성한다. |
@@ -22,7 +22,7 @@
 
 서비스 내부는 업무 도메인 아래 Controller → Service → Repository/Entity, 외부 호출은 대상별 Client로 구성한다. 트랜잭션·멱등성·잠금·복구 경계는 실제 서비스 코드에서 확인한다.
 
-- Core → Payment: 새 주문서의 결제 생성·승인·조회는 영속 원문을 둔 HTTP 중계다. 기존 legacy 환불 HTTP와 늦은 승인 환불 요청 Outbox도 남아 있지만 실제 환불 실행 연동은 미완이다. Payment → Core: 결제 결과 이벤트·대조 조회, Core에 구현된 환불 결과 소비를 구분한다.
+- Core → Payment: 새 주문서의 결제 생성·승인·조회는 영속 원문을 둔 HTTP 중계다. 환불은 Kafka 요청(`commerce.refund.requests.v1`)·결과(`payment.refund.results.v1`)로만 오가고, 옛 환불 HTTP·하이픈 토픽은 #390에서 삭제됐다. Payment → Core: 결제 결과 이벤트·대조 조회와 환불 결과 이벤트다.
 - Core → Catalog: 상품·SKU 메타데이터는 업무 변경과 같은 트랜잭션의 Outbox에 기록하고, 변경된 재고는 기본 60초 fixedDelay 배치로 합친다. Connect가 Catalog 토픽의 삽입·초기 snapshot만 선별해 Kafka로 보낸다. Core relay는 이 토픽을 제외하고 기존 판매·쿠폰·주문 알림 경로는 유지한다.
 - Catalog는 상품·SKU 메타데이터와 재고의 버전을 독립 적용한다. 사본 재고는 지연된 표시 정보이며 주문 시 실제 가격·재고는 Core가 최종 검증한다. 기존 HTTP 판매/쿠폰 조회 설정과 새 CDC 초기 적재를 구분한다.
 - Live → Core/Member: 상품·판매·회원 표시 정보 확인. 방송·프로모션 이벤트는 관련 소비자에 전달한다.
@@ -39,4 +39,4 @@
 
 ## Order 처리 기한 후속
 
-현재 dev는 주문 생성부터 600초(결제 대기), 승인 시도마다 그 접수부터 별도 600초(처리 기한)를 적용한다. 결제 대기 만료는 EXPIRED와 선점 해제다. 처리 기한에 닿은 결제 확인 중 주문은 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 선점을 해제하고 시스템 보상(`APPROVAL_UNKNOWN`)을 공통 dot 토픽으로 요청한다. 보상 없이 닫힌 주문의 늦은 승인은 `core_refund_intent`에 `LATE_APPROVAL` 보상으로 저장한다. 옛 `payment_relay_refund`와 하이픈 토픽 경로는 #390에서 삭제됐다. [주문·결제 흐름](docs/design-docs/flows/order-payment.md)과 [환불 흐름](docs/design-docs/flows/refund.md)을 함께 확인한다.
+현재 dev는 주문 생성부터 600초(결제 대기), 승인 시도마다 그 접수부터 별도 600초(처리 기한)를 적용한다. 결제 대기 만료는 EXPIRED와 선점 해제다. 처리 기한에 닿은 결제 확인 중 주문은 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 선점을 해제하고 시스템 보상(`APPROVAL_UNKNOWN`)을 공통 dot 토픽으로 요청한다. 보상 없이 닫힌 주문의 늦은 승인은 `core_refund_intent`에 `LATE_APPROVAL` 보상으로 저장한다. 하이픈 토픽 경로는 #390에서 삭제됐다. `payment_relay_refund` 테이블과 기존 행은 남지만 새 늦은 승인은 쓰지 않는다. [주문·결제 흐름](docs/design-docs/flows/order-payment.md)과 [환불 흐름](docs/design-docs/flows/refund.md)을 함께 확인한다.

@@ -54,7 +54,7 @@ UNKNOWN은 수량·금액 예약을 유지한다. SUCCEEDED만 이번 수량을 
 
 ## 결과 검증과 전달
 
-요청/결과 토픽은 `commerce.refund.requests.v1` / `payment.refund.results.v1`, 승인 사실은 `payment.execution.results.v1`이다. 기존 하이픈 승인·환불 결과 listener는 저장된 legacy 원문 처리에 보존한다. Notification/Live와 기존 `commerce.payment-group.v1` 알림은 유지한다.
+요청/결과 토픽은 `commerce.refund.requests.v1` / `payment.refund.results.v1`, 승인 사실은 `payment.execution.results.v1`이다. 기존 구 하이픈 승인·환불 결과 listener는 #390에서 삭제됐다. Notification/Live와 기존 `commerce.payment-group.v1` 알림은 유지한다.
 
 결과는 source/version/eventId/key/orderRef·고정 요청ID(영숫자·밑줄·하이픈1~64자)·paymentId·목적·사유·통화·요청시각·금액·판매자/항목/수량을 원문과 대조한다. executionId는 고정하며 resultVersion의 동일버전 다른 본문·동일eventId 다른 본문·모순 종료 결과를 거절한다. 낮은 UNKNOWN과 같은 종료 의미 재전달은 자원 효과0회다. 미등록·불일치 결과나 DB 실패는 예외로 남겨 listener가 무한 backoff 재전달하며 성공 ack하지 않는다. 별도 격리/DLQ 운영 화면은 이번 Core 구현 범위 밖이다.
 

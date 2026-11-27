@@ -14,7 +14,7 @@
 <li>판매와 방송: 상품 원본·이미지·판매 상태, 방송 등록·시작·종료, 상품 연결·프로모션.</li>
 <li>실시간 참여와 알림: SSE·채팅·좋아요, 이벤트 기반 알림함과 구독.</li>
 </ul>
-<p>결제 PG는 토스페이먼츠이고(테스트 키로 확인), 환불 실행은 재설계 중이다. IVS 로컬 stub과 외부 어댑터를 구분한다. 실제 PG·외부 송출 운영 완료를 제품 기능 설명만으로 주장하지 않는다.</p>
-<p>책임과 상세 정책은 <a href="../../ARCHITECTURE.md">아키텍처</a>, <a href="README.html">모듈 문서</a>, <a href="../../contracts/api">계약</a>을 따른다. 정책을 변경할 때 해당 요구사항·설계·계약과 함께 갱신한다.</p><p class="muted fingerprint">MD SHA-256: <code>8f7b339ac10c935566e9f36f62629b42b846e9332b5b35b0d2053c27861e9331</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+<p>결제 PG는 토스페이먼츠이고(테스트 키로 확인), 환불은 Kafka 요청·결과로 Payment가 토스 취소를 실행한다(실제 PG는 테스트 환경까지). IVS 로컬 stub과 외부 어댑터를 구분한다. 실제 PG·외부 송출 운영 완료를 제품 기능 설명만으로 주장하지 않는다.</p>
+<p>책임과 상세 정책은 <a href="../../ARCHITECTURE.md">아키텍처</a>, <a href="README.html">모듈 문서</a>, <a href="../../contracts/api">계약</a>을 따른다. 정책을 변경할 때 해당 요구사항·설계·계약과 함께 갱신한다.</p><p class="muted fingerprint">MD SHA-256: <code>b6c8fedcbd41842b0cd85ca9a338727fe0d3a9b6d86bfb509b1f9833589c82eb</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

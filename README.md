@@ -18,9 +18,9 @@
 
 | 방식 | 주요 흐름 |
 |---|---|
-| HTTP | CommerceCore → Payment 내부 결제·환불 접수/조회, Catalog → CommerceCore 판매·쿠폰 대조, Live → CommerceCore 상품·판매 조회, Live → Member 회원 표시 이름 조회 |
+| HTTP | CommerceCore → Payment 내부 결제 생성·승인·조회, Catalog → CommerceCore 판매·쿠폰 대조, Live → CommerceCore 상품·판매 조회, Live → Member 회원 표시 이름 조회 |
 | 인증 확인 | Catalog·CommerceCore·Live·Notification → Member 세션 활성 상태 확인 |
-| Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. 주문 묶음·쿠폰·판매 상태·방송 → Notification |
+| Kafka | CommerceCore 상품·판매·쿠폰 → Catalog 사본. Payment 실행 결과 → CommerceCore 주문·재고 반영. CommerceCore 환불 요청 → Payment, Payment 환불 결과 → CommerceCore. 주문 묶음·쿠폰·판매 상태·방송 → Notification |
 | Redis Pub/Sub + SSE | Live 인스턴스 사이에서 채팅·방송 상태를 중계하고 시청자 연결에 실시간 전달 |
 
 판매정보 조회는 이벤트로 채운 사본(`replica`)이 기본이며 `catalog.sales.source=http`(`CATALOG_SALES_SOURCE=http`)로 CommerceCore 직접 조회로 되돌릴 수 있습니다. 상품·판매·쿠폰·방송·프로모션 및 Payment 결과 이벤트는 상태 변경과 Outbox 기록을 같은 트랜잭션으로 묶습니다.
@@ -32,11 +32,11 @@
 | [Member](services/member-service) | 회원·인증·세션 | 회원가입, 로그인, JWT 발급, Refresh Token 교체, 로그아웃, 회원정보 수정·탈퇴, 세션 폐기·확인 |
 | [Catalog](services/catalog-service) | 상품·판매·쿠폰 공개 사본 | 상품 검색·목록·상세·구매 진입 확인, 상품·판매·쿠폰 이벤트 수신과 버전 사본 |
 | [CommerceCore](services/commercecore-service) | 상품·이미지·거래 원본 | 상품·이미지·판매자 관리, 판매·재고·장바구니·주문·쿠폰, 공개 결제 facade, 환불 접수와 결과 멱등 반영 |
-| [Payment](services/payment-service) | 결제·환불 실행 | 토스 승인, UNKNOWN 조회 복구·만료, 복식 원장 분개, 결과 Outbox. 환불은 재설계 중 |
+| [Payment](services/payment-service) | 결제·환불 실행 | 토스 승인, UNKNOWN 조회 복구·만료, 복식 원장 분개, 결과 Outbox, Kafka로 받은 환불·시스템 보상 실행 |
 | [Live](services/live-service) | 방송·실시간 참여 | 방송 등록·시작·종료, 방송 상품 연결·정렬, 프로모션 생성·열기·닫기, 채팅, 회원별 좋아요, SSE |
 | [Notification](services/notification-service) | 내 알림함 | 커서 기반 알림 목록, 안 읽은 알림 개수, 본인 알림 읽음 처리 |
 
-결제는 토스페이먼츠로 승인합니다(테스트 키로 확인). 환불 실행은 재설계 중이라 아직 없습니다. Live는 로컬 IVS stub과 AWS IVS 조회 어댑터를 제공하며, 실제 PG·방송 플랫폼의 운영 연동과는 구분합니다. Notification은 이벤트 수신과 중복 방지로 알림을 생성하고 본인 알림함 API를 제공합니다.
+결제는 토스페이먼츠로 승인합니다(테스트 키로 확인). 환불은 CommerceCore의 Kafka 요청을 받아 Payment가 토스 취소로 실행합니다(실제 PG는 테스트 환경까지 확인). Live는 로컬 IVS stub과 AWS IVS 조회 어댑터를 제공하며, 실제 PG·방송 플랫폼의 운영 연동과는 구분합니다. Notification은 이벤트 수신과 중복 방지로 알림을 생성하고 본인 알림함 API를 제공합니다.
 
 ## 기술 스택
 
