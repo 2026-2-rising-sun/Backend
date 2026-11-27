@@ -6,10 +6,7 @@
 </style></head><body><a class="skip" href="#content">본문으로 이동</a><div class="shell"><aside class="sidebar"><strong>ShoppingLive Backend</strong><nav aria-label="문서 이동"><a href="README.md">MD 원본</a><a href="../../../../README.html">문서 지도</a></nav><div class="toc"><div class="toc">
 <ul>
 <li><a href="#처음-읽는-사람을-위한-요약">처음 읽는 사람을 위한 요약</a></li>
-<li><a href="#416-commercecore-결제-결과-불명-주문을-처리-기한까지-유지한다목표-설계와-구현-차이">416 CommerceCore: 결제 결과 불명 주문을 처리 기한까지 유지한다(목표 설계와 구현 차이).</a></li>
-<li><a href="#417-commercecore-결제-미확정으로-끝낸-주문의-재고쿠폰-예약을-즉시-해제한다목표-설계와-구현-차이">417 CommerceCore: 결제 미확정으로 끝낸 주문의 재고·쿠폰 예약을 즉시 해제한다(목표 설계와 구현 차이).</a></li>
-<li><a href="#418-commercecore-승인-거절-뒤-만료-전까지-같은-주문으로-재결제한다목표-설계와-구현-차이">418 CommerceCore: 승인 거절 뒤 만료 전까지 같은 주문으로 재결제한다(목표 설계와 구현 차이).</a></li>
-<li><a href="#400-payment-서킷-브레이커와-mock-2차-pg-라우팅">400 Payment: 서킷 브레이커와 Mock 2차 PG 라우팅.</a><ul>
+<li><a href="#400-payment-서킷-브레이커와-mock-2차-pg-라우팅-다음-범위다">400 Payment: 서킷 브레이커와 Mock 2차 PG 라우팅. 다음 범위다.</a><ul>
 <li><a href="#용어">용어</a></li>
 <li><a href="#팀별로-시작할-곳">팀별로 시작할 곳</a></li>
 <li><a href="#이번-범위에서-정한-것">이번 범위에서 정한 것</a></li>
@@ -39,14 +36,14 @@
 </li>
 </ul>
 </div>
-</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Backend 코드 작업(Phase 1~3)은 dev에 머지됐다. 남은 일은 Frontend #89, Infra #64 알림의 실제 확인, Backend #401·#387·#367의 완료 조건 확인이다.
+</div></aside><main id="content"><h1>#337 결제 서비스 재설계</h1><p>상태: 진행 중 — Backend 코드 작업(Phase 1~3과 CommerceCore #416~#418)은 dev에 머지됐다(2026-11-27, <code>ba9be27c</code>). 남은 일은 Frontend #89 화면 연동, Infra #64 알림의 실제 확인, #387의 완료 조건 확인이다. 이 셋이 확인되기 전에는 계획을 <code>completed/</code>로 옮기지 않는다.
 관련 이슈: <a href="https://github.com/2026-2-rising-sun/Backend/issues/337">#337 재설계</a>(상위). 남은 이슈는 <a href="#phase-23의-남은-일">서비스별 표</a>에 있다.
 관련 요구사항: <a href="../../../../design-docs/services/payment/requirements/payment.html">결제</a> · <a href="../../../../design-docs/services/payment/requirements/ledger.html">원장</a> · <a href="../../../../design-docs/services/payment/requirements/refund.html">환불</a>
 관련 결정: <a href="../../../../adr/0337-1-commerce-relay-internal-api.html">ADR 0337-1</a> · <a href="../../../../adr/0337-2-payment-replacement.html">0337-2</a> · <a href="../../../../adr/0337-3-payment-result-delivery.html">0337-3</a> · <a href="../../../../adr/0337-4-ledger-double-entry.html">0337-4</a> · <a href="../../../../adr/0337-5-pg-timeout-and-unknown.html">0337-5</a>
 Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 자료: <a href="decision.html">목표 설계와 작은 판단</a> · <a href="../../../../design-docs/services/payment/overview.html">Payment 도메인 홈</a>(새 설계와 현재 코드 문서 목록) · <a href="../../../../design-docs/services/payment/design.html">목표 설계</a>(그림·예시. 원본은 요구사항 MD와 ADR)</p>
 <h2 id="처음-읽는-사람을-위한-요약">처음 읽는 사람을 위한 요약</h2>
-<p>Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(CommerceCore)와 연결하는 작업이다. <strong>결제와 환불의 정상 흐름, 장애 때 돈과 주문이 어긋나지 않게 막는 처리, 옛 코드 삭제는 dev에 머지됐다.</strong> 남은 일은 화면 연결과 알림·완료 조건의 실제 확인이다.</p>
+<p>Payment를 Mock에서 실제 토스 결제로 교체하고, 주문 서비스(CommerceCore)와 연결하는 작업이다. <strong>결제와 환불의 정상 흐름, 장애 때 돈과 주문이 어긋나지 않게 막는 처리, 옛 코드 삭제는 dev에 머지됐다.</strong> 결과 불명 주문을 처리 기한까지 유지하는 처리, 보상 대기 때 예약 해제, 승인 거절 뒤 같은 주문 재결제(#416~#418)도 머지됐다. 남은 일은 화면 연결과 알림의 실제 확인이다.</p>
 <pre><code class="language-text">결제: 구매자 → Frontend → CommerceCore → (HTTP) → Payment → 토스
       HTTP 응답을 잃어도 Payment → payment.execution.results.v1 → CommerceCore 로 결과가 도착한다
 
@@ -72,34 +69,24 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <td>처리 못 한 메시지나 묶인 고객 돈을 사람이 늦게 알 수 있다</td>
 <td>Infra #64, #387(지표는 PR #413로 머지)</td>
 </tr>
-<tr>
-<td>토스의 환불 진행 중 응답(<code>ALREADY_REFUNDING_PAYMENT</code>)을 실제로 재현하지 못했다</td>
-<td>코드는 PR #406로 머지됐고 테스트로만 확인했다</td>
-<td>#401</td>
-</tr>
-<tr>
-<td>구매자 일반 환불의 Core 완료 조건을 확인하지 않았다</td>
-<td>토스 테스트 환경 E2E 근거는 이슈 댓글에 있다. 조건별 확인과 닫기만 남았다</td>
-<td>#367</td>
-</tr>
 </tbody>
 </table></div>
-<p>해결됨: 승인 429의 이중 청구 위험(#398), Core 결제 결과 소비자의 무한 재시도(#389), 보상 대기 중 새 구매 차단(#377), 미확정 환불 중 다른 상품 환불(#399), 멈춘 환불의 수동 처리 절차(#369), 옛 결제 경로와 계약(#384·#390·#402), 일부 수량 환불(#345).</p>
+<p>해결됨: 결과 불명 주문의 처리 기한 유지(#416), 보상 대기 때 예약 해제(#417), 승인 거절 뒤 같은 주문 재결제(#418), 토스 환불 진행 중 응답(#401, 실제 응답은 미재현·테스트로 확인), 구매자 일반 환불 완료 조건(#367), 승인 429의 이중 청구 위험(#398), Core 결제 결과 소비자의 무한 재시도(#389), 보상 대기 중 새 구매 차단(#377), 미확정 환불 중 다른 상품 환불(#399), 멈춘 환불의 수동 처리 절차(#369), 옛 결제 경로와 계약(#384·#390·#402), 일부 수량 환불(#345).</p>
 <p>다음 Phase 후보:</p>
 <ul>
 <li>
-<h1 id="416-commercecore-결제-결과-불명-주문을-처리-기한까지-유지한다목표-설계와-구현-차이">416 CommerceCore: 결제 결과 불명 주문을 처리 기한까지 유지한다(목표 설계와 구현 차이).</h1>
+<h1 id="400-payment-서킷-브레이커와-mock-2차-pg-라우팅-다음-범위다">400 Payment: 서킷 브레이커와 Mock 2차 PG 라우팅. 다음 범위다.</h1>
 </li>
-<li>
-<h1 id="417-commercecore-결제-미확정으로-끝낸-주문의-재고쿠폰-예약을-즉시-해제한다목표-설계와-구현-차이">417 CommerceCore: 결제 미확정으로 끝낸 주문의 재고·쿠폰 예약을 즉시 해제한다(목표 설계와 구현 차이).</h1>
-</li>
-<li>
-<h1 id="418-commercecore-승인-거절-뒤-만료-전까지-같은-주문으로-재결제한다목표-설계와-구현-차이">418 CommerceCore: 승인 거절 뒤 만료 전까지 같은 주문으로 재결제한다(목표 설계와 구현 차이).</h1>
-</li>
-<li>
-<h1 id="400-payment-서킷-브레이커와-mock-2차-pg-라우팅">400 Payment: 서킷 브레이커와 Mock 2차 PG 라우팅.</h1>
-</li>
+<li>그 뒤 후순위: 대사 → 정산 → 지급 → 웹훅(선택). 대사는 불일치를 기록·알림만 하고 자동 보정하지 않는다.</li>
 </ul>
+<p>알려진 공백(테스트가 없다, 이번 범위 밖):</p>
+<ul>
+<li>정책0(legacy) 주문의 환불 요청이 409인지 단언하는 테스트.</li>
+<li>옛 <code>payment_relay_refund</code> 행이 있는 주문에 늦은 승인이 오면 승인 반영이 롤백되는지 확인하는 테스트.</li>
+<li>LED-REFUND-01의 구매확정 전후 분개 비교.</li>
+<li>미확정 지표(<code>UnresolvedWorkMetrics*</code>) 테스트의 요구사항 ID 태그.</li>
+</ul>
+<p>남은 구현 갭: 거절 뒤 결제 대기인 주문에 승인 사실이 오면 Core가 충돌로 거부한다. 시스템 보상이 156초 대기 뒤 NO_CHARGE로 끝난 다음 토스가 늦게 승인하면 감지하지 못한다(대사·웹훅에서 처리). <a href="../../../../design-docs/flows/order-payment.html#남은-구현-갭">주문·결제 흐름</a>에 있다.</p>
 <h3 id="용어">용어</h3>
 <ul>
 <li><strong>UNKNOWN(결과 불명)</strong>: 토스에서 돈이 처리됐는지 아직 모르는 상태. 실패로 단정하지 않고 조회로 확인한다.</li>
@@ -120,12 +107,12 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <tr>
 <td>Payment</td>
 <td><a href="../../../../design-docs/services/payment/requirements/refund.html">환불 요구사항</a>, <a href="../../../../design-docs/services/payment/requirements/payment.html">결제 요구사항</a></td>
-<td>#401·#387 완료 조건 확인, 다음 후보 #400</td>
+<td>#387 완료 조건 확인, 다음 범위 #400</td>
 </tr>
 <tr>
 <td>CommerceCore</td>
-<td>각 이슈 본문, <a href="../../../../../contracts/events/commerce-refund-requests.yaml">이벤트 계약</a></td>
-<td>#367 완료 조건 확인, 다음 후보 #416·#417·#418</td>
+<td><a href="../../../../design-docs/flows/order-payment.html">주문·결제 흐름</a>, <a href="../../../../../contracts/events/commerce-refund-requests.yaml">이벤트 계약</a></td>
+<td>이번 범위의 이슈는 모두 닫힘. Frontend #89 연동 질문 대응</td>
 </tr>
 <tr>
 <td>Infra</td>
@@ -243,16 +230,16 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <tr>
 <td><strong>2 주문 연동</strong></td>
 <td>Commerce가 새 결제 API·이벤트를 쓴다</td>
-<td>완료 #343·#365·#383·#377·#389·#390·#399·#345, 확인 남음 #367</td>
+<td>완료 #343·#365·#383·#377·#389·#390·#399·#345·#367·#416·#417·#418</td>
 <td>CommerceCore 문서(<a href="../../../../design-docs/flows/order-payment.html">주문·결제 흐름</a>)</td>
-<td>코드 머지 완료, #367 확인 남음</td>
+<td>완료</td>
 </tr>
 <tr>
 <td><strong>3 환불</strong></td>
 <td>Core가 Kafka로 보낸 환불·보상 요청을 실행하고 결과를 보낸다</td>
-<td>완료 #385·#370·#386·#384·#398·#402·#369, 확인 남음 #401·#387</td>
+<td>완료 #385·#370·#386·#384·#398·#402·#369·#401, 확인 남음 #387</td>
 <td>REF-*, LED-REFUND-01</td>
-<td>코드 머지 완료, #401·#387 확인 남음</td>
+<td>코드 머지 완료, #387 확인 남음</td>
 </tr>
 <tr>
 <td>다음 범위</td>
@@ -301,7 +288,7 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <td>#401</td>
 <td>토스의 환불 진행 중 응답이 실패로 끝나지 않는다</td>
 <td>없음</td>
-<td>열림. PR #406 머지, 토스 실제 응답 미재현</td>
+<td>닫힘(PR #406). 토스 실제 응답은 미재현</td>
 </tr>
 <tr>
 <td>Payment</td>
@@ -357,7 +344,28 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <td>#367</td>
 <td>구매자 일반 환불의 Core 완료 조건을 확인한다</td>
 <td>없음</td>
-<td>열림. 완료 조건 확인 남음</td>
+<td>닫힘</td>
+</tr>
+<tr>
+<td>CommerceCore</td>
+<td>#416</td>
+<td>결과 불명 주문을 처리 기한까지 결제 확인 중으로 유지한다</td>
+<td>없음</td>
+<td>닫힘(PR #435)</td>
+</tr>
+<tr>
+<td>CommerceCore</td>
+<td>#417</td>
+<td>보상 대기로 바꾸는 트랜잭션에서 재고·쿠폰 예약을 한 번 해제한다</td>
+<td>#416</td>
+<td>닫힘(PR #436)</td>
+</tr>
+<tr>
+<td>CommerceCore</td>
+<td>#418</td>
+<td>승인 거절 뒤 만료 전까지 같은 주문으로 재결제한다</td>
+<td>#417</td>
+<td>닫힘(PR #437)</td>
 </tr>
 <tr>
 <td>CommerceCore</td>
@@ -382,7 +390,7 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 </tr>
 </tbody>
 </table></div>
-<p>작업 순서(1–5는 dev 머지 완료):</p>
+<p>작업 순서(1–5와 #416~#418은 dev 머지 완료):</p>
 <ol>
 <li>선행이 없는 Payment, CommerceCore, Infra DLT 작업을 서비스별로 병렬 진행한다.</li>
 <li>CommerceCore는 #377 → #390 → #389 순서로 진행한다. 같은 결제 코드와 소비자 설정을 고쳐 병렬로 하면 충돌한다.</li>
@@ -485,7 +493,7 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 </tr>
 <tr>
 <td>후순위</td>
-<td>대사: V6 + 원장 대사 → 거래 대사·자동 보정(EC 38). 정산: V7 + <code>PurchaseConfirmed</code> → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 웹훅</td>
+<td>대사: V6 + 원장 대사 → 거래 대사. 불일치는 기록·알림만 하고 자동 보정하지 않는다(EC 38은 사람이 확인해 정정). 정산: V7 + <code>PurchaseConfirmed</code> → NORMAL → REVERSAL. 지급: V8 + Mock 지급. 선택: 웹훅</td>
 </tr>
 </tbody>
 </table></div>
@@ -522,6 +530,6 @@ Phase 1 구현 기록: <a href="phase1-payment.html">결제 1차</a>
 <li>완료: 목표 설계, 요구사항, ADR, Phase 1 구현과 토스 샌드박스 확인, Core 결제 중계, Payment 환불 실행(#385·#370·#386), Phase 2·3의 Backend 코드 작업(위 표의 닫힌 이슈).</li>
 <li>남은 일: 위 <a href="#phase-23의-남은-일">Phase 2·3의 남은 일</a>의 열린 이슈와 <a href="#처음-읽는-사람을-위한-요약">다음 Phase 후보</a>.</li>
 <li>결제 재설계가 끝나면 <code>design-docs/services/payment/design.html</code> 상단의 "구현 전 목표" 안내를 지우고 모듈 문서의 현재 코드 설명과 맞춘다.</li>
-</ul><p class="muted fingerprint">MD SHA-256: <code>5fe54dbc1aea34768125e1d72a8c4d4af02f1725f071fd87efdfa9b521c55749</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</ul><p class="muted fingerprint">MD SHA-256: <code>5596f728186341f7fcf98df91cf6de72ad1b4d7a7f8a88378b9a6c0db2e68b41</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>

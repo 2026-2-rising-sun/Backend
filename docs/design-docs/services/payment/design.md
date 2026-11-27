@@ -591,7 +591,7 @@ sequenceDiagram
 #### 서버 검증 절차: 승인 API 하나가 하는 일
 
 
-프론트가 Commerce에 `paymentKey`, `orderId`, `amount`를 보내면 Commerce가 `POST /internal/payments/{orderRef}/approval`로 중계합니다(`orderId`는 본문의 `pgOrderId`로 넘깁니다). Payment 서버는 아래 순서로 처리합니다. **①\~③은 토스를 부르기 전, ⑤\~⑥은 토스 응답을 받은 뒤**입니다.
+프론트가 Commerce에 `paymentKey`, `orderId`, `amount`를 보내면 Commerce가 `POST /v1/internal/payments/{orderRef}/approval`로 중계합니다(`orderId`는 본문의 `pgOrderId`로 넘깁니다). Payment 서버는 아래 순서로 처리합니다. **①\~③은 토스를 부르기 전, ⑤\~⑥은 토스 응답을 받은 뒤**입니다.
 
 
 
@@ -609,7 +609,7 @@ sequenceDiagram
 
 ```
 // Payment 서버, 우리 승인 API (요약)
-approve(orderRef, buyerId, req) {                   // POST /internal/payments/{orderRef}/approval. req = paymentKey, pgOrderId(토스 orderId), amount
+approve(orderRef, buyerId, req) {                   // POST /v1/internal/payments/{orderRef}/approval. req = paymentKey, pgOrderId(토스 orderId), amount
   int rows = paymentRepo.markApproving(req.pgOrderId(), buyerId, req.amount(), req.paymentKey());  // ②③ 조건부 UPDATE + paymentKey 저장
   if (rows == 0) return explainWhy(orderRef, req.pgOrderId());   // 처리 중 · 이미 결제됨 · 거절(+보안 로그)
 
@@ -781,7 +781,7 @@ paymentstatus \= APPROVED\+event\_outbox"결제 승인됨" · event\_id커밋 �
 **판단은 주문 상태를 가진 Commerce가 합니다.** Payment는 "토스에서 승인됐다"는 사실만 "결제 승인됨"으로 알립니다. Commerce는 그 이벤트를 받을 때 주문 행 하나로 판단합니다. 결제 전에 구매자가 주문을 취소한 경우도 같은 규칙으로 처리됩니다. 결제창에서 나가거나 결과를 기다리다 **페이지만 떠난** 경우는 주문이 PENDING이므로, 승인되면 **정상 결제 완료**입니다.
 
 
-**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다.
+**상태 이름 규칙:** 돈이 안 나가고 닫히면 `CANCELED`, 돈이 나갔다가 돌아오면 `REFUNDED`입니다. Stripe와 같은 방식입니다(PaymentIntent는 성공 전에만 cancel, 성공 뒤에는 refund). 토스는 반대로 승인된 결제를 돌려준 것을 `CANCELED`라고 부르므로, 매핑 표에서 바꿔 읽습니다. 예외: 시스템 보상 선점, 승인 응답 불일치 즉시 취소, 결과 불명 조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED입니다(분개 없음).
 
 
 **"취소"가 세 가지라서 헷갈리기 쉽습니다.** ① **주문 취소**: Commerce의 주문 상태. ② **결제 취소됨(CANCELED)**: 돈이 안 나간 결제를 닫음. ③ **토스 취소 API**: 나간 돈을 돌려줌 \= 우리 말로 **환불**. 늦은 승인 환불은 "취소된 주문을 또 취소"하는 것이 아닙니다. 주문은 이미 닫혀 있고 그대로 둡니다. **주문이 닫힌 뒤 늦게 빠져나간 돈만 돌려줍니다**(③). Commerce는 사유가 LATE\_APPROVAL인 환불 완료를 받으면 주문을 건드리지 않고 고객에게 알리기만 합니다.
@@ -798,7 +798,8 @@ UPDATE orders SET status = 'PAID'
 -- 1행: 정상 결제 완료. 재고·쿠폰 확정
 -- 0행: 주문을 다시 읽는다
 --   PAID이고 같은 결제 ID → 중복(또는 동기 응답으로 이미 반영). 무시
---   EXPIRED·CANCELLED     → 같은 트랜잭션에서 outbox "환불 요청됨"(전액, LATE_APPROVAL, 요청 ID late-{결제 ID})
+--   보상 없이 닫힘(EXPIRED·CANCELLED·FAILED) → 같은 트랜잭션에서 outbox "환불 요청됨"(전액, LATE_APPROVAL, 요청 ID는 UUID)
+--   이미 보상 중(fence)       → 승인 사실만 남기고 기존 보상으로 수렴
 
 -- Commerce: 만료 배치 · 결제 전 취소
 UPDATE orders SET status = 'EXPIRED'
@@ -807,7 +808,7 @@ UPDATE orders SET status = 'CANCELLED'
  WHERE order_number = :ref AND status = 'PENDING_PAYMENT';   -- 결제 확인 중이면 0행 → 409
 ```
 
-* **경쟁은 주문 행 하나에서 끝납니다.** PAID와 EXPIRED 둘 다 같은 이전 상태(결제 대기·결제 확인 중)를 조건으로 하므로 하나만 성공합니다. 이벤트가 엇갈려도 따로 처리할 것이 없습니다.
+* **경쟁은 주문 행 하나에서 끝납니다.** 목표 설계는 PAID와 EXPIRED 둘 다 같은 이전 상태(결제 대기·결제 확인 중)에서만 바뀌므로 하나만 성공합니다. 구현은 PAID를 결제 확인 중에서만 허용합니다. 구현은 조건부 UPDATE 하나가 아니라 회원 guard → 주문 묶음 행 잠금 아래에서 상태를 읽고 판단합니다. 결과(먼저 온 쪽이 이김)는 같습니다. 이벤트가 엇갈려도 따로 처리할 것이 없습니다.
 * **환불 요청이 사라지지 않습니다.** "주문이 닫혀 있음" 판단과 "환불 요청됨" outbox 기록이 한 트랜잭션입니다. 따로 이벤트로 보내면 판단과 요청 사이에서 유실될 수 있습니다([사례](https://github.com/woowacourse-teams/2026-setty/pull/608)).
 * **Payment는 판단하지 않습니다.** 주문 상태의 복사본(플래그)도, Commerce 이벤트 구독도 없습니다. 환불 요청이 오면 흐름 7로 실행만 합니다.
 
@@ -891,7 +892,7 @@ Payment
 
 
 토스 CANCELED
-고객 돈 반환 · 우리 REFUNDED
+고객 돈 반환 · 우리 CANCELED
 
 
 
@@ -904,7 +905,7 @@ Payment
 
 
 * **늦은 승인:** 승인 결과를 만료 시각 뒤에야 알게 된 경우입니다. 결과는 "승인됨"입니다.
-* **보상:** 주문을 살릴 수 없으므로(재고 없음) 전액 환불해서 돈을 돌려줍니다. **따로 만들지 않고 흐름 7의 "환불 실행"을 그대로 부릅니다**(사유: `LATE_APPROVAL`). 멱등키, 결과 불명 조회, 환불 실패 처리, 대사용 환불 행을 다시 만들 필요가 없습니다. 결제는 `REFUNDED`가 됩니다. 이미 커밋된 일을 반대 동작으로 되돌리는 것이라 "보상"이라고 부릅니다. Saga의 그 보상입니다.
+* **보상:** 주문을 살릴 수 없으므로(재고 없음) 전액 환불해서 돈을 돌려줍니다. **따로 만들지 않고 흐름 7의 "환불 실행"을 그대로 부릅니다**(사유: `LATE_APPROVAL` 또는 `APPROVAL_UNKNOWN`). 멱등키, 결과 불명 조회, 환불 실패 처리, 대사용 환불 행을 다시 만들 필요가 없습니다. Payment가 아직 승인을 반영하지 못한 결제(APPROVING·UNKNOWN)는 보상이 먼저 `CANCELED`로 선점하고 토스 취소만 보냅니다. 승인·환불 분개와 "결제 승인됨"은 없습니다. 이미 `APPROVED`였던 결제만 `REFUNDED`(환불 분개)가 됩니다. 이미 커밋된 일을 반대 동작으로 되돌리는 것이라 "보상"이라고 부릅니다. Saga의 그 보상입니다.
 
 
 #### 왜 이것까지 고려해야 하나
@@ -918,7 +919,7 @@ Payment
 | 선택지 | 방법 | 좋은 점 | 나쁜 점 | 판단 |
 | --- | --- | --- | --- | --- |
 | A. 자동 보상만 | Commerce가 "결제 승인됨"을 받았을 때 주문이 이미 닫혀 있으면 환불을 요청한다 | 1분 안에 돈이 돌아간다 | 만료가 잦으면 불필요한 취소가 많다 |  |
-| B. 여유 시간 \+ 자동 보상 | Payment는 만료 시각이 지나면 승인을 거절한다. Commerce는 만료 시각 \+ 여유 시간(예: 2분)에 주문을 만료시킨다. 여유 시간 안에 대부분의 결과 불명이 확정된다. 그래도 남는 경우에만 A가 일어난다 | 보상이 거의 일어나지 않는다. 일어나도 자동이다 | 재고가 여유 시간만큼 더 묶인다 | 추천 |
+| B. 여유 시간 \+ 자동 보상 | Payment는 만료 시각이 지나면 승인을 거절한다. Commerce는 만료 시각 \+ 여유 시간(예: 2분)에 주문을 만료시킨다. 여유 시간 안에 대부분의 결과 불명이 확정된다. 그래도 남는 경우에만 A가 일어난다. 구현은 여유 시간 대신 승인 접수부터 600초 처리 기한을 두고, 그동안 1초마다 조회한다(아래 구현 상자) | 보상이 거의 일어나지 않는다. 일어나도 자동이다 | 재고가 처리 기한만큼 더 묶인다 | 추천 · 구현됨 |
 | C. 결제 확인 중이면 만료 안 함 | Commerce가 만료 전에 결제 상태를 확인한다. APPROVING·UNKNOWN이면 만료를 미룬다 | 보상이 필요 없다 | Commerce가 Payment를 동기 호출해야 한다. 결과 불명이 길어지면 재고가 오래 묶인다 |  |
 
 
@@ -930,6 +931,9 @@ Payment
 1행이면 정상 결제 완료(흐름 5\)입니다. 늦은 승인은 0행일 때만 생깁니다.
 
 
+**구현(dev `ba9be27c`)**: 여유 시간 대신 처리 기한을 둡니다. 결제 대기는 주문 생성부터 600초, 승인을 접수하면 그 시도의 처리 기한 600초가 따로 시작됩니다. 처리 기한까지 결과를 모르면(202·UNKNOWN·통신 예외) 주문을 결제 확인 중으로 두고 Commerce가 1초마다 Payment를 조회합니다(C의 조회를 빌림). 기한에 닿으면 Commerce가 주문을 보상 대기(COMPENSATION_PENDING)로 바꾸고 같은 트랜잭션에서 재고·쿠폰 예약을 풀고 시스템 보상(`APPROVAL_UNKNOWN`)을 요청합니다. Payment는 보상을 받으면 APPROVING·UNKNOWN 결제를 먼저 CANCELED로 선점하므로, 기한 뒤에 늦게 온 토스 승인은 보상에 지고 토스 취소만 나갑니다. Commerce `LATE_APPROVAL`은 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)에 승인이 올 때만 씁니다. 주문당 보상 1건은 Commerce가 fence 확인으로 지키고 요청 ID는 UUID입니다.
+
+
 
 
 
@@ -939,17 +943,26 @@ Payment
 
 상황구매자가 상품 일부나 전체의 환불을 요청합니다. 고객은 카드를 다시 긁지 않습니다. **서버가 토스 취소 API를 호출합니다.**
 누가 정하나환불해도 되는지는 **Commerce가 정합니다.** 배송 단계와 판매자 승인을 아는 곳이 Commerce이기 때문입니다. Payment는 승인된 환불을 **실행만** 합니다.
-환불 실행을 부르는 곳**실행은 하나, 시작점은 둘입니다.** 둘 다 Commerce가 정합니다. 두 시작점 모두 Kafka `commerce.refund.requests.v1`의 "환불 요청됨" 하나로 오고 `purpose`로 구분합니다. ① 고객 환불(`USER_REFUND`, 금액·판매자 주문 지정). ② 시스템 보상(`SYSTEM_COMPENSATION`, 늦은 승인·승인 결과 불명, 흐름 6, 전액). 표 밖 경우: 금액이 다르면 `PAYMENT_MISMATCH`, 이미 환불된 결제면 `NOT_REFUNDABLE`로 토스 호출 없이 FAILED입니다. 토스 장애로는 FAILED를 보내지 않고 UNKNOWN으로 조회·같은 키 재요청을 하며 24시간 뒤 멈춥니다. 결과는 `payment.refund.results.v1`의 "환불 결과 기록됨" 하나입니다. 환불 요청 ID로 한 번만 접수하므로 이벤트가 두 번 와도 환불은 한 번입니다. 늦은 승인의 요청 ID는 `late-{결제 ID}`입니다.
+환불 실행을 부르는 곳**실행은 하나, 시작점은 둘입니다.** 둘 다 Commerce가 정합니다. 두 시작점 모두 Kafka `commerce.refund.requests.v1`의 "환불 요청됨" 하나로 오고 `purpose`로 구분합니다. ① 고객 환불(`USER_REFUND`, 금액·판매자 주문 지정). ② 시스템 보상(`SYSTEM_COMPENSATION`, 늦은 승인·승인 결과 불명, 흐름 6, 전액). 표 밖 경우: 금액이 다르면 `PAYMENT_MISMATCH`, 이미 환불된 결제면 `NOT_REFUNDABLE`로 토스 호출 없이 FAILED입니다. 토스 장애로는 FAILED를 보내지 않고 UNKNOWN으로 조회·같은 키 재요청을 하며 24시간 뒤 멈춥니다. 결과는 `payment.refund.results.v1`의 "환불 결과 기록됨" 하나입니다. 환불 요청 ID로 한 번만 접수하므로 이벤트가 두 번 와도 환불은 한 번입니다. 요청 ID는 Commerce가 만든 UUID이고, 주문당 보상 1건은 Commerce가 지킵니다. 토스 취소의 멱등키는 고객 환불이 `refund_request_id`, 시스템 보상이 `cancel-{pg_order_id}`입니다.
 대사와 다른 점늦은 승인은 승인 이벤트를 받은 Commerce가 **그 자리에서** 판단합니다. 거래 대사는 Payment가 아예 모르는 승인(확인 포기 등)을 **다음 날 찾아 APPROVED로 맞추는** 안전망입니다. 맞추면 "결제 승인됨"이 나가고, 같은 판단을 탑니다.
 사고 1: 과다 환불부분 환불 요청 두 개가 동시에 들어옵니다. 각각 "합계가 결제 금액 이하"인지 확인하고 둘 다 통과합니다. 결제 금액보다 많이 환불됩니다. 막는 방법: 결제 행의 환불 누적액을 조건부 UPDATE로 늘립니다.
 사고 2: 이중 환불타임아웃 후 재시도하면 같은 환불이 두 번 실행됩니다. 막는 방법: 토스 취소 요청에 멱등키 헤더를 붙입니다. 같은 키로 다시 보내면 토스가 중복 취소하지 않습니다. 토스 문서 기준으로 멱등키는 **처음 요청한 날부터 15일** 유효하고 최대 300자입니다. 멱등키·API 키·주소·메서드가 같은 요청이 다시 오면 처리하지 않고 첫 응답을 그대로 돌려줍니다. 15일이 지난 재시도는 새 요청이 되므로, 오래된 환불은 다시 보내기 전에 조회부터 합니다.
 사고 3: 부분 취소 불가결제수단에 따라 부분 취소가 안 되는 결제가 있습니다. 결제 때 부분 취소 가능 여부를 저장합니다. 불가능하면 부분 환불 접수를 거절합니다.
-결과 불명승인과 같습니다. 토스 호출 전에 UNKNOWN으로 예약해 커밋하므로 UNKNOWN은 "토스에 갔을 수 있는 환불"이고 한도를 차지합니다. 토스 결제 조회의 취소 내역에서 요청별 취소 사유로 이 환불의 취소를 찾고, 없으면 같은 멱등키로 다시 요청합니다. 재요청이 거절돼도 FAILED로 단정하지 않고, 첫 시도부터 24시간이 지나면 UNKNOWN으로 멈춰 사람이 확인합니다. 토스 장애(429·401·5xx·타임아웃·연결 실패)로는 FAILED로 끝내지 않습니다. 응답을 받은 NotSent는 UNKNOWN을 유지하고, 응답 없는 연결 실패만 PROCESSING으로 되돌려 다시 검증합니다. 첫 시도부터 30분까지는 기존 주기, 24시간까지는 10분 간격으로 재시도합니다. 0원 환불(쿠폰으로 실결제액이 0원인 항목)은 결제가 APPROVED·PARTIALLY_REFUNDED·REFUNDED이면 토스·분개·결제 변경 없이 성공(환불액 0)으로 답합니다.
+결과 불명승인과 같습니다. 토스 호출 전에 UNKNOWN으로 예약해 커밋하므로 UNKNOWN은 "토스에 갔을 수 있는 환불"이고 한도를 차지합니다. 토스 결제 조회의 취소 내역에서 요청별 취소 사유로 이 환불의 취소를 찾고, 없으면 같은 멱등키로 다시 요청합니다. 재요청이 거절돼도 FAILED로 단정하지 않고, 첫 시도부터 24시간이 지나면 UNKNOWN으로 멈춰 사람이 확인합니다. 토스 장애(429·401·5xx·타임아웃·연결 실패)로는 FAILED로 끝내지 않습니다. 응답을 받은 NotSent는 UNKNOWN을 유지하고, 응답 없는 연결 실패만 PROCESSING으로 되돌려 다시 검증합니다. 재시도 일정은 둘이 다릅니다. 고객 환불은 첫 시도부터 30분까지 3분, 그 뒤 24시간까지 10분 간격입니다. 시스템 보상은 30초부터 두 배씩 늘려 10분 간격까지 가고, 첫 예약부터 24시간에 멈춥니다. 0원 환불(쿠폰으로 실결제액이 0원인 항목)은 결제가 APPROVED·PARTIALLY_REFUNDED·REFUNDED이면 토스·분개·결제 변경 없이 성공(환불액 0)으로 답합니다.
+
+**시스템 보상 규칙(구현)**
+
+* 보상 뒤 차단: Commerce는 보상이 있는 주문의 승인 재개·결제창·구매자 취소·만료 판정·사용자 환불 접수를 막는다.
+* NO_CHARGE 조건: 결제가 CREATED이거나 인증 전 CANCELED(`pg_payment_key` 없음)면 바로, 토스 조회가 ABORTED·EXPIRED면 바로, IN_PROGRESS·READY·NOT_FOUND면 첫 승인 호출부터 (3초+60초)×2+30초=156초를 기다린 뒤 NO_CHARGE다. 156초 뒤 토스가 늦게 승인하면 지금은 감지하지 못한다(구현 갭, 대사·웹훅에서 처리).
+* 시스템 보상의 FAILED는 나중에 더 높은 `resultVersion`의 SUCCEEDED·NO_CHARGE로 바뀔 수 있다. 토스 PARTIAL_CANCELED·취소 불가는 보류해 사람이 확인한다.
+* 고객 환불은 승인 시각부터 7일 안에만 Commerce가 접수하고, Payment는 판매자 주문별 한도를 넘으면 FAILED(`OVER_REFUND`)다.
+* 기한 뒤에 늦게 온 승인은 보상에 진다. 보상이 APPROVING·UNKNOWN 결제를 CANCELED로 먼저 선점하기 때문이다.
+
 
 
 환불 요청됨 (USER_REFUND)발송 전 자동 · 발송 후 판매자 승인Kafka 접수환불 실행환불 요청 ID·금액·판매자 주문 번호환불규칙: 누적 환불 ≤ 결제 금액 · 요청 ID당 1건환불 접수됨PROCESSINGPOST /cancel · 멱등키토스페이먼츠외부 시스템
 토스 응답이 200이면토스 → 200환불 완료됨원장 기록모든 환불 · 차) 구매자 예수금 · 대) PG 보관금. 구매확정 뒤 환불이면 역정산(흐름 10\)이 먼저 예수금으로 되돌려 놓음
-늦은 승인이면 (흐름 6에서)환불 요청됨사유 LATE\_APPROVAL · 전액 · 이벤트환불 실행위와 같은 규칙·멱등키
+늦은 승인이면 (흐름 6에서)환불 요청됨사유 LATE\_APPROVAL · 전액 · 이벤트환불 실행위와 같은 규칙 · 멱등키는 cancel-{pg\_order\_id}
 환불 완료됨환불 완료됨 (사유 포함)주문 환불 처리재고 복구 시점은 Commerce가 정함 · 사유가 LATE\_APPROVAL이면 주문은 이미 닫혀 있으니 건드리지 않고 고객 알림만
 4xx이면토스 → 4xx환불 실패됨환불 실패됨환불 실패 안내CS가 다른 환불 방법 안내
 타임아웃이면토스 → 응답 없음결과 불명됨상태 조회 예약흐름 4와 같음
@@ -1376,7 +1389,7 @@ ledger\_journal.ref\_type·ref\_id는 결제·환불·
 | `payment.buyer_id` | VARCHAR(36\) | NOT NULL | 결제 생성 때 Commerce가 보낸 구매자 ID. 승인 요청자가 이 구매자인지 확인한다 (흐름 2\) |
 | `payment.amount` | BIGINT | \> 0 | 승인 때 `successUrl`의 금액과 비교한다 (흐름 2\) |
 | `payment.refunded_amount` | BIGINT | 0 ≤ 값 ≤ amount | 조건부 UPDATE로 과다 환불을 막는다 (흐름 7\) |
-| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED. 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
+| `payment.status` | VARCHAR | enum | 우리 상태. CREATED, APPROVING, APPROVED, UNKNOWN, CANCELED, PARTIALLY\_REFUNDED, REFUNDED. 돈이 안 나가고 닫히면 CANCELED, 나갔다 돌아오면 REFUNDED(보상 선점·승인 응답 불일치 취소·조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED). 거절은 상태가 아니라 `pg_call` 기록이다(흐름 3\) |
 | `payment.expires_at` | TIMESTAMP | NOT NULL | 이 시각 뒤에는 승인을 거절한다 (흐름 6\) |
 | `payment.partial_cancelable` | BOOLEAN |  | 승인 응답에서 저장. false면 부분 환불을 거절한다 (흐름 7\) |
 | `payment.pg_provider` | VARCHAR | NOT NULL | 환불과 조회를 원래 PG로 보낸다 (흐름 8\) |
@@ -1398,7 +1411,7 @@ ledger\_journal.ref\_type·ref\_id는 결제·환불·
 
 | 테이블.컬럼 | 타입 | 제약 | 왜 |
 | --- | --- | --- | --- |
-| `refund.refund_request_id` | VARCHAR | UNIQUE | Commerce의 환불 요청 ID. 늦은 승인은 Commerce가 `late-{결제 ID}`로 만든다. 같은 요청이 두 번 와도 환불은 하나다. **토스 취소 요청의 Idempotency\-Key로도 그대로 보낸다**(별도 키 컬럼 없음) |
+| `refund.refund_request_id` | VARCHAR | UNIQUE | Commerce의 환불 요청 ID. Commerce가 만든 UUID다. 같은 요청이 두 번 와도 환불은 하나다. **고객 환불은 토스 취소 요청의 Idempotency\-Key로 그대로 보낸다**(별도 키 컬럼 없음). 시스템 보상은 `cancel-{pg_order_id}`(마지막 승인 시도의 결제창 ID)를 쓴다 |
 | `refund.purpose` | VARCHAR | enum | USER\_REFUND(고객 환불), SYSTEM\_COMPENSATION(늦은 승인·승인 결과 불명 · Commerce가 요청 · 흐름 6\). 결제당 진행 중 SYSTEM\_COMPENSATION은 1건(부분 UNIQUE) |
 | `refund.request_payload` | TEXT |  | 받은 요청 payload 원문. 결과에 그대로 실어야 Core가 받는다 |
 | `refund.execution_id` | UUID | UNIQUE | 결과의 executionId. 요청당 하나이고 바뀌지 않는다 |
@@ -1585,7 +1598,7 @@ CREATE INDEX ix_ledger_entry_account ON ledger_entry(account, seller_id);
 -- 결과는 그 원문에 Payment 필드를 더해 만든다(Core가 원문과 JSON 값으로 비교한다).
 CREATE TABLE refund (
     id                BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    refund_request_id VARCHAR(64)  NOT NULL UNIQUE,   -- Commerce 값. 늦은 승인은 late-{paymentId}
+    refund_request_id VARCHAR(64)  NOT NULL UNIQUE,   -- Commerce 값(UUID). 보상의 토스 멱등키는 cancel-{pg_order_id}
     execution_id      UUID         NOT NULL UNIQUE,   -- 결과의 executionId. 요청당 하나이고 바뀌지 않는다
     payment_id        BIGINT       REFERENCES payment(id),  -- 결제를 찾지 못한 FAILED는 NULL
     purpose           VARCHAR(32)  NOT NULL CHECK (purpose IN ('USER_REFUND','SYSTEM_COMPENSATION')),
@@ -1827,16 +1840,16 @@ UPDATE payment SET refunded_amount = refunded_amount + :amt,
 
 | API | Commerce가 부르는 때 | 하는 일 | 성공 | 실패 |
 | --- | --- | --- | --- | --- |
-| `POST /internal/payments` | 주문 생성 직후(동기, 타임아웃 3초). 실패하면 Commerce 재시도 스케줄러가 다시 부른다(Commerce 도메인) | 결제 생성(흐름 1\). `orderRef`가 이미 있고 금액·구매자가 같으면 기존 결제를 돌려준다. 첫 결제창 정보까지 발급 | 201 / 200 `{paymentId, status, pgOrderId, amount, expiresAt}` | 400 `SUM_MISMATCH` · 400 `INVALID_ORDER_REF`(형식) · 400 `INVALID_EXPIRES_AT`(지난 시각) · 409 `AMOUNT_CONFLICT`(같은 orderRef에 금액·구매자가 다름) · 409 `PAYMENT_CLOSED` |
-| `POST /internal/payments/{orderRef}/checkouts` | 구매자가 "결제 다시 하기"(거절·결제창 닫힘 뒤) | 결제 시도(결제창) 하나를 새로 만든다. `checkout_seq`를 올리고 새 `pgOrderId` 발급 | 201 `{pgOrderId, amount, expiresAt}` | 409 `PAYMENT_CLOSED`(CREATED 아님·만료) · 404 `NOT_READY`(결제 생성 요청이 아직 도착 전) |
-| `POST /internal/payments/{orderRef}/approval` | 구매자의 승인 요청을 중계 | 승인(흐름 2\). 토스 confirm 호출. 응답 대기 8초 | 200 `APPROVED` · 202 `PENDING`(헤더 `Location: /internal/payments/{orderRef}`) | 422 `DECLINED {code, message}`(다시 결제 가능) · 404 · 403 `BUYER_MISMATCH` · 409 `PAYMENT_CLOSED` · 400 `AMOUNT_MISMATCH` · 400 `ORDER_ID_MISMATCH`(`pgOrderId`가 경로의 `orderRef` 것이 아님) |
-| `GET /internal/payments/{orderRef}` | **필수.** 주문이 "결제 확인 중"으로 10초 넘게 머물 때(정체 해소). 운영·조사에도 씀 | 상태 조회. 구매자 화면은 Commerce 주문 상태를 봅니다 | 200 `{paymentId, status, amount, refundedAmount, pgOrderId, approvedAt}` | 404 |
+| `POST /v1/internal/payments` | 주문 생성 직후(동기, 타임아웃 3초). 실패하면 Commerce 재시도 스케줄러가 다시 부른다(Commerce 도메인) | 결제 생성(흐름 1\). `orderRef`가 이미 있고 금액·구매자가 같으면 기존 결제를 돌려준다. 첫 결제창 정보까지 발급 | 201 / 200 `{paymentId, status, pgOrderId, amount, expiresAt}` | 400 `SUM_MISMATCH` · 400 `INVALID_ORDER_REF`(형식) · 400 `INVALID_EXPIRES_AT`(지난 시각) · 409 `AMOUNT_CONFLICT`(같은 orderRef에 금액·구매자가 다름) · 409 `PAYMENT_CLOSED` |
+| `POST /v1/internal/payments/{orderRef}/checkouts` | 구매자가 "결제 다시 하기"(거절·결제창 닫힘 뒤) | 결제 시도(결제창) 하나를 새로 만든다. `checkout_seq`를 올리고 새 `pgOrderId` 발급 | 201 `{pgOrderId, amount, expiresAt}` | 409 `PAYMENT_CLOSED`(CREATED 아님·만료) · 404 `NOT_READY`(결제 생성 요청이 아직 도착 전) |
+| `POST /v1/internal/payments/{orderRef}/approval` | 구매자의 승인 요청을 중계 | 승인(흐름 2\). 토스 confirm 호출. 응답 대기 8초 | 200 `APPROVED` · 202 `PENDING`(헤더 `Location: /v1/internal/payments/{orderRef}`) | 422 `DECLINED {code, message}`(다시 결제 가능) · 409 `STALE_CHECKOUT`(예전 결제창, 거절 뒤 비워진 경우 포함) · 503 `PG_UNAVAILABLE`(토스에 가지 않음, 결제는 CREATED로) · 404 · 403 `BUYER_MISMATCH` · 409 `PAYMENT_CLOSED` · 400 `AMOUNT_MISMATCH` · 400 `ORDER_ID_MISMATCH`(`pgOrderId`가 경로의 `orderRef` 것이 아님) |
+| `GET /v1/internal/payments/{orderRef}` | **필수.** 주문이 "결제 확인 중"으로 10초 넘게 머물 때(정체 해소). 운영·조사에도 씀 | 상태 조회. 구매자 화면은 Commerce 주문 상태를 봅니다 | 200 `{paymentId, status, amount, refundedAmount, pgOrderId, approvedAt}` | 404 |
 | `POST /webhooks/{pg}` | (Commerce 아님) PG가 직접 호출 | 본문을 믿지 않고 PG에 다시 조회해 흐름 4와 같은 경로로 반영. 토스는 선택, **Stripe를 붙이면 필수** | 200 | 서명 검증 실패 401(Stripe). 토스 웹훅은 서명이 없으므로 본문을 믿지 않고 재조회하는 것이 방어입니다 |
 
 
 
 ```
-POST /internal/payments                      (서비스 토큰)
+POST /v1/internal/payments                      (서비스 토큰)
 { "orderRef": "OD-20261110-K7Q2M9XA", "buyerId": "5c2e8f1a-3b7d-4e9a-8f21-6d4c0b9e7a13", "amount": 30000,
   "expiresAt": "2026-11-10T14:10:00+09:00",     // 결제 만료 시각. Commerce가 정한 값 하나
   "sellerAmounts": [
@@ -1846,7 +1859,7 @@ POST /internal/payments                      (서비스 토큰)
         "amount": 30000, "expiresAt": "2026-11-10T14:10:00+09:00" }
         // Stripe 같은 PG면 여기에 clientSecret이 들어간다
 
-POST /internal/payments/OD-20261110-K7Q2M9XA/approval   (서비스 토큰)
+POST /v1/internal/payments/OD-20261110-K7Q2M9XA/approval   (서비스 토큰)
 { "buyerId": "5c2e8f1a-3b7d-4e9a-8f21-6d4c0b9e7a13", "paymentKey": "tgen_...", "pgOrderId": "OD-20261110-K7Q2M9XA-1", "amount": 30000 }
 → 200 { "paymentId": 1001, "status": "APPROVED" }
 → 422 { "status": "DECLINED", "code": "REJECT_CARD_PAYMENT", "message": "..." }
@@ -1862,7 +1875,7 @@ POST /internal/payments/OD-20261110-K7Q2M9XA/approval   (서비스 토큰)
 
 * **`orderRef`는 Commerce가 주는 불투명한 참조값입니다.** 지금은 주문 번호입니다. Commerce가 나중에 체크아웃 객체를 따로 두거나, 결제 1건에 주문 여러 개를 묶어도 그 ID를 넘기면 계약이 바뀌지 않습니다. 토스 `orderId`, Adyen `merchantReference`와 같은 방식입니다.
 * **confirm의 0행 원인 판별.** 조건부 UPDATE가 0행이면 한 번 더 읽어 이유를 고릅니다. 이미 APPROVED면 200을 다시 줍니다(재시도·새로고침 대비).
-* **결제 확인 중 정체 해소.** 202를 준 뒤 토스가 거절하거나, Commerce가 잠근 직후 죽으면 주문이 "결제 확인 중"에 남습니다. 거절은 이벤트가 없으므로 Commerce가 모릅니다. 그대로 두면 재시도·취소가 모두 409라서 구매자는 만료(T \+ 3분)까지 갇힙니다. 그래서 `GET /orders/{no}`가 들어왔을 때 결제 확인 중으로 10초(Commerce 타임아웃) 넘게 머문 주문이면(`confirming_started_at` 기준) Payment `GET /internal/payments/{orderRef}`를 부릅니다. `CREATED` → 결제 대기로 되돌림, `APPROVED` → 결제 완료 처리 함수(Kafka 지연도 여기서 풀림), `APPROVING`·`UNKNOWN` → 그대로(결과는 이벤트나 다음 조회로), `CANCELED` → 그대로(곧 만료 배치가 닫음), 404 → 결제 생성 재시도 대상으로 둠(`payment_id` NULL). 거절 이벤트를 새로 만들지 않는 이유: 한 주문에 시도가 여러 번이면 옛 시도의 거절 이벤트가 새 시도를 되돌릴 수 있습니다.
+* **결제 확인 중 정체 해소.** 202를 준 뒤 토스가 거절하거나, Commerce가 잠근 직후 죽으면 주문이 "결제 확인 중"에 남습니다. 거절은 이벤트가 없으므로 Commerce가 모릅니다. 그대로 두면 재시도·취소가 모두 409라서 구매자는 만료(T \+ 3분)까지 갇힙니다. 그래서 `GET /orders/{no}`가 들어왔을 때 결제 확인 중으로 10초(Commerce 타임아웃) 넘게 머문 주문이면(`confirming_started_at` 기준) Payment `GET /v1/internal/payments/{orderRef}`를 부릅니다. `CREATED` → 결제 대기로 되돌림, `APPROVED` → 결제 완료 처리 함수(Kafka 지연도 여기서 풀림), `APPROVING`·`UNKNOWN` → 그대로(결과는 이벤트나 다음 조회로), `CANCELED` → 그대로(곧 만료 배치가 닫음), 404 → 결제 생성 재시도 대상으로 둠(`payment_id` NULL). 거절 이벤트를 새로 만들지 않는 이유: 한 주문에 시도가 여러 번이면 옛 시도의 거절 이벤트가 새 시도를 되돌릴 수 있습니다. 구현(dev): GET을 기다리지 않고 Commerce 복구 루프가 1초마다 미완료 승인 전달을 집어 조회합니다. 이것이 결과를 받는 주 경로이고 "결제 승인됨"은 보조입니다. `CREATED`이고 결제창이 그 시도와 다르면 거절로 보고 결제 대기로 되돌립니다(202 뒤 거절, 503, UNKNOWN 뒤 ABORTED·EXPIRED). `CANCELED`면 주문을 실패로 끝냅니다. 끝난 시도의 늦은 응답은 뒤 시도를 덮지 않습니다.
 * **금액 검증은 Payment에 남깁니다.** Commerce가 넘기는 `amount`는 프론트(successUrl)에서 온 값이라 여전히 믿을 수 없습니다.
 * **환불은 API가 아닙니다.** 고객 환불과 시스템 보상 모두 Commerce가 Kafka `commerce.refund.requests.v1`로 보내고, 결과는 `payment.refund.results.v1`으로 받습니다(이벤트 계약). 업무 실패는 HTTP 응답 코드 대신 결과의 `status: FAILED`와 `failureCode`로 알립니다. 정정(2026-11-21): 이전 설계의 `POST /internal/refunds`는 없앴습니다(#384).
 
@@ -1879,7 +1892,7 @@ POST /internal/payments/OD-20261110-K7Q2M9XA/approval   (서비스 토큰)
 * **재고는 주문 생성("결제하기") 때 예약**합니다. 장바구니에서는 잡지 않습니다(이탈자가 한정 수량을 묶음). 결제 승인 이벤트로 확정하고, 만료·결제 전 취소 때 반환합니다. Magento MSI(주문 접수 때 예약, 결제 대기 중 유지, 취소 때 보상), commercetools·Salesforce의 체크아웃 예약과 같은 모델입니다.
 * **체크아웃 객체는 지금 따로 두지 않습니다.** "결제 대기 중인 주문"이 체크아웃입니다. 나중에 따로 두면 그것도 Commerce가 소유하고, Payment에는 그 ID를 `orderRef`로 넘기면 됩니다. 결제 쪽 대응 객체는 이미 있습니다(`payment` 행 CREATED \= Stripe PaymentIntent 역할).
 * **카드 거절은 예약을 유지합니다.** 구매자가 다른 카드로 바꾸는 사이에 재고를 잃지 않게 합니다. Stripe도 실패한 시도 뒤 같은 PaymentIntent를 다시 쓰라고 권장합니다.
-* **타이머:** 결제 만료 T \= 주문 생성 \+ 10분(제안). 주문 만료(재고 반환) \= T \+ 3분. 결제 화면 카운트다운은 T를 보여 줍니다. T는 Commerce가 정해서 결제 생성 요청에 넣습니다.
+* **타이머:** 결제 만료 T \= 주문 생성 \+ 10분(제안). 주문 만료(재고 반환) \= T \+ 3분. 결제 화면 카운트다운은 T를 보여 줍니다. T는 Commerce가 정해서 결제 생성 요청에 넣습니다. 구현(dev): 결제 대기는 생성부터 600초(T와 같음)이고 +3분 여유는 쓰지 않습니다. 승인을 접수하면 그 시도의 처리 기한 600초가 따로 시작됩니다. 거절 뒤 재결제는 원래 T 전까지만 시작할 수 있고, 시도마다 새 처리 기한을 받습니다.
 
 
 #### 상태
@@ -1894,10 +1907,12 @@ stateDiagram-v2
   PENDING_PAYMENT --> PAYMENT_CONFIRMING: 승인 요청 중계 시작
   PAYMENT_CONFIRMING --> PENDING_PAYMENT: 422 거절 · 조회 결과 CREATED (예약 유지)
   PAYMENT_CONFIRMING --> PAID: 결제 승인됨 (동기 200 또는 이벤트)
-  PENDING_PAYMENT --> PAID: 결제 승인됨 (이벤트)
+  PENDING_PAYMENT --> PAID: 결제 승인됨 (이벤트, 구현 갭 · 지금은 충돌로 거부)
   PENDING_PAYMENT --> CANCELLED: 구매자 취소 · 반환
-  PENDING_PAYMENT --> EXPIRED: T + 3분 · 반환
-  PAYMENT_CONFIRMING --> EXPIRED: T + 3분 · 반환
+  PENDING_PAYMENT --> EXPIRED: T + 3분 · 반환 (목표. 구현은 결제 대기 600초)
+  PAYMENT_CONFIRMING --> COMPENSATION_PENDING: 처리 기한 600초 · 반환 · 보상 요청
+  COMPENSATION_PENDING --> CANCELLED: 보상 완료 (SUCCEEDED·NO_CHARGE)
+  PAYMENT_CONFIRMING --> FAILED: Payment CANCELED · 반환
   PAID --> REFUNDED: 환불 성공됨
 
 ```
@@ -2002,7 +2017,7 @@ UPDATE orders SET status = 'PENDING_PAYMENT', confirming_started_at = NULL, upda
 | 승인 중계 전에 본인과 PENDING을 확인하고 "결제 확인 중"으로 잠근다 | 응답 대기 8초 안에 답한다(모르면 202\) |
 | 동기 응답과 이벤트를 **같은 함수**로 처리하고, 0행이면 다시 읽어 중복과 늦은 승인을 구분한다 | 승인되면 **항상** "결제 승인됨"을 보낸다(outbox) |
 | 0행 판단과 "환불 요청됨" 기록을 한 트랜잭션에서 한다 | "환불 요청됨"을 끝까지 실행한다(결과 불명이면 조회) |
-| 결제 확인 중으로 10초 넘게 머문 주문(`confirming_started_at`)은 Payment 상태를 조회해 정리한다 | `GET /internal/payments/{orderRef}`로 현재 상태를 준다. 토스 멱등키는 시도 단위(`pg_order_id`)로 만든다 |
+| 결제 확인 중으로 10초 넘게 머문 주문(`confirming_started_at`)은 Payment 상태를 조회해 정리한다 | `GET /v1/internal/payments/{orderRef}`로 현재 상태를 준다. 토스 멱등키는 시도 단위(`pg_order_id`)로 만든다 |
 | 계약 테스트: 승인 이벤트를 주면 반드시 PAID 또는 환불 요청이 나온다 | 계약 테스트: 같은 승인을 두 번 줘도 이벤트·분개는 1건 |
 
 
@@ -2035,7 +2050,7 @@ UPDATE orders SET status = 'PENDING_PAYMENT', confirming_started_at = NULL, upda
 | 결제 생성 재시도 | 타이머(1초) | `PaymentDeliveryStore` \+ `PaymentDispatcher.recover()`: 요청 행을 저장하고 끝나지 않은 행을 다시 보냅니다 |
 | 승인 중계 | HTTP | `PaymentController`·`PaymentService`(Mock 결제 시작). 새 승인 API로 바꿉니다 |
 | 결제 완료 처리 함수 | HTTP·Kafka·조회 공통 | `OrderPaymentOutcomeService.apply()`. 재고·쿠폰·알림까지 한 번에 처리해서 범위가 큽니다 |
-| "결제 승인됨" 소비 | Kafka | `PaymentEventConsumerConfiguration`: 토픽 `payment.execution.results.v1`(#385에서 점 표기로 바꿈. Core는 옛 하이픈 토픽도 함께 소비), 실패 시 재전달. 이벤트 이름·본문만 바뀝니다 |
+| "결제 승인됨" 소비 | Kafka | `PaymentEventConsumerConfiguration`: 토픽 `payment.execution.results.v1`(#385에서 점 표기로 바꿈. Core는 #390 뒤 점 토픽만 소비), 실패 시 재전달. 이벤트 이름·본문만 바뀝니다 |
 | 정체 해소 | 주문 조회(`GET /orders/{no}`) | 없음. 새로 만듭니다. 아무도 조회하지 않으면 만료 배치가 닫습니다 |
 | 만료 배치 | 타이머 | `PaymentGroupExpirationScheduler`(1분, 100건) |
 | 늦은 승인 환불 요청 | 완료 처리 0행 | 없음. 공통 모듈 `EventOutbox`로 발행합니다 |
@@ -2144,11 +2159,11 @@ CREATE TABLE stock_reservation (
 ALTER TABLE member_coupon ADD COLUMN order_id BIGINT;           -- RESERVED·USED일 때만 값
 ALTER TABLE member_coupon ADD COLUMN used_at  TIMESTAMP WITH TIME ZONE;
 
--- 환불 요청: Payment 환불 결과 이벤트를 받을 곳. 늦은 승인 환불(late-{paymentId})도 같은 표에 남긴다
+-- 환불 요청: Payment 환불 결과 이벤트를 받을 곳. 시스템 보상(요청 ID UUID)도 같은 표에 남긴다
 ALTER TABLE orders ADD COLUMN refunded_amount BIGINT NOT NULL DEFAULT 0;   -- 성공한 환불 합
 CREATE TABLE refund_request (
     id                BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
-    request_id        VARCHAR(64) NOT NULL UNIQUE,    -- Payment refundRequestId. 고객: UUID, 늦은 승인: late-{paymentId}
+    request_id        VARCHAR(64) NOT NULL UNIQUE,    -- Payment refundRequestId. 고객 환불·시스템 보상 모두 UUID
     order_id          BIGINT      NOT NULL REFERENCES orders(id),
     reason            VARCHAR(32) NOT NULL CHECK (reason IN ('CUSTOMER_REQUEST','LATE_APPROVAL')),
     amount            BIGINT      NOT NULL CHECK (amount > 0),
@@ -2206,7 +2221,7 @@ INSERT INTO orders (..., status 'PENDING_PAYMENT', payment_expires_at :T = now()
                     expires_at :T + 3분, payment_retry_at now() + 10초, idempotency_key :key);  -- 동기 호출과 겹치지 않게
 INSERT INTO seller_order ...; INSERT INTO order_item ...;
 COMMIT;
--- 5. 커밋 뒤 Payment POST /internal/payments (타임아웃 3초: DB 저장만 하는 API)
+-- 5. 커밋 뒤 Payment POST /v1/internal/payments (타임아웃 3초: DB 저장만 하는 API)
 --    성공 → UPDATE orders SET payment_id = :pid, payment_retry_at = NULL  → 응답에 결제창 정보
 --    실패 → 주문만 응답(payment = null). 재시도 스케줄러가 이어서 한다
 ```
@@ -2223,7 +2238,7 @@ COMMIT;
 SELECT id FROM orders
  WHERE status = 'PENDING_PAYMENT' AND payment_id IS NULL AND payment_retry_at <= now()
  ORDER BY payment_retry_at LIMIT 50 FOR UPDATE SKIP LOCKED;
--- 주문마다 POST /internal/payments (orderRef 멱등이라 몇 번 보내도 결제 1건)
+-- 주문마다 POST /v1/internal/payments (orderRef 멱등이라 몇 번 보내도 결제 1건)
 --   201·200       → payment_id 저장, payment_retry_at = NULL
 --   실패·타임아웃 → payment_retry_count + 1, payment_retry_at = now() + min(5초 × 2^count, 60초)
 --   payment_expires_at이 지나면 멈춤(payment_retry_at = NULL). 주문은 만료 배치가 닫는다
@@ -2248,7 +2263,7 @@ UPDATE stock_reservation SET status = 'CONSUMED', updated_at = now() WHERE order
 UPDATE member_coupon SET status = 'USED', used_at = now() WHERE order_id = :o AND status = 'RESERVED';
 DELETE FROM cart_item WHERE member_id = :member AND product_id IN (:주문한 product_id);
 --  0행: 다시 읽는다. PAID이고 같은 payment_id → 무시(중복)
---       EXPIRED·CANCELLED → outbox "환불 요청됨" (late-{paymentId})
+--       보상 없이 닫힌 EXPIRED·CANCELLED·FAILED → outbox "환불 요청됨" (LATE_APPROVAL, 요청 ID UUID)
 COMMIT;
 
 -- 만료 배치 (30초마다, 50건씩 SKIP LOCKED, 주문마다 트랜잭션) · 구매자 취소
@@ -2402,10 +2417,10 @@ stateDiagram-v2
 
 | \# | 서비스 | 로컬 트랜잭션 | 다음 단계를 부르는 것 | 보상 | 종류 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Commerce | 주문 PENDING\_PAYMENT · 재고·쿠폰 예약 | `POST /internal/payments` (동기, 결제창 정보 반환) | 주문 만료(EXPIRED) · 재고 반환. 만료 시각 \+ 여유 3분 | 보상 가능 |
+| 1 | Commerce | 주문 PENDING\_PAYMENT · 재고·쿠폰 예약 | `POST /v1/internal/payments` (동기, 결제창 정보 반환) | 주문 만료(EXPIRED) · 재고 반환. 만료 시각 \+ 여유 3분 | 보상 가능 |
 | 2 | Payment | 결제 CREATED (`expires_at` \= T, 주문 만료는 T \+ 3분) | 구매자 승인 요청 → Commerce 중계(결제 확인 중) → confirm | 자체 만료(CANCELED). 돈이 안 움직였으므로 PG 호출 없음 | 보상 가능 |
 | 3 | Payment | APPROVED \+ 승인 분개 \+ outbox "결제 승인됨" | 이벤트 "결제 승인됨" | 환불(흐름 7\) | **피벗**. 돈이 움직인 지점. 여기부터는 앞으로만 간다 |
-| 4 | Commerce | `UPDATE … SET PAID WHERE status IN (결제 대기, 결제 확인 중)` \+ 재고 확정. 동기 200과 이벤트가 같은 함수. 0행이면 다시 읽어, 닫힌 주문일 때만 같은 트랜잭션에서 outbox "환불 요청됨" | 이벤트 "환불 요청됨" (0행일 때만) | 없음. 재시도로 끝까지 간다 | 재시도 |
+| 4 | Commerce | 회원 guard → 주문 묶음 잠금 아래 결제 확인 중이면 PAID(결제 대기에서의 PAID는 구현 갭: 지금은 충돌로 거부) \+ 재고 확정. 1초 폴링의 조회와 이벤트가 같은 함수. 보상 없이 닫힌 주문일 때만 같은 트랜잭션에서 outbox "환불 요청됨"(LATE_APPROVAL), 이미 보상 중이면 기존 보상으로 수렴 | 이벤트 "환불 요청됨" (0행일 때만) | 없음. 재시도로 끝까지 간다 | 재시도 |
 | 5 | Payment | 환불 SUCCEEDED \+ 환불 분개 \+ outbox "환불 성공됨" | 이벤트 "환불 성공됨" | 없음. UNKNOWN은 조회로 확정 | 재시도 |
 
 
@@ -2436,11 +2451,11 @@ Saga는 단계 사이에 다른 요청이 끼어들 수 있습니다(격리 없�
 | --- | --- | --- | --- |
 | 카드 거절 | CREATED로 복귀, 422 | 결제 확인 중 → 결제 대기. 예약 유지 | 만료 전까지 다시 결제 가능 |
 | 결제 확인 중에 구매자 취소 | 변화 없음 | 409 "결제 확인 중" | 승인 결과로 끝남 |
-| 토스 응답이 8초를 넘김 | 202, 호출 계속 | 결제 확인 중 유지 | 이벤트로 PAID 또는 만료 후 환불 |
+| 토스 응답이 8초를 넘김 | 202, 호출 계속 | 결제 확인 중 유지, 1초마다 조회 | 조회 또는 이벤트로 PAID. 처리 기한이면 보상 |
 | 결제 안 하고 나감 | 만료 배치가 CANCELED | 만료 배치가 EXPIRED · 재고 반환 | 둘 다 닫힘. 서로 이벤트 없음 |
-| 결과 불명 후 승인 확인 (만료 전) | UNKNOWN → APPROVED | PENDING → PAID | 정상 결제 |
-| 늦은 승인 (주문 만료 후 승인 확인) | APPROVED → 환불 → REFUNDED | 0행 → "환불 요청됨" | 고객 돈 반환(흐름 6) |
-| Kafka 장애로 "결제 승인됨"이 늦게 도착 | outbox가 계속 재시도 | 도착 시 결제 대기·확인 중이면 PAID, 이미 만료면 환불 요청, 이미 PAID면 무시 | 위 둘 중 하나로 수렴 |
+| 결과 불명 후 승인 확인 (처리 기한 전) | UNKNOWN → APPROVED | 결제 확인 중 → PAID | 정상 결제 |
+| 처리 기한 뒤 승인 확인 | 보상이 먼저 선점해 CANCELED, 토스 취소(분개·"결제 승인됨" 없음). 이미 APPROVED였으면 환불 → REFUNDED | 처리 기한에 보상 대기·예약 해제·보상 요청(APPROVAL_UNKNOWN). 보상 없이 닫힌 주문에 승인이 오면 LATE_APPROVAL 보상 | 고객 돈 반환(흐름 6) |
+| Kafka 장애로 "결제 승인됨"이 늦게 도착 | outbox가 계속 재시도 | 주 경로인 1초 폴링이 먼저 PAID로 반영하는 경우가 많다. 도착 시 결제 확인 중이면 PAID, 보상 없이 닫혔으면 보상 요청, 이미 PAID면 무시 | 위 둘 중 하나로 수렴 |
 | 환불 실패 (토스 4xx) | refund FAILED, "환불 실패됨" | 알림 · 운영자 처리 | 사람이 처리. 거래 대사에도 남는다 |
 
 
@@ -2489,7 +2504,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 ### 토스 상태 ↔ 우리 상태
 
 
-우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다. 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
+우리 상태는 토스 상태와 따로 둡니다. 토스 상태는 토스가 아는 사실이고, 우리 상태는 우리가 아는 사실입니다. 둘이 다른 순간이 있습니다(결과 불명, 우리 만료). **"취소"의 뜻도 다릅니다.** 토스 `CANCELED`는 승인된 돈을 돌려준 것이라 우리 REFUNDED입니다. 우리 CANCELED는 돈이 안 나가고 닫힌 것입니다(예외: 시스템 보상 선점, 승인 응답 불일치 즉시 취소, 결과 불명 조회로 확인한 토스 전액 취소는 돈이 돌아가도 CANCELED입니다(분개 없음)). 토스 원본 값은 `pg_status`에 참고용으로 저장합니다.
 
 
 
@@ -2502,7 +2517,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 | 승인 성공 · 거절 | `DONE` · `ABORTED` | APPROVED · CREATED (재시도 가능) |
 | 승인 응답 없음 | `DONE`일 수도 있음 | UNKNOWN |
 | 인증 후 승인 안 함 | `EXPIRED` | CREATED. `expires_at`이 지나면 CANCELED (자체 배치) |
-| 늦은 승인 환불 | `CANCELED` | REFUNDED (`refund.reason` \= LATE\_APPROVAL) |
+| 늦은 승인 보상 | `CANCELED` | 보상이 먼저 선점했으면 CANCELED(분개 없음), 이미 APPROVED였으면 REFUNDED. Payment `refund`에는 `purpose` \= SYSTEM\_COMPENSATION만 남고 사유(LATE\_APPROVAL·APPROVAL\_UNKNOWN)는 요청 원문에 있다 |
 | 부분 · 전체 환불 | `PARTIAL_CANCELED` · `CANCELED` | PARTIALLY\_REFUNDED · REFUNDED |
 
 
@@ -2528,7 +2543,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 
 | 이벤트 (eventType) | 토픽 · 키 | 방향 | payload | 받는 쪽의 한 번만 반영 |
 | --- | --- | --- | --- | --- |
-| 결제 승인됨 `PaymentApproved` | `payment.execution.results.v1` · orderRef | Payment → Commerce | paymentId, orderRef, amount, approvedAt | 동기 200과 같은 함수로 `UPDATE orders SET PAID WHERE status IN (결제 대기, 결제 확인 중)`. 0행이면 다시 읽어 PAID(같은 결제)는 무시, 닫힌 주문이면 "환불 요청됨" 발행. Payment는 판단 없이 항상 보낸다 |
+| 결제 승인됨 `PaymentApproved` | `payment.execution.results.v1` · orderRef | Payment → Commerce | paymentId, orderRef, amount, approvedAt | 보조 경로. 주 경로는 Commerce 1초 폴링의 HTTP 조회이고 둘은 같은 함수다. 회원 guard → 주문 묶음 잠금 아래 결제 확인 중이면 PAID, 이미 PAID(같은 결제)는 무시, 보상 없이 닫힌 주문이면 "환불 요청됨"(LATE_APPROVAL) 발행, 보상 중이면 기존 보상으로 수렴. 기한 뒤 보상이 결제를 CANCELED로 선점하면 이 이벤트는 나가지 않는다. Payment는 판단 없이 항상 보낸다 |
 | 환불 결과 기록됨 `RefundResultRecorded` | `payment.refund.results.v1` · orderRef | Payment → Commerce | 받은 요청 payload 그대로 \+ executionId(UUID, 요청당 고정), resultVersion(1부터), status(SUCCEEDED·FAILED·NO\_CHARGE), refundedAmount, resolvedAt, nextActionAt(null), failureCode | 요청 원문·executionId·resultVersion으로 검증해 한 번만 반영. 같은 버전은 같은 payload. Payment는 UNKNOWN을 보내지 않고, 같은 요청 ID에 다른 본문이 오면 결과를 보내지 않는다(Core가 거부하면 파티션이 막힘) |
 | 환불 요청됨 `RefundRequested` | `commerce.refund.requests.v1` · orderRef | Commerce → Payment | refundRequestId, orderRef, paymentId, purpose(USER\_REFUND·SYSTEM\_COMPENSATION), reason, currency, amount, items, requestedAt | `refund_request_id`로 `INSERT … ON CONFLICT DO NOTHING` → 0행이면 같은 본문은 저장 결과 재발행, 다른 본문은 충돌 기록만. 결제가 없거나 paymentId가 없거나 다르면 FAILED. 해석할 수 없으면 `commerce.refund.requests.v1.payment.dlt` |
 | 구매확정됨 `PurchaseConfirmed` | `commerce.purchase-confirmations.v1` · sellerOrderNumber | Commerce → Payment | sellerOrderNumber, sellerId, confirmedAt | `INSERT INTO settlement_item … ON CONFLICT DO NOTHING`(UNIQUE `(kind, source_id)`) → 0행이면 끝. 판매 금액 \= `payment_seller_amount.amount` − 그 판매자 주문의 **성공한** 환불 합. 수수료율은 `payment_seller_amount`의 복사값 |
@@ -2586,7 +2601,7 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 | 결과 전달 | | | | |
 | 26 | "결제 승인됨" 이벤트 중복 | 두 번째는 무시 | 0행이면 다시 읽어 PAID·같은 결제면 무시. **빠뜨리면 정상 결제가 환불됨** | 주문 |
 | 27 | 동기 200과 이벤트가 둘 다 도착(순서 무관) | 한 번만 반영 | 같은 처리 함수 \+ 조건부 UPDATE | 주문 |
-| 28 | Kafka 장애로 이벤트가 3분 넘게 늦음 | 만료가 먼저 이김 → 도착 시 환불 | 0행 → 환불 요청 | 6 |
+| 28 | Kafka 장애로 이벤트가 3분 넘게 늦음 | 주 경로인 1초 폴링이 먼저 반영한다. 처리 기한이 먼저면 보상이 이김: Payment가 결제를 CANCELED로 선점하고 늦은 토스 승인(`UnknownPaymentPoller` 5초 조회, 드물게 승인 호출)은 같은 멱등키 `cancel-{pg_order_id}`로 취소된다 | Commerce는 보상 없이 닫힌 주문에만 LATE\_APPROVAL 보상 | 6 |
 | 29 | 이벤트 처리 중 Commerce 장애 | 롤백 후 다시 받음 | 커밋 후 offset · 19와 같은 멱등 | 계약 |
 | 30 | outbox 발행 전 Payment 장애 | 재시작 후 발행 | outbox 행이 상태와 같은 트랜잭션 | 5 |
 | 만료 · 취소 | | | | |
@@ -2596,12 +2611,12 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 | 34 | 나가서 주문 취소 뒤 옛 결제창에서 인증 완료 | Commerce 409, Payment 호출 없음, 돈 안 나감 | 승인 입구가 Commerce 하나 \+ PENDING 확인 | 주문 |
 | 35 | 만료와 승인이 동시에 | 둘 중 하나만 1행 | 같은 이전 상태 조건 | 6 |
 | 36 | 결제 확인 중에 구매자 취소 | 409 "결제 확인 중" | PAYMENT\_CONFIRMING 잠금 | 주문 |
-| 37 | 결과 불명이 여유 3분보다 오래감 | 주문 만료 → 나중에 승인 확인 → 환불 | 늦은 승인 보상 | 6 |
-| 38 | 대사에서 "토스 DONE · 우리 CANCELED" 발견 | APPROVED로 보정 → "결제 승인됨" → Commerce가 판단(대부분 환불) | 거래 대사 | 12 |
+| 37 | 결과 불명이 처리 기한(600초)보다 오래감 | 보상 대기·예약 해제 → 나중에 승인 확인 → 토스 취소(결제 CANCELED) | 늦은 승인 보상 | 6 |
+| 38 | 대사에서 "토스 DONE · 우리 CANCELED" 발견 | 기록·알림만 하고 자동 보정하지 않음 → 운영자가 확인해 정정하면 "결제 승인됨" → Commerce가 판단(대부분 보상) | 거래 대사(후속) | 12 |
 | 환불 | | | | |
 | 39 | 환불 요청 중복(이벤트 재전달·재시도) | 1번만 실행 | `refund_request_id` UNIQUE · `ON CONFLICT DO NOTHING` | 7 |
 | 40 | 동시 부분 환불의 합이 결제 금액 초과 | 한 건 결과 이벤트 FAILED(`OVER_REFUND`) | `payment` 행 FOR UPDATE 후 합 계산 | DDL |
-| 41 | 환불 호출 타임아웃 | UNKNOWN → 조회. 이중 환불 없음 | 토스 멱등키 \= `refund_request_id` | 7 |
+| 41 | 환불 호출 타임아웃 | UNKNOWN → 조회. 이중 환불 없음 | 토스 멱등키 \= 고객 환불 `refund_request_id`, 시스템 보상 `cancel-{pg_order_id}` | 7 |
 | 42 | 환불 실패(토스 4xx) | "환불 실패됨" → 운영자 | 이벤트 \+ 거래 대사 | 7 |
 | 43 | 부분 취소가 안 되는 결제수단에 부분 환불 | 결과 이벤트 FAILED(`PARTIAL_NOT_ALLOWED`) | `partial_cancelable` | 7 |
 | 재고 · 쿠폰 정합성 | | | | |
@@ -2646,9 +2661,9 @@ Question 승인 설명은 "인증 후 10분", 상태 설명은 "`EXPIRED`는 30�
 
 | \# | 질문 | 제안 |
 | --- | --- | --- |
-| 1 | 주문 만료 시간과 여유 시간 | 토스 승인 제한 10분보다 길게. 여유 시간은 승인 호출 최대 시간(60초×2\) \+ 첫 조회 간격보다 길게(예: 3분). 그래야 토스가 정상일 때는 늦은 승인이 생기지 않는다 |
-| 2 | 늦은 승인 환불을 자동으로 할지 | 추천안 B. 시간이 없으면 최소안(대사 \+ 운영자) |
-| 3 | 결과 불명 최대 조회 시간 | 예: 30분. 그 뒤는 대사로 |
+| 1 | 주문 만료 시간과 여유 시간 | 토스 승인 제한 10분보다 길게. 여유 시간은 승인 호출 최대 시간(60초×2\) \+ 첫 조회 간격보다 길게(예: 3분). 그래야 토스가 정상일 때는 늦은 승인이 생기지 않는다. **정함(구현):** 결제 대기 600초(생성부터), 처리 기한 600초(승인 시도 접수부터). 여유 시간 대신 처리 기한 동안 1초마다 조회한다 |
+| 2 | 늦은 승인 환불을 자동으로 할지 | 추천안 B. 시간이 없으면 최소안(대사 \+ 운영자). **정함(구현):** 자동 보상. 보상 뒤에는 같은 주문의 승인·결제창·취소·사용자 환불을 막는다 |
+| 3 | 결과 불명 최대 조회 시간 | 예: 30분. 그 뒤는 대사로. **정함(구현):** 30분 |
 | 4 | 2차 PG로 넘기는 기준 | 서킷 브레이커 OPEN. 결제창 열기 전에만 |
 | 5 | 정산 주기 | 구매확정 후 D\+N 영업일 |
 | 6 | PG 수수료·쿠폰 할인 부담 주체 | PG 수수료는 플랫폼. 지금 쿠폰은 판매자 발행이라 판매자 부담(할인 후 금액으로 정산). 플랫폼 쿠폰이 생기면 다시 정한다 |

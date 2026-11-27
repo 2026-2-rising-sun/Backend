@@ -6,15 +6,17 @@
 
 2026-11-20 기준 Core는 새 주문서의 결제 준비·승인을 HTTP로 중계했다. 사용자 환불은 기존 주문에서만 접수했고, 새 주문서가 닫힌 뒤 승인이 도착하면 `payment_relay_refund`에 요청을 저장하고 하이픈 토픽으로 발행했다. 당시 주문·결제 상태표와 PR343의 검증 범위는 [변경 전 주문 문서](https://github.com/2026-2-rising-sun/Backend/blob/9b807f91e02483c6ecf9b089ea42fa1f85b5f099/docs/design-docs/services/commercecore/order/overview.md)와 [11월 20일 검증 기록](../../../../worklog/2026-11-20-cdc-refund-status.md)에 있다.
 
-[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 신규 주문서의 사용자 환불과 시스템 보상 요청을 각각 저장하고 공통 Kafka 토픽으로 발행하는 Core 경로를 추가한다. 기존 주문과 이미 저장한 하이픈 토픽 요청의 결과는 기존 경로에서 처리한다.
+[#378](https://github.com/2026-2-rising-sun/Backend/pull/378)은 신규 주문서의 사용자 환불과 시스템 보상 요청을 각각 저장하고 공통 Kafka 토픽으로 발행하는 Core 경로를 추가한다. 기존 하이픈 토픽 요청·결과 경로는 #390에서 삭제됐다.
 
 ## 주문과 승인
 
 논리 주문은 `payment_group`, 구매 항목은 `orders`, 판매자별 금액 스냅샷은 `seller_order`다. 신규 주문서는 policyVersion=1이며 기존 policyVersion=0의 공개 주문·결제·환불 실행과 분리한다. SKU·상품명·판매자·단가·할인·수량·Cart ID/version은 생성 시 보존한다. 옵션은 기존 공급 범위대로 처리하며 환불 시 현재 상품 가격을 재계산하지 않는다.
 
-회원 구매 guard → Cart 출처 → Product 공유 잠금 → SKU 쓰기 잠금 순으로 새 주문과 재고·쿠폰 예약을 원자적으로 만든다. Product 판매중지·삭제는 신규 주문을 막으며 이미 선점한 유효 주문의 결제까지 취소하지 않는다. 판매자별 양수 실결제액과 `commerce.commission-rate`를 생성 시 보존하며 설정 누락은 주문 전체를 롤백한다. legacy 0원 경로는 유지한다.
+회원 구매 guard → Cart 출처 → Product 공유 잠금 → SKU 쓰기 잠금 순으로 새 주문과 재고·쿠폰 예약을 원자적으로 만든다. Product 판매중지·삭제는 신규 주문을 막으며 이미 선점한 유효 주문의 결제까지 취소하지 않는다. 판매자별 양수 실결제액과 `commerce.commission-rate`를 생성 시 보존하며 설정 누락은 주문 전체를 롤백한다. legacy 0원 결제·환불 경로는 #390에서 삭제됐다(legacy 주문 생성은 남지만 결제할 경로가 없다).
 
-준비 PENDING_PAYMENT는 생성부터600초, 승인 진입 PAYMENT_CONFIRMING은 최초 전환부터 별도600초다. PREPARE/APPROVAL 원문·고정 전달ID와 상태는 같은 Core TX에 저장하고 승인 HTTP는 커밋 뒤 수행한다. 정상202 PENDING은 처리 중 응답이며 보상 의도를 만들지 않는다. 단순 조회 실패도 보상 접수 근거가 아니다.
+준비 PENDING_PAYMENT는 생성부터600초, 승인 진입 PAYMENT_CONFIRMING은 그 승인 시도의 접수부터 별도600초다. PREPARE/APPROVAL 원문·고정 전달ID와 상태는 같은 Core TX에 저장하고 승인 HTTP는 커밋 뒤 수행한다. 정상202 PENDING과 명시적 UNKNOWN은 처리 중 응답이며 보상 의도를 만들지 않는다(#416). 단순 조회 실패도 보상 접수 근거가 아니다. 복구 루프는 1초마다 `next_action_at, id` 순으로 미완료 전달을 집는다. 승인 전달은 먼저 Payment를 조회하고 승인 미접수면 승인을 다시 보낸다. 준비 전달은 주문이 PENDING일 때만 결제 생성을 다시 부르고, 아니면 `ORDER_CLOSED`로 닫는다.
+
+승인 거절(422 `DECLINED`, 또는 조회가 CREATED이고 결제창이 그 시도와 다름)은 주문을 PENDING_PAYMENT로 되돌리고 처리 기한을 비운다. 예약은 유지하고 Core 결제창(`pg_order_id`)과 송신 표시를 비운다. 원래 생성 기한 전까지 같은 주문에서 새 결제창·새 `X-Idempotency-Key`로 다시 승인한다. 승인 전달은 시도마다 한 건이고(V119) 진행·성공 시도는 주문당 하나다. 이미 끝난 시도의 늦은 거절·처리중 응답은 뒤 시도의 상태를 덮지 않는다. Payment CANCELED만 주문을 FAILED로 끝내고 PaymentFailed를 보낸다(#418).
 
 확정 승인은 구매 guard와 그룹 잠금 아래 원결제ID·금액·승인시각을 검증한다. 유효 주문은 PAID와 판매 수량 소비·쿠폰 사용·본인 구매 SKU Cart 정리를 같은 TX에 반영한다. Cart 출처 ID/version은 삭제 뒤에도 보존한다. 실패·취소·만료·보상 대상 늦은 승인에서는 Cart를 정리하지 않는다.
 
@@ -24,19 +26,19 @@ Cart 출처 ID/version은 주문 생성 시 선택 검증과 기존 선택 환�
 
 ## 시스템 응답 유실과 보상 fence
 
-최초 승인 처리 시작부터600초 무응답 또는 명시적 승인 UNKNOWN에서 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·고정UUID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 재고·쿠폰 예약을 유지한다. 단순 HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 기존 PROCESSING에서 첫 처리 시작의600초 기한까지 기다린다. 재시도로 기한을 늘리지 않는다.
+보상 대기(COMPENSATION_PENDING) 전환은 승인 시도의 600초 처리 기한에 닿을 때만이며(사유 `APPROVAL_UNKNOWN`), 보상 없이 닫힌 주문(EXPIRED·CANCELLED·FAILED)에 늦게 온 승인은 같은 저장을 사유 `LATE_APPROVAL`로 따로 한다. 기한 판정에서는 `core_refund_intent(purpose=SYSTEM_COMPENSATION,status=REQUESTED)`와 전체 요청 원문·UUID 요청ID·`commerce.refund.requests.v1` Outbox를 같은 TX에 저장한다(사유 `APPROVAL_UNKNOWN`). COMPENSATION_PENDING 전환은 기한 판정(`OrderSheetLifecycleService.expire`)만 만든다. 사용자 환불 상태와 섞지 않는다. 그룹과 관련 항목을 COMPENSATION_PENDING으로 바꾸고 같은 TX에서 재고·쿠폰 예약을 한 번 해제한다(`compensation_released_at`, V118). 해제의 논리적 실패는 JDBC savepoint까지만 되돌려 보상 요청을 커밋하고, 보상 완료 때 다시 해제한다. 명시적 UNKNOWN·HTTP 통신오류·timeout·응답 유실은 즉시 보상하지 않고 PAYMENT_CONFIRMING에서 기한까지 조회한다. 같은 시도의 재요청으로 기한을 늘리지 않는다.
 
 보상 행은 완료 뒤에도 정상 승인 재개를 차단하는 영속 fence다. 승인 API 재진입, checkout, dispatcher 재전달과 만료/취소는 이를 확인한다. 송신 직전에는 같은 그룹 잠금 아래 `approval_send_started_at`을 기록하는 조건부 송신 시작 TX를 커밋한다. 이 지점보다 보상이 먼저면 HTTP를 보내지 않으며, 시작권한 커밋 뒤의 호출은 이미 진행 중인 호출로 분류한다. DB 잠금을 HTTP 동안 유지하지 않는다. 이미 시작된 HTTP와 보상 접수의 경합은 늦은 승인 사실을 저장하되 기존 요청ID의 보상으로 수렴시킨다. 새 `late-*` 요청을 만들거나 정상 PAID로 부활시키지 않는다.
 
-결제 전 PENDING_PAYMENT는 기존 기한에 EXPIRED로 만료·해제한다. PAYMENT_CONFIRMING의600초 기한 도달은 보상대기 진입이며 일반 만료·선해제가 아니다. 보상 REQUESTED/UNKNOWN/FAILED인 진행 주문은 만료 배치에서 예약을 해제하지 않는다. 승인 반영·보상 접수·만료는 guard → 그룹 잠금 순서로 직렬화한다. 승인 사실이 먼저 PAID를 확정하면 뒤 늦은 UNKNOWN 콜백은 보상을 새로 만들지 않는다.
+결제 전 PENDING_PAYMENT는 기존 기한에 EXPIRED로 만료·해제한다. PAYMENT_CONFIRMING의600초 기한 도달은 일반 만료가 아니라 보상대기 진입이며, 이때 예약을 해제한다(#417). 보상이 있는 주문은 만료 배치가 다시 건드리지 않는다. 보상됐거나 닫힌 주문의 남은 승인 전달은 dispatch 때 `TIMEOUT`(`ORDER_CLOSED`)으로 닫는다. 승인 반영·보상 접수·만료는 guard → 그룹 잠금 순서로 직렬화한다. 승인 사실이 먼저 PAID를 확정하면 뒤 늦은 UNKNOWN 콜백은 보상을 새로 만들지 않는다.
 
 | 보상 결과 | 진행 주문 | 이미 EXPIRED/CANCELLED/FAILED인 주문 |
 |---|---|---|
-| UNKNOWN | COMPENSATION_PENDING·예약 유지, 보상 UNKNOWN | 종료 상태 유지 |
-| FAILED | COMPENSATION_PENDING·예약 유지, 원인 기록. 같은 요청·실행의 더 높은 버전 완료 결과 재검증 가능 | 종료 상태 유지 |
-| SUCCEEDED/NO_CHARGE | CANCELLED, 예약 재고·쿠폰을 한 번 해제. 시스템 완료 알림은 발행하지 않음 | 종료 유지, 보상 COMPLETED만 기록, 추가 자원 반환 없음 |
+| UNKNOWN | COMPENSATION_PENDING 유지(예약은 전환 때 해제), 보상 UNKNOWN | 종료 상태 유지 |
+| FAILED | COMPENSATION_PENDING 유지, 원인 기록. 같은 요청·실행의 더 높은 버전 완료 결과 재검증 가능 | 종료 상태 유지 |
+| SUCCEEDED/NO_CHARGE | CANCELLED. 전환 때 해제하지 못한 주문만 이때 한 번 해제. 시스템 완료 알림은 발행하지 않음 | 종료 유지, 보상 COMPLETED만 기록, 추가 자원 반환 없음 |
 
-NO_CHARGE는 Payment가 미승인과 향후 승인 불가를 확정한 결과다. 일시 not-found·조회 장애를 Core가 NO_CHARGE로 추정하지 않는다. 금전 승인 사실과 Core의 CANCELLED 주문 결과는 서로 다른 축이다. 장기 UNKNOWN/FAILED의 자동 해제나 임의 TTL은 없다. 완료 이후 낮은 버전 UNKNOWN/FAILED 재전달은 추가 자원 효과가 없고, 더 높은 버전의 모순 종료 결과는 거절한다. 이미 종료한 과거 주문은 보상으로 재활성화하지 않는다.
+NO_CHARGE는 Payment가 미승인과 향후 승인 불가를 확정한 결과다. 일시 not-found·조회 장애를 Core가 NO_CHARGE로 추정하지 않는다. 금전 승인 사실과 Core의 CANCELLED 주문 결과는 서로 다른 축이다. 보상 결과가 오래 UNKNOWN/FAILED여도 주문을 자동 종료하는 임의 TTL은 없다. 완료 이후 낮은 버전 UNKNOWN/FAILED 재전달은 추가 자원 효과가 없고, 더 높은 버전의 모순 종료 결과는 거절한다. 이미 종료한 과거 주문은 보상으로 재활성화하지 않는다.
 
 ## 사용자 전체·선택·부분수량 환불
 
@@ -52,15 +54,15 @@ UNKNOWN은 수량·금액 예약을 유지한다. SUCCEEDED만 이번 수량을 
 
 ## 결과 검증과 전달
 
-요청/결과 토픽은 `commerce.refund.requests.v1` / `payment.refund.results.v1`, 승인 사실은 `payment.execution.results.v1`이다. 기존 하이픈 승인·환불 결과 listener는 저장된 legacy 원문 처리에 보존한다. Notification/Live와 기존 `commerce.payment-group.v1` 알림은 유지한다.
+요청/결과 토픽은 `commerce.refund.requests.v1` / `payment.refund.results.v1`, 승인 사실은 `payment.execution.results.v1`이다. 기존 구 하이픈 승인·환불 결과 listener는 #390에서 삭제됐다. Notification/Live와 기존 `commerce.payment-group.v1` 알림은 유지한다.
 
 결과는 source/version/eventId/key/orderRef·고정 요청ID(영숫자·밑줄·하이픈1~64자)·paymentId·목적·사유·통화·요청시각·금액·판매자/항목/수량을 원문과 대조한다. executionId는 고정하며 resultVersion의 동일버전 다른 본문·동일eventId 다른 본문·모순 종료 결과를 거절한다. 낮은 UNKNOWN과 같은 종료 의미 재전달은 자원 효과0회다. 미등록·불일치 결과나 DB 실패는 예외로 남겨 listener가 무한 backoff 재전달하며 성공 ack하지 않는다. 별도 격리/DLQ 운영 화면은 이번 Core 구현 범위 밖이다.
 
-사용자 환불의 결과 반영·재고/쿠폰·주문·요청/결과 원장·기존 환불 알림 Outbox는 같은 Core TX다. 시스템 완료는 원문·COMPLETED/outcome·COMPENSATION_PENDING→CANCELLED와 예약 해제만 같은 TX에 저장하며 PG 거절을 뜻하는 PaymentFailed나 계약에 없는 OrderFailed를 합성하지 않는다. 정상 결제 거절·실제 타임아웃 알림은 기존 경로대로 유지한다. 별도 시스템 보상 완료 알림은 후속 범위다. Payment의 실제 PG 실행과 Core 로컬 반영은 별도 TX이며 Core rollback이 이미 실행된 금전 환불을 취소하지 않는다.
+사용자 환불의 결과 반영·재고/쿠폰·주문·요청/결과 원장·기존 환불 알림 Outbox는 같은 Core TX다. 시스템 완료는 원문·COMPLETED/outcome·COMPENSATION_PENDING→CANCELLED(전환 때 못 한 예약 해제 포함)만 같은 TX에 저장하며 PaymentFailed나 계약에 없는 OrderFailed를 합성하지 않는다. 승인 거절은 재결제를 위해 알림을 보내지 않고, PaymentFailed는 Payment CANCELED로 주문이 FAILED가 될 때만 보낸다. 별도 시스템 보상 완료 알림은 후속 범위다. Payment의 실제 PG 실행과 Core 로컬 반영은 별도 TX이며 Core rollback이 이미 실행된 금전 환불을 취소하지 않는다.
 
 ## 호환·설정·Frontend 영향
 
-policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. 이전 정책의 CANCEL_PENDING 행은 마이그레이션하지 않고, 결과 반영이 PAID·PARTIALLY_REFUNDED·REFUNDED로 끝낸다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 토글은 legacy HTTP에만 적용한다. 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
+policyVersion=0의 과거 키·금액·미완료 HTTP 원문과 `late_approval_refund/payment_relay_refund`는 자동 재작성·Kafka 재발행하지 않는다. 이전 정책의 CANCEL_PENDING 행은 마이그레이션하지 않고, 결과 반영이 PAID·PARTIALLY_REFUNDED·REFUNDED로 끝낸다. legacy 부분수량은 완료 범위가 아니다. 신규 Kafka 접수는 `execution-enabled`와 무관하게 Outbox를 저장하며 이 설정은 현재 코드가 읽지 않는다(legacy HTTP는 #390에서 삭제). 공용 Outbox relay가 OFF이면 전달은 지연되고 접수는 보존된다. 기본 application.yml과 SKU 내부 추적은 이번 환불 변경에 포함하지 않는다.
 
 Frontend는 새 주문/항목 COMPENSATION_PENDING, PARTIALLY_REFUNDED와 이전 정책 데이터의 CANCEL_PENDING, `payment.compensation{requestId,status,outcome,completedAt}`, `refundRequestId`, 요청 targets.quantity와 환불 가능 누계 필드를 처리해야 한다. UNKNOWN이나201/202를 성공으로 표시하지 않아야 한다. Frontend 파일은 수정하지 않았다.
 
@@ -82,10 +84,10 @@ V115는 신규 intent/결과event 원장·이전 항목 상태·CANCEL_PENDING C
 
 ## 현재 검증 경계
 
-환불 공통 요청은 `commerce.refund.requests.v1`, 공통 결과는 `payment.refund.results.v1`이며 두 목적 모두 처음부터 존재하는 orderRef(groupNumber)를 key로 쓴다. Core는 저장된 refundRequestId·목적·원문으로 결과를 검증한다. Payment의 consumer·조회/대사·PG 환불·결과 producer는 타팀 책임으로 이번 구현·실행 범위에 없다. 결과 테스트는 Core fixture 주입이다. 기존 원문에 paymentId가 없고 결과에만 새 ID가 있는 경우에는 검증된 기존 binding이 없으면 적용을 보류하고 재전달한다. 현재 Payment GET 계약의 필드로 안전한 연결 복구를 증명하지 못했으므로 미해결이며 새 필드를 가정하거나 검증을 완화하지 않는다.
+환불 공통 요청은 `commerce.refund.requests.v1`, 공통 결과는 `payment.refund.results.v1`이며 두 목적 모두 처음부터 존재하는 orderRef(groupNumber)를 key로 쓴다. Core는 저장된 refundRequestId·목적·원문으로 결과를 검증한다. Payment의 consumer·PG 환불·결과 producer는 Payment 서비스가 구현했다(이슈 #385·#370·#386, PR #394~#396). 대사는 후순위다. Core 결과 테스트는 fixture 주입이고, 두 서비스를 함께 띄운 확인은 [#416~#418 기록](../../../../worklog/2026-11-27-core-payment-retry.md)에 있다. 기존 원문에 paymentId가 없고 결과에만 새 ID가 있는 경우에는 검증된 기존 binding이 없으면 적용을 보류하고 재전달한다. 현재 Payment GET 계약의 필드로 안전한 연결 복구를 증명하지 못했으므로 미해결이며 새 필드를 가정하거나 검증을 완화하지 않는다.
 
 V116은 기적용 V115를 변경하지 않고 상태 CHECK와 활성 회원 인덱스를 확장한다. 기존 미완료 시스템 보상과 진행 주문만 새 대기 상태로 이행하고 원문·요청ID·예약과 이미 종료한 주문은 보존한다.
 
-Core 선병합 기준(`dev` `1dbedd4a`)에서 Payment 생산 계약은 구 `payment.refund-results.v1/RefundExecutionResolved`이며 신규 dot 토픽 `payment.refund.results.v1/RefundResultRecorded`와 불일치한다. 새 결과 모양은 Core 테스트 fixture이고 상대 producer 확정·연동 완료를 뜻하지 않는다. 이 계약 게이트가 해소되기 전 실제 환불 연동 완료로 배포하지 않는다.
+Core 선병합 기준(`dev` `1dbedd4a`)에서는 Payment 생산 계약이 구 `payment.refund-results.v1/RefundExecutionResolved`라 신규 dot 토픽과 맞지 않았다. 이 불일치는 아래 #393~#396으로 해소됐고 Core는 #390에서 구 토픽 구독을 지웠다.
 
 Payment의 [결과 계약 #393](https://github.com/2026-2-rising-sun/Backend/pull/393), [요청 소비·결과 발행 #394](https://github.com/2026-2-rising-sun/Backend/pull/394), [사용자 환불 #395](https://github.com/2026-2-rising-sun/Backend/pull/395), [시스템 보상 #396](https://github.com/2026-2-rising-sun/Backend/pull/396)이 후속 변경이다. Core가 먼저 구·신 승인 토픽을 모두 구독하면 Payment가 승인 발행 토픽을 전환할 수 있다.

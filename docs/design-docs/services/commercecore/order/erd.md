@@ -12,7 +12,7 @@
 | payment_group | orders | 불변 SKU/상품/판매자/수량/가격/할인/Cart출처. 항목별 PAID·PARTIALLY_REFUNDED·REFUNDED (이전 정책 행만 CANCEL_PENDING 가능) |
 | payment_group | seller_order | 판매자별 생성 당시 실결제액·수수료율·외부 판매자주문번호 |
 | payment_group | order_payment_relay | 원결제ID·결제창·별도 승인 사실·approval_send_started_at. 송신 시작/보상을 같은 그룹 잠금으로 정렬하며 HTTP 동안 잠금 유지 없음. 주문 종료 뒤에도 승인 사실 보존 |
-| payment_group | payment_delivery_request | 기존 PREPARE/APPROVAL HTTP 원문. 신규 환불 HTTP 전달은 만들지 않음 |
+| payment_group | payment_delivery_request | 기존 PREPARE/APPROVAL HTTP 원문. V119부터 승인 전달은 시도마다 1건(`uk_payment_relay_approval_key`). 신규 환불 HTTP 전달은 만들지 않음 |
 | payment_group | core_refund_intent | 고정UUID·요청 원문·purpose·상태·outcome·executionId·resultVersion·결과 원문. 시스템은 그룹당 단일행·영구 fence |
 | core_refund_intent | refund_request | USER_REFUND만 user_request_id로 연결. 회원+키·fingerprint·금액·PROCESSING/UNKNOWN/SUCCESS/FAILED |
 | refund_request | refund_target_order | 주문별 요청 quantity·refund_amount·previous_status·상품/판매자 스냅샷. 기존 PK(request,order) 보존 |
@@ -32,4 +32,4 @@ V104의 정책·스냅샷·대상수량·쿠폰출처, V105의 별도 처리기�
 
 ## 시스템 보상 상태 이행
 
-V116은 orders/payment_group의 CHECK에 COMPENSATION_PENDING을 추가하고 활성 회원 유일성에도 포함한다. 첫 처리 시작600초 무응답 또는 명시적UNKNOWN에서 그룹·항목 상태와 SYSTEM_COMPENSATION 원문/Outbox를 한 TX로 기록한다. 검증된 완료 결과에서만 CANCELLED와 예약 단일해제를 확정한다. V115 원문·ID를 보존하며 기적용 미완료 보상만 대기로 이행한다. 이미 종료한 과거 주문은 유지한다. 실패 보상은 대기 상태이며 같은 요청/실행·더 높은 resultVersion 완료를 허용한다.
+V116은 orders/payment_group의 CHECK에 COMPENSATION_PENDING을 추가하고 활성 회원 유일성에도 포함했다(V117에서 보상 대기는 이 유일성에서 다시 뺐다). 당시에는 첫 처리 시작600초 무응답 또는 명시적UNKNOWN에서 보상 대기로 바꾸고 완료 결과에서 예약을 풀었다. 지금은 승인 시도의 처리 기한에 닿을 때만 그룹·항목 상태와 SYSTEM_COMPENSATION 원문/Outbox를 한 TX로 기록하고, 같은 TX에서 예약을 한 번 해제한다(V118 `compensation_released_at`). 보상 완료(SUCCEEDED·NO_CHARGE)에서 CANCELLED로 확정한다. V115 원문·ID를 보존하며 기적용 미완료 보상만 대기로 이행한다. 이미 종료한 과거 주문은 유지한다. 실패 보상은 대기 상태이며 같은 요청/실행·더 높은 resultVersion 완료를 허용한다.

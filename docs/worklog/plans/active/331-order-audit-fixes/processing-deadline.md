@@ -1,5 +1,7 @@
 # Order 별도600초 기한과 팀원 Payment 연동
 
+> 과거 기준(#331). 처리 기한(승인 시도마다 600초), 거절 뒤 결제 대기 복귀, 보상 요청 ID(UUID)·`core_refund_intent` 등 현재 동작은 [주문·결제 흐름](../../../../design-docs/flows/order-payment.md)과 [환불 흐름](../../../../design-docs/flows/refund.md)을 따른다. 아래 본문은 당시 기록이다.
+
 상태: 진행 중. Core 구현·계약 대역 검증을 제공하고 실제 환불 통합과 운영 이행은 미완이다. 사용자는 CommerceCore 한정 dev 병합을 승인했다. PR Draft/ready·실제 병합은 코디네이터가 수행하며 SDK/Frontend/Payment 전체 완료를 이번 Core 병합 조건으로 확대하지 않는다. 배포 완료를 뜻하지 않는다.
 
 ## 현재 제공

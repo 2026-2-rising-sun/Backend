@@ -37,7 +37,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
   - 분개([LED-REFUND-01](ledger.md))
   - `RefundResultRecorded`(SUCCEEDED, `refundedAmount` = 요청 금액)
 - [x] **REF-EXEC-03** 이전 호출 없는 첫 호출을 토스가 거절(4xx)하면 FAILED와 `RefundResultRecorded`(FAILED, `refundedAmount` 0)를 기록한다. (EC 42)
-- [x] **REF-EXEC-04** 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다. 토스가 `ALREADY_REFUNDING_PAYMENT`(앞선 취소 진행 중)로 답하면 FAILED가 아니라 불명이다(#401). 앞선 환불이 UNKNOWN이어도 뒤 환불의 취소는 나가고, 미확정 금액은 한도에 포함한다.
+- [x] **REF-EXEC-04** 결과를 모르면 환불을 UNKNOWN으로 둔다. UNKNOWN 결과는 보내지 않는다. 결제 조회로 취소 내역을 확인하고, 없으면 같은 멱등 키로 다시 요청한다. 조회 마감이 지나면 멈추고 대사가 맡는다. 토스가 `ALREADY_REFUNDING_PAYMENT`(앞선 취소 진행 중)로 답하면 FAILED가 아니라 불명이다(#401). 앞선 환불이 UNKNOWN이어도 뒤 환불의 취소는 나가고, 미확정 금액은 한도에 포함한다. 고객 전액 환불에 토스가 PARTIAL_CANCELED로 답해도 바로 확정하거나 보류하지 않고, REF-EXEC-06의 24시간 상한까지 재시도한 뒤 사람 확인으로 넘긴다.
 - [x] **REF-EXEC-05** 쿠폰 등으로 실결제액이 0원인 항목의 고객 환불은 정상 요청이다. 전체 `amount`가 0이면 결제 상태만 확인하고(APPROVED·PARTIALLY_REFUNDED·REFUNDED가 아니면 FAILED `NOT_REFUNDABLE`), 토스 호출·분개·결제 변경 없이 SUCCEEDED(`refundedAmount` 0, 거래 키 없음)를 기록한다. 금액이 있는 요청의 0원 판매자 줄은 판매자 주문·누적 한도 검증과 `refund_item`에서 뺀다.
 - [x] **REF-EXEC-06** 인프라·PG 장애(429, 401, 설정성 403, 5xx, 타임아웃, 연결 실패)로는 고객 환불을 FAILED로 끝내지 않고 결과도 보내지 않는다. Core 주문은 환불 처리중으로 남는다. FAILED는 돈이 움직이지 않은 것이 확정된 경우, 즉 토스 호출 전 검증 실패와 이전 호출이 없는 첫 호출의 명확한 거절만이다.
   - HTTP 응답을 받은 NotSent는 토스에 도달했으므로 UNKNOWN을 유지해 한도를 잡고, 조회에 취소 내역이 없으면 같은 멱등 키·같은 본문으로 다시 요청한다. 응답이 없는 연결 실패만 PROCESSING으로 돌아갈 수 있다.
@@ -46,7 +46,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 
 ## 시스템 보상과 늦은 승인
 
-- [x] **REF-LATE-01** `SYSTEM_COMPENSATION` 요청(사유 `LATE_APPROVAL`·`APPROVAL_UNKNOWN` 등)을 받으면 결제 전액 환불을 접수한다. 늦은 승인의 refundRequestId는 `late-{paymentId}`다. 중복 수신은 1건이다. (EC 28, 37)
+- [x] **REF-LATE-01** `SYSTEM_COMPENSATION` 요청(사유 `LATE_APPROVAL`·`APPROVAL_UNKNOWN` 등)을 받으면 결제 전액 환불을 접수한다. refundRequestId는 Commerce가 만든 UUID이고, 주문당 보상 1건은 Commerce가 보상 fence로 지킨다. Payment는 같은 ID 중복 수신을 1건으로 처리한다. 토스 취소의 Idempotency-Key는 `cancel-{pg_order_id}`(그 결제의 마지막 승인 시도 결제창 ID)라 승인 응답 불일치 보상과 같은 요청이 된다. (EC 28, 37)
 - [x] **REF-LATE-02** 시스템 보상의 FAILED 뒤에 더 높은 `resultVersion`으로 SUCCEEDED·NO_CHARGE를 보낼 수 있다. 결제가 승인되지 않아 돌려줄 돈이 없으면 NO_CHARGE(`failureCode: NO_CHARGE`, `refundedAmount` 0)다. USER_REFUND에는 NO_CHARGE를 쓰지 않는다.
 - 시스템 보상의 결제 상태별·토스 조회 결과별 처리는 [#386](https://github.com/2026-2-rising-sun/Backend/issues/386)의 표를 따른다. 표 밖 경우는 다음과 같다.
   - 요청 금액이 결제 금액과 다르면 결제 상태를 보기 전에 토스 호출 없이 FAILED(`PAYMENT_MISMATCH`, `refundedAmount` 0)로 답한다.
@@ -63,7 +63,7 @@ Payment가 승인된 환불과 시스템 보상을 실행하는 기준이다. �
 
 ## 결과 이벤트
 
-- [ ] **REF-EVENT-01** `RefundResultRecorded`는 상태 변경과 같은 트랜잭션에 공통 outbox로 기록하고, `payment.refund.results.v1`에 orderRef 키로 보낸다. payload는 받은 요청 payload 그대로에 다음 7개 필드를 더한 것이다.
+- [x] **REF-EVENT-01** `RefundResultRecorded`는 상태 변경과 같은 트랜잭션에 공통 outbox로 기록하고, `payment.refund.results.v1`에 orderRef 키로 보낸다. payload는 받은 요청 payload 그대로에 다음 7개 필드를 더한 것이다.
   - `executionId`
   - `resultVersion`: 요청마다 1부터 시작해 결과를 새로 기록할 때마다 1씩 오른다
   - `status`: SUCCEEDED·FAILED·NO_CHARGE
