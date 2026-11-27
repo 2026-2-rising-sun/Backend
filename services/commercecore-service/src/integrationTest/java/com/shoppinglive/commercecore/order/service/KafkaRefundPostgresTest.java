@@ -885,11 +885,23 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
     }
 
     @Test
-    @DisplayName("정상 결제 거절의 기존 알림은 REJECTED 사유로 한 번 유지한다")
-    void normalDeclineAndUserRefundKeepNotifications() throws Exception {
+    @DisplayName("승인 거절은 재결제 대상이라 결제 실패 알림을 보내지 않고, 전액 취소 종료만 REJECTED 알림을 한 번 보낸다")
+    void declineDoesNotNotifyButCancellationDoes() throws Exception {
         String n = prepare(false);
         var delivery = accept(n);
         relay.declined(delivery, Map.of("status", "DECLINED"));
+        assertThat(state(n)).isEqualTo("PENDING_PAYMENT");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentFailed'",
+                                Long.class))
+                .isZero();
+        lifecycle.cancel(MEMBER_A, n);
+        String c = prepare(false, PAYMENT + 1);
+        var canceled = accept(c);
+        relay.canceled(canceled, Map.of("status", "CANCELED"));
+        relay.canceled(canceled, Map.of("status", "CANCELED"));
+        assertThat(state(c)).isEqualTo("FAILED");
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentFailed'",
@@ -1515,6 +1527,25 @@ class KafkaRefundPostgresTest extends OrderSheetPostgresSupport {
         assertThat(reserved(501)).isZero();
         assertThat(available(501)).isEqualTo(20);
         assertThat(couponStatus()).isEqualTo("AVAILABLE");
+    }
+
+    @Test
+    @DisplayName("보상 대기 중 승인 거절이 확정돼도 보상 대기를 유지하고 예약을 다시 잡거나 결제 실패 알림을 보내지 않는다")
+    void declineDuringCompensationKeepsCompensation() {
+        String n = prepare(true);
+        var delivery = accept(n);
+        compensate(delivery);
+        relay.declined(delivery, Map.of("status", "DECLINED"));
+        assertThat(state(n)).isEqualTo("COMPENSATION_PENDING");
+        assertThat(intents.compensation(id(n)).status()).isEqualTo("REQUESTED");
+        assertThat(reserved(501)).isZero();
+        assertThat(available(501)).isEqualTo(20);
+        assertThat(couponStatus()).isEqualTo("AVAILABLE");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM event_outbox WHERE event_type='PaymentFailed'",
+                                Long.class))
+                .isZero();
     }
 
     @Test

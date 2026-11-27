@@ -75,12 +75,20 @@ public class PaymentDeliveryStore {
             Object command) {
         if (!"PREPARE".equals(kind) && !"APPROVAL".equals(kind))
             throw new IllegalArgumentException("지원하지 않는 중계 종류입니다.");
+        // 승인은 시도마다 한 건이다. 같은 키는 그 시도를, 다른 키는 진행 중이거나 성공한 시도를 가리킨다.
         var existing =
-                jdbc.queryForList(
-                        "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=?",
-                        String.class,
-                        groupId,
-                        kind);
+                "APPROVAL".equals(kind)
+                        ? jdbc.queryForList(
+                                "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind='APPROVAL' AND (request_key=? OR status<>'FAILED') ORDER BY (request_key=?) DESC, id DESC",
+                                String.class,
+                                groupId,
+                                key,
+                                key)
+                        : jdbc.queryForList(
+                                "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=?",
+                                String.class,
+                                groupId,
+                                kind);
         if (!existing.isEmpty()) {
             Delivery prior = get(existing.getFirst());
             String priorKey =
@@ -90,7 +98,13 @@ public class PaymentDeliveryStore {
                             prior.id());
             if (!Objects.equals(key, priorKey)
                     || !Objects.equals(readTree(json(command)), readTree(prior.command())))
-                throw new BusinessException(ErrorCode.CONFLICT, "기존 중계 요청과 입력이 다릅니다.");
+                throw new BusinessException(
+                        ErrorCode.CONFLICT,
+                        "APPROVAL".equals(kind)
+                                        && Objects.equals(key, priorKey)
+                                        && "FAILED".equals(prior.status())
+                                ? "거절된 승인 시도의 키입니다. 재결제는 새 X-Idempotency-Key로 요청해 주세요."
+                                : "기존 중계 요청과 입력이 다릅니다.");
             return prior;
         }
         String requestId = UUID.randomUUID().toString();
@@ -110,10 +124,20 @@ public class PaymentDeliveryStore {
         return get(requestId);
     }
 
+    public boolean approvalKeyUsed(long groupId, String key) {
+        return jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM payment_delivery_request WHERE payment_group_id=? AND kind='APPROVAL' AND request_key=?",
+                        Long.class,
+                        groupId,
+                        key)
+                > 0;
+    }
+
+    /** 가장 최근 시도를 돌려준다. 승인은 거절된 이전 시도가 남을 수 있다. */
     public Delivery relay(Long groupId, String kind) {
         var ids =
                 jdbc.queryForList(
-                        "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=?",
+                        "SELECT request_id FROM payment_delivery_request WHERE payment_group_id=? AND kind=? ORDER BY id DESC LIMIT 1",
                         String.class,
                         groupId,
                         kind);

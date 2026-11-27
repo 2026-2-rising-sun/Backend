@@ -114,8 +114,16 @@ public class PaymentRelayStore {
     @Transactional(propagation = Propagation.MANDATORY)
     public void checkout(long groupId, String pgOrderId) {
         jdbc.update(
-                "UPDATE order_payment_relay SET pg_order_id=? WHERE payment_group_id=? AND approved_at IS NULL",
+                "UPDATE order_payment_relay SET pg_order_id=?,payment_status='CREATED' WHERE payment_group_id=? AND approved_at IS NULL",
                 pgOrderId,
+                groupId);
+    }
+
+    /** 거절된 시도의 결제창을 닫는다. 같은 인증 결과로 다시 승인하지 못하게 하고 다음 시도가 새 결제창을 열게 한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void declined(long groupId) {
+        jdbc.update(
+                "UPDATE order_payment_relay SET payment_status='DECLINED',pg_order_id=NULL,approval_send_started_at=NULL WHERE payment_group_id=? AND approved_at IS NULL",
                 groupId);
     }
 
