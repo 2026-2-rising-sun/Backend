@@ -164,8 +164,8 @@
 <td>돈이 잡힌 채 CANCELED일 수 있다. 거래 대사를 만들기 전까지는 오류 로그로 수동 확인</td>
 </tr>
 <tr>
-<td>토스 401·429와 설정 403 2개 코드는 "보내지 않음"(CREATED 유지, 503)으로 본다. 그 밖의 403은 거절</td>
-<td>우리 키 설정 문제나 호출 제한은 카드 거절이 아니다. 카드 거절 대부분이 403이라 상태 코드만으로 나누면 안 된다(토스 오류 코드 문서, 2026-11-15 확인)</td>
+<td>토스 401과 설정 403 2개 코드는 "보내지 않음"(CREATED 유지, 503)으로 본다. 429(호출 제한)는 "불명"(UNKNOWN 유지, 조회로 확정)이다. 그 밖의 403은 거절</td>
+<td>우리 키 설정 문제는 카드 거절이 아니다. 429는 토스가 처리했는지 알 수 없어 "보내지 않음"으로 보면 다시 결제할 때 이중 청구·미환불이 생길 수 있다(정정 2026-11-24, #398, <a href="../../../../design-docs/services/payment/requirements/payment.html">PAY-PG-01</a>). 카드 거절 대부분이 403이라 상태 코드만으로 나누면 안 된다(토스 오류 코드 문서, 2026-11-15 확인)</td>
 <td>원본 <code>#f4</code>는 4xx를 모두 거절로 본다. 토스가 코드를 늘리면 분류표를 고친다</td>
 </tr>
 <tr>
@@ -209,6 +209,6 @@
 <td>운영 후 조정</td>
 </tr>
 </tbody>
-</table></div><p class="muted fingerprint">MD SHA-256: <code>fb8ae0ad1f3ca9f2769362edfbf17e3cae8fc360e7e0ff816eceb441e9afe702</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
+</table></div><p class="muted fingerprint">MD SHA-256: <code>a1f881a6e84888a3427ec5ee1be22b424a45685c82f8f2850cf0f6b1e332a764</code></p><footer>설명과 실행 근거는 구분합니다. 실제 검증 결과는 연결된 워크로그에서 확인하세요.</footer></main></div><script>
 document.querySelectorAll('.graph').forEach(graph=>{let scale=1;const svg=graph.querySelector('svg');graph.querySelectorAll('[data-zoom]').forEach(button=>button.addEventListener('click',()=>{scale=button.dataset.zoom==='fit'?1:Math.max(.5,Math.min(3,scale+(button.dataset.zoom==='in'?.25:-.25)));svg.style.width=`${scale*100}%`;}));});
 </script></body></html>
